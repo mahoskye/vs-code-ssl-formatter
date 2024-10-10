@@ -1,0 +1,64 @@
+{
+    "name": "vs-code-ssl-formatter",
+    "displayName": "STARLIMS Scripting Language Formatter",
+    "description": "Syntax highlighting and folding for STARLIMS Scripting Language (SSL)",
+    "version": "0.1.0",
+    "engines": {
+        "vscode": "^1.94.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "publisher": "mahoskye",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/mahoskye/vs-code-ssl-formatter.git"
+    },
+    "bugs": {
+        "url": "https://github.com/mahoskye/vs-code-ssl-formatter/issues"
+    },
+    "homepage": "https://github.com/mahoskye/vs-code-ssl-formatter#readme",
+    "contributes": {
+        "languages": [
+            {
+                "id": "ssl",
+                "aliases": [
+                    "STARLIMS Scripting Language",
+                    "ssl"
+                ],
+                "extensions": [
+                    ".ssl",
+                    ".ssl.txt"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "ssl",
+                "scopeName": "source.ssl",
+                "path": "./syntaxes/ssl.tmLanguage.json"
+            }
+        ]
+    },
+    "main": "./out/extension.js",
+    "activationEvents": [
+        "onLanguage:ssl"
+    ],
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/vscode": "^1.94.0",
+        "@types/node": "^22.7.5",
+        "@typescript-eslint/eslint-plugin": "^5.59.1",
+        "@typescript-eslint/parser": "^5.59.1",
+        "eslint": "^8.39.0",
+        "typescript": "^5.6.3"
+    }
+}

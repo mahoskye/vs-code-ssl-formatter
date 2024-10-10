@@ -1,0 +1,32 @@
+{
+    "comments": {
+        "blockComment": ["/*", ";"]
+    },
+    "brackets": [
+        ["{", "}"],
+        ["[", "]"],
+        ["(", ")"]
+    ],
+    "autoClosingPairs": [
+        { "open": "{", "close": "}" },
+        { "open": "[", "close": "]" },
+        { "open": "(", "close": ")" },
+        { "open": "\"", "close": "\"", "notIn": ["string"] },
+        { "open": "'", "close": "'", "notIn": ["string"] },
+        { "open": "`", "close": "`", "notIn": ["string"] },
+        { "open": "/*", "close": ";", "notIn": ["string"] }
+    ],
+    "surroundingPairs": [
+        ["{", "}"],
+        ["[", "]"],
+        ["(", ")"],
+        ["\"", "\""],
+        ["'", "'"]
+    ],
+    "folding": {
+        "markers": {
+            "start": "^\\s*(:REGION|/\\*region|:PROCEDURE|:IF|:WHILE|:FOR|:BEGINCASE|:CLASS|:TRY)\\b",
+            "end": "^\\s*(:ENDREGION|/\\*endregion|:ENDPROC|:ENDIF|:ENDWHILE|:NEXT|:ENDCASE|:ENDTRY)\\b"
+        }
+    }
+}
