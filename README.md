@@ -6,7 +6,7 @@ This Visual Studio Code extension provides syntax highlighting and folding for S
 
 -   Syntax highlighting for SSL files
 -   Code folding for SSL-specific constructs
--   Special highlighting for `/*region` folds in the minimap
+-   Special highlighting for folds in the minimap
 
 ## Installation
 
