@@ -42,12 +42,20 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
                 inComment = false;
                 continue;
             }
-            if (inComment) continue;
+            if (inComment) {
+                continue;
+            }
 
             // Ignore content within strings
-            if ((line.match(/"/g) || []).length % 2 !== 0) inString = !inString;
-            if ((line.match(/'/g) || []).length % 2 !== 0) inString = !inString;
-            if (inString) continue;
+            if ((line.match(/"/g) || []).length % 2 !== 0) {
+                inString = !inString;
+            }
+            if ((line.match(/'/g) || []).length % 2 !== 0) {
+                inString = !inString;
+            }
+            if (inString) {
+                continue;
+            }
 
             const trimmedLine = line.trim().toLowerCase();
 
