@@ -1,13 +1,21 @@
 {
     "name": "vs-code-ssl-formatter",
     "displayName": "STARLIMS Scripting Language Formatter",
-    "description": "Syntax highlighting and folding for STARLIMS Scripting Language (SSL)",
-    "version": "0.1.0",
+    "description": "Syntax highlighting, folding, and auto-completion for STARLIMS Scripting Language (SSL)",
+    "version": "0.2.0",
     "engines": {
         "vscode": "^1.94.0"
     },
     "categories": [
-        "Programming Languages"
+        "Programming Languages",
+        "Snippets"
+    ],
+    "keywords": [
+        "ssl",
+        "starlims",
+        "formatter",
+        "syntax",
+        "highlighting"
     ],
     "publisher": "mahoskye",
     "repository": {
@@ -39,12 +47,34 @@
                 "scopeName": "source.ssl",
                 "path": "./syntaxes/ssl.tmLanguage.json"
             }
+        ],
+        "configuration": [
+            {
+                "title": "SSL Formatter",
+                "properties": {
+                    "sslFormatter.completions": {
+                        "type": "array",
+                        "default": [
+                            {
+                                "label": "exampleFunction()",
+                                "kind": "function",
+                                "detail": "This is a demonstration function",
+                                "documentation": "This function is used for demonstration purposes."
+                            }
+                        ],
+                        "description": "Custom completions for SSL"
+                    }
+                }
+            }
+        ],
+        "commands": [
+            {
+                "command": "sslFormatter.reloadCompletions",
+                "title": "Reload SSL Completions"
+            }
         ]
     },
-    "main": "./out/extension.js",
-    "activationEvents": [
-        "onLanguage:ssl"
-    ],
+    "main": "./out/src/extension.js",
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",

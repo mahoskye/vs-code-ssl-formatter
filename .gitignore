@@ -1,6 +1,11 @@
+# Private Config
+config.private.json
+config/config.private.json
+
 # Compiled output
 out/
 dist/
+filetree.txt
 
 # Dependencies
 node_modules/

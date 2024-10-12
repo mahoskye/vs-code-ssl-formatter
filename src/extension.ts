@@ -1,26 +1,34 @@
 import * as vscode from "vscode";
 import { SSLFoldingProvider } from "./sslFoldingProvider";
+import { SSLCompletionProvider } from "./sslCompletionProvider";
 
 /**
- * Activates the SSL extension.
  * This function is called when the extension is activated.
- * The extension is activated the first time the command is executed.
- * @param context The extension context provided by VS Code.
+ * It sets up the SSL language support.
  */
 export function activate(context: vscode.ExtensionContext) {
-    console.log("SSL extension is now active!");
+    // Define the document selector for SSL files
+    const selector = { scheme: "file", language: "ssl" };
 
-    // Register the folding range provider for SSL language
-    context.subscriptions.push(
-        vscode.languages.registerFoldingRangeProvider({ language: "ssl" }, new SSLFoldingProvider())
-    );
+    // Register the folding range provider
+    const sslFoldingProvider = new SSLFoldingProvider();
+    const foldingProvider = vscode.languages.registerFoldingRangeProvider(selector, sslFoldingProvider);
+
+    // Register the completion item provider
+    const sslCompletionProvider = new SSLCompletionProvider();
+    const completionProvider = vscode.languages.registerCompletionItemProvider(selector, sslCompletionProvider);
+
+    // Register the command to reload completion items
+    const reloadCommand = vscode.commands.registerCommand("sslFormatter.reloadCompletions", () => {
+        sslCompletionProvider.loadCompletionItems();
+        vscode.window.showInformationMessage("SSL completion items reloaded.");
+    });
+
+    // Add all providers and commands to the extension's subscriptions
+    context.subscriptions.push(foldingProvider, completionProvider, reloadCommand);
 }
 
 /**
- * Deactivates the SSL extension.
  * This function is called when the extension is deactivated.
- * Use this to clean up your extension resources.
  */
-export function deactivate() {
-    // Currently, no cleanup is necessary
-}
+export function deactivate() {}

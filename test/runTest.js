@@ -14,17 +14,18 @@ const vscode_test_1 = require("vscode-test");
 function main() {
     return __awaiter(this, void 0, void 0, function* () {
         try {
-            // The folder containing the Extension Manifest package.json
-            // Passed to `--extensionDevelopmentPath`
             const extensionDevelopmentPath = path.resolve(__dirname, "../../");
-            // The path to the extension test runner script
-            // Passed to --extensionTestsPath
             const extensionTestsPath = path.resolve(__dirname, "./suite/index");
-            // Download VS Code, unzip it and run the integration test
-            yield (0, vscode_test_1.runTests)({ extensionDevelopmentPath, extensionTestsPath });
+            // Specify the path to the extracted VS Code folder
+            const vscodeExecutablePath = "C:\\Misc\\VSCode-win32-x64-1.94.2\\Code.exe";
+            yield (0, vscode_test_1.runTests)({
+                extensionDevelopmentPath,
+                extensionTestsPath,
+                vscodeExecutablePath,
+            });
         }
         catch (err) {
-            console.error("Failed to run tests");
+            console.error("Failed to run tests", err);
             process.exit(1);
         }
     });
