@@ -1,6 +1,16 @@
 import * as vscode from "vscode";
 
+/**
+ * Provides folding ranges for SSL files.
+ */
 export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
+    /**
+     * Calculates folding ranges for the given document.
+     * @param document The document to provide folding ranges for.
+     * @param context The folding context.
+     * @param token A cancellation token.
+     * @returns An array of folding ranges.
+     */
     public provideFoldingRanges(
         document: vscode.TextDocument,
         context: vscode.FoldingContext,
@@ -76,6 +86,7 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
                 }
             }
 
+            // Check for cancellation request
             if (token.isCancellationRequested) {
                 return foldingRanges;
             }
