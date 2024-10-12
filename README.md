@@ -2,6 +2,12 @@
 
 This Visual Studio Code extension provides syntax highlighting, folding, and auto-completion for STARLIMS Scripting Language (SSL).
 
+## Disclaimer
+
+This extension is unofficial and not affiliated with or endorsed by Abbott Informatics or any of its subsidiaries. It is provided "as is" without warranty of any kind, express or implied. Use at your own risk.
+
+STARLIMS® is a registered trademark of Abbott Informatics Corporation. This extension is an independent project created to enhance the development experience for STARLIMS users and is not officially associated with STARLIMS or Abbott Informatics products.
+
 ## Features
 
 -   Syntax highlighting for SSL files
