@@ -53,15 +53,36 @@
                 "title": "SSL Formatter",
                 "properties": {
                     "sslFormatter.completions": {
-                        "type": "array",
-                        "default": [
-                            {
-                                "label": "exampleFunction()",
-                                "kind": "function",
-                                "detail": "This is a demonstration function",
-                                "documentation": "This function is used for demonstration purposes."
-                            }
-                        ],
+                        "type": "object",
+                        "default": {
+                            "Array Functions": [],
+                            "Database Functions": [],
+                            "Runtime Functions to Get/Return a DATASET": [],
+                            "Data Type Functions": [],
+                            "Date Functions": [],
+                            "E-mail Functions": [],
+                            "File Manipulation Functions": [],
+                            "FTP Functions": [],
+                            "Logical Functions": [],
+                            "Miscellaneous Functions": [
+                                {
+                                    "label": "exampleFunction()",
+                                    "kind": "function",
+                                    "detail": "This is a demonstration function",
+                                    "documentation": "This function is used for demonstration purposes."
+                                }
+                            ],
+                            "Numeric Functions": [],
+                            "Process Functions": [],
+                            "Security Functions": [],
+                            "Serial Communications Functions": [],
+                            "String Functions": [],
+                            "Statements": [],
+                            "UDP Functions": [],
+                            "Internal Functions": [],
+                            "Error Handling": [],
+                            "Web Specific Functions": []
+                        },
                         "description": "Custom completions for SSL"
                     }
                 }

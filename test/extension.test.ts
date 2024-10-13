@@ -71,11 +71,17 @@ Some code here
             { triggerKind: vscode.CompletionTriggerKind.Invoke, triggerCharacter: undefined }
         );
 
-        // Simulate adding a new completion item via settings
-        await vscode.workspace.getConfiguration("sslFormatter").update(
-            "completions",
-            [
-                ...((vscode.workspace.getConfiguration("sslFormatter").get("completions") as any[]) || []),
+        // Ensure completions is an object with arrays as values (grouped by categories)
+        const completions = vscode.workspace.getConfiguration("sslFormatter").get<any>("completions", {});
+        if (typeof completions !== "object" || completions === null) {
+            throw new Error("Completions configuration is not an object.");
+        }
+
+        // Simulate adding a new completion item under a category
+        const updatedCompletions = {
+            ...completions,
+            "Miscellaneous Functions": [
+                ...(completions["Miscellaneous Functions"] || []),
                 {
                     label: "newTestFunction()",
                     kind: "function",
@@ -83,8 +89,11 @@ Some code here
                     documentation: "This function was added for testing purposes.",
                 },
             ],
-            vscode.ConfigurationTarget.Global
-        );
+        };
+
+        await vscode.workspace
+            .getConfiguration("sslFormatter")
+            .update("completions", updatedCompletions, vscode.ConfigurationTarget.Global);
 
         // Trigger the reload command
         await vscode.commands.executeCommand("sslFormatter.reloadCompletions");
@@ -107,12 +116,22 @@ Some code here
         assert.ok(newFunction, "Should include the newly added function");
 
         // Clean up: remove the added completion item
-        const currentCompletions =
-            (vscode.workspace.getConfiguration("sslFormatter").get("completions") as any[]) || [];
-        await vscode.workspace.getConfiguration("sslFormatter").update(
-            "completions",
-            currentCompletions.filter((item) => item.label !== "newTestFunction()"),
-            vscode.ConfigurationTarget.Global
-        );
+        const currentCompletions = vscode.workspace.getConfiguration("sslFormatter").get<any>("completions", {});
+        const cleanedUpCompletions = {
+            ...currentCompletions,
+            "Miscellaneous Functions": (currentCompletions["Miscellaneous Functions"] || []).filter(
+                (item: any) => item.label !== "newTestFunction()"
+            ),
+        };
+
+        await vscode.workspace
+            .getConfiguration("sslFormatter")
+            .update("completions", cleanedUpCompletions, vscode.ConfigurationTarget.Global);
     });
 });
+interface CompletionItem {
+    label: string;
+    kind: string;
+    detail: string;
+    documentation: string;
+}

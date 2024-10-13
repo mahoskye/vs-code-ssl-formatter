@@ -40,8 +40,17 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
      */
     public loadCompletionItems() {
         const config = vscode.workspace.getConfiguration("sslFormatter");
-        const userCompletions = config.get<any[]>("completions", []);
-        this.completionItems = userCompletions.map((item) => this.createCompletionItem(item));
+        const userCompletions = config.get<any>("completions", {});
+        this.completionItems = [];
+
+        for (const category in userCompletions) {
+            const items = userCompletions[category];
+            if (Array.isArray(items)) {
+                items.forEach((item: any) => {
+                    this.completionItems.push(this.createCompletionItem(item));
+                });
+            }
+        }
     }
 
     /**
