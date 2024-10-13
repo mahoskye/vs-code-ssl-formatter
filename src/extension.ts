@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { SSLFoldingProvider } from "./sslFoldingProvider";
 import { SSLCompletionProvider } from "./sslCompletionProvider";
+import { SSLHoverProvider } from "./sslHoverProvider";
 
 /**
  * This function is called when the extension is activated.
@@ -18,6 +19,10 @@ export function activate(context: vscode.ExtensionContext) {
     const sslCompletionProvider = new SSLCompletionProvider();
     const completionProvider = vscode.languages.registerCompletionItemProvider(selector, sslCompletionProvider);
 
+    // Register the hover provider
+    const sslHoverProvider = new SSLHoverProvider();
+    const hoverProvider = vscode.languages.registerHoverProvider(selector, sslHoverProvider);
+
     // Register the command to reload completion items
     const reloadCommand = vscode.commands.registerCommand("sslFormatter.reloadCompletions", () => {
         sslCompletionProvider.loadCompletionItems();
@@ -25,7 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     // Add all providers and commands to the extension's subscriptions
-    context.subscriptions.push(foldingProvider, completionProvider, reloadCommand);
+    context.subscriptions.push(foldingProvider, completionProvider, hoverProvider, reloadCommand);
 }
 
 /**

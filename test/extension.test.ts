@@ -2,6 +2,7 @@ import * as assert from "assert";
 import * as vscode from "vscode";
 import { SSLFoldingProvider } from "../src/sslFoldingProvider";
 import { SSLCompletionProvider } from "../src/sslCompletionProvider";
+import { SSLHoverProvider } from "../src/sslHoverProvider";
 
 suite("SSL Extension Test Suite", () => {
     vscode.window.showInformationMessage("Start all tests.");
@@ -127,6 +128,31 @@ Some code here
         await vscode.workspace
             .getConfiguration("sslFormatter")
             .update("completions", cleanedUpCompletions, vscode.ConfigurationTarget.Global);
+    });
+
+    test("Hover shows documentation for function names with and without parentheses", async () => {
+        const hoverProvider = new SSLHoverProvider();
+
+        // Create a mock document and position to simulate hover
+        const testDocument = await vscode.workspace.openTextDocument({ content: "exampleFunction()" });
+        const position = new vscode.Position(0, 0); // Hover at the beginning of the line
+
+        // Get hover result
+        const hover = await hoverProvider.provideHover(
+            testDocument,
+            position,
+            new vscode.CancellationTokenSource().token
+        );
+
+        // Assert that the hover result contains the correct documentation
+        assert.ok(hover, "Hover result should be defined");
+
+        // Assuming "This function is used for demonstration purposes." is the expected documentation
+        const hoverContent = (hover.contents[0] as vscode.MarkdownString).value;
+        assert.ok(
+            hoverContent.includes("This function is used for demonstration purposes."),
+            "Hover content should contain the expected documentation"
+        );
     });
 });
 interface CompletionItem {
