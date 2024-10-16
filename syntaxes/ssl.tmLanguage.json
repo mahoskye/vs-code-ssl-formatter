@@ -6,7 +6,6 @@
         { "include": "#strings" },
         { "include": "#comments" },
         { "include": "#functions" },
-        { "include": "#builtInFunctions" },
         { "include": "#arrays" },
         { "include": "#variables" },
         { "include": "#operators" },
@@ -19,7 +18,7 @@
             "patterns": [
                 {
                     "name": "keyword.control.ssl",
-                    "match": "(?<!\\w)(:IF|:ELSE|:ENDIF|:WHILE|:ENDWHILE|:FOR|:NEXT|:BEGINCASE|:CASE|:ENDCASE|:RETURN|:INCLUDE|:DECLARE|:PARAMETERS|:PROCEDURE|:ENDPROC|:PUBLIC|:LOOP|:EXITLOOP|:LABEL|:REGION|:ENDREGION|:CLASS|:INHERIT|:ERROR|:RESUME)\\b"
+                    "match": "(?<!\\w)(:IF|:ELSE|:ENDIF|:WHILE|:ENDWHILE|:EXITWHILE|:FOR|:NEXT|:BEGINCASE|:CASE|:ENDCASE|:RETURN|:INCLUDE|:DECLARE|:PARAMETERS|:PROCEDURE|:ENDPROC|:PUBLIC|:LOOP|:EXITLOOP|:LABEL|:REGION|:ENDREGION|:CLASS|:INHERIT|:ERROR|:RESUME|:OTHERWISE|:DEFAULT)\\b"
                 }
             ]
         },
@@ -56,14 +55,6 @@
                 {
                     "name": "support.function.ssl",
                     "match": "(?i)\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\("
-                }
-            ]
-        },
-        "builtInFunctions": {
-            "patterns": [
-                {
-                    "name": "support.function.builtin.ssl",
-                    "match": "(?i)\\b(SqlExecute|ExtractCol|BuildString|DoProc|ExecFunction|LimsOleConnect|EndLimsOleConnect|CreateUdObject|GetRegion|ExecUdf|GetInlineCode|DeleteInlineCode|eval|ArrayNew|AScan|LimsTypeEx|Len|Chr|Empty|Today|LimsString|Aadd|BuildStringForIn|BuildArray|BuildArray2|BuildArraySQL|CompArray|DelArray|SortArray)\\b"
                 }
             ]
         },

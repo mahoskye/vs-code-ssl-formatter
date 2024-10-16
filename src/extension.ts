@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { SSLFoldingProvider } from "./sslFoldingProvider";
 import { SSLCompletionProvider } from "./sslCompletionProvider";
 import { SSLHoverProvider } from "./sslHoverProvider";
+import { SSLFormatter } from "./sslFormatter";
 
 /**
  * This function is called when the extension is activated.
@@ -31,6 +32,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Add all providers and commands to the extension's subscriptions
     context.subscriptions.push(foldingProvider, completionProvider, hoverProvider, reloadCommand);
+
+    const formatter = new SSLFormatter();
+    context.subscriptions.push(vscode.languages.registerDocumentFormattingEditProvider("ssl", formatter));
 }
 
 /**
