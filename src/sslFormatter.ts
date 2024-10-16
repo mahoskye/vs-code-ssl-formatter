@@ -131,16 +131,24 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
             const prevLine = i > 0 ? lines[i - 1].trim() : "";
 
             // Check if we're entering or exiting a comment block
-            if (currentLine.startsWith("/*")) inCommentBlock = true;
-            if (currentLine.endsWith(";") && inCommentBlock) inCommentBlock = false;
+            if (currentLine.startsWith("/*")) {
+                inCommentBlock = true;
+            }
+            if (currentLine.endsWith(";") && inCommentBlock) {
+                inCommentBlock = false;
+            }
 
             // Add the current line
             formattedLines.push(currentLine);
 
             // Function to check if we need to add a blank line
             const needsBlankLine = () => {
-                if (currentLine === "" || nextLine === "") return false;
-                if (inCommentBlock) return false;
+                if (currentLine === "" || nextLine === "") {
+                    return false;
+                }
+                if (inCommentBlock) {
+                    return false;
+                }
                 if (
                     currentLine.startsWith(":DECLARE") ||
                     currentLine.startsWith(":PARAMETERS") ||
@@ -153,12 +161,24 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
                         !nextLine.startsWith(":DEFAULT")
                     );
                 }
-                if (currentLine.startsWith(":PROCEDURE")) return true;
-                if (nextLine.match(/^:(IF|WHILE|BEGINCASE)/i)) return true;
-                if (currentLine.match(/^:(ENDIF|ENDWHILE|ENDCASE|ENDPROC)/i)) return true;
-                if (currentLine.startsWith(":RETURN")) return true;
-                if (currentLine.startsWith("/*") && !prevLine.startsWith("/*")) return true;
-                if (currentLine.endsWith(";") && nextLine.startsWith("/*")) return true;
+                if (currentLine.startsWith(":PROCEDURE")) {
+                    return true;
+                }
+                if (nextLine.match(/^:(IF|WHILE|BEGINCASE)/i)) {
+                    return true;
+                }
+                if (currentLine.match(/^:(ENDIF|ENDWHILE|ENDCASE|ENDPROC)/i)) {
+                    return true;
+                }
+                if (currentLine.startsWith(":RETURN")) {
+                    return true;
+                }
+                if (currentLine.startsWith("/*") && !prevLine.startsWith("/*")) {
+                    return true;
+                }
+                if (currentLine.endsWith(";") && nextLine.startsWith("/*")) {
+                    return true;
+                }
                 return false;
             };
 
