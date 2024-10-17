@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 
+type LineData = { indent: number; line: string };
+
 export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
     private document!: vscode.TextDocument;
     private options!: vscode.FormattingOptions;
@@ -50,6 +52,7 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
         text = this.enforceLineSpacing(text);
         text = this.breakLongLines(text);
         text = this.adjustIndentation(text);
+        text = this.ensureSingleFinalNewline(text);
 
         // Create a single edit for the entire document
         const lastLineId = document.lineCount - 1;
@@ -57,7 +60,9 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
         const range = new vscode.Range(0, 0, lastLineId, lastLineLength);
         return [vscode.TextEdit.replace(range, text)];
     }
-
+    private ensureSingleFinalNewline(text: string): string {
+        return text.replace(/\n+$/, "\n");
+    }
     // Correct the casing of SSL keywords
     private correctKeywordCasing(text: string): string {
         const keywordRegex = new RegExp(`:(${this.keywords.join("|")})\\b`, "gi");
@@ -75,48 +80,140 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
     // Adjust the indentation of the code
     private adjustIndentation(text: string): string {
         const lines = text.split("\n");
-        let indentLevel = 0;
-        const indentStack: number[] = [];
+        const formattedLines: string[] = [];
+
+        const repeatTab = (count: number): string => "\t".repeat(count);
+
         const indentIncreaseKeywords = /^:(IF|WHILE|BEGINCASE|PROCEDURE|REGION|BEGININLINECODE)\b/i;
         const indentDecreaseKeywords = /^:(ENDIF|ENDWHILE|ENDCASE|ENDPROC|ENDINLINECODE|ENDREGION)\b/i;
         const specialCaseKeywords = /^:(CASE|OTHERWISE|ELSE)\b/i;
+        const multiLineKeywords = /^:(PARAMETERS|DECLARE|DEFAULT)\b/i;
+        const nonWhiteSpaceCharacters = /\S/;
+        const blockCommentKeyword = /^\/\*\*+/;
 
-        const formattedLines = lines.map((line, index) => {
-            const trimmedLine = line.trim();
+        let isMultiLine = false;
+        const multiLineBuffer: LineData[] = [];
 
-            // Handle indent decrease
-            if (indentDecreaseKeywords.test(trimmedLine)) {
-                if (indentStack.length > 0) {
-                    indentLevel = indentStack.pop()!;
+        let indentLevel = 0;
+        const indentStack: number[] = [];
+
+        for (let i = 0; i < lines.length; i++) {
+            let thisLine;
+            if (blockCommentKeyword.test(lines[i])) {
+                thisLine = lines[i];
+            } else {
+                thisLine = lines[i].trim();
+            }
+            const currentLine = thisLine;
+
+            if (!isMultiLine) {
+                // Check if this line starts a multi-line statement
+                const isWorkable = nonWhiteSpaceCharacters.test(currentLine);
+
+                if (isWorkable && !currentLine.endsWith(";")) {
+                    isMultiLine = true;
+                    multiLineBuffer.push({ indent: indentLevel, line: currentLine });
+                    continue;
+                }
+
+                // Update indentLevel based on the line content
+                // Handle indent decrease
+                if (indentDecreaseKeywords.test(currentLine)) {
+                    if (indentStack.length > 0) {
+                        indentLevel = indentStack.pop()!;
+                    }
+                }
+
+                // Special handling for CASE, OTHERWISE, ELSE
+                if (specialCaseKeywords.test(currentLine)) {
+                    const hasIndentStacks = indentStack.length > 0;
+                    const isNotFirstLine = i > 0;
+                    const previousLineNotBeginCase = !/^:BEGINCASE\b/i.test(lines[i - 1].trim());
+                    if (hasIndentStacks && isNotFirstLine && previousLineNotBeginCase) {
+                        indentLevel--;
+                    }
+                }
+
+                // Process single-line statements
+                const indentedLine = repeatTab(indentLevel) + currentLine;
+                formattedLines.push(indentedLine);
+
+                // Handle indent increase
+                if (indentIncreaseKeywords.test(currentLine)) {
+                    indentStack.push(indentLevel);
+                    indentLevel++;
+                }
+
+                // Increase indent after special case keywords
+                if (specialCaseKeywords.test(currentLine)) {
+                    indentLevel++;
+                }
+            } else {
+                // We're in a multi-line statement
+                multiLineBuffer.push({ indent: indentLevel, line: currentLine });
+
+                if (currentLine.endsWith(";")) {
+                    // End of multi-line statement
+                    isMultiLine = false;
+
+                    // Process the multi-line buffer
+                    const processedMultiLine = this.processMultiLineStatement(multiLineBuffer);
+                    formattedLines.push(...processedMultiLine);
+
+                    multiLineBuffer.length = 0;
                 }
             }
-
-            // Special handling for CASE, OTHERWISE, and ELSE
-            if (specialCaseKeywords.test(trimmedLine)) {
-                if (indentStack.length > 0 && index > 0 && !/^:BEGINCASE\b/i.test(lines[index - 1].trim())) {
-                    indentLevel--;
-                }
-            }
-
-            // Calculate the new indentation using tabs
-            const newIndent = "\t".repeat(indentLevel);
-            const newLine = newIndent + trimmedLine;
-
-            // Handle indent increase
-            if (indentIncreaseKeywords.test(trimmedLine)) {
-                indentStack.push(indentLevel);
-                indentLevel++;
-            }
-
-            // Increase indent after special case keywords
-            if (specialCaseKeywords.test(trimmedLine)) {
-                indentLevel++;
-            }
-
-            return newLine;
-        });
-
+        }
         return formattedLines.join("\n");
+    }
+
+    private processMultiLineStatement(multiLineBuffer: LineData[]) {
+        const processed: string[] = [];
+        const firstLine = multiLineBuffer[0].line;
+        const firstIndent = multiLineBuffer[0].indent;
+        const repeatTab = (count: number): string => "\t".repeat(count);
+
+        const blockCommentKeyword = /^\/\*\*+/;
+        const bracketPattern = /^[\w\s:=]*[\(\{\[]/;
+        const commentKeyword = /^\/\*[^*]/;
+        const keywordPattern = /^:(\w+)\b/i;
+        const operatorPattern = /^[\w\s]*:=/;
+
+        processed.push(repeatTab(firstIndent) + firstLine);
+
+        let subIndent = firstIndent;
+
+        // Need to find the first position of:
+        const keywordMatch = firstLine.match(keywordPattern);
+        const commentMatch = firstLine.match(commentKeyword);
+        const bracketMatch = firstLine.match(bracketPattern);
+        const operatorMatch = firstLine.match(operatorPattern);
+
+        if (blockCommentKeyword.test(firstLine)) {
+            subIndent = firstIndent;
+        } else if (keywordMatch) {
+            // - The first space after a :KEYWORD
+            subIndent = Math.ceil((keywordMatch[0].length + 1) / 4);
+        } else if (commentMatch) {
+            // - The first space after a Comment operator '/*'
+            subIndent = Math.ceil((commentMatch[0].length + 1) / 4);
+        } else if (bracketMatch) {
+            // - The first space after an opening bracket ({[
+            subIndent = Math.ceil(bracketMatch[0].length / 4);
+        } else if (operatorMatch) {
+            // - The first space after the assignment operator ':='
+            subIndent = Math.ceil((operatorMatch[0].length + 1) / 4);
+        }
+
+        subIndent += firstIndent;
+
+        for (let i = 1; i < multiLineBuffer.length; i++) {
+            const currentLine = multiLineBuffer[i].line;
+            const currentIndent = multiLineBuffer[i].indent;
+            processed.push(repeatTab(subIndent) + currentLine);
+        }
+
+        return processed;
     }
 
     // Enforce line spacing according to LIMS style guide
@@ -124,6 +221,7 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
         const lines = text.split("\n");
         const formattedLines: string[] = [];
         let inCommentBlock = false;
+        let inParameterBlock = false;
 
         for (let i = 0; i < lines.length; i++) {
             const currentLine = lines[i].trim();
@@ -138,6 +236,14 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
                 inCommentBlock = false;
             }
 
+            // Check if we're in a parameter block
+            if (currentLine.startsWith(":PARAMETERS") || currentLine.startsWith(":DEFAULT")) {
+                inParameterBlock = true;
+            }
+            if (inParameterBlock && currentLine.endsWith(";")) {
+                inParameterBlock = false;
+            }
+
             // Add the current line
             formattedLines.push(currentLine);
 
@@ -146,7 +252,7 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
                 if (currentLine === "" || nextLine === "") {
                     return false;
                 }
-                if (inCommentBlock) {
+                if (inCommentBlock || inParameterBlock) {
                     return false;
                 }
                 if (
@@ -178,6 +284,9 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
                 }
                 if (currentLine.endsWith(";") && nextLine.startsWith("/*")) {
                     return true;
+                }
+                if (nextLine.match(/^:(ELSE|OTHERWISE)/i)) {
+                    return false;
                 }
                 return false;
             };
@@ -225,6 +334,7 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
             segment = segment.replace(/\s+;/g, ";"); // Remove space before semicolon
             segment = segment.replace(/\(\s+/g, "("); // Remove space after opening parenthesis
             segment = segment.replace(/\s+\)/g, ")"); // Remove space before closing parenthesis
+            segment = segment.replace(/\s*:=\s*/g, " := "); // Remove extra spacing around assignment operator
 
             // Handle negative numbers (don't add space after minus sign)
             segment = segment.replace(/(\s+)-(\d+)/g, "$1-$2");

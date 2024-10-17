@@ -3,6 +3,7 @@ config.private.json
 config/config.private.json
 poorlyFormatted.ssl.txt 
 poorlyFormattedTestResults.ssl.txt
+poorlyFormattedExpectedResults.ssl.txt
 *.ignore*
 
 # Compiled output
