@@ -136,7 +136,7 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
 
                 // Process single-line statements
                 const indentedLine = repeatTab(indentLevel) + currentLine;
-                formattedLines.push(indentedLine);
+                formattedLines.push(indentedLine.trimEnd());
 
                 // Handle indent increase
                 if (indentIncreaseKeywords.test(currentLine)) {
