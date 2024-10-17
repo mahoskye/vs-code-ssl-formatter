@@ -224,9 +224,9 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
         let inParameterBlock = false;
 
         for (let i = 0; i < lines.length; i++) {
-            const currentLine = lines[i].trim();
-            const nextLine = i < lines.length - 1 ? lines[i + 1].trim() : "";
-            const prevLine = i > 0 ? lines[i - 1].trim() : "";
+            const currentLine = lines[i].trimEnd();
+            const nextLine = i < lines.length - 1 ? lines[i + 1].trimEnd() : "";
+            const prevLine = i > 0 ? lines[i - 1].trimEnd() : "";
 
             // Check if we're entering or exiting a comment block
             if (currentLine.startsWith("/*")) {
