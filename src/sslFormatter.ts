@@ -98,17 +98,11 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
         const indentStack: number[] = [];
 
         for (let i = 0; i < lines.length; i++) {
-            let thisLine;
-            if (blockCommentKeyword.test(lines[i])) {
-                thisLine = lines[i];
-            } else {
-                thisLine = lines[i].trim();
-            }
-            const currentLine = thisLine;
+            const currentLine = lines[i];
 
             if (!isMultiLine) {
                 // Check if this line starts a multi-line statement
-                const isWorkable = nonWhiteSpaceCharacters.test(currentLine);
+                const isWorkable = nonWhiteSpaceCharacters.test(currentLine.trim());
 
                 if (isWorkable && !currentLine.endsWith(";")) {
                     isMultiLine = true;
@@ -118,14 +112,14 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
 
                 // Update indentLevel based on the line content
                 // Handle indent decrease
-                if (indentDecreaseKeywords.test(currentLine)) {
+                if (indentDecreaseKeywords.test(currentLine.trim())) {
                     if (indentStack.length > 0) {
                         indentLevel = indentStack.pop()!;
                     }
                 }
 
                 // Special handling for CASE, OTHERWISE, ELSE
-                if (specialCaseKeywords.test(currentLine)) {
+                if (specialCaseKeywords.test(currentLine.trim())) {
                     const hasIndentStacks = indentStack.length > 0;
                     const isNotFirstLine = i > 0;
                     const previousLineNotBeginCase = !/^:BEGINCASE\b/i.test(lines[i - 1].trim());
@@ -135,17 +129,17 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
                 }
 
                 // Process single-line statements
-                const indentedLine = repeatTab(indentLevel) + currentLine;
-                formattedLines.push(indentedLine.trimEnd());
+                const indentedLine = repeatTab(indentLevel) + currentLine.trim();
+                formattedLines.push(indentedLine);
 
                 // Handle indent increase
-                if (indentIncreaseKeywords.test(currentLine)) {
+                if (indentIncreaseKeywords.test(currentLine.trim())) {
                     indentStack.push(indentLevel);
                     indentLevel++;
                 }
 
                 // Increase indent after special case keywords
-                if (specialCaseKeywords.test(currentLine)) {
+                if (specialCaseKeywords.test(currentLine.trim())) {
                     indentLevel++;
                 }
             } else {
@@ -179,7 +173,7 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
         const keywordPattern = /^:(\w+)\b/i;
         const operatorPattern = /^[\w\s]*:=/;
 
-        processed.push(repeatTab(firstIndent) + firstLine);
+        processed.push(repeatTab(firstIndent) + firstLine.trim());
 
         let subIndent = firstIndent;
 
@@ -191,12 +185,12 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
 
         if (blockCommentKeyword.test(firstLine)) {
             subIndent = firstIndent;
-        } else if (keywordMatch) {
-            // - The first space after a :KEYWORD
-            subIndent = Math.ceil((keywordMatch[0].length + 1) / 4);
         } else if (commentMatch) {
             // - The first space after a Comment operator '/*'
             subIndent = Math.ceil((commentMatch[0].length + 1) / 4);
+        } else if (keywordMatch) {
+            // - The first space after a :KEYWORD
+            subIndent = Math.ceil((keywordMatch[0].length + 1) / 4);
         } else if (bracketMatch) {
             // - The first space after an opening bracket ({[
             subIndent = Math.ceil(bracketMatch[0].length / 4);
@@ -210,7 +204,13 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
         for (let i = 1; i < multiLineBuffer.length; i++) {
             const currentLine = multiLineBuffer[i].line;
             const currentIndent = multiLineBuffer[i].indent;
-            processed.push(repeatTab(subIndent) + currentLine);
+
+            // If the first line is a block comment, we will never want to fully trim that
+            if (blockCommentKeyword.test(firstLine)) {
+                processed.push(repeatTab(subIndent) + currentLine.trimEnd());
+            } else {
+                processed.push(repeatTab(subIndent) + currentLine.trim());
+            }
         }
 
         return processed;
