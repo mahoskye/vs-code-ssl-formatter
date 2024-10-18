@@ -56,14 +56,20 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
 
         // Ensure semicolons are followed by newlines
         text = ensureSemicolonNewline(text);
+
+        // Enforce spacing around operators
         text = enforceOperatorSpacing(text);
 
         // Enforce line spacing according to style guide
         text = enforceLineSpacing(text);
+
+        // Break lines over 90 characters
         text = breakLongLines(text);
 
         // Adjust the indentation of the code
         text = adjustIndentation(text);
+
+        // Make sure the code ends in a single blank line
         text = ensureSingleFinalNewline(text);
 
         // Create a single edit for the entire document
