@@ -29,7 +29,7 @@ export function adjustIndentation(text: string): string {
             // Check if this line starts a multi-line statement
             const isWorkable = nonWhiteSpaceCharacters.test(currentLine.trim());
 
-            if (isWorkable && !currentLine.endsWith(";")) {
+            if (isWorkable && !currentLine.trim().endsWith(";")) {
                 isMultiLine = true;
                 multiLineBuffer.push({ indent: indentLevel, line: currentLine });
                 continue;
@@ -71,7 +71,7 @@ export function adjustIndentation(text: string): string {
             // We're in a multi-line statement
             multiLineBuffer.push({ indent: indentLevel, line: currentLine });
 
-            if (currentLine.endsWith(";")) {
+            if (currentLine.trim().endsWith(";")) {
                 // End of multi-line statement
                 isMultiLine = false;
 
