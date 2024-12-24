@@ -1,3 +1,13 @@
+/**
+ * TODO: This code needs to be refactored.
+ * - Correctly spaces around operators
+ * - Correctly respects quotes and comments
+ * - Correctly handles messy string quotes (i.e. "SELECT * FROM EQUIPMENT WHERE EQUIPID='" + sEquipId + "' AND TESTCODE=")
+ * - Incorrectly leaves spaces after a semi-colon
+ * - Incorrectly trims lines breaking indents. First whitespace group needs to be preserved
+ * - Need to revise how this code is laid out so it's easier for me to read.
+ */
+
 export function enforceOperatorSpacing(text: string): string {
     // Define regex patterns for operators (arithmetic, comparison, assignment, logical, commas)
     const operators = /([+\-*/%^=<>!]=?|:=|\.and\.|\.or\.|\.not\.)/gi;
@@ -5,6 +15,12 @@ export function enforceOperatorSpacing(text: string): string {
 
     // Regex to match quoted strings (including nested quotes) or block comments
     const stringOrCommentPattern = /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\/\*[\s\S]*?;)/g;
+
+    // Tests
+    const hasWSBeforeSemiColon = /\s+;/g;
+    const hasWSAfterOpenBracket = /\(\s+/g;
+    const hasWSBeforeCloseBracket = /\s+\)/g;
+    const hasWSBeforeAfterAssignmentOperator = /\s*:=\s*/g;
 
     // Split the text into code and non-code (strings/comments) segments
     let segments = text.split(stringOrCommentPattern);
@@ -18,10 +34,10 @@ export function enforceOperatorSpacing(text: string): string {
         segment = segment.replace(commas, ", ");
 
         // Handle special cases
-        segment = segment.replace(/\s+;/g, ";"); // Remove space before semicolon
-        segment = segment.replace(/\(\s+/g, "("); // Remove space after opening parenthesis
-        segment = segment.replace(/\s+\)/g, ")"); // Remove space before closing parenthesis
-        segment = segment.replace(/\s*:=\s*/g, " := "); // Remove extra spacing around assignment operator
+        segment = segment.replace(hasWSBeforeSemiColon, ";"); // Remove space before semicolon
+        segment = segment.replace(hasWSAfterOpenBracket, "("); // Remove space after opening parenthesis
+        segment = segment.replace(hasWSBeforeCloseBracket, ")"); // Remove space before closing parenthesis
+        segment = segment.replace(hasWSBeforeAfterAssignmentOperator, " := "); // Remove extra spacing around assignment operator
 
         // Handle negative numbers (don't add space after minus sign)
         segment = segment.replace(/(\s+)-(\d+)/g, "$1-$2");

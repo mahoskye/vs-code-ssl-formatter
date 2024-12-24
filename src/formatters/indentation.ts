@@ -1,3 +1,8 @@
+/**
+ * TODO:
+ * - Add FOR, NEXT, LOOP
+ * - Rename multiLineKeywords to something more appropriate
+ */
 type LineData = { indent: number; line: string };
 
 const repeatTab = (count: number): string => "\t".repeat(count);

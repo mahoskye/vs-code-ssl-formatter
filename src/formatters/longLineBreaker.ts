@@ -1,3 +1,13 @@
+/**
+ * TODO: This code needs to be refactored.
+ * - Correctly affects long comments without attempting to format them
+ * - Incorrectly handles lists.
+ *      - Will favor inserting a newline into a string over moving the list item to a new line
+ *      - Will cause the closing bracket for a list to move to a new line. Should move the last list item with it
+ * - Will insert a newline into a string. We should never modify the value of a string
+ * - Will split a variable name. Words must remain whole
+ */
+
 export function breakLongLines(text: string, maxLength: number = 90): string {
     const lines = text.split("\n");
     const newLines: string[] = [];
