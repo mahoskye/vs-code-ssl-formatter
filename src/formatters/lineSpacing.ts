@@ -1,93 +1,277 @@
-export function enforceLineSpacing(text: string): string {
-    const lines = text.split("\n");
-    const formattedLines: string[] = [];
-    let inCommentBlock = false;
-    let inParameterBlock = false;
+/**
+ * Handles line spacing formatting for STARLIMS code files
+ */
+// Types of content blocks extracted from rules
+enum ContentType {
+    declaration,
+    procedure,
+    error,
+    region,
+    controlStructure,
+    comment,
+    statement,
+    unknown,
+}
+
+// Types of individual lines within content blocks
+enum LineType {
+    procedureStart, // :PROCEDURE
+    procedureEnd, // :ENDPROC
+    errorStart, // :ERROR
+    errorResume, // :RESUME
+    regionStart, // /* region or /*region
+    regionEnd, // /* endregion or /*endregion
+    caseStart, // :BEGINCASE
+    caseEnd, // :ENDCASE
+    caseStatement, // :CASE or :OTHERWISE
+    exitCase, // :EXITCASE
+    elseStatement, // :ELSE or :ENDIF
+    singleLineComment, // /*
+    blockComment, // /**
+    logic,
+    declaration,
+    return,
+    code, // Any other code
+    blankLine, // Empty or whitespace-only line
+    unknown,
+}
+/* Arbritrary comment because LIMS comments cause
+   issues with the typescript formatter XD */
+
+// Interface for processed individual lines
+interface ProcessedLine {
+    originalString: string; // The unmodified line
+    leadingWhitespace: string; // Leading whitespace from the original line
+    trimmedContent: string; // Line with whitespace trimmed
+    lineType: LineType; // Type of line based on content
+}
+
+// Interface for content blocks
+interface ContentBlock {
+    lines: ProcessedLine[]; // Array of lines in this block
+    contentType: ContentType; // Type of content this block represents
+}
+
+// Interface for logic groups
+interface LogicGroup {
+    contentBlock: ContentBlock;
+    blankLineCount: number; // Number of blank lines before next block
+    nextBlockType?: ContentType; // Type of the next block (if any)
+    nextFirstLine?: string; // First line of next block (if needed)
+}
+
+// Common regex patterns for rule matching
+export const patterns = {
+    comments: {
+        blockComment: /^\/\*\*/,
+        singleLineComment: /^\/\*/,
+    },
+    lines: {
+        blankLine: /^\s*$/,
+        newLine: /\?r\n/,
+        multiLine: /[^;]\s*$/,
+    },
+    operators: {
+        semicolon: /;/,
+        assignment: /:=/,
+    },
+    regions: {
+        regionStart: /^\/\*\s*region\b/i,
+        regionEnd: /^\/\*\s*endregion\b/i,
+    },
+    spacing: {
+        double: {
+            after: /:(ENDPROC|ENDCASE|ENDWHILE|ENDIF|ENDREGION|RESUME|ERROR)\b/i,
+            before: /:(PROCEDURE|ERROR)\b/i,
+        },
+        single: {
+            after: /:(BEGINCASE|ERROR|EXITCASE)\b/i,
+            before: /:(ELSE|ENDIF|ENDCASE|EXITCASE|RESUME)\b/i,
+        },
+        nospace: {
+            after: null,
+            before: /^:(CASE|OTHERWISE)\b/i,
+        },
+    },
+    statements: {
+        declarations: /^:(?:DECLARE|INCLUDE|DEFAULT|PARAMETERS)\b/i,
+        logic: /:(IF|ELSE|WHILE|FOR|BEGINCASE|CASE|OTHERWISE|ENDCASE|ENDIF|ENDWHILE|EXITCASE|EXITWHILE)\b/i,
+        return: /^:RETURN\b/i,
+        procedureStart: /:(?:CLASS|PROCEDURE)\b/i,
+        procedureEnd: /:ENDPROC\b/i,
+        errorStart: /:ERROR\b/i,
+        errorEnd: /:RESUME\b/i,
+        caseStart: /:BEGINCASE\b/i,
+        caseEnd: /:ENDCASE\b/i,
+    },
+} as const;
+
+// Main formatter function
+export function lineSpacingFormatter(text: string): string {
+    // Split text into lines
+    const lines = text.split(patterns.lines.newLine);
+
+    // Process lines into content blocks
+    const contentBlocks = createContentBlocks(lines);
+
+    // Create logic groups from content blocks
+    const logicGroups = createLogicGroups(contentBlocks);
+
+    // Apply spacing rules
+    const formattedGroups = applySpacingRules(logicGroups);
+
+    // Convert back to text
+    return convertToText(formattedGroups);
+}
+
+// Helper function to process lines into content blocks
+function createContentBlocks(lines: string[]): ContentBlock[] {
+    const blocks: ContentBlock[] = [];
+    let currentBlock: ContentBlock = createEmptyContentBlock();
 
     for (let i = 0; i < lines.length; i++) {
-        const currentLine = lines[i].trimEnd();
-        const nextLine = i < lines.length - 1 ? lines[i + 1].trimEnd() : "";
-        const prevLine = i > 0 ? lines[i - 1].trimEnd() : "";
-
-        // Check if we're entering or exiting a comment block
-        if (currentLine.startsWith("/*")) {
-            inCommentBlock = true;
-        }
-        if (currentLine.endsWith(";") && inCommentBlock) {
-            inCommentBlock = false;
-        }
-
-        // Check if we're in a parameter block
-        if (currentLine.startsWith(":PARAMETERS") || currentLine.startsWith(":DEFAULT")) {
-            inParameterBlock = true;
-        }
-        if (inParameterBlock && currentLine.endsWith(";")) {
-            inParameterBlock = false;
-        }
-
-        // Add the current line
-        formattedLines.push(currentLine);
-
-        // Function to check if we need to add a blank line
-        const needsBlankLine = () => {
-            if (currentLine === "" || nextLine === "") {
-                return false;
-            }
-            if (inCommentBlock || inParameterBlock) {
-                return false;
-            }
-            if (
-                currentLine.startsWith(":DECLARE") ||
-                currentLine.startsWith(":PARAMETERS") ||
-                currentLine.startsWith(":DEFAULT")
-            ) {
-                return (
-                    nextLine &&
-                    !nextLine.startsWith(":DECLARE") &&
-                    !nextLine.startsWith(":PARAMETERS") &&
-                    !nextLine.startsWith(":DEFAULT")
-                );
-            }
-            if (currentLine.startsWith(":PROCEDURE")) {
-                return true;
-            }
-            if (nextLine.match(/^:(IF|WHILE|BEGINCASE)/i)) {
-                return true;
-            }
-            if (currentLine.match(/^:(ENDIF|ENDWHILE|ENDCASE|ENDPROC)/i)) {
-                return true;
-            }
-            if (currentLine.startsWith(":RETURN")) {
-                return true;
-            }
-            if (currentLine.startsWith("/*") && !prevLine.startsWith("/*")) {
-                return true;
-            }
-            if (currentLine.endsWith(";") && nextLine.startsWith("/*")) {
-                return true;
-            }
-            if (nextLine.match(/^:(ELSE|OTHERWISE)/i)) {
-                return false;
-            }
-            return false;
-        };
-
-        // Add a blank line if needed
-        if (needsBlankLine() && formattedLines[formattedLines.length - 1] !== "") {
-            formattedLines.push("");
-        }
+        const line = lines[i];
+        const processedLine = processLine(line);
+        // Implement processing logic
+        // Example: Add line to currentBlock
+        currentBlock.lines.push(processedLine);
     }
 
-    // Remove extra blank lines (more than one consecutive blank line)
-    const cleanedLines = formattedLines.filter(
-        (line, index, array) =>
-            line.trim() !== "" || (index > 0 && array[index - 1].trim() !== "") || index === array.length - 1
-    );
-
-    // Ensure the document ends with exactly one blank line
-    if (cleanedLines[cleanedLines.length - 1].trim() !== "") {
-        cleanedLines.push("");
+    // Add the last block if it has lines
+    if (currentBlock.lines.length > 0) {
+        blocks.push(currentBlock);
     }
 
-    return cleanedLines.join("\n");
+    // TODO: Implement processing logic
+
+    return blocks;
+}
+
+// Helper function to create empty content blocks
+function createEmptyContentBlock(): ContentBlock {
+    return {
+        lines: [],
+        contentType: ContentType.unknown,
+    };
+}
+
+// Process lines
+function processLine(line: string): ProcessedLine {
+    const trimmed = line.trim();
+    const leadingWhitespace = line.slice(0, line.indexOf(trimmed));
+
+    return {
+        originalString: line,
+        leadingWhitespace,
+        trimmedContent: trimmed,
+        lineType: determineLineType(trimmed),
+    };
+}
+
+function determineLineType(trimmedLine: string): LineType {
+    if (patterns.lines.blankLine.test(trimmedLine)) {
+        return LineType.blankLine;
+    }
+
+    if (patterns.comments.blockComment.test(trimmedLine)) {
+        return LineType.blockComment;
+    }
+
+    if (patterns.comments.singleLineComment.test(trimmedLine)) {
+        return LineType.singleLineComment;
+    }
+
+    if (patterns.statements.procedureStart.test(trimmedLine)) {
+        return LineType.procedureStart;
+    }
+
+    if (patterns.statements.procedureEnd.test(trimmedLine)) {
+        return LineType.procedureEnd;
+    }
+
+    if (patterns.statements.errorStart.test(trimmedLine)) {
+        return LineType.errorStart;
+    }
+
+    if (patterns.statements.errorEnd.test(trimmedLine)) {
+        return LineType.errorResume;
+    }
+
+    if (patterns.statements.caseStart.test(trimmedLine)) {
+        return LineType.caseStart;
+    }
+
+    if (patterns.statements.caseEnd.test(trimmedLine)) {
+        return LineType.caseEnd;
+    }
+
+    if (patterns.statements.declarations.test(trimmedLine)) {
+        return LineType.declaration;
+    }
+
+    if (patterns.statements.logic.test(trimmedLine)) {
+        return LineType.logic;
+    }
+
+    if (patterns.statements.return.test(trimmedLine)) {
+        return LineType.return;
+    }
+
+    return LineType.code;
+}
+
+function determineContentType(lines: ProcessedLine[]): ContentType {
+    const firstContentLine = lines.find((line) => line.lineType !== LineType.blankLine);
+
+    if (!firstContentLine) {
+        return ContentType.unknown;
+    }
+
+    switch (firstContentLine.lineType) {
+        case LineType.blockComment:
+        case LineType.singleLineComment:
+            return ContentType.comment;
+
+        case LineType.procedureStart:
+        case LineType.procedureEnd:
+            return ContentType.procedure;
+
+        case LineType.errorStart:
+        case LineType.errorResume:
+            return ContentType.error;
+
+        case LineType.caseStart:
+        case LineType.caseEnd:
+        case LineType.caseStatement:
+        case LineType.exitCase:
+        case LineType.elseStatement:
+            return ContentType.controlStructure;
+
+        default:
+            if (patterns.statements.declarations.test(firstContentLine.trimmedContent)) {
+                return ContentType.declaration;
+            }
+            return ContentType.statement;
+    }
+}
+
+// Helper function to create logic groups from content blocks
+function createLogicGroups(blocks: ContentBlock[]): LogicGroup[] {
+    const groups: LogicGroup[] = [];
+
+    // TODO: Implement grouping logic
+
+    return groups;
+}
+
+// Helper function to apply spacing rules to logic groups
+function applySpacingRules(groups: LogicGroup[]): LogicGroup[] {
+    // TODO: Implement rule application logic
+    return groups;
+}
+
+// Helper function to convert logic groups back to text
+function convertToText(groups: LogicGroup[]): string {
+    // TODO: Implement conversion logic
+    return "";
 }

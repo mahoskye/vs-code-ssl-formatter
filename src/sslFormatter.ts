@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { correctKeywordCasing } from "./formatters/keywordCasing";
 import { ensureSemicolonNewline } from "./formatters/semicolonNewline";
 import { enforceOperatorSpacing } from "./formatters/operatorSpacing";
-import { enforceLineSpacing } from "./formatters/lineSpacing";
+import { lineSpacingFormatter } from "./formatters/lineSpacing";
 import { breakLongLines } from "./formatters/longLineBreaker";
 import { adjustIndentation } from "./formatters/indentation";
 import { ensureSingleFinalNewline } from "./formatters/finalNewline";
@@ -52,25 +52,25 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
 
         // Apply formatting steps
         // Correct the casing of SSL keywords
-        text = correctKeywordCasing(text, this.keywords);
+        // text = correctKeywordCasing(text, this.keywords);
 
         // Ensure semicolons are followed by newlines
-        text = ensureSemicolonNewline(text);
+        // text = ensureSemicolonNewline(text);
 
         // Enforce spacing around operators
-        text = enforceOperatorSpacing(text);
+        // text = enforceOperatorSpacing(text);
 
         // Enforce line spacing according to style guide
-        text = enforceLineSpacing(text);
+        text = lineSpacingFormatter(text);
 
         // Break lines over 90 characters
-        text = breakLongLines(text);
+        // text = breakLongLines(text);
 
         // Adjust the indentation of the code
-        text = adjustIndentation(text);
+        // text = adjustIndentation(text);
 
         // Make sure the code ends in a single blank line
-        text = ensureSingleFinalNewline(text);
+        // text = ensureSingleFinalNewline(text);
 
         // Create a single edit for the entire document
         const lastLineId = document.lineCount - 1;
