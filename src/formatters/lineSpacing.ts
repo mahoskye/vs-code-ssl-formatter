@@ -24,7 +24,7 @@ export const patterns = {
     },
     lines: {
         blankLine: /^\s*$/,
-        newLine: /\?r\n/,
+        newLine: /\r?\n/,
         multiLine: /[^;]\s*$/,
     },
     operators: {
@@ -64,7 +64,7 @@ export const patterns = {
 
 // Main formatter function
 export function lineSpacingFormatter(text: string): string {
-    let debug = true;
+    let debug = false;
 
     // Split text into blocks and process lines
     const blocks = splitIntoBlocks(text);
@@ -91,36 +91,42 @@ function splitIntoBlocks(text: string): ContentBlock[] {
     const lines = text.split(patterns.lines.newLine);
     const blocks: ContentBlock[] = [];
     let currentBlock: ProcessedLine[] = [];
+    let isBlockComment = false;
 
     for (let i = 0; i < lines.length; i++) {
         const line = processLine(lines[i]);
         currentBlock.push(line);
 
-        // Check if this is a block comment
+        // Check if start of block comment
         if (patterns.comments.blockComment.test(line.trimmedContent)) {
-            // Get the first line of the next block if it exists
-            const nextLine = i + 1 < lines.length ? processLine(lines[i + 1]) : undefined;
-
-            blocks.push({
-                lines: [...currentBlock],
-                followingSpaces: 0, // TBD later
-                nextBlockFirstLine: nextLine,
-            });
-            currentBlock = [];
-            continue;
+            isBlockComment = true;
         }
 
-        // Check if this line ends a block
-        if (patterns.operators.semicolon.test(line.originalString)) {
-            // Get the first line of th enext block if it exists
-            const nextLine = i + 1 < lines.length ? processLine(lines[i + 1]) : undefined;
+        // Count blank lines after this block
+        let blankCount = 0;
+        let nextIndex = i + 1;
+        while (nextIndex < lines.length && patterns.lines.blankLine.test(lines[nextIndex].trim())) {
+            blankCount++;
+            nextIndex++;
+        }
 
+        // Get the next non-blank line
+        const nextContentLine = nextIndex < lines.length ? processLine(lines[nextIndex]) : undefined;
+
+        // Check if this line ends a block
+        if (
+            (!isBlockComment && patterns.operators.semicolon.test(line.originalString)) || // Normal line ending
+            (!isBlockComment && patterns.comments.blockComment.test(line.trimmedContent)) || // Start of new block comment
+            (isBlockComment && patterns.operators.semicolon.test(line.originalString)) // End of block comment
+        ) {
             blocks.push({
                 lines: [...currentBlock],
-                followingSpaces: 0, // TBD later
-                nextBlockFirstLine: nextLine,
+                followingSpaces: Math.min(blankCount, 2),
+                nextBlockFirstLine: nextContentLine,
             });
             currentBlock = [];
+            isBlockComment = false; // Reset flag
+            i += blankCount; // Skip the blank lines we've already counted
         }
     }
 
@@ -128,7 +134,7 @@ function splitIntoBlocks(text: string): ContentBlock[] {
     if (currentBlock.length > 0) {
         blocks.push({
             lines: currentBlock,
-            followingSpaces: 0, // TBD later
+            followingSpaces: 0,
             nextBlockFirstLine: undefined, // This is the last block
         });
     }
@@ -137,7 +143,6 @@ function splitIntoBlocks(text: string): ContentBlock[] {
 }
 
 function determineSpacing(blocks: ContentBlock[]): ContentBlock[] {
-    // TODO: Implement spacing logic
     return blocks;
 }
 
@@ -147,7 +152,7 @@ function formatBlocks(blocks: ContentBlock[]): string {
     blocks.forEach((block, index) => {
         // Add all lines in the block with their original whitespace
         block.lines.forEach((line) => {
-            result += line.leadingWhitespace + line.trimmedContent + "\n";
+            result += line.originalString + "\n";
         });
 
         // Add following spaces if this isn't the last block
@@ -164,23 +169,26 @@ function formatBlocks(blocks: ContentBlock[]): string {
 
 // Formatting function for debugging
 function formatBlocksDebug(blocks: ContentBlock[]): string {
-    return blocks
-        .map((block, index) => {
-            const firstLine = block.lines[0].trimmedContent;
-            const nextLine = block.nextBlockFirstLine?.trimmedContent || "END";
+    return (
+        blocks
+            .map((block, index) => {
+                const firstLine = block.lines[0].trimmedContent;
+                const nextLine = block.nextBlockFirstLine?.trimmedContent || "END";
 
-            // Truncate long lines for readability
-            const truncateLength = 30;
-            const truncatedFirst =
-                firstLine.length > truncateLength ? firstLine.substring(0, truncateLength) + "..." : firstLine;
-            const truncatedNext =
-                nextLine.length > truncateLength ? nextLine.substring(0, truncateLength) + "..." : nextLine;
+                // Truncate long lines for readability
+                const truncateLength = 30;
+                const truncatedFirst =
+                    firstLine.length > truncateLength ? firstLine.substring(0, truncateLength) + "..." : firstLine;
+                const truncatedNext =
+                    nextLine.length > truncateLength ? nextLine.substring(0, truncateLength) + "..." : nextLine;
 
-            return (
-                `Block ${index + 1}: lines: ${block.lines.length} | ` +
-                `blanks: ${block.followingSpaces} | firstline: ${truncatedFirst} | ` +
-                `nextline: ${truncatedNext}`
-            );
-        })
-        .join("\n");
+                return (
+                    `Block ${index + 1}: lines: ${block.lines.length} | ` +
+                    `blanks: ${block.followingSpaces} | firstline: ${truncatedFirst} | ` +
+                    `nextline: ${truncatedNext}`
+                );
+            })
+            .join("\n")
+            .trimEnd() + "\n"
+    );
 }
