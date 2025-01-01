@@ -70,12 +70,6 @@ export function lineSpacingFormatter(text: string): string {
     // Determine spacing requirements
     const spacedBlocks = determineSpacing(blocks);
 
-<<<<<<< HEAD
-    // Determine spacing requirements
-    const spacedBlocks = determineSpacing(blocks);
-
-=======
->>>>>>> e9befe5 (Refactor line spacing formatter to improve block processing and spacing logic)
     // Apply spacing and join blocks
     return formatBlocks(spacedBlocks);
 }
@@ -145,27 +139,7 @@ function determineSpacing(blocks: ContentBlock[]): ContentBlock[] {
     return blocks;
 }
 
-<<<<<<< HEAD
-// Helper function to create logic groups from content blocks
-function createLogicGroups(blocks: ContentBlock[]): LogicGroup[] {
-    const groups: LogicGroup[] = [];
-
-    // TODO: Implement grouping logic
-
-    return groups;
-}
-
-function determineSpacing(blocks: ContentBlock[]): ContentBlock[] {
-    // TODO: Implement spacing logic
-    return blocks;
-}
-
-// Helper function to convert logic groups back to text
-function convertToText(groups: LogicGroup[]): string {
-    // TODO: Implement conversion logic
-=======
 function formatBlocks(blocks: ContentBlock[]): string {
     // TODO: Implement block formatting and joining
->>>>>>> e9befe5 (Refactor line spacing formatter to improve block processing and spacing logic)
     return "";
 }
