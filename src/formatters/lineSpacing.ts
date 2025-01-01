@@ -64,6 +64,8 @@ export const patterns = {
 
 // Main formatter function
 export function lineSpacingFormatter(text: string): string {
+    let debug = true;
+
     // Split text into blocks and process lines
     const blocks = splitIntoBlocks(text);
 
@@ -71,7 +73,7 @@ export function lineSpacingFormatter(text: string): string {
     const spacedBlocks = determineSpacing(blocks);
 
     // Apply spacing and join blocks
-    return formatBlocks(spacedBlocks);
+    return debug ? formatBlocksDebug(spacedBlocks) : formatBlocks(spacedBlocks);
 }
 
 function processLine(line: string): ProcessedLine {
@@ -140,6 +142,45 @@ function determineSpacing(blocks: ContentBlock[]): ContentBlock[] {
 }
 
 function formatBlocks(blocks: ContentBlock[]): string {
-    // TODO: Implement block formatting and joining
-    return "";
+    let result = "";
+
+    blocks.forEach((block, index) => {
+        // Add all lines in the block with their original whitespace
+        block.lines.forEach((line) => {
+            result += line.leadingWhitespace + line.trimmedContent + "\n";
+        });
+
+        // Add following spaces if this isn't the last block
+        if (index < blocks.length - 1) {
+            for (let i = 0; i < block.followingSpaces; i++) {
+                result += "\n";
+            }
+        }
+    });
+
+    // Ensure exactly one trailing newline
+    return result.trimEnd() + "\n";
+}
+
+// Formatting function for debugging
+function formatBlocksDebug(blocks: ContentBlock[]): string {
+    return blocks
+        .map((block, index) => {
+            const firstLine = block.lines[0].trimmedContent;
+            const nextLine = block.nextBlockFirstLine?.trimmedContent || "END";
+
+            // Truncate long lines for readability
+            const truncateLength = 30;
+            const truncatedFirst =
+                firstLine.length > truncateLength ? firstLine.substring(0, truncateLength) + "..." : firstLine;
+            const truncatedNext =
+                nextLine.length > truncateLength ? nextLine.substring(0, truncateLength) + "..." : nextLine;
+
+            return (
+                `Block ${index + 1}: lines: ${block.lines.length} | ` +
+                `blanks: ${block.followingSpaces} | firstline: ${truncatedFirst} | ` +
+                `nextline: ${truncatedNext}`
+            );
+        })
+        .join("\n");
 }
