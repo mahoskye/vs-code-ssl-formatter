@@ -44,12 +44,13 @@ interface ProcessedLine {
     originalString: string;
     leadingWhitespace: string;
     trimmedContent: string;
+    lineNumber: number;
 }
 
 interface BlockContext {
     parentBlock?: TypedBlock;
-    depth: number;
     isPartOfChain: boolean;
+    parentBlockType: BlockType | null;
 }
 
 interface BlockMetadata {
@@ -57,15 +58,19 @@ interface BlockMetadata {
     isStart: boolean;
     isMiddle: boolean;
     isEnd: boolean;
+    isCaseContent?: boolean;
 }
 
 interface TypedBlock {
     lines: ProcessedLine[];
     followingSpaces: number;
+    originalSpaces: number;
     nextBlockFirstLine?: ProcessedLine;
     blockType: BlockType;
     metadata: BlockMetadata;
     context: BlockContext;
+    startLineNumber: number;
+    endLineNumber: number;
 }
 
 // Pattern definitions
@@ -104,12 +109,15 @@ const patterns = {
         },
     },
     declaration: {
-        include: /:INCLUDE\b/i,
-        declare: /:DECLARE\b/i,
-        public: /:PUBLIC\b/i,
-        parameters: /:PARAMETERS\b/i,
-        assignment: /:=/,
-        default: /:DEFAULT\b/i,
+        types: {
+            include: /:INCLUDE\b/i,
+            declare: /:DECLARE\b/i,
+            public: /:PUBLIC\b/i,
+            parameters: /:PARAMETERS\b/i,
+            assignment: /:=/,
+            default: /:DEFAULT\b/i,
+        },
+        group: /^:(?:PARAMETERS|DEFAULT|DECLARE)\b/i,
     },
     comment: {
         block: /^\/\*\*/,
@@ -149,7 +157,7 @@ class BlockProcessor {
         let isBlockComment = false;
 
         for (let i = 0; i < lines.length; i++) {
-            const line = this.processLine(lines[i]);
+            const line = this.processLine(lines[i], i);
 
             // Skip empty lines at the start of file
             if (currentBlock.length === 0 && line.trimmedContent === "") {
@@ -169,7 +177,7 @@ class BlockProcessor {
                 // Check if this block should be merged with the previous one
                 if (blocks.length > 0 && this.shouldMergeBlocks(blocks[blocks.length - 1], block)) {
                     const prevBlock = blocks[blocks.length - 1];
-                    prevBlock.lines.push(...block.lines);
+                    this.mergeBlocks(prevBlock, block);
                 } else {
                     blocks.push(block);
                 }
@@ -179,50 +187,22 @@ class BlockProcessor {
             }
         }
 
+        if (this.debug) {
+            this.validateBlocks(blocks);
+        }
+
         return blocks;
     }
 
-    private shouldMergeBlocks(prevBlock: TypedBlock, currentBlock: TypedBlock): boolean {
-        // Merge declarations that should be grouped
-        if (prevBlock.blockType === "declaration" && currentBlock.blockType === "declaration") {
-            const prevLine = prevBlock.lines[0].trimmedContent;
-            const currentLine = currentBlock.lines[0].trimmedContent;
-            const declarationTypes = /^:(?:PARAMETERS|DEFAULT|DECLARE)\b/i;
-
-            return (
-                (declarationTypes.test(prevLine) && declarationTypes.test(currentLine)) ||
-                prevBlock.context.depth === currentBlock.context.depth
-            );
-        }
-
-        // Merge parts of control structures
-        if (
-            ["conditional", "loop", "switch", "errorHandling"].includes(prevBlock.blockType) &&
-            prevBlock.blockType === currentBlock.blockType
-        ) {
-            return prevBlock.context.depth === currentBlock.context.depth;
-        }
-
-        return false;
-    }
-
-    private processLine(line: string): ProcessedLine {
-        // Keep the original line exactly as is
+    private processLine(line: string, lineIndex: number): ProcessedLine {
         const trimmed = line.trim();
-        // If the line is empty, we want empty strings for all fields
-        if (trimmed === "") {
-            return {
-                originalString: line,
-                leadingWhitespace: "",
-                trimmedContent: "",
-            };
-        }
-        // For non-empty lines, preserve the exact leading whitespace
-        const leadingWhitespace = line.substring(0, line.length - line.trimLeft().length);
+        const leadingWhitespace = trimmed === "" ? "" : line.substring(0, line.length - line.trimStart().length);
+
         return {
             originalString: line,
             leadingWhitespace,
             trimmedContent: trimmed,
+            lineNumber: lineIndex + 1, // Convert to 1-based line numbers
         };
     }
 
@@ -234,19 +214,35 @@ class BlockProcessor {
     }
 
     private createBlock(lines: ProcessedLine[], allLines: string[], currentIndex: number): TypedBlock {
+        const startLine = lines[0].lineNumber;
+        const endLine = lines[lines.length - 1].lineNumber;
+
         const blankCount = this.countFollowingBlankLines(allLines, currentIndex);
         const nextLine = this.getNextContentLine(allLines, currentIndex + blankCount + 1);
 
-        return {
+        const blockIdentification = BlockIdentifier.identify(lines);
+
+        const block = {
             lines,
+            originalSpaces: blankCount,
             followingSpaces: Math.min(blankCount, 2),
             nextBlockFirstLine: nextLine,
-            ...BlockIdentifier.identify(lines),
+            ...blockIdentification,
             context: {
-                depth: this.calculateDepth(lines[0].leadingWhitespace),
                 isPartOfChain: false,
+                parentBlockType: blockIdentification.blockType,
             },
+            startLineNumber: startLine,
+            endLineNumber: endLine,
         };
+
+        if (this.debug) {
+            console.log(
+                `Created block: ${startLine}-${endLine}, type=${blockIdentification.blockType}, originalSpaces=${blankCount}`
+            );
+        }
+
+        return block;
     }
 
     private countFollowingBlankLines(lines: string[], currentIndex: number): number {
@@ -262,31 +258,134 @@ class BlockProcessor {
     private getNextContentLine(lines: string[], index: number): ProcessedLine | undefined {
         while (index < lines.length) {
             if (!patterns.structure.blankLine.test(lines[index])) {
-                return this.processLine(lines[index]);
+                return this.processLine(lines[index], index);
             }
             index++;
         }
         return undefined;
     }
 
-    private calculateDepth(whitespace: string): number {
-        return Math.floor(whitespace.length / 4);
+    private shouldMergeBlocks(prevBlock: TypedBlock, currentBlock: TypedBlock): boolean {
+        // Handle switch case statements specifically
+        if (prevBlock.blockType === "switch") {
+            // Merge CASE statements with their content
+            const isCaseStatement =
+                prevBlock.metadata.flowType === "caseBranch" || prevBlock.metadata.flowType === "caseDefault";
+
+            if (isCaseStatement) {
+                // Merge with any content that follows the case statement
+                if (!["caseStart", "caseEnd", "caseBranch", "caseDefault"].includes(currentBlock.metadata.flowType)) {
+                    if (this.debug) {
+                        console.log(`Merging case content with case statement`);
+                    }
+                    return true;
+                }
+            }
+
+            // Always merge consecutive case branches
+            if (currentBlock.blockType === "switch") {
+                if (this.debug) {
+                    console.log(`Merging consecutive case branches`);
+                }
+                return true;
+            }
+        }
+
+        // Merge declarations that should be grouped
+        if (prevBlock.blockType === "declaration" && currentBlock.blockType === "declaration") {
+            const currentLine = prevBlock.lines[0].trimmedContent;
+            const nextLine = currentBlock.lines[0].trimmedContent;
+            const declarationTypes = patterns.declaration.group;
+
+            const shouldMergeDeclarations =
+                declarationTypes.test(currentLine) &&
+                declarationTypes.test(nextLine) &&
+                currentLine.substring(1, currentLine.indexOf(" ")) === nextLine.substring(1, nextLine.indexOf(" "));
+
+            const shouldMergeAssignments =
+                patterns.declaration.types.assignment.test(currentLine) &&
+                patterns.declaration.types.assignment.test(nextLine);
+
+            if ((shouldMergeDeclarations || shouldMergeAssignments) && this.debug) {
+                console.log(`Merging declarations: ${currentLine} with ${nextLine}`);
+            }
+
+            return shouldMergeDeclarations || shouldMergeAssignments;
+        }
+
+        // Handle control flow blocks
+        if (
+            ["conditional", "loop", "switch", "errorHandling"].includes(prevBlock.blockType) &&
+            prevBlock.blockType === currentBlock.blockType
+        ) {
+            const shouldMerge =
+                prevBlock.metadata.flowType === currentBlock.metadata.flowType || currentBlock.context.isPartOfChain;
+
+            if (shouldMerge && this.debug) {
+                console.log(`Merging control flow blocks`);
+            }
+
+            return shouldMerge;
+        }
+
+        return false;
+    }
+
+    private mergeBlocks(target: TypedBlock, source: TypedBlock): void {
+        target.lines.push(...source.lines);
+        target.endLineNumber = source.endLineNumber;
+        target.nextBlockFirstLine = source.nextBlockFirstLine;
+        target.originalSpaces = source.originalSpaces;
+        target.followingSpaces = source.followingSpaces;
+
+        if (target.blockType === "switch" && source.metadata.isCaseContent) {
+            target.metadata = {
+                ...target.metadata,
+                isCaseContent: true,
+            };
+        }
+
+        if (this.debug) {
+            console.log(`Merged blocks: ${target.startLineNumber}-${target.endLineNumber}`);
+        }
+    }
+
+    private validateBlocks(blocks: TypedBlock[]): void {
+        for (let i = 0; i < blocks.length - 1; i++) {
+            const currentBlock = blocks[i];
+            const nextBlock = blocks[i + 1];
+
+            if (
+                currentBlock.nextBlockFirstLine &&
+                currentBlock.nextBlockFirstLine.lineNumber !== nextBlock.lines[0].lineNumber
+            ) {
+                console.warn(
+                    `Block transition mismatch at line ${currentBlock.endLineNumber}:\n` +
+                        `Expected next line: ${currentBlock.nextBlockFirstLine.lineNumber}\n` +
+                        `Actual next line: ${nextBlock.lines[0].lineNumber}`
+                );
+            }
+
+            const expectedNextLine = currentBlock.endLineNumber + currentBlock.followingSpaces + 1;
+            if (nextBlock.startLineNumber > expectedNextLine) {
+                console.warn(
+                    `Line number gap detected between blocks:\n` +
+                        `Block ${i} ends at line ${currentBlock.endLineNumber}\n` +
+                        `Block ${i + 1} starts at line ${nextBlock.startLineNumber}\n` +
+                        `Gap: ${nextBlock.startLineNumber - expectedNextLine} lines`
+                );
+            }
+        }
     }
 
     private updateBlockRelationships(): void {
-        const stack: TypedBlock[] = [];
-
-        this.blocks.forEach((block) => {
-            while (stack.length > 0 && stack[stack.length - 1].context.depth >= block.context.depth) {
-                stack.pop();
-            }
-
-            if (stack.length > 0) {
-                block.context.parentBlock = stack[stack.length - 1];
-            }
-
-            if (block.metadata.isStart) {
-                stack.push(block);
+        this.blocks.forEach((block, index) => {
+            if (index > 0) {
+                const prevBlock = this.blocks[index - 1];
+                if (prevBlock.metadata.isStart) {
+                    block.context.parentBlock = prevBlock;
+                    block.context.parentBlockType = prevBlock.blockType;
+                }
             }
         });
     }
@@ -328,9 +427,7 @@ class BlockProcessor {
         this.blocks.forEach((block, index) => {
             // Add each line exactly as it was in the original file
             block.lines.forEach((line, lineIndex) => {
-                // Add the line with its original whitespace intact
                 result += line.originalString;
-                // Add newline after each line except the very last line of the file
                 if (!(index === this.blocks.length - 1 && lineIndex === block.lines.length - 1)) {
                     result += "\n";
                 }
@@ -355,9 +452,11 @@ class BlockProcessor {
                     const truncateLength = 30;
 
                     return (
-                        `Block ${index + 1}: type=${block.blockType} | ` +
-                        `depth=${block.context.depth} | ` +
+                        `Block ${index + 1}: ` +
+                        `lines=${block.startLineNumber}-${block.endLineNumber} | ` +
+                        `type=${block.blockType} | ` +
                         `spaces=${block.followingSpaces} | ` +
+                        `originalSpaces=${block.originalSpaces} | ` +
                         `first=${firstLine.substring(0, truncateLength)}${
                             firstLine.length > truncateLength ? "..." : ""
                         } | ` +
@@ -376,10 +475,10 @@ class BlockIdentifier {
 
         // Try each identifier in order of specificity
         return (
-            this.identifyProcedure(lines) ||
-            this.identifyDeclaration(firstLine) ||
             this.identifyComment(firstLine) ||
+            this.identifyProcedure(lines) ||
             this.identifyControlFlow(firstLine) ||
+            this.identifyDeclaration(firstLine) ||
             this.createLogicBlock(firstLine)
         );
     }
@@ -415,7 +514,7 @@ class BlockIdentifier {
     }
 
     private static identifyDeclaration(line: string): { blockType: BlockType; metadata: BlockMetadata } | null {
-        for (const [key, pattern] of Object.entries(patterns.declaration)) {
+        for (const [key, pattern] of Object.entries(patterns.declaration.types)) {
             if (pattern.test(line)) {
                 return {
                     blockType: "declaration",
@@ -485,13 +584,20 @@ class BlockIdentifier {
         // Check switch flow
         for (const [key, pattern] of Object.entries(patterns.flow.switch)) {
             if (pattern.test(line)) {
+                const isCase = key === "branch" || key === "default" || key === "exit";
+                const isCaseContent =
+                    !patterns.flow.switch.branch.test(line) &&
+                    !patterns.flow.switch.default.test(line) &&
+                    !patterns.flow.switch.start.test(line) &&
+                    !patterns.flow.switch.end.test(line);
                 return {
                     blockType: "switch",
                     metadata: {
                         flowType: key as FlowKeyword,
                         isStart: key === "start",
-                        isMiddle: key === "branch" || key === "default" || key === "exit",
+                        isMiddle: isCase,
                         isEnd: key === "end",
+                        isCaseContent: isCaseContent,
                     },
                 };
             }
@@ -558,15 +664,15 @@ class SpacingRulesEngine {
 
     private static applyDeclarationRules(block: TypedBlock, nextBlock: TypedBlock): number | null {
         if (block.blockType === "declaration") {
-            // Group all declarations together (PARAMETERS, DEFAULT, DECLARE)
+            // Group declarations of the same type together
             const currentLine = block.lines[0].trimmedContent;
             const nextLine = nextBlock.lines[0].trimmedContent;
-            const declarationTypes = /^:(?:PARAMETERS|DEFAULT|DECLARE)\b/i;
 
             if (
                 nextBlock.blockType === "declaration" &&
-                ((declarationTypes.test(currentLine) && declarationTypes.test(nextLine)) ||
-                    block.context.depth === nextBlock.context.depth)
+                patterns.declaration.group.test(currentLine) &&
+                patterns.declaration.group.test(nextLine) &&
+                currentLine.substring(1, currentLine.indexOf(" ")) === nextLine.substring(1, nextLine.indexOf(" "))
             ) {
                 return 0;
             }
@@ -579,10 +685,10 @@ class SpacingRulesEngine {
     private static applyControlFlowRules(block: TypedBlock, nextBlock: TypedBlock): number | null {
         // Handle control flow blocks (if, while, switch, etc.)
         if (["conditional", "loop", "switch", "errorHandling"].includes(block.blockType)) {
-            // No space for chained blocks or blocks at same depth
+            // No space for chained blocks or related blocks
             if (
                 nextBlock.context.isPartOfChain ||
-                (block.context.depth === nextBlock.context.depth && !block.metadata.isEnd)
+                (block.metadata.flowType === nextBlock.metadata.flowType && !block.metadata.isEnd)
             ) {
                 return 0;
             }
@@ -592,8 +698,8 @@ class SpacingRulesEngine {
                 return ["conditional", "loop", "switch", "errorHandling"].includes(nextBlock.blockType) ? 0 : 1;
             }
 
-            // No space between control structure elements at same depth
-            if (block.metadata.isStart && block.context.depth === nextBlock.context.depth) {
+            // No space between control structure elements that are related
+            if (block.metadata.isStart && block.metadata.flowType === nextBlock.metadata.flowType) {
                 return 0;
             }
         }
@@ -604,13 +710,8 @@ class SpacingRulesEngine {
         if (block.blockType === "comment") {
             const commentLine = block.lines[0].trimmedContent;
 
-            // Double space after section comments
-            if (patterns.comment.block.test(commentLine)) {
-                return 1;
-            }
-
-            // Single space after single-line comments unless part of a group
-            if (patterns.comment.single.test(commentLine)) {
+            // Single space after comments unless part of a group
+            if (patterns.comment.block.test(commentLine) || patterns.comment.single.test(commentLine)) {
                 return nextBlock.blockType === "comment" ? 0 : 1;
             }
         }
@@ -620,7 +721,7 @@ class SpacingRulesEngine {
     private static applyLogicRules(block: TypedBlock, nextBlock: TypedBlock): number | null {
         if (block.blockType === "logic") {
             // Group related logic statements
-            if (nextBlock.blockType === "logic" && block.context.depth === nextBlock.context.depth) {
+            if (nextBlock.blockType === "logic") {
                 return 0;
             }
             return 1;
