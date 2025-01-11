@@ -45,15 +45,29 @@ export type FlowKeyword =
 export type DeclarationType = "parameters" | "declare" | "default" | "public" | "include" | "other";
 
 // Comment type definitions
-export type CommentType =
-  | "block" // /** ;
-  | "single" // /* ;
-  | "regionStart" // /* region ...;
-  | "regionEnd"; // /* endregion;
+export type CommentType = "block" | "single" | "regionStart" | "regionEnd";
 
-/**
- * Core interfaces for the formatter
- */
+export interface FormatterConfig {
+  useContext?: boolean;
+  debug?: boolean;
+  preserveUser?: boolean;
+  maxConsecutiveBlank?: number;
+}
+
+export const DEFAULT_FORMATTER_CONFIG: FormatterConfig = {
+  useContext: true,
+  debug: true,
+  preserveUser: false,
+  maxConsecutiveBlank: 2,
+};
+
+export interface SpacingState {
+  originalSpaces: number;
+  standardSpaces: number;
+  contextSpaces?: number;
+  postProcessSpaces?: number;
+  followingSpaces: number;
+}
 
 // Processed line information
 export interface ProcessedLine {
@@ -69,6 +83,8 @@ export interface BlockContext {
   previousBlock?: TypedBlock;
   isPartOfChain: boolean;
   parentBlockType: BlockType | null;
+  depth?: number;
+  chainPosition?: "first" | "middle" | "last";
 }
 
 // Block metadata information
@@ -85,8 +101,7 @@ export interface BlockMetadata {
 // Full block information
 export interface TypedBlock {
   lines: ProcessedLine[];
-  followingSpaces: number;
-  originalSpaces: number;
+  spacing: SpacingState;
   nextBlockFirstLine?: ProcessedLine;
   blockType: BlockType;
   metadata: BlockMetadata;
@@ -94,6 +109,18 @@ export interface TypedBlock {
   startLineNumber: number;
   endLineNumber: number;
 }
+
+export interface ValidationResult {
+  valid: boolean;
+  warnings: Array<{ blockIndex: number; message: string; severity: "warning" | "error" }>;
+}
+
+export type FlowTransition = {
+  type: FlowKeyword;
+  requiresSpace: boolean;
+  preserveOriginal: boolean;
+  contextDependent: boolean;
+};
 
 /**
  * Pattern definitions for STARLIMS syntax
@@ -180,8 +207,7 @@ export const typeGuards = {
     return (
       typeof obj === "object" &&
       Array.isArray(obj.lines) &&
-      typeof obj.followingSpaces === "number" &&
-      typeof obj.originalSpaces === "number" &&
+      typeof obj.spacing === "object" &&
       typeof obj.blockType === "string" &&
       typeof obj.metadata === "object" &&
       typeof obj.context === "object"
@@ -205,7 +231,28 @@ export const typeGuards = {
       (obj.parentBlockType === null || typeof obj.parentBlockType === "string")
     );
   },
+
+  isSpacingState(obj: any): obj is SpacingState {
+    return (
+      typeof obj === "object" &&
+      typeof obj.originalSpaces === "number" &&
+      typeof obj.standardSpaces === "number" &&
+      typeof obj.followingSpaces === "number"
+    );
+  },
 };
+
+// Main formatter function
+export function lineSpacingFormatter(
+  text: string,
+  config: Partial<FormatterConfig> = {}
+): string | ValidationResult {
+  // Merge provided config with defaults
+  const finalConfig = { ...DEFAULT_FORMATTER_CONFIG, ...config };
+
+  const processor = new BlockProcessor(text, finalConfig);
+  return processor.process();
+}
 
 // Block identifier class
 /**
@@ -732,12 +779,21 @@ class BlockIdentifier {
  * Abstract base class for spacing rules
  */
 abstract class SpacingRule {
+  constructor(protected config: FormatterConfig) {}
+
   /**
    * Apply spacing rules to a block of code
    * @param block The current block being processed
    * @param nextBlock Optional next block in the sequence
    */
   abstract applyRule(block: TypedBlock, nextBlock?: TypedBlock): void;
+
+  /**
+   * Update block spacing while preserving state
+   */
+  protected updateSpacing(block: TypedBlock, spaces: number): void {
+    block.spacing.followingSpaces = spaces;
+  }
 
   /**
    * Check if a line contains specific keywords
@@ -825,13 +881,17 @@ abstract class SpacingRule {
    * Check if a block should preserve its original spacing
    */
   protected shouldPreserveSpacing(block: TypedBlock): boolean {
+    if (!this.config.preserveUser) {
+      return false;
+    }
+
     // Preserve spacing in block comments
     if (this.isBlockComment(block)) {
       return true;
     }
 
     // Preserve spacing in explicitly separated declarations
-    if (block.blockType === "declaration" && block.originalSpaces > 0) {
+    if (block.blockType === "declaration" && block.spacing.originalSpaces > 0) {
       return true;
     }
 
@@ -862,7 +922,15 @@ abstract class SpacingRule {
  * Handles standard spacing rules that don't require broader context
  */
 class StandardSpacingRules extends SpacingRule {
+  constructor(config: FormatterConfig) {
+    super(config);
+  }
+
   applyRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    // Store original spacing for later reference
+    const originalSpacing = block.spacing.followingSpaces;
+
+    // Apply rules in sequence
     this.applyFileStartRule(block);
     this.applyConsecutiveBlankLinesRule(block);
     this.applyRegionSpacingRule(block);
@@ -870,6 +938,11 @@ class StandardSpacingRules extends SpacingRule {
     this.applyBasicControlStructureRule(block);
     this.applyBasicCommentRule(block, nextBlock);
     this.applyFileEndRule(block, nextBlock);
+
+    // Preserve original spacing if necessary
+    if (this.shouldPreserveSpacing(block)) {
+      this.updateSpacing(block, originalSpacing);
+    }
   }
 
   /**
@@ -887,7 +960,7 @@ class StandardSpacingRules extends SpacingRule {
    * Enforce maximum of two consecutive blank lines
    */
   private applyConsecutiveBlankLinesRule(block: TypedBlock): void {
-    block.followingSpaces = Math.min(block.followingSpaces, 2);
+    this.updateSpacing(block, Math.min(block.spacing.followingSpaces, 2));
   }
 
   /**
@@ -900,14 +973,14 @@ class StandardSpacingRules extends SpacingRule {
 
     if (block.metadata.commentType === "regionStart") {
       if (block.context.previousBlock) {
-        block.context.previousBlock.followingSpaces = 1;
+        this.updateSpacing(block.context.previousBlock, 1);
       }
-      block.followingSpaces = 1;
+      this.updateSpacing(block, 1);
     } else if (block.metadata.commentType === "regionEnd") {
       if (block.context.previousBlock) {
-        block.context.previousBlock.followingSpaces = 1;
+        this.updateSpacing(block.context.previousBlock, 1);
       }
-      block.followingSpaces = 2;
+      this.updateSpacing(block, 2);
     }
   }
 
@@ -921,14 +994,14 @@ class StandardSpacingRules extends SpacingRule {
 
     if (block.metadata.flowType === "error") {
       if (block.context.previousBlock) {
-        block.context.previousBlock.followingSpaces = 2;
+        this.updateSpacing(block.context.previousBlock, 2);
       }
-      block.followingSpaces = 1;
+      this.updateSpacing(block, 1);
     } else if (block.metadata.flowType === "resume") {
       if (block.context.previousBlock) {
-        block.context.previousBlock.followingSpaces = 1;
+        this.updateSpacing(block.context.previousBlock, 1);
       }
-      block.followingSpaces = 1;
+      this.updateSpacing(block, 1);
     }
   }
 
@@ -948,9 +1021,9 @@ class StandardSpacingRules extends SpacingRule {
    */
   private applySwitchBlockRules(block: TypedBlock): void {
     if (block.metadata.flowType === "caseStart") {
-      block.followingSpaces = 1;
+      this.updateSpacing(block, 1);
     } else if (block.metadata.flowType === "caseEnd" && block.context.previousBlock) {
-      block.context.previousBlock.followingSpaces = 1;
+      this.updateSpacing(block.context.previousBlock, 1);
     }
   }
 
@@ -961,7 +1034,7 @@ class StandardSpacingRules extends SpacingRule {
     const isEndOfBlock = block.metadata.flowType === "else" || block.metadata.flowType === "ifEnd";
 
     if (isEndOfBlock && block.context.previousBlock) {
-      block.context.previousBlock.followingSpaces = 1;
+      this.updateSpacing(block.context.previousBlock, 1);
     }
   }
 
@@ -977,17 +1050,18 @@ class StandardSpacingRules extends SpacingRule {
 
     // One blank line before any comment unless it follows another comment
     if (!isPreviousComment && block.context.previousBlock) {
-      block.context.previousBlock.followingSpaces = 1;
+      this.updateSpacing(block.context.previousBlock, 1);
     }
 
     // Block comments always get spacing
     if (block.metadata.commentType === "block") {
       // Block comments followed by two blank lines
-      block.followingSpaces = 2;
+      this.updateSpacing(block, 2);
     } else {
       // Single line comments followed by one blank line unless
       // followed by another comment
-      block.followingSpaces = block.originalSpaces === 0 ? 1 : block.originalSpaces;
+      const spacing = block.spacing.originalSpaces === 0 ? 1 : block.spacing.originalSpaces;
+      this.updateSpacing(block, spacing);
     }
   }
 
@@ -996,7 +1070,7 @@ class StandardSpacingRules extends SpacingRule {
    */
   private applyFileEndRule(block: TypedBlock, nextBlock?: TypedBlock): void {
     if (!nextBlock) {
-      block.followingSpaces = 1;
+      this.updateSpacing(block, 1);
     }
   }
 }
@@ -1006,12 +1080,25 @@ class StandardSpacingRules extends SpacingRule {
  * Handles context-dependent spacing rules that require awareness of surrounding blocks
  */
 class ContextualSpacingRules extends SpacingRule {
+  constructor(config: FormatterConfig) {
+    super(config);
+  }
+
   applyRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    // Store original spacing for potential preservation
+    const originalSpacing = block.spacing.followingSpaces;
+
+    // Apply contextual rules
     this.applyDeclarationSpacingRule(block, nextBlock);
     this.applyProcedureBlockSpacingRule(block, nextBlock);
     this.applyAdvancedControlStructureRule(block, nextBlock);
     this.applyContextualCommentRule(block, nextBlock);
     this.applyChainedBlockRule(block, nextBlock);
+
+    // Preserve original spacing if necessary
+    if (this.shouldPreserveSpacing(block)) {
+      this.updateSpacing(block, originalSpacing);
+    }
   }
 
   /**
@@ -1024,19 +1111,19 @@ class ContextualSpacingRules extends SpacingRule {
 
     const currentType = block.metadata.declarationType;
     const nextType = nextBlock?.metadata.declarationType;
-    const isExplicitlySeparated = block.originalSpaces > 0;
+    const isExplicitlySeparated = block.spacing.originalSpaces > 0;
 
     if (nextBlock?.blockType === "declaration") {
       if (currentType === nextType && !isExplicitlySeparated) {
         // No blank lines between same type declarations unless explicitly separated
-        block.followingSpaces = 0;
+        this.updateSpacing(block, 0);
       } else if (currentType !== nextType) {
         // One blank line between different declaration types
-        block.followingSpaces = 1;
+        this.updateSpacing(block, 1);
       }
     } else if (nextBlock && !this.isDeclarationRelated(nextBlock)) {
       // Two blank lines after last declaration before main code
-      block.followingSpaces = 2;
+      this.updateSpacing(block, 2);
     }
   }
 
@@ -1051,17 +1138,17 @@ class ContextualSpacingRules extends SpacingRule {
     if (block.metadata.isStart) {
       // Two blank lines before procedure unless it's first or after separator
       if (block.context.previousBlock && !this.isSectionSeparator(block.context.previousBlock)) {
-        block.context.previousBlock.followingSpaces = 2;
+        this.updateSpacing(block.context.previousBlock, 2);
       }
       // One blank line after procedure declaration
-      block.followingSpaces = 1;
+      this.updateSpacing(block, 1);
     } else if (block.metadata.isEnd) {
       // One blank line before return
       if (block.context.previousBlock) {
-        block.context.previousBlock.followingSpaces = 1;
+        this.updateSpacing(block.context.previousBlock, 1);
       }
       // Two blank lines after procedure end unless it's last
-      block.followingSpaces = nextBlock ? 2 : 1;
+      this.updateSpacing(block, nextBlock ? 2 : 1);
     }
   }
 
@@ -1075,7 +1162,7 @@ class ContextualSpacingRules extends SpacingRule {
         block.context.previousBlock &&
         !this.isConsecutiveComment(block.context.previousBlock, block)
       ) {
-        block.context.previousBlock.followingSpaces = 1;
+        this.updateSpacing(block.context.previousBlock, 1);
       }
     }
 
@@ -1095,13 +1182,13 @@ class ContextualSpacingRules extends SpacingRule {
 
     if (isCaseOrOtherwise && nextBlock?.blockType !== "switch") {
       // No blank line after CASE/OTHERWISE when followed by code
-      block.followingSpaces = 0;
+      this.updateSpacing(block, 0);
     } else if (block.metadata.flowType === "exitCase") {
       // One blank line before and after EXITCASE
       if (block.context.previousBlock) {
-        block.context.previousBlock.followingSpaces = 1;
+        this.updateSpacing(block.context.previousBlock, 1);
       }
-      block.followingSpaces = 1;
+      this.updateSpacing(block, 1);
     }
   }
 
@@ -1111,7 +1198,7 @@ class ContextualSpacingRules extends SpacingRule {
   private applyConditionalRules(block: TypedBlock, nextBlock?: TypedBlock): void {
     if (block.metadata.flowType === "else" && this.hasNestedControl(nextBlock)) {
       // Add space when ELSE is followed by nested control
-      block.followingSpaces = 1;
+      this.updateSpacing(block, 1);
     }
   }
 
@@ -1125,10 +1212,10 @@ class ContextualSpacingRules extends SpacingRule {
 
     if (this.isRelatedCodeComment(block, nextBlock)) {
       // No blank line after comments describing following code
-      block.followingSpaces = 0;
+      this.updateSpacing(block, 0);
     } else if (this.isConsecutiveComment(block, nextBlock)) {
       // No blank line between consecutive comments
-      block.followingSpaces = 0;
+      this.updateSpacing(block, 0);
     }
   }
 
@@ -1141,9 +1228,9 @@ class ContextualSpacingRules extends SpacingRule {
     }
 
     if (block.blockType === "conditional" && nextBlock.metadata.flowType === "else") {
-      block.followingSpaces = 0;
+      this.updateSpacing(block, 0);
     } else if (block.blockType === "switch" && this.isCaseStatement(nextBlock)) {
-      block.followingSpaces = 0;
+      this.updateSpacing(block, 0);
     }
   }
 
@@ -1240,28 +1327,34 @@ class ContextualSpacingRules extends SpacingRule {
 export class SpacingRulesProcessor {
   private standardRules: StandardSpacingRules;
   private contextualRules: ContextualSpacingRules;
+  private validationResult: ValidationResult = {
+    valid: true,
+    warnings: [],
+  };
 
-  constructor() {
-    this.standardRules = new StandardSpacingRules();
-    this.contextualRules = new ContextualSpacingRules();
+  constructor(private config: FormatterConfig) {
+    this.standardRules = new StandardSpacingRules(config);
+    this.contextualRules = new ContextualSpacingRules(config);
   }
 
   /**
    * Process blocks and apply spacing rules
    */
-  processBlocks(blocks: TypedBlock[], useContext: boolean = true): void {
+  processBlocks(blocks: TypedBlock[]): ValidationResult {
     if (blocks.length === 0) {
-      return;
+      return this.validationResult;
     }
 
     // First pass: Set up block relationships
     this.establishBlockRelationships(blocks);
 
     // Second pass: Apply spacing rules
-    this.applySpacingRules(blocks, useContext);
+    this.applySpacingRules(blocks);
 
     // Final pass: Validate and normalize spacing
     this.validateAndNormalizeSpacing(blocks);
+
+    return this.validationResult;
   }
 
   /**
@@ -1271,25 +1364,37 @@ export class SpacingRulesProcessor {
     let currentProcedure: TypedBlock | null = null;
     let currentControlBlock: TypedBlock | null = null;
     let blockStack: TypedBlock[] = [];
+    let depth = 0;
 
     blocks.forEach((block, index) => {
       // Set up basic relationships
       const previousBlock = index > 0 ? blocks[index - 1] : undefined;
       const nextBlock = index < blocks.length - 1 ? blocks[index + 1] : undefined;
 
+      // Update the block depth
+      if (block.metadata.isStart) {
+        depth++;
+      }
+
       // Determine block context
       const context = this.determineBlockContext(
         block,
         previousBlock,
         currentProcedure,
-        currentControlBlock
+        currentControlBlock,
+        depth
       );
+
+      // Update block relationships with null safety
+      const isChainable = previousBlock ? this.isChainable(previousBlock, block) : false;
+      const chainPosition = this.determineChainPosition(block, previousBlock, nextBlock);
 
       // Update block relationships
       block.context = {
         ...context,
         previousBlock,
-        isPartOfChain: previousBlock ? this.isChainable(previousBlock, block) : false,
+        isPartOfChain: isChainable,
+        chainPosition: chainPosition,
       };
 
       // Track procedure blocks
@@ -1311,6 +1416,7 @@ export class SpacingRulesProcessor {
         } else if (block.metadata.isEnd) {
           currentControlBlock = blockStack.length > 1 ? blockStack[blockStack.length - 2] : null;
           blockStack.pop();
+          depth = Math.max(0, depth - 1);
         }
       }
 
@@ -1321,6 +1427,32 @@ export class SpacingRulesProcessor {
     });
   }
 
+  private determineChainPosition(
+    block: TypedBlock,
+    previousBlock?: TypedBlock,
+    nextBlock?: TypedBlock
+  ): "first" | "middle" | "last" | undefined {
+    // First check if any block is undefined
+    if (!block || (!previousBlock && !nextBlock)) {
+      return undefined;
+    }
+
+    // Check chainability with null safety
+    const isPrevChainable = previousBlock ? this.isChainable(previousBlock, block) : false;
+    const isNextChainable = nextBlock ? this.isChainable(block, nextBlock) : false;
+
+    if (!isPrevChainable && !isNextChainable) {
+      return undefined;
+    }
+    if (!isPrevChainable) {
+      return "first";
+    }
+    if (!isNextChainable) {
+      return "last";
+    }
+    return "middle";
+  }
+
   /**
    * Determine context for a block
    */
@@ -1328,13 +1460,15 @@ export class SpacingRulesProcessor {
     block: TypedBlock,
     previousBlock?: TypedBlock,
     currentProcedure?: TypedBlock | null,
-    currentControlBlock?: TypedBlock | null
+    currentControlBlock?: TypedBlock | null,
+    depth?: number
   ): BlockContext {
     return {
       parentBlock: currentProcedure || currentControlBlock || undefined,
       isPartOfChain: false,
       parentBlockType: currentProcedure?.blockType || currentControlBlock?.blockType || null,
       previousBlock: previousBlock,
+      depth: depth || 0,
     };
   }
 
@@ -1348,17 +1482,24 @@ export class SpacingRulesProcessor {
   /**
    * Apply spacing rules to blocks
    */
-  private applySpacingRules(blocks: TypedBlock[], useContext: boolean): void {
+  private applySpacingRules(blocks: TypedBlock[]): void {
     blocks.forEach((block, index) => {
       const nextBlock = index < blocks.length - 1 ? blocks[index + 1] : undefined;
 
+      // Store the original spacing before any rules are applied
+      block.spacing.originalSpaces = block.spacing.followingSpaces;
+
       // Apply standard rules first
       this.standardRules.applyRule(block, nextBlock);
+      block.spacing.standardSpaces = block.spacing.followingSpaces;
 
       // Then apply contextual rules if enabled
-      if (useContext) {
+      if (this.config.useContext) {
         this.contextualRules.applyRule(block, nextBlock);
+        block.spacing.contextSpaces = block.spacing.followingSpaces;
       }
+
+      // TODO: Post Processing
     });
   }
 
@@ -1367,17 +1508,23 @@ export class SpacingRulesProcessor {
    */
   private validateAndNormalizeSpacing(blocks: TypedBlock[]): void {
     blocks.forEach((block, index) => {
+      const originalSpacing = block.spacing.followingSpaces;
+
       // Ensure no negative spacing
-      block.followingSpaces = Math.max(0, block.followingSpaces);
+      block.spacing.followingSpaces = Math.max(0, originalSpacing);
 
       // Apply maximum consecutive blank lines rule
       if (index > 0) {
         const prevBlock = blocks[index - 1];
         const combinedSpacing =
-          prevBlock.followingSpaces + (block.lines[0].trimmedContent === "" ? 1 : 0);
+          prevBlock.spacing.followingSpaces + (block.lines[0].trimmedContent === "" ? 1 : 0);
 
-        if (combinedSpacing > 2) {
-          prevBlock.followingSpaces = 2;
+        if (combinedSpacing > this.config.maxConsecutiveBlank!) {
+          const reduction = combinedSpacing - this.config.maxConsecutiveBlank!;
+          prevBlock.spacing.followingSpaces = Math.max(
+            0,
+            prevBlock.spacing.followingSpaces - reduction
+          );
         }
       }
 
@@ -1385,7 +1532,38 @@ export class SpacingRulesProcessor {
       if (index === 0 || index === blocks.length - 1) {
         this.handleFileBoundaries(block, index === 0, index === blocks.length - 1);
       }
+
+      // Validate final spacing matches expectations
+      this.validateBlockSpacing(block, index);
     });
+  }
+
+  private validateBlockSpacing(block: TypedBlock, index: number): void {
+    // Check for inconsistencies between spacing states
+    if (
+      this.config.useContext &&
+      block.spacing.contextSpaces !== undefined &&
+      block.spacing.followingSpaces !== block.spacing.contextSpaces
+    ) {
+      this.validationResult.warnings.push({
+        blockIndex: index,
+        message:
+          `Block ${index}: Final spacing (${block.spacing.followingSpaces}) ` +
+          `doesn't match contextual spacing (${block.spacing.contextSpaces})`,
+        severity: "warning",
+      });
+    }
+
+    // Check for unexpected large gaps
+    if (block.spacing.followingSpaces > this.config.maxConsecutiveBlank!) {
+      this.validationResult.warnings.push({
+        blockIndex: index,
+        message:
+          `Block ${index}: Spacing (${block.spacing.followingSpaces}) ` +
+          `exceeds maximum (${this.config.maxConsecutiveBlank})`,
+        severity: "warning",
+      });
+    }
   }
 
   /**
@@ -1401,14 +1579,19 @@ export class SpacingRulesProcessor {
 
     if (isLast) {
       // Ensure exactly one trailing blank line
-      block.followingSpaces = 1;
+      block.spacing.followingSpaces = 1;
     }
   }
 
   /**
    * Check if blocks can be chained
    */
-  private isChainable(prev: TypedBlock, current: TypedBlock): boolean {
+  private isChainable(prev: TypedBlock | undefined, current: TypedBlock | undefined): boolean {
+    // Return false if either block is undefined
+    if (!prev || !current) {
+      return false;
+    }
+
     // Handle if/else chains
     if (prev.blockType === "conditional" && current.blockType === "conditional") {
       return current.metadata.flowType === "else";
@@ -1423,7 +1606,7 @@ export class SpacingRulesProcessor {
     if (prev.blockType === "declaration" && current.blockType === "declaration") {
       const prevType = prev.metadata.declarationType;
       const currentType = current.metadata.declarationType;
-      return prevType === currentType && prev.originalSpaces === 0;
+      return prevType === currentType && prev.spacing.originalSpaces === 0;
     }
 
     return false;
@@ -1434,13 +1617,13 @@ export class SpacingRulesProcessor {
    */
   private establishChainRelationship(prev: TypedBlock, current: TypedBlock): void {
     if (prev.blockType === "conditional" && current.metadata.flowType === "else") {
-      prev.followingSpaces = 0;
+      prev.spacing.followingSpaces = 0;
       current.context.isPartOfChain = true;
     } else if (
       prev.blockType === "switch" &&
       ["caseBranch", "caseDefault"].includes(current.metadata.flowType)
     ) {
-      prev.followingSpaces = 0;
+      prev.spacing.followingSpaces = 0;
       current.context.isPartOfChain = true;
     }
   }
@@ -1453,28 +1636,52 @@ export class SpacingRulesProcessor {
 class BlockProcessor {
   private blocks: TypedBlock[] = [];
   private rulesProcessor: SpacingRulesProcessor;
+  private config: FormatterConfig;
+  private validationResult: ValidationResult = {
+    valid: true,
+    warnings: [],
+  };
 
-  private debug: boolean = false;
-  private useContext: boolean = true;
-
-  constructor(private text: string) {
-    this.rulesProcessor = new SpacingRulesProcessor();
+  constructor(private text: string, config: FormatterConfig) {
+    this.config = config;
+    this.rulesProcessor = new SpacingRulesProcessor(config);
   }
 
   /**
    * Process input text and apply formatting rules
    */
-  public process(): string {
+  public process(): string | ValidationResult {
     try {
       this.blocks = this.splitIntoBlocks();
-      this.rulesProcessor.processBlocks(this.blocks, this.useContext);
-      return this.debug ? this.formatDebug() : this.format();
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        throw new BlockProcessingError(`Error processing blocks: ${error.message}`);
+      this.rulesProcessor.processBlocks(this.blocks);
+
+      // If in debug mode, return validation result
+      if (this.config.debug) {
+        return this.formatDebug();
       }
-      throw new BlockProcessingError(`Error processing blocks: ${String(error)}`);
+      return this.format();
+    } catch (error: unknown) {
+      this.validationResult.valid = false;
+      this.validationResult.warnings.push({
+        blockIndex: -1,
+        message: error instanceof Error ? error.message : String(error),
+        severity: "error",
+      });
+
+      if (this.config.debug) {
+        return this.validationResult;
+      }
+
+      throw error;
     }
+  }
+
+  private createSpacingState(followingSpaces: number): SpacingState {
+    return {
+      originalSpaces: followingSpaces,
+      standardSpaces: followingSpaces,
+      followingSpaces: followingSpaces,
+    };
   }
 
   /**
@@ -1583,8 +1790,7 @@ class BlockProcessor {
 
     return {
       lines,
-      originalSpaces: blankCount,
-      followingSpaces: blankCount,
+      spacing: this.createSpacingState(blankCount),
       nextBlockFirstLine: nextLine,
       ...blockIdentification,
       context: {
@@ -1632,8 +1838,8 @@ class BlockProcessor {
     target.lines.push(...source.lines);
     target.endLineNumber = source.endLineNumber;
     target.nextBlockFirstLine = source.nextBlockFirstLine;
-    target.originalSpaces = source.originalSpaces;
-    target.followingSpaces = source.followingSpaces;
+    target.spacing.originalSpaces = source.spacing.originalSpaces;
+    target.spacing.followingSpaces = source.spacing.followingSpaces;
 
     if (target.blockType === "switch" && source.metadata.isCaseContent) {
       target.metadata = {
@@ -1660,7 +1866,7 @@ class BlockProcessor {
 
       // Add block spacing
       if (index < this.blocks.length - 1) {
-        result += "\n".repeat(block.followingSpaces);
+        result += "\n".repeat(block.spacing.followingSpaces);
       }
     });
 
@@ -1673,7 +1879,8 @@ class BlockProcessor {
     output.push("Block Analysis:");
     output.push("==============");
     output.push(
-      "`block`|`type`|`flow`|`spacing`|`startLine`|`endLine`|`firstLine`|`nextLine`|`isChain`"
+      "`block`|`type`|`flow`|`origSpacing`|`stdSpacing`|`ctxSpacing`|`currSpacing`" +
+        "|`startLine`|`endLine`|`firstLine`|`isChain`"
     );
 
     this.blocks.forEach((block, index) => {
@@ -1686,7 +1893,10 @@ class BlockProcessor {
         `${index + 1}`,
         `${block.blockType}`,
         `${block.metadata.flowType}`,
-        `${block.followingSpaces}`,
+        `${block.spacing.originalSpaces}`,
+        `${block.spacing.standardSpaces}`,
+        `${block.spacing.contextSpaces}`,
+        `${block.spacing.followingSpaces}`,
         `${block.startLineNumber}`,
         `${block.endLineNumber}`,
         `${this.truncateString(firstLine, truncateLength)}`,
@@ -1706,12 +1916,6 @@ class BlockProcessor {
     }
     return str.substring(0, maxLength) + "...";
   }
-}
-
-// Main formatter function
-export function lineSpacingFormatter(text: string): string {
-  const processor = new BlockProcessor(text);
-  return processor.process();
 }
 
 // Error types

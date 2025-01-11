@@ -2,80 +2,96 @@ import * as vscode from "vscode";
 import { correctKeywordCasing } from "./formatters/keywordCasing";
 import { ensureSemicolonNewline } from "./formatters/semicolonNewline";
 import { enforceOperatorSpacing } from "./formatters/operatorSpacing";
-import { lineSpacingFormatter } from "./formatters/lineSpacing";
+import { lineSpacingFormatter, ValidationResult } from "./formatters/lineSpacing";
 import { breakLongLines } from "./formatters/longLineBreaker";
 import { adjustIndentation } from "./formatters/indentation";
 import { ensureSingleFinalNewline } from "./formatters/finalNewline";
 
 export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
-    private document!: vscode.TextDocument;
-    private options!: vscode.FormattingOptions;
+  private document!: vscode.TextDocument;
+  private options!: vscode.FormattingOptions;
 
-    // List of SSL keywords that should be capitalized
-    private keywords = [
-        "BEGINCASE",
-        "BEGININLINECODE",
-        "CASE",
-        "DECLARE",
-        "DEFAULT",
-        "ELSE",
-        "ENDCASE",
-        "ENDIF",
-        "ENDINLINECODE",
-        "ENDWHILE",
-        "ERROR",
-        "EXITCASE",
-        "EXITWHILE",
-        "IF",
-        "INCLUDE",
-        "LOOP",
-        "OTHERWISE",
-        "PARAMETERS",
-        "PROCEDURE",
-        "PUBLIC",
-        "REGION",
-        "RESUME",
-        "RETURN",
-        "WHILE",
-    ];
+  // List of SSL keywords that should be capitalized
+  private keywords = [
+    "BEGINCASE",
+    "BEGININLINECODE",
+    "CASE",
+    "DECLARE",
+    "DEFAULT",
+    "ELSE",
+    "ENDCASE",
+    "ENDIF",
+    "ENDINLINECODE",
+    "ENDWHILE",
+    "ERROR",
+    "EXITCASE",
+    "EXITWHILE",
+    "IF",
+    "INCLUDE",
+    "LOOP",
+    "OTHERWISE",
+    "PARAMETERS",
+    "PROCEDURE",
+    "PUBLIC",
+    "REGION",
+    "RESUME",
+    "RETURN",
+    "WHILE",
+  ];
 
-    public provideDocumentFormattingEdits(
-        document: vscode.TextDocument,
-        options: vscode.FormattingOptions,
-        token: vscode.CancellationToken
-    ): vscode.TextEdit[] {
-        this.document = document;
-        this.options = options;
+  public provideDocumentFormattingEdits(
+    document: vscode.TextDocument,
+    options: vscode.FormattingOptions,
+    token: vscode.CancellationToken
+  ): vscode.TextEdit[] {
+    this.document = document;
+    this.options = options;
 
-        let text = document.getText();
-        const originalLines = text.split("\n");
+    let text = document.getText();
+    const originalLines = text.split("\n");
 
-        // Apply formatting steps
-        // Correct the casing of SSL keywords
-        // text = correctKeywordCasing(text, this.keywords);
+    // Apply formatting steps
+    // Correct the casing of SSL keywords
+    // text = correctKeywordCasing(text, this.keywords);
 
-        // Ensure semicolons are followed by newlines
-        // text = ensureSemicolonNewline(text);
+    // Ensure semicolons are followed by newlines
+    // text = ensureSemicolonNewline(text);
 
-        // Enforce spacing around operators
-        // text = enforceOperatorSpacing(text);
+    // Enforce spacing around operators
+    // text = enforceOperatorSpacing(text);
 
-        // Enforce line spacing according to style guide
-        text = lineSpacingFormatter(text);
+    // Enforce line spacing according to style guide
+    const result = lineSpacingFormatter(text);
 
-        // Break lines over 90 characters
-        // text = breakLongLines(text);
+    // If the formatter returns validation results instead of formatted test,
+    //  show the warnings in the editor but return the original text
+    if (typeof result !== "string") {
+      // Log validation warnings to the output channel
+      result.warnings.forEach((warning) => {
+        vscode.window.showWarningMessage(
+          `Formatting warning at block ${warning.blockIndex}: ${warning.message}`
+        );
+      });
 
-        // Adjust the indentation of the code
-        // text = adjustIndentation(text);
-
-        // Make sure the code ends in a single blank line
-        // text = ensureSingleFinalNewline(text);
-
-        // Create a single edit for the entire document
-        const lastLineId = document.lineCount - 1;
-        const lastLineLength = document.lineAt(lastLineId).text.length;
-        const range = new vscode.Range(0, 0, lastLineId, lastLineLength);
-        return [vscode.TextEdit.replace(range, text)];
+      // Return the original text
+      text = result.valid ? text : document.getText();
+    } else {
+      text = result;
     }
+
+    // Break lines over 90 characters
+    // text = breakLongLines(text);
+
+    // Adjust the indentation of the code
+    // text = adjustIndentation(text);
+
+    // Make sure the code ends in a single blank line
+    // text = ensureSingleFinalNewline(text);
+
+    // Create a single edit for the entire document
+    const lastLineId = document.lineCount - 1;
+    const lastLineLength = document.lineAt(lastLineId).text.length;
+    const range = new vscode.Range(0, 0, lastLineId, lastLineLength);
+    return [vscode.TextEdit.replace(range, text)];
+  }
 }
