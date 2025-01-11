@@ -143,7 +143,7 @@ export const patterns = {
     group: /^:(?:PARAMETERS|DEFAULT|DECLARE)\b/i,
   },
   logic: {
-    assignment: /:=/,
+    assignment: /[:+-]=/,
     funtionCall: /\w+\s*\(/,
   },
   comment: {
@@ -650,18 +650,6 @@ class BlockIdentifier {
     };
   }
 
-  private static createLogicBlock(): { blockType: BlockType; metadata: BlockMetadata } {
-    return {
-      blockType: "logic",
-      metadata: {
-        flowType: "other",
-        isStart: false,
-        isMiddle: true,
-        isEnd: false,
-      },
-    };
-  }
-
   static shouldMergeWithPrevious(prevBlock: TypedBlock, currentBlock: TypedBlock): boolean {
     // Handle switch case statements
     if (prevBlock.blockType === "switch") {
@@ -853,6 +841,8 @@ abstract class SpacingRule {
   /**
    * Check if a block is a section separator
    */
+  // ! We don't really have a convention for section separators, but I like it enough to keep it
+  // ! We should set it up with a 2 before 2 after rule
   protected isSectionSeparator(block: TypedBlock): boolean {
     if (block.blockType !== "comment") {
       return false;
@@ -983,22 +973,21 @@ class StandardSpacingRules extends SpacingRule {
       return;
     }
 
-    const isBlockComment = block.metadata.commentType === "block";
     const isPreviousComment = block.context.previousBlock?.blockType === "comment";
-    const isNextComment = nextBlock?.blockType === "comment";
 
     // One blank line before any comment unless it follows another comment
     if (!isPreviousComment && block.context.previousBlock) {
       block.context.previousBlock.followingSpaces = 1;
     }
 
-    if (isBlockComment) {
+    // Block comments always get spacing
+    if (block.metadata.commentType === "block") {
       // Block comments followed by two blank lines
       block.followingSpaces = 2;
-    } else if (!isNextComment) {
+    } else {
       // Single line comments followed by one blank line unless
       // followed by another comment
-      block.followingSpaces = 1;
+      block.followingSpaces = block.originalSpaces === 0 ? 1 : block.originalSpaces;
     }
   }
 
@@ -1061,7 +1050,7 @@ class ContextualSpacingRules extends SpacingRule {
 
     if (block.metadata.isStart) {
       // Two blank lines before procedure unless it's first or after separator
-      if (block.context.previousBlock && !this.isProcedureSeparator(block.context.previousBlock)) {
+      if (block.context.previousBlock && !this.isSectionSeparator(block.context.previousBlock)) {
         block.context.previousBlock.followingSpaces = 2;
       }
       // One blank line after procedure declaration
@@ -1080,6 +1069,16 @@ class ContextualSpacingRules extends SpacingRule {
    * Apply advanced control structure spacing rules
    */
   private applyAdvancedControlStructureRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    // Check for control structure start
+    if (block.metadata.isStart || block.metadata.flowType === "ifStart") {
+      if (
+        block.context.previousBlock &&
+        !this.isConsecutiveComment(block.context.previousBlock, block)
+      ) {
+        block.context.previousBlock.followingSpaces = 1;
+      }
+    }
+
     if (block.blockType === "switch") {
       this.applySwitchCaseRules(block, nextBlock);
     } else if (block.blockType === "conditional") {
@@ -1161,6 +1160,7 @@ class ContextualSpacingRules extends SpacingRule {
   /**
    * Helper method to check if a comment is declaration-related
    */
+  // ! We should be checking to see if the type that follows the comment is a declaration or logic
   private isDeclarationComment(block: TypedBlock): boolean {
     const commentText = block.lines[0].trimmedContent.toLowerCase();
     return (
@@ -1172,15 +1172,9 @@ class ContextualSpacingRules extends SpacingRule {
   }
 
   /**
-   * Helper method to check if a block is a procedure separator
-   */
-  private isProcedureSeparator(block: TypedBlock): boolean {
-    return block.blockType === "comment" && block.lines[0].trimmedContent.includes("=".repeat(20));
-  }
-
-  /**
    * Helper method to check if a block has nested control structures
    */
+  // ! We should probably be using the pattern to check for nested control structures
   private hasNestedControl(block?: TypedBlock): boolean {
     if (!block) {
       return false;
@@ -1193,6 +1187,10 @@ class ContextualSpacingRules extends SpacingRule {
   /**
    * Helper method to check if a comment is related to following code
    */
+  // ! This is complicating the logic too much. Block comments should always have space
+  // ! after them but single line comments can be followed by code of any type
+  // ! Maybe this is more of a post-processing step?
+  // ! do a single space after a single line always, unless the user chose to have no space
   private isRelatedCodeComment(block: TypedBlock, nextBlock?: TypedBlock): boolean {
     if (!nextBlock) {
       return false;
@@ -1219,7 +1217,11 @@ class ContextualSpacingRules extends SpacingRule {
     return (
       nextBlock?.blockType === "comment" &&
       block.metadata.commentType !== "block" &&
-      nextBlock.metadata.commentType !== "block"
+      block.metadata.commentType !== "regionStart" &&
+      block.metadata.commentType !== "regionEnd" &&
+      nextBlock.metadata.commentType !== "block" &&
+      nextBlock.metadata.commentType !== "regionStart" &&
+      nextBlock.metadata.commentType !== "regionEnd"
     );
   }
 
@@ -1452,6 +1454,7 @@ class BlockProcessor {
   private blocks: TypedBlock[] = [];
   private rulesProcessor: SpacingRulesProcessor;
 
+  private debug: boolean = false;
   private useContext: boolean = true;
 
   constructor(private text: string) {
@@ -1465,7 +1468,7 @@ class BlockProcessor {
     try {
       this.blocks = this.splitIntoBlocks();
       this.rulesProcessor.processBlocks(this.blocks, this.useContext);
-      return this.format();
+      return this.debug ? this.formatDebug() : this.format();
     } catch (error: unknown) {
       if (error instanceof Error) {
         throw new BlockProcessingError(`Error processing blocks: ${error.message}`);
@@ -1505,7 +1508,7 @@ class BlockProcessor {
       currentBlock.push(line);
 
       // Check for block end
-      if (this.isBlockEnd(line, isBlockComment, isMultiLineStatement)) {
+      if (this.isBlockEnd(line)) {
         const block = this.createBlock(currentBlock, lines, i);
 
         // Check if this block should be merged with previous
@@ -1552,25 +1555,11 @@ class BlockProcessor {
   /**
    * Check if current line ends a block
    */
-  private isBlockEnd(
-    line: ProcessedLine,
-    isBlockComment: boolean,
-    isMultiLineStatement: boolean
-  ): boolean {
+  private isBlockEnd(line: ProcessedLine): boolean {
     const content = line.trimmedContent;
 
-    // End of block comment
-    if (isBlockComment && content.endsWith("*/")) {
-      return true;
-    }
-
-    // End of multi-line statement
-    if (isMultiLineStatement && patterns.structure.semicolon.test(content)) {
-      return true;
-    }
-
-    // Single-line statement
-    if (!isBlockComment && !isMultiLineStatement && patterns.structure.semicolon.test(content)) {
+    // Just check for semi-colons at the end of statement
+    if (patterns.structure.semicolon.test(content)) {
       return true;
     }
 
@@ -1677,6 +1666,45 @@ class BlockProcessor {
 
     // Ensure exactly one trailing newline
     return result.trimEnd() + "\n";
+  }
+  private formatDebug(): string {
+    const output: string[] = [];
+
+    output.push("Block Analysis:");
+    output.push("==============");
+    output.push(
+      "`block`|`type`|`flow`|`spacing`|`startLine`|`endLine`|`firstLine`|`nextLine`|`isChain`"
+    );
+
+    this.blocks.forEach((block, index) => {
+      const firstLine = block.lines[0].trimmedContent;
+      const nextLine = block.nextBlockFirstLine?.trimmedContent || "END";
+      const truncateLength = 30;
+
+      // Build the debug info string
+      const debugInfo = [
+        `${index + 1}`,
+        `${block.blockType}`,
+        `${block.metadata.flowType}`,
+        `${block.followingSpaces}`,
+        `${block.startLineNumber}`,
+        `${block.endLineNumber}`,
+        `${this.truncateString(firstLine, truncateLength)}`,
+        `${this.truncateString(nextLine, truncateLength)}`,
+        `${block.context.isPartOfChain}`,
+      ].join("`|`");
+
+      output.push("`" + debugInfo + "`");
+    });
+
+    return output.join("\n");
+  }
+
+  private truncateString(str: string, maxLength: number): string {
+    if (str.length <= maxLength) {
+      return str;
+    }
+    return str.substring(0, maxLength) + "...";
   }
 }
 
