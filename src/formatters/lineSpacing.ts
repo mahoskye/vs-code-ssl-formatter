@@ -878,9 +878,6 @@ class StandardSpacingRules extends SpacingRule {
   }
 
   applyRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    // Store original spacing for later reference
-    const originalSpacing = block.spacing.followingSpaces;
-
     // File structure rules
     this.applyFileStartRule(block);
     this.applyMaxBlankLinesRule(block);
@@ -1011,9 +1008,6 @@ class ContextualSpacingRules extends SpacingRule {
   }
 
   applyRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    // Store original spacing for potential preservation
-    const originalSpacing = block.spacing.followingSpaces;
-
     // Apply contextual rules
     this.applyDeclarationSpacingRule(block, nextBlock);
     this.applyProcedureBlockSpacingRule(block, nextBlock);
