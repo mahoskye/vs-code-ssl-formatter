@@ -129,7 +129,7 @@ export const patterns = {
   flow: {
     procedure: {
       start: /:(?:CLASS|PROCEDURE)\b/i,
-      end: /:RETURN\b/i,
+      end: /:(?:RETURN|ENDPROC)\b/i,
     },
     conditional: {
       ifStart: /:IF\b/i,
@@ -921,16 +921,43 @@ class StandardSpacingRules extends SpacingRule {
 
     switch (block.blockType) {
       case "procedure":
-        if (block.metadata.isStart || block.metadata.flowType === "procedureEnd") {
+        if (block.metadata.isStart) {
           spacing = 1;
+        } else if (block.metadata.flowType === "procedureEnd") {
+          spacing = 2;
         }
         break;
 
       case "conditional":
+        if (block.metadata.flowType === "ifEnd") {
+          spacing = 2;
+        } else {
+          spacing = 1;
+        }
+        break;
+
       case "loop":
+        if (block.metadata.flowType === "whileEnd" || block.metadata.flowType === "forEnd") {
+          spacing = 2;
+        } else {
+          spacing = 1;
+        }
+        break;
+
       case "switch":
+        if (block.metadata.flowType === "caseEnd") {
+          spacing = 2;
+        } else {
+          spacing = 1;
+        }
+        break;
+
       case "errorHandling":
-        spacing = 1;
+        if (block.metadata.flowType === "tryEnd" || block.metadata.flowType === "resume") {
+          spacing = 2;
+        } else {
+          spacing = 1;
+        }
         break;
 
       case "comment":
