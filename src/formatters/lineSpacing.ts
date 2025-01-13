@@ -55,8 +55,8 @@ export interface FormatterConfig {
 }
 
 export const DEFAULT_FORMATTER_CONFIG: FormatterConfig = {
-  useContext: true,
-  debug: true,
+  useContext: false,
+  debug: false,
   preserveUser: false,
   maxConsecutiveBlank: 2,
 };
@@ -901,8 +901,6 @@ abstract class SpacingRule {
   /**
    * Check if a block is a section separator
    */
-  // ! We don't really have a convention for section separators, but I like it enough to keep it
-  // ! We should set it up with a 2 before 2 after rule
   protected isSectionSeparator(block: TypedBlock): boolean {
     if (block.blockType !== "comment") {
       return false;
@@ -930,19 +928,27 @@ class StandardSpacingRules extends SpacingRule {
     // Store original spacing for later reference
     const originalSpacing = block.spacing.followingSpaces;
 
-    // Apply rules in sequence
+    // File structure rules
     this.applyFileStartRule(block);
-    this.applyConsecutiveBlankLinesRule(block);
-    this.applyRegionSpacingRule(block);
-    this.applyErrorBlockSpacingRule(block);
-    this.applyBasicControlStructureRule(block);
-    this.applyBasicCommentRule(block, nextBlock);
-    this.applyFileEndRule(block, nextBlock);
+    this.applyMaxBlankLinesRule(block);
 
-    // Preserve original spacing if necessary
-    if (this.shouldPreserveSpacing(block)) {
-      this.updateSpacing(block, originalSpacing);
-    }
+    // Comment rules
+    this.applyBlockCommentRule(block);
+    this.applyConsecutiveCommentRule(block, nextBlock);
+    this.applyRegionSpacingRule(block);
+    this.applyBasicCommentRule(block, nextBlock);
+
+    // Block structure rules
+    this.applyControlStructureRule(block, nextBlock);
+    this.applyErrorBlockSpacingRule(block);
+
+    // Statement rules
+    this.applyDeclarationRule(block);
+    this.applyLogicRule(block);
+    this.applyProcedureEndRule(block);
+
+    // File end rule (always last)
+    this.applyFileEndRule(block, nextBlock);
   }
 
   /**
@@ -956,30 +962,62 @@ class StandardSpacingRules extends SpacingRule {
     }
   }
 
+  private applyDeclarationRule(block: TypedBlock): void {
+    if (block.blockType === "declaration") {
+      // Default one line after declarations
+      this.updateSpacing(block, 1);
+    }
+  }
+
+  private applyLogicRule(block: TypedBlock): void {
+    if (block.blockType !== "logic") {
+      return;
+    }
+
+    if (block.metadata.flowType === "assignment" || block.metadata.flowType === "functionCall") {
+      // Default one line after statements
+      this.updateSpacing(block, 1);
+    }
+  }
+
+  private applyProcedureEndRule(block: TypedBlock): void {
+    if (block.metadata.flowType === "procedureEnd") {
+      // Default one line after procedure end
+      this.updateSpacing(block, 1);
+    }
+  }
+
   /**
    * Enforce maximum of two consecutive blank lines
    */
-  private applyConsecutiveBlankLinesRule(block: TypedBlock): void {
+  private applyMaxBlankLinesRule(block: TypedBlock): void {
     this.updateSpacing(block, Math.min(block.spacing.followingSpaces, 2));
+  }
+
+  private applyBlockCommentRule(block: TypedBlock): void {
+    if (this.isBlockComment(block)) {
+      this.updateSpacing(block, 2);
+    }
+  }
+
+  private applyConsecutiveCommentRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (block.blockType === "comment" && nextBlock?.blockType === "comment") {
+      // No space between consecutive comments
+      this.updateSpacing(block, 0);
+    }
   }
 
   /**
    * Apply region comment spacing rules
    */
   private applyRegionSpacingRule(block: TypedBlock): void {
-    if (block.blockType !== "comment") {
+    if (!this.isRegionComment(block)) {
       return;
     }
 
     if (block.metadata.commentType === "regionStart") {
-      if (block.context.previousBlock) {
-        this.updateSpacing(block.context.previousBlock, 1);
-      }
       this.updateSpacing(block, 1);
     } else if (block.metadata.commentType === "regionEnd") {
-      if (block.context.previousBlock) {
-        this.updateSpacing(block.context.previousBlock, 1);
-      }
       this.updateSpacing(block, 2);
     }
   }
@@ -993,14 +1031,8 @@ class StandardSpacingRules extends SpacingRule {
     }
 
     if (block.metadata.flowType === "error") {
-      if (block.context.previousBlock) {
-        this.updateSpacing(block.context.previousBlock, 2);
-      }
       this.updateSpacing(block, 1);
     } else if (block.metadata.flowType === "resume") {
-      if (block.context.previousBlock) {
-        this.updateSpacing(block.context.previousBlock, 1);
-      }
       this.updateSpacing(block, 1);
     }
   }
@@ -1008,33 +1040,16 @@ class StandardSpacingRules extends SpacingRule {
   /**
    * Apply basic control structure spacing rules
    */
-  private applyBasicControlStructureRule(block: TypedBlock): void {
-    if (block.blockType === "switch") {
-      this.applySwitchBlockRules(block);
-    } else if (block.blockType === "conditional") {
-      this.applyConditionalBlockRules(block);
+  private applyControlStructureRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (!this.isControlStructure(block)) {
+      return;
     }
-  }
 
-  /**
-   * Apply switch block spacing rules
-   */
-  private applySwitchBlockRules(block: TypedBlock): void {
-    if (block.metadata.flowType === "caseStart") {
+    // Only handle structure starts/ends
+    if (block.metadata.isEnd) {
       this.updateSpacing(block, 1);
-    } else if (block.metadata.flowType === "caseEnd" && block.context.previousBlock) {
-      this.updateSpacing(block.context.previousBlock, 1);
-    }
-  }
-
-  /**
-   * Apply conditional block spacing rules
-   */
-  private applyConditionalBlockRules(block: TypedBlock): void {
-    const isEndOfBlock = block.metadata.flowType === "else" || block.metadata.flowType === "ifEnd";
-
-    if (isEndOfBlock && block.context.previousBlock) {
-      this.updateSpacing(block.context.previousBlock, 1);
+    } else if (block.metadata.isStart) {
+      this.updateSpacing(block, 1);
     }
   }
 
@@ -1042,27 +1057,15 @@ class StandardSpacingRules extends SpacingRule {
    * Apply basic comment spacing rules
    */
   private applyBasicCommentRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (block.blockType !== "comment") {
+    if (
+      block.blockType !== "comment" ||
+      this.isBlockComment(block) ||
+      this.isRegionComment(block)
+    ) {
       return;
     }
 
-    const isPreviousComment = block.context.previousBlock?.blockType === "comment";
-
-    // One blank line before any comment unless it follows another comment
-    if (!isPreviousComment && block.context.previousBlock) {
-      this.updateSpacing(block.context.previousBlock, 1);
-    }
-
-    // Block comments always get spacing
-    if (block.metadata.commentType === "block") {
-      // Block comments followed by two blank lines
-      this.updateSpacing(block, 2);
-    } else {
-      // Single line comments followed by one blank line unless
-      // followed by another comment
-      const spacing = block.spacing.originalSpaces === 0 ? 1 : block.spacing.originalSpaces;
-      this.updateSpacing(block, spacing);
-    }
+    this.updateSpacing(block, 1);
   }
 
   /**
@@ -1091,14 +1094,12 @@ class ContextualSpacingRules extends SpacingRule {
     // Apply contextual rules
     this.applyDeclarationSpacingRule(block, nextBlock);
     this.applyProcedureBlockSpacingRule(block, nextBlock);
-    this.applyAdvancedControlStructureRule(block, nextBlock);
-    this.applyContextualCommentRule(block, nextBlock);
+    this.applyProcedureTransitionRule(block, nextBlock);
+    this.applyControlStructureRule(block, nextBlock);
     this.applyChainedBlockRule(block, nextBlock);
-
-    // Preserve original spacing if necessary
-    if (this.shouldPreserveSpacing(block)) {
-      this.updateSpacing(block, originalSpacing);
-    }
+    this.applyTightlyCoupledRule(block, nextBlock);
+    this.applyContextualCommentRule(block, nextBlock);
+    this.applyStatementBlockRule(block, nextBlock);
   }
 
   /**
@@ -1142,28 +1143,30 @@ class ContextualSpacingRules extends SpacingRule {
       }
       // One blank line after procedure declaration
       this.updateSpacing(block, 1);
-    } else if (block.metadata.isEnd) {
-      // One blank line before return
-      if (block.context.previousBlock) {
-        this.updateSpacing(block.context.previousBlock, 1);
-      }
+    } else if (block.metadata.flowType === "procedureEnd") {
       // Two blank lines after procedure end unless it's last
       this.updateSpacing(block, nextBlock ? 2 : 1);
     }
   }
 
   /**
+   * Apply procedure transition spacing rules
+   */
+  private applyProcedureTransitionRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (block.blockType === "switch" && block.metadata.isEnd) {
+      // For switch endings, look ahead to see if next block needs more spacing
+      if (nextBlock && nextBlock.blockType === "procedure" && nextBlock.metadata.isStart) {
+        this.updateSpacing(block, 2);
+      }
+    }
+  }
+
+  /**
    * Apply advanced control structure spacing rules
    */
-  private applyAdvancedControlStructureRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    // Check for control structure start
-    if (block.metadata.isStart || block.metadata.flowType === "ifStart") {
-      if (
-        block.context.previousBlock &&
-        !this.isConsecutiveComment(block.context.previousBlock, block)
-      ) {
-        this.updateSpacing(block.context.previousBlock, 1);
-      }
+  private applyControlStructureRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (!this.isControlStructure(block)) {
+      return;
     }
 
     if (block.blockType === "switch") {
@@ -1180,14 +1183,11 @@ class ContextualSpacingRules extends SpacingRule {
     const isCaseOrOtherwise =
       block.metadata.flowType === "caseBranch" || block.metadata.flowType === "caseDefault";
 
-    if (isCaseOrOtherwise && nextBlock?.blockType !== "switch") {
+    if (isCaseOrOtherwise && nextBlock && !this.isControlStructure(nextBlock)) {
       // No blank line after CASE/OTHERWISE when followed by code
       this.updateSpacing(block, 0);
     } else if (block.metadata.flowType === "exitCase") {
       // One blank line before and after EXITCASE
-      if (block.context.previousBlock) {
-        this.updateSpacing(block.context.previousBlock, 1);
-      }
       this.updateSpacing(block, 1);
     }
   }
@@ -1196,9 +1196,14 @@ class ContextualSpacingRules extends SpacingRule {
    * Apply conditional statement spacing rules
    */
   private applyConditionalRules(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (block.metadata.flowType === "else" && this.hasNestedControl(nextBlock)) {
-      // Add space when ELSE is followed by nested control
-      this.updateSpacing(block, 1);
+    if (block.metadata.flowType === "else" && nextBlock) {
+      if (this.hasNestedControl(nextBlock)) {
+        // Add space when ELSE is followed by nested control
+        this.updateSpacing(block, 1);
+      } else {
+        // No space when ELSE is followed by directo code
+        this.updateSpacing(block, 0);
+      }
     }
   }
 
@@ -1206,15 +1211,12 @@ class ContextualSpacingRules extends SpacingRule {
    * Apply contextual comment spacing rules
    */
   private applyContextualCommentRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (block.blockType !== "comment") {
+    if (block.blockType !== "comment" || this.isBlockComment(block)) {
       return;
     }
 
-    if (this.isRelatedCodeComment(block, nextBlock)) {
+    if (nextBlock && this.isFollowedByCode(block, nextBlock)) {
       // No blank line after comments describing following code
-      this.updateSpacing(block, 0);
-    } else if (this.isConsecutiveComment(block, nextBlock)) {
-      // No blank line between consecutive comments
       this.updateSpacing(block, 0);
     }
   }
@@ -1223,15 +1225,56 @@ class ContextualSpacingRules extends SpacingRule {
    * Apply chained block spacing rules
    */
   private applyChainedBlockRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (!block.context.isPartOfChain || !nextBlock) {
+    if (!nextBlock || !block.context.isPartOfChain) {
       return;
     }
 
-    if (block.blockType === "conditional" && nextBlock.metadata.flowType === "else") {
-      this.updateSpacing(block, 0);
-    } else if (block.blockType === "switch" && this.isCaseStatement(nextBlock)) {
+    const isElseChain = block.blockType === "conditional" && nextBlock.metadata.flowType === "else";
+    const isCaseChain = block.blockType === "switch" && this.isCaseStatement(nextBlock);
+
+    // Handle chained blocks (IF-ELSE, CASE statement)
+    if (isElseChain || isCaseChain) {
       this.updateSpacing(block, 0);
     }
+  }
+
+  /**
+   * Apply tightly coupled block spacing rules
+   */
+  private applyTightlyCoupledRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (this.areTightlyCoupled(block, nextBlock)) {
+      this.updateSpacing(block, 0);
+    }
+  }
+
+  private areTightlyCoupled(block?: TypedBlock, nextBlock?: TypedBlock): boolean {
+    if (!block || !nextBlock) {
+      return false;
+    }
+
+    return (
+      this.isDeclarationRelated(block) &&
+      this.isDeclarationRelated(nextBlock) &&
+      block.metadata.declarationType === nextBlock.metadata.declarationType
+    );
+  }
+
+  private applyStatementBlockRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (block.blockType !== "logic") {
+      return;
+    }
+
+    if (this.isEarlyReturn(block)) {
+      this.updateSpacing(block, 2);
+    } else if (this.isPartOfFunctionGroup(block, nextBlock)) {
+      // No blank line between related function calls
+      this.updateSpacing(block, 0);
+    }
+  }
+
+  private isFollowedByCode(block: TypedBlock, nextBlock: TypedBlock): boolean {
+    const codeTypes: BlockType[] = ["conditional", "loop", "switch", "errorHandling", "logic"];
+    return codeTypes.includes(nextBlock.blockType);
   }
 
   /**
@@ -1240,75 +1283,36 @@ class ContextualSpacingRules extends SpacingRule {
   private isDeclarationRelated(block: TypedBlock): boolean {
     return (
       block.blockType === "declaration" ||
-      (block.blockType === "comment" && this.isDeclarationComment(block))
+      (block.blockType === "comment" && block.context.parentBlockType === "declaration")
     );
   }
 
-  /**
-   * Helper method to check if a comment is declaration-related
-   */
-  // ! We should be checking to see if the type that follows the comment is a declaration or logic
-  private isDeclarationComment(block: TypedBlock): boolean {
-    const commentText = block.lines[0].trimmedContent.toLowerCase();
-    return (
-      commentText.includes("parameter") ||
-      commentText.includes("declare") ||
-      commentText.includes("variable") ||
-      commentText.includes("constant")
-    );
-  }
-
-  /**
-   * Helper method to check if a block has nested control structures
-   */
-  // ! We should probably be using the pattern to check for nested control structures
   private hasNestedControl(block?: TypedBlock): boolean {
     if (!block) {
       return false;
     }
 
-    const content = block.lines[0].trimmedContent.toLowerCase();
-    return content.includes(":if") || content.includes(":while") || content.includes(":for");
-  }
-
-  /**
-   * Helper method to check if a comment is related to following code
-   */
-  // ! This is complicating the logic too much. Block comments should always have space
-  // ! after them but single line comments can be followed by code of any type
-  // ! Maybe this is more of a post-processing step?
-  // ! do a single space after a single line always, unless the user chose to have no space
-  private isRelatedCodeComment(block: TypedBlock, nextBlock?: TypedBlock): boolean {
-    if (!nextBlock) {
-      return false;
-    }
-
-    const commentText = block.lines[0].trimmedContent.toLowerCase();
-    const nextCode = nextBlock.lines[0].trimmedContent.toLowerCase();
-
     return (
-      !block.metadata.commentType?.startsWith("block") &&
-      ((commentText.includes("initialize") && nextCode.includes(":=")) ||
-        (commentText.includes("check") &&
-          (nextCode.includes(":if") || nextCode.includes(":while"))) ||
-        (commentText.includes("loop") &&
-          (nextCode.includes(":for") || nextCode.includes(":while"))) ||
-        (commentText.includes("handle") && nextCode.includes(":try")))
+      block.metadata.isStart ||
+      block.blockType === "conditional" ||
+      block.blockType === "loop" ||
+      block.blockType === "switch"
     );
   }
 
-  /**
-   * Helper method to check if comments are consecutive
-   */
-  private isConsecutiveComment(block: TypedBlock, nextBlock?: TypedBlock): boolean {
+  private isEarlyReturn(block: TypedBlock): boolean {
     return (
-      nextBlock?.blockType === "comment" &&
-      block.metadata.commentType !== "block" &&
-      block.metadata.commentType !== "regionStart" &&
-      block.metadata.commentType !== "regionEnd" &&
-      nextBlock.metadata.commentType !== "block" &&
-      nextBlock.metadata.commentType !== "regionStart" &&
-      nextBlock.metadata.commentType !== "regionEnd"
+      block.metadata.flowType === "procedureEnd" &&
+      block.context.parentBlock?.metadata.isStart === true
+    );
+  }
+
+  private isPartOfFunctionGroup(block: TypedBlock, nextBlock?: TypedBlock): boolean {
+    return (
+      block.blockType === "logic" &&
+      nextBlock?.blockType === "logic" &&
+      block.metadata.flowType === "functionCall" &&
+      nextBlock?.metadata.flowType === "functionCall"
     );
   }
 
@@ -1352,7 +1356,7 @@ export class SpacingRulesProcessor {
     this.applySpacingRules(blocks);
 
     // Final pass: Validate and normalize spacing
-    this.validateAndNormalizeSpacing(blocks);
+    this.validateSpacing(blocks);
 
     return this.validationResult;
   }
@@ -1500,41 +1504,61 @@ export class SpacingRulesProcessor {
       }
 
       // TODO: Post Processing
+
+      // Ensure spacing constraints
+      block.spacing.followingSpaces = Math.max(
+        0,
+        Math.min(block.spacing.followingSpaces, this.config.maxConsecutiveBlank!)
+      );
+
+      // Handle file boundries
+      if (index === blocks.length - 1) {
+        block.spacing.followingSpaces = 1;
+      }
     });
   }
 
   /**
    * Validate and normalize block spacing
    */
-  private validateAndNormalizeSpacing(blocks: TypedBlock[]): void {
+  private validateSpacing(blocks: TypedBlock[]): void {
     blocks.forEach((block, index) => {
-      const originalSpacing = block.spacing.followingSpaces;
+      // Validate spacing against rules
+      this.validateBlockSpacing(block, index);
 
-      // Ensure no negative spacing
-      block.spacing.followingSpaces = Math.max(0, originalSpacing);
-
-      // Apply maximum consecutive blank lines rule
+      // Check for consecutive blank lines
       if (index > 0) {
         const prevBlock = blocks[index - 1];
         const combinedSpacing =
           prevBlock.spacing.followingSpaces + (block.lines[0].trimmedContent === "" ? 1 : 0);
 
         if (combinedSpacing > this.config.maxConsecutiveBlank!) {
-          const reduction = combinedSpacing - this.config.maxConsecutiveBlank!;
-          prevBlock.spacing.followingSpaces = Math.max(
-            0,
-            prevBlock.spacing.followingSpaces - reduction
-          );
+          this.validationResult.warnings.push({
+            blockIndex: index,
+            message:
+              `Excessive consecutive blank lines(${combinedSpacing}) ` +
+              `between blocks ${index - 1} and ${index}`,
+            severity: "warning",
+          });
         }
       }
 
-      // Special handling for file boundaries
+      // Validate file boundaries
       if (index === 0 || index === blocks.length - 1) {
-        this.handleFileBoundaries(block, index === 0, index === blocks.length - 1);
+        this.validationResult.warnings.push({
+          blockIndex: index,
+          message: "File starts with blank line",
+          severity: "warning",
+        });
       }
 
-      // Validate final spacing matches expectations
-      this.validateBlockSpacing(block, index);
+      if (index === blocks.length - 1 && block.spacing.followingSpaces !== 1) {
+        this.validationResult.warnings.push({
+          blockIndex: index,
+          message: `File should end with exactly one blank line, found ${block.spacing.followingSpaces}`,
+          severity: "warning",
+        });
+      }
     });
   }
 
@@ -1563,23 +1587,6 @@ export class SpacingRulesProcessor {
           `exceeds maximum (${this.config.maxConsecutiveBlank})`,
         severity: "warning",
       });
-    }
-  }
-
-  /**
-   * Handle file boundary spacing
-   */
-  private handleFileBoundaries(block: TypedBlock, isFirst: boolean, isLast: boolean): void {
-    if (isFirst) {
-      // Remove leading blank lines at start of file
-      while (block.lines[0]?.trimmedContent === "") {
-        block.lines.shift();
-      }
-    }
-
-    if (isLast) {
-      // Ensure exactly one trailing blank line
-      block.spacing.followingSpaces = 1;
     }
   }
 
@@ -1873,38 +1880,54 @@ class BlockProcessor {
     // Ensure exactly one trailing newline
     return result.trimEnd() + "\n";
   }
+
   private formatDebug(): string {
     const output: string[] = [];
 
     output.push("Block Analysis:");
     output.push("==============");
-    output.push(
-      "`block`|`type`|`flow`|`origSpacing`|`stdSpacing`|`ctxSpacing`|`currSpacing`" +
-        "|`startLine`|`endLine`|`firstLine`|`isChain`"
-    );
+
+    // Build header based on config
+    const headers = ["block", "type", "flow", "origSpacing", "stdSpacing"];
+
+    // Only include context spacing column if context is enabled
+    if (this.config.useContext) {
+      headers.push("ctxSpacing");
+    }
+
+    headers.push("currSpacing", "startLine", "endLine", "firstLine", "isChain");
+
+    output.push("`" + headers.join("`|`") + "`");
 
     this.blocks.forEach((block, index) => {
       const firstLine = block.lines[0].trimmedContent;
       const nextLine = block.nextBlockFirstLine?.trimmedContent || "END";
       const truncateLength = 30;
 
-      // Build the debug info string
+      // Build info array based on config
       const debugInfo = [
         `${index + 1}`,
         `${block.blockType}`,
         `${block.metadata.flowType}`,
         `${block.spacing.originalSpaces}`,
         `${block.spacing.standardSpaces}`,
-        `${block.spacing.contextSpaces}`,
+      ];
+
+      // Only include context spacing if enabled
+      if (this.config.useContext) {
+        debugInfo.push(`${block.spacing.contextSpaces}`);
+      }
+
+      debugInfo.push(
         `${block.spacing.followingSpaces}`,
         `${block.startLineNumber}`,
         `${block.endLineNumber}`,
         `${this.truncateString(firstLine, truncateLength)}`,
         `${this.truncateString(nextLine, truncateLength)}`,
-        `${block.context.isPartOfChain}`,
-      ].join("`|`");
+        `${block.context.isPartOfChain}`
+      );
 
-      output.push("`" + debugInfo + "`");
+      output.push("`" + debugInfo.join("`|`") + "`");
     });
 
     return output.join("\n");
