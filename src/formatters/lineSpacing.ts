@@ -698,79 +698,33 @@ class BlockIdentifier {
   }
 
   static shouldMergeWithPrevious(prevBlock: TypedBlock, currentBlock: TypedBlock): boolean {
-    // Handle switch case statements
-    if (prevBlock.blockType === "switch") {
-      if (
-        prevBlock.metadata.flowType === "caseBranch" ||
-        prevBlock.metadata.flowType === "caseDefault"
-      ) {
-        return !this.isCaseOrCaseEnd(currentBlock);
-      }
-
-      if (currentBlock.blockType === "switch") {
-        return true;
-      }
-    }
-
-    // Handle declarations that should be grouped
-    if (this.areMergeableDeclarations(prevBlock, currentBlock)) {
-      return true;
-    }
-
-    // Handle control flow blocks
-    if (this.areMergeableControlBlocks(prevBlock, currentBlock)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  private static isCaseOrCaseEnd(block: TypedBlock): boolean {
-    return (
-      block.blockType === "switch" &&
-      ["caseBranch", "caseDefault", "caseEnd"].includes(block.metadata.flowType)
-    );
-  }
-
-  private static areMergeableDeclarations(
-    prevBlock: TypedBlock,
-    currentBlock: TypedBlock
-  ): boolean {
-    if (prevBlock.blockType === "declaration" && currentBlock.blockType === "declaration") {
-      const prevLine = prevBlock.lines[0].trimmedContent;
-      const currentLine = currentBlock.lines[0].trimmedContent;
-
-      // Check if declarations are of the same type
-      const shouldMergeDeclarations =
-        patterns.declaration.group.test(prevLine) &&
-        patterns.declaration.group.test(currentLine) &&
-        prevBlock.metadata.declarationType === currentBlock.metadata.declarationType;
-
-      // Check if they're assignment declarations
-      const shouldMergeAssignments =
-        patterns.logic.assignment.test(prevLine) && patterns.logic.assignment.test(currentLine);
-
-      return shouldMergeDeclarations || shouldMergeAssignments;
-    }
-    return false;
-  }
-
-  private static areMergeableControlBlocks(
-    prevBlock: TypedBlock,
-    currentBlock: TypedBlock
-  ): boolean {
-    const controlTypes = ["conditional", "loop", "switch", "errorHandling"];
-
+    // Handle multi-line statements that are incomplete(no semicolon)
     if (
-      controlTypes.includes(prevBlock.blockType) &&
-      prevBlock.blockType === currentBlock.blockType
+      patterns.structure.multiLine.test(prevBlock.lines[prevBlock.lines.length - 1].trimmedContent)
     ) {
-      return (
-        prevBlock.metadata.flowType === currentBlock.metadata.flowType ||
-        currentBlock.context.isPartOfChain
-      );
+      if (currentBlock.blockType === "comment") {
+        return false;
+      }
+      return true;
     }
+
+    // Handle blocks that are explicitly joined (like a statement broken accross lines)
+    if (this.isExplicitContinuation(currentBlock.lines[0].trimmedContent)) {
+      return true;
+    }
+
     return false;
+  }
+
+  private static isExplicitContinuation(line: string): boolean {
+    // Don't consider comments as continuations
+    if (line.trimStart().startsWith("/*")) {
+      return false;
+    }
+
+    // Check for lines that are clear continuations
+    const continuationPattern = /^[\s]*(?:[+\-*/%,.]|(?:and|or|&&|\|\|))\s/i;
+    return continuationPattern.test(line);
   }
 }
 
@@ -915,7 +869,6 @@ abstract class SpacingRule {
   }
 }
 
-// Standard rules that don't require context
 /**
  * Handles standard spacing rules that don't require broader context
  */
@@ -932,20 +885,8 @@ class StandardSpacingRules extends SpacingRule {
     this.applyFileStartRule(block);
     this.applyMaxBlankLinesRule(block);
 
-    // Comment rules
-    this.applyBlockCommentRule(block);
-    this.applyConsecutiveCommentRule(block, nextBlock);
-    this.applyRegionSpacingRule(block);
-    this.applyBasicCommentRule(block, nextBlock);
-
-    // Block structure rules
-    this.applyControlStructureRule(block, nextBlock);
-    this.applyErrorBlockSpacingRule(block);
-
-    // Statement rules
-    this.applyDeclarationRule(block);
-    this.applyLogicRule(block);
-    this.applyProcedureEndRule(block);
+    // Basic Block Structure Rules
+    this.applyBasicBlockRules(block);
 
     // File end rule (always last)
     this.applyFileEndRule(block, nextBlock);
@@ -962,110 +903,65 @@ class StandardSpacingRules extends SpacingRule {
     }
   }
 
-  private applyDeclarationRule(block: TypedBlock): void {
-    if (block.blockType === "declaration") {
-      // Default one line after declarations
-      this.updateSpacing(block, 1);
-    }
-  }
-
-  private applyLogicRule(block: TypedBlock): void {
-    if (block.blockType !== "logic") {
-      return;
-    }
-
-    if (block.metadata.flowType === "assignment" || block.metadata.flowType === "functionCall") {
-      // Default one line after statements
-      this.updateSpacing(block, 1);
-    }
-  }
-
-  private applyProcedureEndRule(block: TypedBlock): void {
-    if (block.metadata.flowType === "procedureEnd") {
-      // Default one line after procedure end
-      this.updateSpacing(block, 1);
-    }
-  }
-
   /**
    * Enforce maximum of two consecutive blank lines
    */
   private applyMaxBlankLinesRule(block: TypedBlock): void {
-    this.updateSpacing(block, Math.min(block.spacing.followingSpaces, 2));
-  }
-
-  private applyBlockCommentRule(block: TypedBlock): void {
-    if (this.isBlockComment(block)) {
-      this.updateSpacing(block, 2);
-    }
-  }
-
-  private applyConsecutiveCommentRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (block.blockType === "comment" && nextBlock?.blockType === "comment") {
-      // No space between consecutive comments
-      this.updateSpacing(block, 0);
-    }
+    this.updateSpacing(
+      block,
+      Math.min(block.spacing.followingSpaces, this.config.maxConsecutiveBlank ?? 2)
+    );
   }
 
   /**
-   * Apply region comment spacing rules
+   * Apply default one blank line after most blocks
    */
-  private applyRegionSpacingRule(block: TypedBlock): void {
-    if (!this.isRegionComment(block)) {
-      return;
+  private applyBasicBlockRules(block: TypedBlock): void {
+    let spacing = 1;
+
+    switch (block.blockType) {
+      case "procedure":
+        if (block.metadata.isStart || block.metadata.flowType === "procedureEnd") {
+          spacing = 1;
+        }
+        break;
+
+      case "conditional":
+      case "loop":
+      case "switch":
+      case "errorHandling":
+        spacing = 1;
+        break;
+
+      case "comment":
+        switch (block.metadata.commentType) {
+          case "block":
+          case "regionStart":
+            spacing = 1;
+            break;
+          case "regionEnd":
+            spacing = 2;
+            break;
+          case "single":
+            spacing = 1;
+            break;
+        }
+        break;
+
+      case "declaration":
+        spacing = 1;
+        break;
+
+      case "logic":
+        spacing = 1;
+        break;
+
+      default:
+        spacing = 1;
+        break;
     }
 
-    if (block.metadata.commentType === "regionStart") {
-      this.updateSpacing(block, 1);
-    } else if (block.metadata.commentType === "regionEnd") {
-      this.updateSpacing(block, 2);
-    }
-  }
-
-  /**
-   * Apply error handling block spacing rules
-   */
-  private applyErrorBlockSpacingRule(block: TypedBlock): void {
-    if (block.blockType !== "errorHandling") {
-      return;
-    }
-
-    if (block.metadata.flowType === "error") {
-      this.updateSpacing(block, 1);
-    } else if (block.metadata.flowType === "resume") {
-      this.updateSpacing(block, 1);
-    }
-  }
-
-  /**
-   * Apply basic control structure spacing rules
-   */
-  private applyControlStructureRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (!this.isControlStructure(block)) {
-      return;
-    }
-
-    // Only handle structure starts/ends
-    if (block.metadata.isEnd) {
-      this.updateSpacing(block, 1);
-    } else if (block.metadata.isStart) {
-      this.updateSpacing(block, 1);
-    }
-  }
-
-  /**
-   * Apply basic comment spacing rules
-   */
-  private applyBasicCommentRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (
-      block.blockType !== "comment" ||
-      this.isBlockComment(block) ||
-      this.isRegionComment(block)
-    ) {
-      return;
-    }
-
-    this.updateSpacing(block, 1);
+    this.updateSpacing(block, spacing);
   }
 
   /**
