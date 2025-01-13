@@ -55,7 +55,7 @@ export interface FormatterConfig {
 }
 
 export const DEFAULT_FORMATTER_CONFIG: FormatterConfig = {
-  useContext: false,
+  useContext: true,
   debug: false,
   preserveUser: false,
   maxConsecutiveBlank: 2,
@@ -130,6 +130,8 @@ export const patterns = {
     procedure: {
       start: /:(?:CLASS|PROCEDURE)\b/i,
       end: /:(?:RETURN|ENDPROC)\b/i,
+      endProc: /:ENDPROC\b/i,
+      return: /:RETURN\b/i,
     },
     conditional: {
       ifStart: /:IF\b/i,
@@ -824,6 +826,24 @@ abstract class SpacingRule {
     return ["conditional", "loop", "switch", "errorHandling"].includes(block.blockType);
   }
 
+  protected isComment(block: TypedBlock): boolean {
+    return block.blockType === "comment";
+  }
+
+  protected isEarlyReturn(block: TypedBlock, nextBlock?: TypedBlock): boolean {
+    return !!(
+      block.metadata.flowType === "procedureEnd" &&
+      block.context.parentBlock?.metadata.isStart === true &&
+      nextBlock
+    );
+  }
+
+  protected isLogicalBlockEnd(block: TypedBlock, nextBlock?: TypedBlock): boolean {
+    // Check if logical group of operations
+    const hasDeveloperIntendedSpacing = block.spacing.originalSpaces > 0;
+    return block.metadata.flowType === "other" && hasDeveloperIntendedSpacing;
+  }
+
   /**
    * Check if a block is part of a chain (like IF-ELSE or CASE)
    */
@@ -866,6 +886,21 @@ abstract class SpacingRule {
       content.includes("-".repeat(20)) ||
       content.includes("*".repeat(20))
     );
+  }
+
+  protected isInsideProcedure(block: TypedBlock): boolean {
+    // Walk up the context chain to find if we're inside a procedure
+    let currentContext = block.context;
+    while (currentContext.parentBlock) {
+      if (
+        currentContext.parentBlock.blockType === "procedure" &&
+        currentContext.parentBlock.metadata.isStart
+      ) {
+        return true;
+      }
+      currentContext = currentContext.parentBlock.context;
+    }
+    return false;
   }
 }
 
@@ -1009,14 +1044,31 @@ class ContextualSpacingRules extends SpacingRule {
 
   applyRule(block: TypedBlock, nextBlock?: TypedBlock): void {
     // Apply contextual rules
+    this.applyHeaderCommentRule(block, nextBlock);
     this.applyDeclarationSpacingRule(block, nextBlock);
     this.applyProcedureBlockSpacingRule(block, nextBlock);
-    this.applyProcedureTransitionRule(block, nextBlock);
-    this.applyControlStructureRule(block, nextBlock);
-    this.applyChainedBlockRule(block, nextBlock);
-    this.applyTightlyCoupledRule(block, nextBlock);
-    this.applyContextualCommentRule(block, nextBlock);
+    this.applyErrorBlockSpacingRule(block, nextBlock);
+    this.applyControlStructureSpacingRule(block, nextBlock);
+    this.applyCommentSpacingRule(block, nextBlock);
+    this.applyRegionSpacingRule(block, nextBlock);
     this.applyStatementBlockRule(block, nextBlock);
+  }
+
+  private applyHeaderCommentRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    // Only process block comments
+    if (block.blockType !== "comment" || block.metadata.commentType !== "block") {
+      return;
+    }
+
+    // Check if this is the first block and next block is parameters
+    if (
+      !block.context.previousBlock &&
+      nextBlock?.blockType === "declaration" &&
+      nextBlock.metadata.declarationType === "parameters"
+    ) {
+      this.updateSpacing(block, 0);
+      return;
+    }
   }
 
   /**
@@ -1027,21 +1079,30 @@ class ContextualSpacingRules extends SpacingRule {
       return;
     }
 
-    const currentType = block.metadata.declarationType;
-    const nextType = nextBlock?.metadata.declarationType;
-    const isExplicitlySeparated = block.spacing.originalSpaces > 0;
+    // Add new condition for parameters after procedure
+    if (
+      block.metadata.declarationType === "parameters" &&
+      block.context.previousBlock?.blockType === "procedure" &&
+      block.context.previousBlock?.metadata.isStart
+    ) {
+      this.updateSpacing(block.context.previousBlock, 0);
+      return;
+    }
 
     if (nextBlock?.blockType === "declaration") {
-      if (currentType === nextType && !isExplicitlySeparated) {
-        // No blank lines between same type declarations unless explicitly separated
+      // Same type declarations -> no space
+      if (block.metadata.declarationType === nextBlock?.metadata.declarationType) {
         this.updateSpacing(block, 0);
-      } else if (currentType !== nextType) {
-        // One blank line between different declaration types
+      } else {
+        // Different declaration types -> one blank line
         this.updateSpacing(block, 1);
       }
-    } else if (nextBlock && !this.isDeclarationRelated(nextBlock)) {
-      // Two blank lines after last declaration before main code
-      this.updateSpacing(block, 2);
+    } else {
+      // Check if we're inside a procedure block
+      const isInsideProcedure = this.isInsideProcedure(block);
+
+      // Last declaration before main code -> two blank lines
+      this.updateSpacing(block, isInsideProcedure ? 1 : 2);
     }
   }
 
@@ -1054,34 +1115,60 @@ class ContextualSpacingRules extends SpacingRule {
     }
 
     if (block.metadata.isStart) {
-      // Two blank lines before procedure unless it's first or after separator
-      if (block.context.previousBlock && !this.isSectionSeparator(block.context.previousBlock)) {
-        this.updateSpacing(block.context.previousBlock, 2);
-      }
-      // One blank line after procedure declaration
+      // One blank line after PROCEDURE declaration
       this.updateSpacing(block, 1);
     } else if (block.metadata.flowType === "procedureEnd") {
-      // Two blank lines after procedure end unless it's last
-      this.updateSpacing(block, nextBlock ? 2 : 1);
+      if (patterns.flow.procedure.endProc.test(block.lines[0].trimmedContent)) {
+        // Two blank lines after ENDPROC
+        this.updateSpacing(block, 2);
+      } else {
+        // For other procedure endings (like RETURN), use standard spacing
+        this.updateSpacing(block, 1);
+      }
     }
   }
 
-  /**
-   * Apply procedure transition spacing rules
-   */
-  private applyProcedureTransitionRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (block.blockType === "switch" && block.metadata.isEnd) {
-      // For switch endings, look ahead to see if next block needs more spacing
-      if (nextBlock && nextBlock.blockType === "procedure" && nextBlock.metadata.isStart) {
-        this.updateSpacing(block, 2);
-      }
+  private applyErrorBlockSpacingRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (block.blockType !== "errorHandling") {
+      return;
+    }
+
+    switch (block.metadata.flowType) {
+      case "error":
+        // One blank line after ERROR block
+        this.updateSpacing(block, 1);
+        break;
+
+      case "resume":
+        // One blank line after RESUME
+        this.updateSpacing(block, 1);
+        break;
+    }
+  }
+
+  private applyRegionSpacingRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (
+      block.blockType !== "comment" ||
+      !["regionStart", "regionEnd"].includes(block.metadata.commentType || "")
+    ) {
+      return;
+    }
+
+    if (block.metadata.commentType === "regionEnd") {
+      // Two blank lines after region end
+      this.updateSpacing(block, 2);
+      return;
+    } else if (block.metadata.commentType === "regionStart") {
+      // One blank line after region start
+      this.updateSpacing(block, 1);
+      return;
     }
   }
 
   /**
    * Apply advanced control structure spacing rules
    */
-  private applyControlStructureRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+  private applyControlStructureSpacingRule(block: TypedBlock, nextBlock?: TypedBlock): void {
     if (!this.isControlStructure(block)) {
       return;
     }
@@ -1097,15 +1184,24 @@ class ContextualSpacingRules extends SpacingRule {
    * Apply switch case spacing rules
    */
   private applySwitchCaseRules(block: TypedBlock, nextBlock?: TypedBlock): void {
-    const isCaseOrOtherwise =
-      block.metadata.flowType === "caseBranch" || block.metadata.flowType === "caseDefault";
-
-    if (isCaseOrOtherwise && nextBlock && !this.isControlStructure(nextBlock)) {
-      // No blank line after CASE/OTHERWISE when followed by code
-      this.updateSpacing(block, 0);
-    } else if (block.metadata.flowType === "exitCase") {
-      // One blank line before and after EXITCASE
-      this.updateSpacing(block, 1);
+    switch (block.metadata.flowType) {
+      case "caseStart": // :BEGINCASE
+        this.updateSpacing(block, 1);
+        break;
+      case "caseEnd": // :ENDCASE
+        this.updateSpacing(block, 2);
+        break;
+      case "caseBranch": // :CASE
+      case "caseDefault": // :OTHERWISE
+        if (nextBlock && !this.isControlStructure(nextBlock) && !this.isComment(nextBlock)) {
+          this.updateSpacing(block, 0); // No blank lines when followed by code
+        } else {
+          this.updateSpacing(block, 1);
+        }
+        break;
+      case "exitCase": // :EXITCASE
+        this.updateSpacing(block, 1);
+        break;
     }
   }
 
@@ -1113,67 +1209,30 @@ class ContextualSpacingRules extends SpacingRule {
    * Apply conditional statement spacing rules
    */
   private applyConditionalRules(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (block.metadata.flowType === "else" && nextBlock) {
-      if (this.hasNestedControl(nextBlock)) {
-        // Add space when ELSE is followed by nested control
-        this.updateSpacing(block, 1);
-      } else {
-        // No space when ELSE is followed by directo code
-        this.updateSpacing(block, 0);
-      }
+    if (block.metadata.flowType === "else" || block.metadata.flowType === "ifEnd") {
+      // Handle :ELSE or :ENDIF
+      this.updateSpacing(block, 1);
     }
   }
 
-  /**
-   * Apply contextual comment spacing rules
-   */
-  private applyContextualCommentRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (block.blockType !== "comment" || this.isBlockComment(block)) {
+  private applyCommentSpacingRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (block.blockType !== "comment") {
       return;
     }
 
-    if (nextBlock && this.isFollowedByCode(block, nextBlock)) {
-      // No blank line after comments describing following code
-      this.updateSpacing(block, 0);
-    }
-  }
-
-  /**
-   * Apply chained block spacing rules
-   */
-  private applyChainedBlockRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (!nextBlock || !block.context.isPartOfChain) {
+    // Block comments (/**) - preserve their spacing
+    if (block.metadata.commentType === "block") {
       return;
     }
 
-    const isElseChain = block.blockType === "conditional" && nextBlock.metadata.flowType === "else";
-    const isCaseChain = block.blockType === "switch" && this.isCaseStatement(nextBlock);
-
-    // Handle chained blocks (IF-ELSE, CASE statement)
-    if (isElseChain || isCaseChain) {
+    // If next block is a procedure definition, no blank line
+    if (nextBlock?.blockType === "procedure" && nextBlock.metadata.isStart) {
       this.updateSpacing(block, 0);
-    }
-  }
-
-  /**
-   * Apply tightly coupled block spacing rules
-   */
-  private applyTightlyCoupledRule(block: TypedBlock, nextBlock?: TypedBlock): void {
-    if (this.areTightlyCoupled(block, nextBlock)) {
-      this.updateSpacing(block, 0);
-    }
-  }
-
-  private areTightlyCoupled(block?: TypedBlock, nextBlock?: TypedBlock): boolean {
-    if (!block || !nextBlock) {
-      return false;
+      return;
     }
 
-    return (
-      this.isDeclarationRelated(block) &&
-      this.isDeclarationRelated(nextBlock) &&
-      block.metadata.declarationType === nextBlock.metadata.declarationType
-    );
+    // Default: One blank line after comment
+    this.updateSpacing(block, 1);
   }
 
   private applyStatementBlockRule(block: TypedBlock, nextBlock?: TypedBlock): void {
@@ -1181,63 +1240,33 @@ class ContextualSpacingRules extends SpacingRule {
       return;
     }
 
-    if (this.isEarlyReturn(block)) {
-      this.updateSpacing(block, 2);
-    } else if (this.isPartOfFunctionGroup(block, nextBlock)) {
-      // No blank line between related function calls
-      this.updateSpacing(block, 0);
-    }
-  }
-
-  private isFollowedByCode(block: TypedBlock, nextBlock: TypedBlock): boolean {
-    const codeTypes: BlockType[] = ["conditional", "loop", "switch", "errorHandling", "logic"];
-    return codeTypes.includes(nextBlock.blockType);
-  }
-
-  /**
-   * Helper method to check if block is declaration-related
-   */
-  private isDeclarationRelated(block: TypedBlock): boolean {
-    return (
-      block.blockType === "declaration" ||
-      (block.blockType === "comment" && block.context.parentBlockType === "declaration")
-    );
-  }
-
-  private hasNestedControl(block?: TypedBlock): boolean {
-    if (!block) {
-      return false;
-    }
-
-    return (
-      block.metadata.isStart ||
-      block.blockType === "conditional" ||
-      block.blockType === "loop" ||
-      block.blockType === "switch"
-    );
-  }
-
-  private isEarlyReturn(block: TypedBlock): boolean {
-    return (
-      block.metadata.flowType === "procedureEnd" &&
-      block.context.parentBlock?.metadata.isStart === true
-    );
-  }
-
-  private isPartOfFunctionGroup(block: TypedBlock, nextBlock?: TypedBlock): boolean {
-    return (
-      block.blockType === "logic" &&
+    // Check for consecutive logic blocks
+    if (
       nextBlock?.blockType === "logic" &&
-      block.metadata.flowType === "functionCall" &&
-      nextBlock?.metadata.flowType === "functionCall"
-    );
-  }
+      block.metadata.flowType === nextBlock.metadata.flowType &&
+      (block.metadata.flowType === "assignment" || block.metadata.flowType === "functionCall")
+    ) {
+      this.updateSpacing(block, 0);
+      return;
+    }
 
-  /**
-   * Helper method to check if a block is a case statement
-   */
-  private isCaseStatement(block: TypedBlock): boolean {
-    return block.metadata.flowType === "caseBranch" || block.metadata.flowType === "caseDefault";
+    // If next block is a procedure, use two blank lines
+    if (nextBlock?.blockType === "procedure" && nextBlock.metadata.isStart) {
+      this.updateSpacing(block, 2);
+      return;
+    }
+
+    // Handle early returns
+    if (this.isEarlyReturn(block)) {
+      // Two blank lines after early return
+      this.updateSpacing(block, 2);
+      return;
+    }
+
+    // Handle statements that end a logical block
+    if (this.isLogicalBlockEnd(block)) {
+      this.updateSpacing(block, 1);
+    }
   }
 }
 
