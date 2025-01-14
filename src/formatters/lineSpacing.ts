@@ -45,10 +45,11 @@ export type FlowKeyword =
 export type DeclarationType = "parameters" | "declare" | "default" | "public" | "include" | "other";
 
 // Comment type definitions
-export type CommentType = "block" | "single" | "regionStart" | "regionEnd";
+export type CommentType = "block" | "single" | "regionStart" | "regionEnd" | "separator";
 
 export interface FormatterConfig {
   useContext?: boolean;
+  usePostProcessing?: boolean;
   debug?: boolean;
   preserveUser?: boolean;
   maxConsecutiveBlank?: number;
@@ -56,6 +57,7 @@ export interface FormatterConfig {
 
 export const DEFAULT_FORMATTER_CONFIG: FormatterConfig = {
   useContext: true,
+  usePostProcessing: true,
   debug: false,
   preserveUser: false,
   maxConsecutiveBlank: 2,
@@ -182,6 +184,7 @@ export const patterns = {
       start: /^\/\*\s*region\b/i,
       end: /^\/\*\s*endregion\b/i,
     },
+    separator: /^\/\*\s*[=*-]{20}/,
   },
   structure: {
     semicolon: /;/,
@@ -349,6 +352,19 @@ class BlockIdentifier {
           isMiddle: false,
           isEnd: true,
           commentType: "regionEnd",
+        },
+      };
+    }
+
+    if (patterns.comment.separator.test(line) && patterns.structure.semicolon.test(line)) {
+      return {
+        blockType: "comment",
+        metadata: {
+          flowType: "other",
+          isStart: false,
+          isMiddle: true,
+          isEnd: false,
+          commentType: "separator",
         },
       };
     }
@@ -852,40 +868,10 @@ abstract class SpacingRule {
   }
 
   /**
-   * Check if a block should preserve its original spacing
-   */
-  protected shouldPreserveSpacing(block: TypedBlock): boolean {
-    if (!this.config.preserveUser) {
-      return false;
-    }
-
-    // Preserve spacing in block comments
-    if (this.isBlockComment(block)) {
-      return true;
-    }
-
-    // Preserve spacing in explicitly separated declarations
-    if (block.blockType === "declaration" && block.spacing.originalSpaces > 0) {
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
    * Check if a block is a section separator
    */
   protected isSectionSeparator(block: TypedBlock): boolean {
-    if (block.blockType !== "comment") {
-      return false;
-    }
-
-    const content = block.lines[0].trimmedContent;
-    return (
-      content.includes("=".repeat(20)) ||
-      content.includes("-".repeat(20)) ||
-      content.includes("*".repeat(20))
-    );
+    return block.blockType === "comment" && block.metadata.commentType === "separator";
   }
 
   protected isInsideProcedure(block: TypedBlock): boolean {
@@ -900,6 +886,44 @@ abstract class SpacingRule {
       }
       currentContext = currentContext.parentBlock.context;
     }
+    return false;
+  }
+
+  protected shouldPreserveSpacing(block: TypedBlock, nextBlock?: TypedBlock): boolean {
+    if (!nextBlock) {
+      return false;
+    }
+
+    // Preserve if developer explicitly added more spacing
+    if (block.spacing.originalSpaces > block.spacing.followingSpaces) {
+      // But still respect max blank lines
+      return block.spacing.originalSpaces <= this.config.maxConsecutiveBlank!;
+    }
+
+    // Preserve comment grouping intent
+    if (block.blockType === "comment" && block.spacing.originalSpaces === 0) {
+      return block.spacing.originalSpaces === 0;
+    }
+
+    // Preserve logical goruping
+    if (this.isSequentialOperation(block, nextBlock)) {
+      return block.spacing.originalSpaces === 0;
+    }
+
+    return false;
+  }
+
+  protected isSequentialOperation(block: TypedBlock, nextBlock?: TypedBlock): boolean {
+    // Check if blocks operate on same variable/object
+    if (!nextBlock) {
+      return false;
+    }
+
+    // Look for patterns like consecutive assignments or method calls
+    if (block.blockType === "logic" && nextBlock.blockType === "logic") {
+      return true;
+    }
+
     return false;
   }
 }
@@ -1270,6 +1294,108 @@ class ContextualSpacingRules extends SpacingRule {
   }
 }
 
+/**
+ * Handles post-processing spacing rules that run after standard and contextual rules
+ */
+class PostProcessingSpacingRules extends SpacingRule {
+  constructor(config: FormatterConfig) {
+    super(config);
+  }
+
+  applyRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    // Apply specific post-processing rules
+    this.applyEndBlockCollapseRule(block, nextBlock);
+    this.applyPreservationRules(block, nextBlock);
+    this.applySeparatorRule(block, nextBlock);
+    this.applyEndRegionSpacingRule(block, nextBlock);
+  }
+
+  /**
+   * Collapses spacing between consecutive ending blocks to improve readability
+   */
+  private applyEndBlockCollapseRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (!nextBlock) {
+      return;
+    }
+
+    // Check if both blocks are ending blocks using metadata
+    if (this.isEndingBlock(block) && this.isEndingBlock(nextBlock)) {
+      this.updateSpacing(block, 0);
+    }
+  }
+
+  /**
+   * Determines if a block represents an ending statement based on its type and metadata
+   */
+  private isEndingBlock(block: TypedBlock): boolean {
+    const endingFlowTypes: FlowKeyword[] = [
+      "whileEnd",
+      "exitWhile",
+      "forEnd",
+      "ifEnd",
+      "caseEnd",
+      "exitCase",
+      "procedureEnd",
+      "tryEnd",
+      "error",
+      "resume",
+    ];
+
+    // Check flow types for control structures and procedures
+    if (endingFlowTypes.includes(block.metadata.flowType)) {
+      return true;
+    }
+
+    // Check for comment endings (endregion)
+    if (block.blockType === "comment" && block.metadata.commentType === "regionEnd") {
+      return true;
+    }
+
+    return false;
+  }
+
+  private applyPreservationRules(block: TypedBlock, nextBlock?: TypedBlock): void {
+    const intent = this.shouldPreserveSpacing(block, nextBlock);
+
+    if (intent) {
+      // Preserve original spacing but respect max blank lines
+      const preservedSpacing = Math.min(
+        block.spacing.originalSpaces,
+        this.config.maxConsecutiveBlank ?? 2
+      );
+      this.updateSpacing(block, preservedSpacing);
+    }
+  }
+
+  /**
+   * Apply spacing rules for section separator comments
+   */
+  private applySeparatorRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (!this.isSectionSeparator(block)) {
+      return;
+    }
+
+    // Add two blank lines before separator unless it's at the start of file
+    if (block.context.previousBlock) {
+      this.updateSpacing(block.context.previousBlock, 2);
+    }
+
+    // Add one blank line after separator unless it's at the end of file
+    if (nextBlock) {
+      this.updateSpacing(block, 2);
+    }
+  }
+
+  private applyEndRegionSpacingRule(block: TypedBlock, nextBlock?: TypedBlock): void {
+    if (block.blockType !== "comment" || block.metadata.commentType !== "regionEnd") {
+      return;
+    }
+
+    // Two blank lines after endregion
+    this.updateSpacing(block, 2);
+  }
+}
+
 // Spacing rules engine with updated implementation
 /**
  * Coordinates the application of spacing rules
@@ -1277,6 +1403,7 @@ class ContextualSpacingRules extends SpacingRule {
 export class SpacingRulesProcessor {
   private standardRules: StandardSpacingRules;
   private contextualRules: ContextualSpacingRules;
+  private postProcessingRules: PostProcessingSpacingRules;
   private validationResult: ValidationResult = {
     valid: true,
     warnings: [],
@@ -1285,6 +1412,7 @@ export class SpacingRulesProcessor {
   constructor(private config: FormatterConfig) {
     this.standardRules = new StandardSpacingRules(config);
     this.contextualRules = new ContextualSpacingRules(config);
+    this.postProcessingRules = new PostProcessingSpacingRules(config);
   }
 
   /**
@@ -1437,7 +1565,11 @@ export class SpacingRulesProcessor {
       const nextBlock = index < blocks.length - 1 ? blocks[index + 1] : undefined;
 
       // Store the original spacing before any rules are applied
-      block.spacing.originalSpaces = block.spacing.followingSpaces;
+      block.spacing.originalSpaces = Math.min(
+        block.spacing.originalSpaces,
+        this.config.maxConsecutiveBlank!
+      );
+      block.spacing.followingSpaces = block.spacing.originalSpaces;
 
       // Apply standard rules first
       this.standardRules.applyRule(block, nextBlock);
@@ -1449,7 +1581,11 @@ export class SpacingRulesProcessor {
         block.spacing.contextSpaces = block.spacing.followingSpaces;
       }
 
-      // TODO: Post Processing
+      // Then apply contextual rules if enabled
+      if (this.config.usePostProcessing) {
+        this.postProcessingRules.applyRule(block, nextBlock);
+        block.spacing.postProcessSpaces = block.spacing.followingSpaces;
+      }
 
       // Ensure spacing constraints
       block.spacing.followingSpaces = Math.max(
@@ -1460,6 +1596,11 @@ export class SpacingRulesProcessor {
       // Handle file boundries
       if (index === blocks.length - 1) {
         block.spacing.followingSpaces = 1;
+      }
+
+      // Update original spacing to match final state for next formatting run
+      if (!this.config.debug) {
+        block.spacing.originalSpaces = block.spacing.followingSpaces;
       }
     });
   }
@@ -1841,6 +1982,10 @@ class BlockProcessor {
       headers.push("ctxSpacing");
     }
 
+    if (this.config.usePostProcessing) {
+      headers.push("postSpacing");
+    }
+
     headers.push("currSpacing", "startLine", "endLine", "firstLine", "isChain");
 
     output.push("`" + headers.join("`|`") + "`");
@@ -1862,6 +2007,10 @@ class BlockProcessor {
       // Only include context spacing if enabled
       if (this.config.useContext) {
         debugInfo.push(`${block.spacing.contextSpaces}`);
+      }
+
+      if (this.config.usePostProcessing) {
+        debugInfo.push(`${block.spacing.postProcessSpaces}`);
       }
 
       debugInfo.push(
