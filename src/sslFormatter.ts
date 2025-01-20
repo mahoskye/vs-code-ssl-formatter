@@ -11,8 +11,8 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
     constructor() {
         // Create pipeline with VS Code specific configuration
         const config: FormatterConfig = {
-            debug: true,
-            showSegmentDetails: true,
+            debug: false,
+            showSegmentDetails: false,
             useSpacingContext: true,
             useSpacingPostProcessing: true,
             preserveUserSpacing: false,
