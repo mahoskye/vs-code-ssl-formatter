@@ -1,97 +1,103 @@
 import * as vscode from "vscode";
-import { correctKeywordCasing } from "./formatters/keywordCasing";
-import { ensureSemicolonNewline } from "./formatters/semicolonNewline";
-import { enforceOperatorSpacing } from "./formatters/operatorSpacing";
-import { lineSpacingFormatter, ValidationResult } from "./formatters/lineSpacing";
-import { breakLongLines } from "./formatters/longLineBreaker";
-import { adjustIndentation } from "./formatters/indentation";
-import { ensureSingleFinalNewline } from "./formatters/finalNewline";
+import { FormatterPipeline, FormatterConfig } from "./formatters/formattingPipeline";
+import { KeywordCasingFormatter } from "./formatters/keywordCasing";
+// Import other formatters as they're converted
 
 export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
-  private document!: vscode.TextDocument;
-  private options!: vscode.FormattingOptions;
+    private pipeline: FormatterPipeline;
+    private tableChannel: vscode.OutputChannel | undefined;
+    private debugChannel: vscode.OutputChannel | undefined;
 
-  // List of SSL keywords that should be capitalized
-  private keywords = [
-    "BEGINCASE",
-    "BEGININLINECODE",
-    "CASE",
-    "DECLARE",
-    "DEFAULT",
-    "ELSE",
-    "ENDCASE",
-    "ENDIF",
-    "ENDINLINECODE",
-    "ENDWHILE",
-    "ERROR",
-    "EXITCASE",
-    "EXITWHILE",
-    "IF",
-    "INCLUDE",
-    "LOOP",
-    "OTHERWISE",
-    "PARAMETERS",
-    "PROCEDURE",
-    "PUBLIC",
-    "REGION",
-    "RESUME",
-    "RETURN",
-    "WHILE",
-  ];
+    constructor() {
+        // Create pipeline with VS Code specific configuration
+        const config: FormatterConfig = {
+            debug: true,
+            showSegmentDetails: true,
+            useSpacingContext: true,
+            useSpacingPostProcessing: true,
+            preserveUserSpacing: false,
+            maxConsecutiveBlankLines: 2,
+            maxLineLength: 90,
+            tabSize: 4,
+            indentStyle: "space",
+        };
 
-  public provideDocumentFormattingEdits(
-    document: vscode.TextDocument,
-    options: vscode.FormattingOptions,
-    token: vscode.CancellationToken
-  ): vscode.TextEdit[] {
-    this.document = document;
-    this.options = options;
+        this.pipeline = new FormatterPipeline(config);
 
-    let text = document.getText();
-    const originalLines = text.split("\n");
-
-    // Apply formatting steps
-    // Correct the casing of SSL keywords
-    // text = correctKeywordCasing(text, this.keywords);
-
-    // Ensure semicolons are followed by newlines
-    // text = ensureSemicolonNewline(text);
-
-    // Enforce spacing around operators
-    // text = enforceOperatorSpacing(text);
-
-    // Enforce line spacing according to style guide
-    const result = lineSpacingFormatter(text);
-
-    // If the formatter returns validation results instead of formatted test,
-    //  show the warnings in the editor but return the original text
-    if (typeof result !== "string") {
-      // Log validation warnings to the output channel
-      result.warnings.forEach((warning) => {
-        vscode.window.showWarningMessage(
-          `Formatting warning at block ${warning.blockIndex}: ${warning.message}`
-        );
-      });
-
-      // Return the original text
-      text = result.valid ? text : document.getText();
-    } else {
-      text = result;
+        // Add formatters in desired order
+        this.pipeline.addFormatter(new KeywordCasingFormatter());
+        // Add other formatters as they're converted:
+        // this.pipeline.addFormatter(new SemicolonFormatter());
+        // this.pipeline.addFormatter(new OperatorSpacingFormatter());
+        // this.pipeline.addFormatter(new LineBreakFormatter());
+        // this.pipeline.addFormatter(new IndentationFormatter());
+        // this.pipeline.addFormatter(new LineSpacingFormatter());
     }
 
-    // Break lines over 90 characters
-    // text = breakLongLines(text);
+    private getTableChannel(): vscode.OutputChannel {
+        if (!this.tableChannel) {
+            this.tableChannel = vscode.window.createOutputChannel("SSL Formatter Table");
+        }
+        return this.tableChannel;
+    }
 
-    // Adjust the indentation of the code
-    // text = adjustIndentation(text);
+    private getDebugChannel(): vscode.OutputChannel {
+        if (!this.debugChannel) {
+            this.debugChannel = vscode.window.createOutputChannel("SSL Formatter Debug");
+        }
+        return this.debugChannel;
+    }
 
-    // Make sure the code ends in a single blank line
-    // text = ensureSingleFinalNewline(text);
+    public async provideDocumentFormattingEdits(
+        document: vscode.TextDocument,
+        options: vscode.FormattingOptions,
+        token: vscode.CancellationToken
+    ): Promise<vscode.TextEdit[]> {
+        try {
+            const text = document.getText();
+            const result = await this.pipeline.process(text);
 
-    // Create a single edit for the entire document
-    const lastLineId = document.lineCount - 1;
-    const lastLineLength = document.lineAt(lastLineId).text.length;
-    const range = new vscode.Range(0, 0, lastLineId, lastLineLength);
-    return [vscode.TextEdit.replace(range, text)];
-  }
+            // Handle debug output
+            if (typeof result !== "string") {
+                // Show debug info in table format
+                const tableChannel = this.getTableChannel();
+                tableChannel.clear();
+                tableChannel.appendLine(result.tableView);
+                tableChannel.show(true);
+
+                // Show debug info in detail format
+                const debugChannel = this.getDebugChannel();
+                debugChannel.clear();
+                debugChannel.appendLine(result.detailedView);
+                debugChannel.show(false);
+
+                // Return original text when in debug mode
+                return [];
+            }
+
+            // Normal formatting
+            const lastLineId = document.lineCount - 1;
+            const lastLineLength = document.lineAt(lastLineId).text.length;
+            const range = new vscode.Range(0, 0, lastLineId, lastLineLength);
+            return [vscode.TextEdit.replace(range, result)];
+        } catch (error) {
+            vscode.window.showErrorMessage(
+                `Formatting error: ${error instanceof Error ? error.message : String(error)}`
+            );
+            return [];
+        }
+    }
+
+    /**
+     * Update pipeline configuration based on VS Code formatting options
+     */
+    private updateConfig(options: vscode.FormattingOptions): void {
+        const config = this.pipeline.getConfig();
+
+        // Update relevant options
+        config.tabSize = options.tabSize;
+        config.indentStyle = options.insertSpaces ? "space" : "tab";
+
+        // Could add more VS Code specific configuration here
+    }
 }
