@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { FormatterPipeline, FormatterConfig } from "./formatters/formattingPipeline";
 import { KeywordCasingFormatter } from "./formatters/keywordCasing";
+import { SemicolonNewlineFormatter } from "./formatters/semicolonNewline";
 // Import other formatters as they're converted
 
 export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
@@ -26,8 +27,8 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
 
         // Add formatters in desired order
         this.pipeline.addFormatter(new KeywordCasingFormatter());
+        this.pipeline.addFormatter(new SemicolonNewlineFormatter());
         // Add other formatters as they're converted:
-        // this.pipeline.addFormatter(new SemicolonFormatter());
         // this.pipeline.addFormatter(new OperatorSpacingFormatter());
         // this.pipeline.addFormatter(new LineBreakFormatter());
         // this.pipeline.addFormatter(new IndentationFormatter());
