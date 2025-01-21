@@ -1,124 +1,139 @@
 {
-  "name": "vs-code-ssl-formatter",
-  "displayName": "STARLIMS Scripting Language Formatter",
-  "description": "Syntax highlighting, folding, and auto-completion for STARLIMS Scripting Language (SSL)",
-  "version": "0.2.0",
-  "engines": {
-    "vscode": "^1.94.0"
-  },
-  "categories": [
-    "Programming Languages",
-    "Snippets"
-  ],
-  "keywords": [
-    "ssl",
-    "starlims",
-    "formatter",
-    "syntax",
-    "highlighting"
-  ],
-  "publisher": "mahoskye",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/mahoskye/vs-code-ssl-formatter.git"
-  },
-  "bugs": {
-    "url": "https://github.com/mahoskye/vs-code-ssl-formatter/issues"
-  },
-  "homepage": "https://github.com/mahoskye/vs-code-ssl-formatter#readme",
-  "contributes": {
-    "languages": [
-      {
-        "id": "ssl",
-        "aliases": [
-          "STARLIMS Scripting Language",
-          "ssl"
-        ],
-        "extensions": [
-          ".ssl",
-          ".ssl.txt"
-        ],
-        "configuration": "./language-configuration.json"
-      }
+    "name": "vs-code-ssl-formatter",
+    "displayName": "STARLIMS Scripting Language Formatter",
+    "description": "Syntax highlighting, folding, and auto-completion for STARLIMS Scripting Language (SSL)",
+    "version": "0.2.0",
+    "engines": {
+        "vscode": "^1.94.0"
+    },
+    "categories": [
+        "Programming Languages",
+        "Snippets"
     ],
-    "grammars": [
-      {
-        "language": "ssl",
-        "scopeName": "source.ssl",
-        "path": "./syntaxes/ssl.tmLanguage.json"
-      }
+    "keywords": [
+        "ssl",
+        "starlims",
+        "formatter",
+        "syntax",
+        "highlighting"
     ],
-    "configuration": [
-      {
-        "title": "SSL Formatter",
-        "properties": {
-          "sslFormatter.completions": {
-            "type": "object",
-            "default": {
-              "Array Functions": [],
-              "Database Functions": [],
-              "Runtime Functions to Get/Return a DATASET": [],
-              "Data Type Functions": [],
-              "Date Functions": [],
-              "E-mail Functions": [],
-              "File Manipulation Functions": [],
-              "FTP Functions": [],
-              "Logical Functions": [],
-              "Miscellaneous Functions": [
-                {
-                  "label": "exampleFunction()",
-                  "kind": "function",
-                  "detail": "This is a demonstration function",
-                  "documentation": "This function is used for demonstration purposes."
+    "publisher": "mahoskye",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/mahoskye/vs-code-ssl-formatter.git"
+    },
+    "bugs": {
+        "url": "https://github.com/mahoskye/vs-code-ssl-formatter/issues"
+    },
+    "homepage": "https://github.com/mahoskye/vs-code-ssl-formatter#readme",
+    "contributes": {
+        "languages": [
+            {
+                "id": "ssl",
+                "aliases": [
+                    "STARLIMS Scripting Language",
+                    "ssl"
+                ],
+                "extensions": [
+                    ".ssl",
+                    ".ssl.txt"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ],
+        "grammars": [
+            {
+                "language": "ssl",
+                "scopeName": "source.ssl",
+                "path": "./syntaxes/ssl.tmLanguage.json"
+            }
+        ],
+        "configuration": [
+            {
+                "title": "SSL Formatter",
+                "properties": {
+                    "sslFormatter.completions": {
+                        "type": "object",
+                        "default": {
+                            "Array Functions": [],
+                            "Database Functions": [],
+                            "Runtime Functions to Get/Return a DATASET": [],
+                            "Data Type Functions": [],
+                            "Date Functions": [],
+                            "E-mail Functions": [],
+                            "File Manipulation Functions": [],
+                            "FTP Functions": [],
+                            "Logical Functions": [],
+                            "Miscellaneous Functions": [
+                                {
+                                    "label": "exampleFunction()",
+                                    "kind": "function",
+                                    "detail": "This is a demonstration function",
+                                    "documentation": "This function is used for demonstration purposes."
+                                }
+                            ],
+                            "Numeric Functions": [],
+                            "Process Functions": [],
+                            "Security Functions": [],
+                            "Serial Communications Functions": [],
+                            "String Functions": [],
+                            "Statements": [],
+                            "UDP Functions": [],
+                            "Internal Functions": [],
+                            "Error Handling": [],
+                            "Web Specific Functions": []
+                        },
+                        "description": "Custom completions for SSL"
+                    },
+                    "sslFormatter.debug.showTableView": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Show table view in debug output"
+                    },
+                    "sslFormatter.debug.showDetailedView": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Show detailed view in debug output"
+                    },
+                    "sslFormatter.debug.showInsights": {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "Show formatter insights in debug output"
+                    }
                 }
-              ],
-              "Numeric Functions": [],
-              "Process Functions": [],
-              "Security Functions": [],
-              "Serial Communications Functions": [],
-              "String Functions": [],
-              "Statements": [],
-              "UDP Functions": [],
-              "Internal Functions": [],
-              "Error Handling": [],
-              "Web Specific Functions": []
-            },
-            "description": "Custom completions for SSL"
-          }
-        }
-      }
-    ],
-    "commands": [
-      {
-        "command": "sslFormatter.reloadCompletions",
-        "title": "Reload SSL Completions"
-      }
-    ]
-  },
-  "main": "./out/src/extension.js",
-  "scripts": {
-    "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src --ext ts",
-    "test": "node ./out/test/runTest.js"
-  },
-  "devDependencies": {
-    "@types/glob": "^8.1.0",
-    "@types/mocha": "^10.0.9",
-    "@types/node": "^22.7.5",
-    "@types/vscode": "^1.94.0",
-    "@typescript-eslint/eslint-plugin": "^5.59.1",
-    "@typescript-eslint/parser": "^5.59.1",
-    "eslint": "^8.39.0",
-    "glob": "^11.0.0",
-    "mocha": "^10.7.3",
-    "typescript": "~5.1.6",
-    "vscode-test": "^1.6.1"
-  },
-  "prettier": {
-    "printWidth": 100,
-    "tabWidth": 4
-  }
+            }
+        ],
+        "commands": [
+            {
+                "command": "sslFormatter.reloadCompletions",
+                "title": "Reload SSL Completions"
+            }
+        ]
+    },
+    "main": "./out/src/extension.js",
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -watch -p ./",
+        "pretest": "npm run compile && npm run lint",
+        "lint": "eslint src --ext ts",
+        "test": "node ./out/test/runTest.js"
+    },
+    "devDependencies": {
+        "@types/glob": "^8.1.0",
+        "@types/mocha": "^10.0.9",
+        "@types/node": "^22.7.5",
+        "@types/vscode": "^1.94.0",
+        "@typescript-eslint/eslint-plugin": "^5.59.1",
+        "@typescript-eslint/parser": "^5.59.1",
+        "eslint": "^8.39.0",
+        "glob": "^11.0.0",
+        "mocha": "^10.7.3",
+        "typescript": "~5.1.6",
+        "vscode-test": "^1.6.1"
+    },
+    "prettier": {
+        "printWidth": 100,
+        "tabWidth": 4
+    }
 }

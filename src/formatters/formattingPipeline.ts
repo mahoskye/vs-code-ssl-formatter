@@ -61,10 +61,18 @@ export interface ContentSegment {
 // Update ProcessedLine to include segments
 export interface ProcessedLine {
     originalString: string;
+    formattedString: string; // Add this field
     leadingWhitespace: string;
     trimmedContent: string;
     lineNumber: number;
+    originalLineNumber: number;
     segments: ContentSegment[]; // Add segments array
+}
+
+export interface BlockOperation {
+    type: "insert" | "update" | "delete";
+    blockIndex: number;
+    blocks: TypedBlock[];
 }
 
 // Configuration interface
@@ -95,6 +103,7 @@ export const DEFAULT_FORMATTER_CONFIG: FormatterConfig = {
 // Line and block structure interfaces
 export interface ProcessedLine {
     originalString: string;
+    formattedString: string; // Add this field
     leadingWhitespace: string;
     trimmedContent: string;
     lineNumber: number;
@@ -128,6 +137,7 @@ export interface TypedBlock {
     startLineNumber: number;
     endLineNumber: number;
     nextBlockFirstLine?: ProcessedLine;
+    formatterInsights?: FormatterInsight[]; // Add this line
 }
 
 export interface DebugResult {
@@ -146,7 +156,9 @@ export type TokenTypeName =
     | "comment"
     | "empty"
     | "methodCall" // Add this
-    | "propertyAccess"; // Add this
+    | "propertyAccess" // Add this
+    | "logicalOperator" // Add this
+    | "incrementDecrement"; // Add this
 
 interface TokenType {
     type: TokenTypeName;
@@ -175,6 +187,15 @@ interface ProcessingResult {
     newIndex: number;
 }
 
+export interface FormatterInsight {
+    formatterName: string;
+    sourceLineNumber: number;
+    changeType: "spacing" | "casing" | "splitting" | "other";
+    description: string;
+    before: string;
+    after: string;
+}
+
 // Map token types to content types
 export const TOKEN_TYPE_TO_CONTENT_TYPE: Record<TokenTypeName, ContentType> = {
     keyword: "code",
@@ -187,6 +208,8 @@ export const TOKEN_TYPE_TO_CONTENT_TYPE: Record<TokenTypeName, ContentType> = {
     empty: "empty",
     methodCall: "code",
     propertyAccess: "code",
+    logicalOperator: "code",
+    incrementDecrement: "code",
 };
 
 // Define which token types should never be merged
@@ -198,6 +221,8 @@ export const NON_MERGEABLE_TYPES: TokenTypeName[] = [
     "number",
     "methodCall",
     "propertyAccess",
+    "logicalOperator",
+    "incrementDecrement",
 ];
 
 // Configuration for the segment processor
@@ -304,6 +329,8 @@ export class FormatterError extends Error {
 // Interface that all formatters must implement
 export interface CodeFormatter {
     format(blocks: TypedBlock[]): Promise<void>;
+    getName(): string; // Add method to get formatter name
+    getInsights(): FormatterInsight[]; // Add method to get insights
 }
 
 /**
@@ -855,9 +882,9 @@ export class BlockProcessor {
         let result = "";
 
         blocks.forEach((block, index) => {
-            // Add each line
+            // Add each line, using formattedString instead of originalString
             block.lines.forEach((line, lineIndex) => {
-                result += line.originalString;
+                result += line.formattedString || line.originalString; // Use formattedString with fallback
                 if (!(index === blocks.length - 1 && lineIndex === block.lines.length - 1)) {
                     result += "\n";
                 }
@@ -931,9 +958,11 @@ export class BlockProcessor {
         if (trimmed === "") {
             return {
                 originalString: line,
+                formattedString: line, // Initialize with original
                 leadingWhitespace,
                 trimmedContent: trimmed,
                 lineNumber: lineIndex + 1,
+                originalLineNumber: lineIndex + 1,
                 segments: [
                     {
                         type: "empty",
@@ -946,13 +975,18 @@ export class BlockProcessor {
             };
         }
 
-        // Check if line is part of a block comment
-        if (this.isBlockComment(line) || this.commentState.inBlockComment) {
+        // Check if this line is part of a block comment first
+        const isCommentLine = this.isBlockComment(line);
+
+        // If it's a comment line or we're in a block comment, handle it accordingly
+        if (isCommentLine || this.commentState.inBlockComment) {
             return {
                 originalString: line,
+                formattedString: line, // Initialize with original
                 leadingWhitespace,
                 trimmedContent: trimmed,
                 lineNumber: lineIndex + 1,
+                originalLineNumber: lineIndex + 1,
                 segments: [
                     {
                         type: "comment",
@@ -968,35 +1002,16 @@ export class BlockProcessor {
             };
         }
 
-        if (trimmed.startsWith("/*")) {
-            return {
-                originalString: line,
-                leadingWhitespace,
-                trimmedContent: trimmed,
-                lineNumber: lineIndex + 1,
-                segments: [
-                    {
-                        type: "comment",
-                        content: line,
-                        startIndex: 0,
-                        endIndex: line.length,
-                        tokenType: {
-                            type: "comment",
-                            breakable: false,
-                        },
-                    },
-                ],
-            };
-        }
-
-        // Get segments from the processor
+        // Get segments from the processor for all other lines
         const segments = this.segmentProcessor.processLine(line);
 
         return {
             originalString: line,
+            formattedString: line, // Initialize with original
             leadingWhitespace,
             trimmedContent: trimmed,
             lineNumber: lineIndex + 1,
+            originalLineNumber: lineIndex + 1,
             segments,
         };
     }
@@ -1044,6 +1059,46 @@ export class BlockProcessor {
         };
     }
 
+    public applyBlockOperation(blocks: TypedBlock[], operations: BlockOperation[]): TypedBlock[] {
+        // Sort operations by block index in reverse order to handle deletions
+        operations.sort((a, b) => b.blockIndex - a.blockIndex);
+
+        // Apply each operation
+        for (const op of operations) {
+            switch (op.type) {
+                case "insert":
+                    // Insert new blocks at the specified index
+                    blocks.splice(op.blockIndex, 0, ...op.blocks);
+                    break;
+                case "update":
+                    // Replace the block at the specified index
+                    blocks.splice(op.blockIndex, 1, ...op.blocks);
+                    break;
+                case "delete":
+                    // Remove the block at the specified index
+                    blocks.splice(op.blockIndex, 1);
+                    break;
+            }
+        }
+
+        // Update line numbers and relationships
+        this.updateblockLineNumbers(blocks);
+        return blocks;
+    }
+
+    private updateblockLineNumbers(blocks: TypedBlock[]): void {
+        let currentLineNumber = 1;
+
+        blocks.forEach((block) => {
+            block.startLineNumber = currentLineNumber;
+            block.lines.forEach((line) => {
+                line.lineNumber = currentLineNumber++;
+            });
+
+            block.endLineNumber = currentLineNumber - 1;
+        });
+    }
+
     /**
      * Get the next non-empty line
      */
@@ -1079,13 +1134,7 @@ export class BlockProcessor {
     private isBlockComment(line: string): boolean {
         const trimmed = line.trim();
 
-        // Handle block comment start
-        if (trimmed.startsWith("/*")) {
-            this.commentState.blockCommentDepth++;
-            this.commentState.inBlockComment = true;
-        }
-
-        // Check for comment endings (semicolon)
+        // If we're already in a block comment, check for ending
         if (this.commentState.inBlockComment) {
             if (trimmed.endsWith(";")) {
                 this.commentState.blockCommentDepth--;
@@ -1094,6 +1143,17 @@ export class BlockProcessor {
                 }
             }
             return true;
+        }
+
+        // Handle block comment start
+        if (trimmed.startsWith("/*")) {
+            // Check if comment ends on the same line
+            if (trimmed.endsWith(";")) {
+                // This is an inline comment - split it into segments
+                return false;
+            }
+            this.commentState.blockCommentDepth++;
+            this.commentState.inBlockComment = true;
         }
 
         return false;
@@ -1105,6 +1165,8 @@ export class BlockProcessor {
 export class FormatterPipeline {
     private formatters: CodeFormatter[] = [];
     private blockProcessor: BlockProcessor;
+    private allInsights: FormatterInsight[] = [];
+    private blockOperations: BlockOperation[] = [];
 
     constructor(private config: FormatterConfig = DEFAULT_FORMATTER_CONFIG) {
         this.blockProcessor = new BlockProcessor(config);
@@ -1138,6 +1200,40 @@ export class FormatterPipeline {
             // Establish block relationships
             this.establishBlockRelationships(blocks);
 
+            // Reset insights and operations
+            this.allInsights = [];
+            this.blockOperations = [];
+
+            // Run each formatter
+            for (const formatter of this.formatters) {
+                await formatter.format(blocks);
+                const insights = formatter.getInsights();
+                this.allInsights.push(...insights);
+
+                // Apply block operations after each formatter
+                if (this.blockOperations.length > 0) {
+                    blocks = this.blockProcessor.applyBlockOperation(blocks, this.blockOperations);
+                    this.blockOperations = [];
+
+                    // Re-establish relationships after structural changes
+                    this.establishBlockRelationships(blocks);
+                }
+
+                // Add insights to their respective blocks
+                const blockContainsLine = (block: TypedBlock, lineNumber: number) => {
+                    return block.lines.some((line) => line.lineNumber === lineNumber);
+                };
+                insights.forEach((insight) => {
+                    const block = blocks.find((b) =>
+                        blockContainsLine(b, insight.sourceLineNumber)
+                    );
+                    if (block) {
+                        block.formatterInsights = block.formatterInsights || [];
+                        block.formatterInsights.push(insight);
+                    }
+                });
+            }
+
             // If in debug mode, return debug analysis
             if (this.config.debug) {
                 return {
@@ -1147,11 +1243,6 @@ export class FormatterPipeline {
                 };
             }
 
-            // Run each formatter
-            for (const formatter of this.formatters) {
-                await formatter.format(blocks);
-            }
-
             // Convert blocks back to text
             return this.blockProcessor.blocksToText(blocks);
         } catch (error) {
@@ -1159,6 +1250,10 @@ export class FormatterPipeline {
                 `Formatting failed: ${error instanceof Error ? error.message : String(error)}`
             );
         }
+    }
+
+    public registerBlockOperation(operation: BlockOperation): void {
+        this.blockOperations.push(operation);
     }
 
     /**
@@ -1331,12 +1426,26 @@ export class FormatterPipeline {
         output.push("Detailed Block Analysis:");
         output.push("========================");
 
+        // Group insights by source line number
+        const insightsByLine = new Map<number, FormatterInsight[]>();
+        this.allInsights.forEach((insight) => {
+            // Ensure we're using the original line number from the insight
+            const insights = insightsByLine.get(insight.sourceLineNumber) || [];
+            insights.push(insight);
+            insightsByLine.set(insight.sourceLineNumber, insights);
+        });
+
         // Add each block
         blocks.forEach((block, index) => {
             output.push(`\nBlock ${index + 1}:`);
             output.push(`Type: ${block.blockType}`);
             output.push(`Flow: ${block.metadata.flowType}`);
-            output.push(`Lines: ${block.startLineNumber}-${block.endLineNumber}`);
+            // Use original line numbers for block range
+            output.push(
+                `Lines: ${block.lines[0].originalLineNumber}-${
+                    block.lines[block.lines.length - 1].originalLineNumber
+                }`
+            );
             output.push(`Depth: ${block.context.depth}`);
 
             // Add more details for the block if relevant
@@ -1356,9 +1465,33 @@ export class FormatterPipeline {
                 output.push(`Parent Block: ${block.context.parentBlockType}`);
             }
 
-            output.push("\nTrimmed Content:");
+            // Add formatter insights for lines in this block
             block.lines.forEach((line) => {
-                output.push(`    ${line.trimmedContent}`);
+                // Use originalLineNumber for insights
+                const lineInsights = insightsByLine.get(line.originalLineNumber);
+                if (lineInsights?.length) {
+                    output.push(`\nFormatter Changes for Line ${line.originalLineNumber}:`);
+                    // Sort insights by formatter and change type to ensure consistent ordering
+                    const sortedInsights = lineInsights.sort((a, b) => {
+                        if (a.formatterName === b.formatterName) {
+                            return a.changeType.localeCompare(b.changeType);
+                        }
+                        return a.formatterName.localeCompare(b.formatterName);
+                    });
+                    sortedInsights.forEach((insight) => {
+                        output.push(`  ${insight.formatterName}:`);
+                        output.push(`    ${insight.description}`);
+                        output.push(`    Before: "${insight.before}"`);
+                        output.push(`    After:  "${insight.after}"`);
+                    });
+                }
+            });
+
+            output.push("\nContent Comparison:");
+            block.lines.forEach((line) => {
+                output.push(`    Line ${line.originalLineNumber}:`);
+                output.push(`       Original: ${line.originalString.trim()}`);
+                output.push(`      Formatted: ${line.formattedString.trim()}`);
             });
 
             // Show segments for each line
@@ -1447,10 +1580,15 @@ export class FormatterPipeline {
  */
 export class SegmentProcessor {
     private readonly config: SegmentConfig;
+    private commentState: CommentState = {
+        inBlockComment: false,
+        blockCommentDepth: 0,
+    };
 
     // Core token patterns
     private readonly patterns = {
         whitespace: /^\s+/,
+        incrementDecrement: /^(?:\+\+|--)\w+|^\w+(?:\+\+|--)/, // Moved up in the patterns list
         // Split method calls into two types
         colonMethodCall: /^[A-Za-z_]\w*:[A-Za-z_]\w*\s*\(/, // s:format(
         simpleMethodCall: /^[A-Za-z_]\w*\s*\(/, // usrmes(
@@ -1460,9 +1598,10 @@ export class SegmentProcessor {
         number: /^-?\d*\.?\d+/,
         stringStart: /^["']/,
         commentStart: /^\/\*/,
-        operator: /^(?::=|==|===|!=|>=|<=|&&|\|\||[+\-*/%=])/,
+        operator: /^(?::=|==|===|!=|>=|<=|&&|\|\||[+\-*/%=<>])/,
         separator: /^[,;()[\]{}]/,
         colon: /^:/, // Add the missing colon pattern
+        logicalOperator: /^\.(?:T|F|AND|OR)\./i, // Add pattern for .T., .F., .AND., .OR.
     };
 
     constructor(config: SegmentConfig = DEFAULT_SEGMENT_CONFIG) {
@@ -1501,7 +1640,6 @@ export class SegmentProcessor {
      */
     private processNextToken(line: string, startIndex: number): ProcessingResult | null {
         const remaining = line.slice(startIndex);
-
         // Skip whitespace
         const whitespaceMatch = remaining.match(this.patterns.whitespace);
         if (whitespaceMatch) {
@@ -1511,23 +1649,75 @@ export class SegmentProcessor {
             };
         }
 
-        // Look for inline comments first since they need to capture until semicolon
+        // Process in correct order:
+        // 1. Comments (only if they start with /*)
         if (remaining.startsWith("/*")) {
             return this.processComment(line, startIndex);
         }
 
-        // Try other token types in order
-        return (
-            this.processColonMethodCall(line, startIndex) || // Try colon methods first
-            this.processSimpleMethodCall(line, startIndex) || // Then simple methods
-            this.processPropertyAccess(line, startIndex) || // Then property access
-            this.processKeyword(line, startIndex) || // Then keywords
-            this.processOperator(line, startIndex) || // Then other tokens
+        // 2. Increment/Decrement patterns (moved up in priority)
+        const incDecMatch = remaining.match(this.patterns.incrementDecrement);
+        if (incDecMatch) {
+            return {
+                token: {
+                    type: "incrementDecrement",
+                    content: incDecMatch[0],
+                    startIndex,
+                    endIndex: startIndex + incDecMatch[0].length,
+                    breakable: false,
+                },
+                newIndex: startIndex + incDecMatch[0].length,
+            };
+        }
+
+        // 3. Keywords (includes :parameters, :if, etc)
+        const keywordResult = this.processKeyword(line, startIndex);
+        if (keywordResult) {
+            return keywordResult;
+        }
+
+        // 4. Method calls and property access
+        const methodResult =
+            this.processColonMethodCall(line, startIndex) ||
+            this.processSimpleMethodCall(line, startIndex) ||
+            this.processPropertyAccess(line, startIndex);
+        if (methodResult) {
+            return methodResult;
+        }
+
+        // 5. Separators and operators
+        const operatorResult =
+            this.processSeparator(line, startIndex) || this.processOperator(line, startIndex);
+        if (operatorResult) {
+            return operatorResult;
+        }
+
+        // 6. Values
+        const valueResult =
             this.processString(line, startIndex) ||
-            this.processSeparator(line, startIndex) ||
             this.processNumber(line, startIndex) ||
-            this.processIdentifier(line, startIndex)
-        );
+            this.processIdentifier(line, startIndex);
+        if (valueResult) {
+            return valueResult;
+        }
+
+        // Check for logical operators first (.T., .F., etc)
+        const logicalMatch = remaining.match(this.patterns.logicalOperator);
+        if (logicalMatch) {
+            return {
+                token: {
+                    type: "logicalOperator",
+                    content: logicalMatch[0],
+                    startIndex,
+                    endIndex: startIndex + logicalMatch[0].length,
+                    breakable: false,
+                },
+                newIndex: startIndex + logicalMatch[0].length,
+            };
+        }
+
+        // Skip any unrecognized character
+        return null;
     }
 
     /**
@@ -1585,12 +1775,34 @@ export class SegmentProcessor {
 
         // Find the comment part and the semicolon that ends it
         let endIndex = startIndex;
+        let foundSemicolon = false;
+
         while (endIndex < line.length) {
             if (line[endIndex] === ";") {
                 endIndex++;
+                foundSemicolon = true;
+                // Reset block comment state when we find the ending semicolon
+                this.commentState.inBlockComment = false;
+                this.commentState.blockCommentDepth = 0;
                 break;
             }
             endIndex++;
+        }
+
+        // If no semicolon found, the comment continues
+        if (!foundSemicolon) {
+            this.commentState.inBlockComment = true;
+            this.commentState.blockCommentDepth++;
+            return {
+                token: {
+                    type: "comment",
+                    content: line.slice(startIndex),
+                    startIndex,
+                    endIndex: line.length,
+                    breakable: true,
+                },
+                newIndex: line.length,
+            };
         }
 
         return {
@@ -1599,7 +1811,7 @@ export class SegmentProcessor {
                 content: line.slice(startIndex, endIndex),
                 startIndex,
                 endIndex,
-                breakable: true,
+                breakable: false, // Don't break inline comments
             },
             newIndex: endIndex,
         };

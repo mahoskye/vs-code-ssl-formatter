@@ -2,16 +2,27 @@ import * as vscode from "vscode";
 import { FormatterPipeline, FormatterConfig } from "./formatters/formattingPipeline";
 import { KeywordCasingFormatter } from "./formatters/keywordCasing";
 import { SemicolonNewlineFormatter } from "./formatters/semicolonNewline";
-// Import other formatters as they're converted
+import { OperatorSpacingFormatter } from "./formatters/operatorSpacing";
 
-export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
+interface SSLFormatterConfig {
+    showTableView: boolean;
+    showDetailedView: boolean;
+    showInsights: boolean;
+}
+
+export class SSLFormatter implements vscode.DocumentFormattingEditProvider, vscode.Disposable {
     private pipeline: FormatterPipeline;
     private tableChannel: vscode.OutputChannel | undefined;
     private debugChannel: vscode.OutputChannel | undefined;
+    private insightsChannel: vscode.OutputChannel | undefined;
+    private config: SSLFormatterConfig;
 
     constructor() {
+        // Initialize debug configuration from VS Code settings
+        this.config = this.loadConfig();
+
         // Create pipeline with VS Code specific configuration
-        const config: FormatterConfig = {
+        const pipelineConfig: FormatterConfig = {
             debug: false,
             showSegmentDetails: false,
             useSpacingContext: true,
@@ -23,16 +34,30 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
             indentStyle: "space",
         };
 
-        this.pipeline = new FormatterPipeline(config);
+        this.pipeline = new FormatterPipeline(pipelineConfig);
 
         // Add formatters in desired order
         this.pipeline.addFormatter(new KeywordCasingFormatter());
-        this.pipeline.addFormatter(new SemicolonNewlineFormatter());
-        // Add other formatters as they're converted:
-        // this.pipeline.addFormatter(new OperatorSpacingFormatter());
-        // this.pipeline.addFormatter(new LineBreakFormatter());
-        // this.pipeline.addFormatter(new IndentationFormatter());
-        // this.pipeline.addFormatter(new LineSpacingFormatter());
+        // this.pipeline.addFormatter(new SemicolonNewlineFormatter(this.pipeline));
+        this.pipeline.addFormatter(new OperatorSpacingFormatter());
+
+        // Listen for configuration changes
+        vscode.workspace.onDidChangeConfiguration(this.handleConfigChange, this);
+    }
+
+    private loadConfig(): SSLFormatterConfig {
+        const config = vscode.workspace.getConfiguration("sslFormatter.debug");
+        return {
+            showTableView: config.get("showTableView", true),
+            showDetailedView: config.get("showDetailedView", true),
+            showInsights: config.get("showInsights", true),
+        };
+    }
+
+    private handleConfigChange(event: vscode.ConfigurationChangeEvent): void {
+        if (event.affectsConfiguration("sslFormatter.debug")) {
+            this.config = this.loadConfig();
+        }
     }
 
     private getTableChannel(): vscode.OutputChannel {
@@ -49,6 +74,13 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
         return this.debugChannel;
     }
 
+    private getInsightsChannel(): vscode.OutputChannel {
+        if (!this.insightsChannel) {
+            this.insightsChannel = vscode.window.createOutputChannel("SSL Formatter Insights");
+        }
+        return this.insightsChannel;
+    }
+
     public async provideDocumentFormattingEdits(
         document: vscode.TextDocument,
         options: vscode.FormattingOptions,
@@ -60,17 +92,46 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
 
             // Handle debug output
             if (typeof result !== "string") {
-                // Show debug info in table format
-                const tableChannel = this.getTableChannel();
-                tableChannel.clear();
-                tableChannel.appendLine(result.tableView);
-                tableChannel.show(true);
+                // Show debug info in table format if enabled
+                if (this.config.showTableView) {
+                    const tableChannel = this.getTableChannel();
+                    tableChannel.clear();
+                    tableChannel.appendLine(result.tableView);
+                    tableChannel.show(true);
+                }
 
-                // Show debug info in detail format
-                const debugChannel = this.getDebugChannel();
-                debugChannel.clear();
-                debugChannel.appendLine(result.detailedView);
-                debugChannel.show(false);
+                // Show debug info in detail format if enabled
+                if (this.config.showDetailedView) {
+                    const debugChannel = this.getDebugChannel();
+                    debugChannel.clear();
+                    debugChannel.appendLine(result.detailedView);
+                    debugChannel.show(false);
+                }
+
+                // Show formatter insights if enabled
+                if (this.config.showInsights) {
+                    const insightsChannel = this.getInsightsChannel();
+                    insightsChannel.clear();
+                    if (result.blocks.some((b) => b.formatterInsights?.length)) {
+                        insightsChannel.appendLine("Formatter Insights:");
+                        insightsChannel.appendLine("==================");
+
+                        result.blocks.forEach((block, blockIndex) => {
+                            if (block.formatterInsights && block.formatterInsights.length > 0) {
+                                insightsChannel.appendLine(`\nBlock ${blockIndex + 1}:`);
+                                block.formatterInsights.forEach((insight) => {
+                                    insightsChannel.appendLine(`  ${insight.formatterName}:`);
+                                    insightsChannel.appendLine(
+                                        `    Line ${insight.sourceLineNumber}: ${insight.description}`
+                                    );
+                                    insightsChannel.appendLine(`    Before: "${insight.before}"`);
+                                    insightsChannel.appendLine(`    After:  "${insight.after}"`);
+                                });
+                            }
+                        });
+                        insightsChannel.show(false);
+                    }
+                }
 
                 // Return original text when in debug mode
                 return [];
@@ -89,16 +150,9 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider {
         }
     }
 
-    /**
-     * Update pipeline configuration based on VS Code formatting options
-     */
-    private updateConfig(options: vscode.FormattingOptions): void {
-        const config = this.pipeline.getConfig();
-
-        // Update relevant options
-        config.tabSize = options.tabSize;
-        config.indentStyle = options.insertSpaces ? "space" : "tab";
-
-        // Could add more VS Code specific configuration here
+    public dispose(): void {
+        this.tableChannel?.dispose();
+        this.debugChannel?.dispose();
+        this.insightsChannel?.dispose();
     }
 }
