@@ -51,27 +51,23 @@ export class SemicolonNewlineFormatter implements CodeFormatter {
             const splitLines = this.splitLineOnSemicolons(line);
 
             if (splitLines.length > 1) {
-                // Create new blocks for each split line
                 const newBlocks = this.createBlocksFromSplitLines(splitLines, block);
 
-                // Create an update operation for the current block
                 operations.push({
                     type: "update",
                     blockIndex: blockIndex + lineOffset,
                     blocks: newBlocks,
                 });
 
-                // Track how many new blocks we're adding
                 lineOffset += newBlocks.length - 1;
 
-                // Record insights
                 this.insights.push({
                     formatterName: this.getName(),
                     sourceLineNumber: line.originalLineNumber,
                     changeType: "splitting",
                     description: `Split into ${splitLines.length} lines`,
                     before: line.originalString,
-                    after: splitLines.map((l) => l.originalString).join("\n"),
+                    after: splitLines.map((l) => l.formattedString).join("\n"),
                 });
             }
         }
@@ -86,11 +82,10 @@ export class SemicolonNewlineFormatter implements CodeFormatter {
         const blocks: TypedBlock[] = [];
         let currentLines: ProcessedLine[] = [];
 
-        // Group split lines into new blocks
+        // Process each line and create blocks
         for (const line of lines) {
             currentLines.push(line);
 
-            // If this line ends with a semicolon, create a new block
             if (line.trimmedContent.endsWith(";")) {
                 const newBlock = this.createBlockFromLines(currentLines, originalBlock);
                 blocks.push(newBlock);
@@ -98,7 +93,6 @@ export class SemicolonNewlineFormatter implements CodeFormatter {
             }
         }
 
-        // Handle any remaining lines
         if (currentLines.length > 0) {
             blocks.push(this.createBlockFromLines(currentLines, originalBlock));
         }
@@ -107,11 +101,13 @@ export class SemicolonNewlineFormatter implements CodeFormatter {
     }
 
     private createBlockFromLines(lines: ProcessedLine[], originalBlock: TypedBlock): TypedBlock {
-        // Use BlockIdentifier to determine block type and metadata
         const identification = BlockIdentifier.identify(lines);
 
         return {
-            lines,
+            lines: lines.map((line) => ({
+                ...line,
+                originalString: line.formattedString,
+            })),
             blockType: identification.blockType,
             metadata: identification.metadata,
             context: {
@@ -141,26 +137,26 @@ export class SemicolonNewlineFormatter implements CodeFormatter {
                 splitPos + 1,
                 line.lineNumber,
                 line.originalLineNumber,
-                currentStart === 0 ? line.leadingWhitespace : line.leadingWhitespace + "    "
+                currentStart === 0 ? line.leadingWhitespace : line.leadingWhitespace
             );
+
             result.push(newLine);
             currentStart = splitPos + 1;
         }
 
-        // Add remaining content if any and not empty
         if (currentStart < line.originalString.length) {
             const remainingContent = line.originalString.substring(currentStart).trim();
             if (remainingContent) {
-                result.push(
-                    this.createProcessedLine(
-                        line,
-                        currentStart,
-                        line.originalString.length,
-                        line.lineNumber,
-                        line.originalLineNumber,
-                        line.leadingWhitespace + "    "
-                    )
+                const finalLine = this.createProcessedLine(
+                    line,
+                    currentStart,
+                    line.originalString.length,
+                    line.lineNumber,
+                    line.originalLineNumber,
+                    line.leadingWhitespace
                 );
+
+                result.push(finalLine);
             }
         }
 
@@ -175,31 +171,28 @@ export class SemicolonNewlineFormatter implements CodeFormatter {
         originalLineNumber: number,
         leadingWhitespace: string
     ): ProcessedLine {
-        // Extract code content
         const content = originalLine.originalString.substring(startPos, endPos);
         const trimmedContent = content.trim();
-
-        // Split segments by type
         const segments = this.createSegmentsForSplit(originalLine.segments, startPos, endPos);
-        const codeSegments = segments.filter((s) => s.type === "code");
-        const commentSegments = segments.filter((s) => s.type === "comment");
+        const orderedSegments = segments.sort((a, b) => a.startIndex - b.startIndex);
 
-        // Build formatted content
-        const formattedContent = `${leadingWhitespace}${codeSegments
-            .map((s) => s.content)
-            .join(" ")
-            .trim()}${
-            commentSegments.length > 0 ? " " + commentSegments.map((s) => s.content).join(" ") : ""
-        }`;
+        let formattedContent = leadingWhitespace;
+        let lastEndIndex = 0;
+
+        orderedSegments.forEach((segment, index) => {
+            if (index > 0 && segment.startIndex > lastEndIndex) {
+                formattedContent += " ";
+            }
+
+            formattedContent += segment.content;
+            lastEndIndex = segment.endIndex;
+        });
 
         return {
             originalString: originalLine.originalString,
             formattedString: formattedContent,
             leadingWhitespace,
-            trimmedContent: codeSegments
-                .map((s) => s.content)
-                .join(" ")
-                .trim(),
+            trimmedContent,
             lineNumber,
             originalLineNumber,
             segments,
@@ -214,16 +207,13 @@ export class SemicolonNewlineFormatter implements CodeFormatter {
         const segments: ContentSegment[] = [];
 
         for (const segment of originalSegments) {
-            // Skip segments that don't overlap with our range
             if (segment.endIndex <= startPos || segment.startIndex >= endPos) {
                 continue;
             }
 
-            // Calculate the overlapping portion
             const overlapStart = Math.max(segment.startIndex, startPos);
             const overlapEnd = Math.min(segment.endIndex, endPos);
 
-            // Calculate relative positions for the new segment
             const relativeStart = overlapStart - startPos;
             const relativeEnd = overlapEnd - startPos;
 
@@ -247,24 +237,22 @@ export class SemicolonNewlineFormatter implements CodeFormatter {
         const splitPositions: number[] = [];
         let lastFoundPosition = -1;
 
-        // Find all semicolons in the line
         for (let i = 0; i < line.originalString.length; i++) {
             if (line.originalString[i] === ";") {
-                // Find which segment contains this semicolon
                 const containingSegment = line.segments.find(
                     (seg) => i >= seg.startIndex && i < seg.endIndex
                 );
 
-                // Skip if semicolon is in a string or comment
-                if (
-                    !containingSegment ||
-                    containingSegment.type === "string" ||
-                    containingSegment.type === "comment"
-                ) {
+                if (containingSegment?.type === "comment") {
+                    splitPositions.push(i);
+                    lastFoundPosition = i;
                     continue;
                 }
 
-                // Get the rest of the line after this semicolon
+                if (containingSegment?.type === "string") {
+                    continue;
+                }
+
                 const restOfLine = line.originalString.substring(i + 1).trim();
                 const isClosing = restOfLine === ")" || restOfLine === ");" || restOfLine === "";
 
