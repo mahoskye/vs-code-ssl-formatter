@@ -275,37 +275,15 @@ export class OperatorSpacingFormatter implements CodeFormatter {
         segment: ProcessedSegment,
         prevSegment: ProcessedSegment | null,
         nextSegment: ProcessedSegment | null,
-        segments: ProcessedSegment[], // Add segments parameter
-        currentIndex: number // Add current index parameter
+        segments: ProcessedSegment[],
+        currentIndex: number
     ): SpacingRule {
-        // First check if we're in a method call context
         const isMethodCallContext = this.isFunctionCall(segments, currentIndex);
-
-        console.log("Getting spacing rule for:", {
-            content: segment.content,
-            isCompound: segment.isCompound,
-            prev: prevSegment?.content,
-            prevType: prevSegment?.tokenType?.type,
-            next: nextSegment?.content,
-            nextType: nextSegment?.tokenType?.type,
-            // Add these new fields:
-            rule: this.spacingRules.get(segment.content),
-            inMethodCall: isMethodCallContext,
-            isUnary: this.isUnaryOperator(segment, prevSegment, nextSegment),
-        });
 
         if (
             prevSegment?.content === ":RETURN" &&
             (segment.content === "{" || segment.content === "}")
         ) {
-            console.log("RETURN block check:", {
-                segment: segment.content,
-                rule:
-                    segment.content === "{"
-                        ? { before: true, after: false }
-                        : { before: false, after: false },
-            });
-            // Special case for :RETURN {...};
             if (segment.content === "{") {
                 return { before: true, after: false };
             }
@@ -506,14 +484,6 @@ export class OperatorSpacingFormatter implements CodeFormatter {
                             i
                         );
 
-                        console.log("Applying spacing rule:", {
-                            segment: segment.content,
-                            beforeRule: rule.before,
-                            afterRule: rule.after,
-                            lastWasSpace,
-                            newContentBefore: newContent,
-                        });
-
                         if (rule.before && !lastWasSpace) {
                             newContent += " ";
                         }
@@ -552,11 +522,6 @@ export class OperatorSpacingFormatter implements CodeFormatter {
                         lastWasSpace = false;
                     }
                 }
-
-                console.log("After applying rule:", {
-                    newContent,
-                    lastWasSpace,
-                });
 
                 newContent = newContent.trimEnd();
                 if (newContent !== originalContent) {

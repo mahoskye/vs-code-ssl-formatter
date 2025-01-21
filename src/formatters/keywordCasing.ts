@@ -20,18 +20,6 @@ export class KeywordCasingFormatter implements CodeFormatter {
             }
 
             for (const line of block.lines) {
-                // 🔴 Breakpoint 1: Start of line processing
-                console.log("\nProcessing line:", line.trimmedContent);
-                console.log(
-                    "Original segments:",
-                    line.segments.map((s) => ({
-                        content: s.content,
-                        type: s.tokenType?.type,
-                        start: s.startIndex,
-                        end: s.endIndex,
-                    }))
-                );
-
                 let modified = false;
                 const originalContent = line.trimmedContent;
 
@@ -40,11 +28,6 @@ export class KeywordCasingFormatter implements CodeFormatter {
                     if (segment.type === "code" && segment.tokenType?.type === "keyword") {
                         const content = segment.content;
                         if (content.startsWith(":")) {
-                            console.log("Processing keyword:", {
-                                original: content,
-                                keywordPart: content.slice(1).toUpperCase(),
-                                replacement: `:${content.slice(1).toUpperCase()}`,
-                            });
                             const keywordPart = content.slice(1).toUpperCase();
                             const replacement = `:${keywordPart}`;
 
@@ -61,17 +44,8 @@ export class KeywordCasingFormatter implements CodeFormatter {
                     let formattedContent = "";
                     let currentPos = 0;
 
-                    console.log("\nReconstructing line:");
                     for (const segment of line.segments) {
                         const gapSize = segment.startIndex - currentPos;
-                        console.log("Segment:", {
-                            content: segment.content,
-                            type: segment.tokenType?.type,
-                            start: segment.startIndex,
-                            end: segment.endIndex,
-                            gapSize,
-                            currentPos,
-                        });
 
                         if (gapSize > 0) {
                             formattedContent += " ".repeat(gapSize);
@@ -80,11 +54,6 @@ export class KeywordCasingFormatter implements CodeFormatter {
                         formattedContent += segment.content;
                         currentPos = segment.endIndex;
                     }
-
-                    console.log("Line reconstruction result:", {
-                        before: originalContent,
-                        after: formattedContent,
-                    });
 
                     line.formattedString = line.leadingWhitespace + formattedContent;
                     line.trimmedContent = formattedContent;
