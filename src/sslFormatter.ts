@@ -3,6 +3,7 @@ import { FormatterPipeline, FormatterConfig } from "./formatters/formattingPipel
 import { KeywordCasingFormatter } from "./formatters/keywordCasing";
 import { SemicolonNewlineFormatter } from "./formatters/semicolonNewline";
 import { OperatorSpacingFormatter } from "./formatters/operatorSpacing";
+import { LongLineBreaker } from "./formatters/longLineBreaker";
 
 interface SSLFormatterConfig {
     showTableView: boolean;
@@ -23,8 +24,8 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider, vsco
 
         // Create pipeline with VS Code specific configuration
         const pipelineConfig: FormatterConfig = {
-            debug: false,
-            showSegmentDetails: false,
+            debug: true,
+            showSegmentDetails: true,
             useSpacingContext: true,
             useSpacingPostProcessing: true,
             preserveUserSpacing: false,
@@ -37,9 +38,10 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider, vsco
         this.pipeline = new FormatterPipeline(pipelineConfig);
 
         // Add formatters in desired order
-        this.pipeline.addFormatter(new KeywordCasingFormatter());
-        this.pipeline.addFormatter(new SemicolonNewlineFormatter(this.pipeline));
-        this.pipeline.addFormatter(new OperatorSpacingFormatter());
+        // this.pipeline.addFormatter(new KeywordCasingFormatter());
+        // this.pipeline.addFormatter(new SemicolonNewlineFormatter(this.pipeline));
+        // this.pipeline.addFormatter(new OperatorSpacingFormatter());
+        this.pipeline.addFormatter(new LongLineBreaker(pipelineConfig.maxLineLength));
 
         // Listen for configuration changes
         vscode.workspace.onDidChangeConfiguration(this.handleConfigChange, this);
