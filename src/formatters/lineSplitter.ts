@@ -19,6 +19,7 @@ interface ItemListInfo {
      * Specifies the type of the item list.
      *
      * - "tuple": The list represents tuple/positional arguments.
+     * - "blockParameter": The list is a block parameter.
      * - "parameter": The list is a parameter.
      * - "array": The list is an array.
      * - "none": There is no list.
@@ -34,14 +35,16 @@ interface ItemListInfo {
 export class LineSplitter implements CodeFormatter {
     private insights: FormatterInsight[] = [];
     private maxLineLength: number;
+    private itemsPerLine: number;
 
     /**
      * Creates an instance of the LineSplitter.
      *
      * @param maxLineLength - The maximum length of a line before it should be split.
      */
-    constructor(maxLineLength: number) {
+    constructor(maxLineLength: number, itemsPerLine: number) {
         this.maxLineLength = maxLineLength;
+        this.itemsPerLine = itemsPerLine || 6;
     }
 
     /**
@@ -82,42 +85,43 @@ export class LineSplitter implements CodeFormatter {
     public async format(blocks: TypedBlock[]): Promise<void> {
         try {
             this.insights = [];
-            console.log(
+            console.debug(
                 `\n[LineSplitter] Starting format with maxLineLength: ${this.maxLineLength}`
             );
 
             for (const block of blocks) {
-                console.log(`\n[LineSplitter] Processing block of type: ${block.blockType}`);
+                console.debug(`\n[LineSplitter] Processing block of type: ${block.blockType}`);
 
                 for (let i = 0; i < block.lines.length; i++) {
                     const line = block.lines[i];
-                    console.log(
+                    console.debug(
                         `\n[LineSplitter] Line ${line.lineNumber}: Length ${line.formattedString.length}`
                     );
-                    console.log(`Content: \`${line.trimmedContent}\``);
-                    console.log(`Is Long Line: ${this.isLongLine(line)}`);
-                    console.log(`Has Multiple Semicolons: ${this.hasMultipleSemicolons(line)}`);
+                    console.debug(`Content: \`${line.trimmedContent}\``);
+                    console.debug(`Is Long Line: ${this.isLongLine(line)}`);
+                    console.debug(`Has Multiple Semicolons: ${this.hasMultipleSemicolons(line)}`);
                     const listInfo = this.containsItemList(block, line);
                     if (this.hasList(block)) {
-                        console.log(`Has List: true of type: ${listInfo.listType}`);
+                        console.debug(`Has List of Type: ${listInfo.listType}`);
+                        console.debug(`Items Per Line: ${this.itemsPerLine}`);
                         if (listInfo.listType === "blockParameter") {
-                            console.log(
+                            console.debug(
                                 `List Items: ${this.getListItems(block, listInfo.listType).join(
                                     " 🐭 "
                                 )}`
                             );
                         } else {
-                            console.log(
+                            console.debug(
                                 `List Items: ${this.getListItems(block, listInfo.listType).join(
                                     " 🐸 "
                                 )}`
                             );
                         }
                     } else {
-                        console.log("Has List: false");
+                        console.debug("Has List: ⛔");
                     }
-                    console.log(`Is Comment Block: ${this.isCommentBlock(block)}`);
-                    console.log(`Has Comment Segment: ${this.hasCommentSegment(line)}`);
+                    console.debug(`Is Comment Block: ${this.isCommentBlock(block)}`);
+                    console.debug(`Has Comment Segment: ${this.hasCommentSegment(line)}`);
                 }
             }
         } catch (e) {
@@ -263,15 +267,20 @@ export class LineSplitter implements CodeFormatter {
      * @returns An object containing the opening and closing wrappers for the list type.
      */
     private getListWrappers(listType: string): { open: string; close: string } {
-        switch (listType) {
-            case "array":
-                return { open: "{", close: "}" };
-            case "parameter":
-                return { open: "(", close: ")" };
-            case "tuple":
-                return { open: "[", close: "]" };
-            default:
-                return { open: "", close: "" };
+        try {
+            switch (listType) {
+                case "array":
+                    return { open: "{", close: "}" };
+                case "parameter":
+                    return { open: "(", close: ")" };
+                case "tuple":
+                    return { open: "[", close: "]" };
+                default:
+                    return { open: "", close: "" };
+            }
+        } catch (e) {
+            console.error(`Error retrieving list wrappers: ${e}`);
+            return { open: "", close: "" };
         }
     }
 
@@ -355,97 +364,48 @@ export class LineSplitter implements CodeFormatter {
     }
 
     /**
-     * Retrieves parameter list items from a declaration block.
+     * Retrieves blockParameter list items from a declaration block.
      *
      * @param block - The block containing parameter declarations.
      * @returns An array of parameter items.
      */
     private getParameterListItems(block: TypedBlock, listType: string): string[] {
-        const items: string[] = [];
+        try {
+            const items: string[] = [];
 
-        /**
-         * @todo Implement logic that uses listType to determine how to extract parameter items
-         *          - For "blockParameter", we can use the existing approach
-         *          - For "parameter", we need a different approach (they should probably be different functions, but do inline for now)
-         * currently, the logic seems to be splitting apart strings based on the segment type, which is not ideal
-         */
+            for (const line of block.lines) {
+                for (const segment of line.segments) {
+                    const content = segment.content.trim();
 
-        for (const line of block.lines) {
-            for (const segment of line.segments) {
-                const content = segment.content.trim();
+                    if (!content || segment.type === "comment") {
+                        // Skip lines that don't contain actual parameters
+                        continue;
+                    }
 
-                if (!content || segment.type === "comment") {
-                    // Skip lines that don't contain actual parameters
-                    continue;
-                }
+                    if (segment.tokenType?.type === "separator" && content === ";") {
+                        break;
+                    }
 
-                if (segment.tokenType?.type === "separator" && content === ";") {
-                    break;
-                }
+                    // If segment is a separator
+                    if (segment.tokenType?.type === "separator" && content === ",") {
+                        continue;
+                    }
 
-                // If segment is a separator
-                if (segment.tokenType?.type === "separator" && content === ",") {
-                    continue;
-                }
+                    if (["separator", "keyword"].includes(segment.tokenType.type)) {
+                        continue;
+                    }
 
-                if (["separator", "keyword"].includes(segment.tokenType.type)) {
-                    continue;
-                }
-
-                if (!["separator", "keyword"].includes(segment.tokenType.type)) {
-                    items.push(content);
-                    continue;
+                    if (!["separator", "keyword"].includes(segment.tokenType.type)) {
+                        items.push(content);
+                        continue;
+                    }
                 }
             }
+            // Clean up and normalize items
+            return items.map((item) => item.trim()).filter((item) => item.length > 0);
+        } catch (e) {
+            console.error(`Error retrieving list items: ${e}`);
+            return [];
         }
-        // Clean up and normalize items
-        return items.map((item) => item.trim()).filter((item) => item.length > 0);
     }
 }
-
-// prev approach for reference
-
-//     /**
-//      * Retrieves parameter list items from a declaration block.
-//      *
-//      * @param block - The block containing parameter declarations.
-//      * @returns An array of parameter items.
-//      */
-//     private getParameterListItems(block: TypedBlock): string[] {
-//         const items: string[] = [];
-//         let currentItem = "";
-
-//         for (const line of block.lines) {
-//             const content = line.trimmedContent;
-
-//             // Skip lines that don't contain actual parameters
-//             if (!content || content.startsWith(":") || content.startsWith("/*")) {
-//                 continue;
-//             }
-
-//             // If line ends with comma, it's a complete parameter
-//             if (content.endsWith(",")) {
-//                 currentItem += content.slice(0, -1).trim();
-//                 if (currentItem) {
-//                     items.push(currentItem);
-//                 }
-//                 currentItem = "";
-//             }
-//             // If line ends with semicolon, it's the last parameter
-//             else if (content.endsWith(";")) {
-//                 currentItem += content.slice(0, -1).trim();
-//                 if (currentItem) {
-//                     items.push(currentItem);
-//                 }
-//                 currentItem = "";
-//                 break;
-//             }
-//             // Otherwise, it's a continuation of the current parameter
-//             else {
-//                 currentItem += content.trim() + " ";
-//             }
-//         }
-
-//         return items.map((item) => item.trim()).filter((item) => item.length > 0);
-//     }
-// }
