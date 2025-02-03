@@ -5,6 +5,17 @@
 import { start } from "repl";
 
 // Core block and content types
+/**
+ * Represents the different types of code blocks that can be formatted.
+ * - `procedure`: A block representing a procedure or function.
+ * - `conditional`: A block representing a conditional statement (e.g., if-else).
+ * - `loop`: A block representing a loop (e.g., for, while).
+ * - `switch`: A block representing a switch-case statement.
+ * - `errorHandling`: A block representing error handling (e.g., try-catch).
+ * - `comment`: A block representing a comment.
+ * - `declaration`: A block representing a variable or constant declaration.
+ * - `logic`: A block representing logical operations or expressions.
+ */
 export type BlockType =
     | "procedure"
     | "conditional"
@@ -15,6 +26,36 @@ export type BlockType =
     | "declaration"
     | "logic";
 
+/**
+ * Represents the various flow control keywords used in the formatting pipeline.
+ *
+ * The possible values are:
+ * - `"procedureStart"`: Indicates the start of a procedure.
+ * - `"procedureEnd"`: Indicates the end of a procedure.
+ * - `"ifStart"`: Indicates the start of an if statement.
+ * - `"ifEnd"`: Indicates the end of an if statement.
+ * - `"else"`: Indicates an else statement.
+ * - `"whileStart"`: Indicates the start of a while loop.
+ * - `"whileEnd"`: Indicates the end of a while loop.
+ * - `"exitWhile"`: Indicates an exit from a while loop.
+ * - `"forStart"`: Indicates the start of a for loop.
+ * - `"forEnd"`: Indicates the end of a for loop.
+ * - `"loop"`: Indicates a loop statement.
+ * - `"caseStart"`: Indicates the start of a case statement.
+ * - `"caseBranch"`: Indicates a branch within a case statement.
+ * - `"caseDefault"`: Indicates the default branch within a case statement.
+ * - `"caseEnd"`: Indicates the end of a case statement.
+ * - `"exitCase"`: Indicates an exit from a case statement.
+ * - `"tryStart"`: Indicates the start of a try block.
+ * - `"catch"`: Indicates a catch block.
+ * - `"finally"`: Indicates a finally block.
+ * - `"tryEnd"`: Indicates the end of a try block.
+ * - `"error"`: Indicates an error statement.
+ * - `"resume"`: Indicates a resume statement.
+ * - `"assignment"`: Indicates an assignment statement.
+ * - `"functionCall"`: Indicates a function call.
+ * - `"other"`: Indicates any other type of statement not covered by the above keywords.
+ */
 export type FlowKeyword =
     | "procedureStart"
     | "procedureEnd"
@@ -42,52 +83,210 @@ export type FlowKeyword =
     | "functionCall"
     | "other";
 
+/**
+ * Represents the different types of declarations that can be used in the formatting pipeline.
+ *
+ * - `parameters`: Represents a parameter declaration.
+ * - `declare`: Represents a declare statement.
+ * - `default`: Represents a default declaration.
+ * - `public`: Represents a public declaration.
+ * - `include`: Represents an include statement.
+ * - `other`: Represents any other type of declaration.
+ */
 export type DeclarationType = "parameters" | "declare" | "default" | "public" | "include" | "other";
+
+/**
+ * Represents the different types of comments that can be used in the formatting pipeline.
+ *
+ * - `block`: A block comment, typically spanning multiple lines.
+ * - `single`: A single-line comment.
+ * - `regionStart`: A comment indicating the start of a region.
+ * - `regionEnd`: A comment indicating the end of a region.
+ * - `separator`: A comment used as a separator.
+ */
 export type CommentType = "block" | "single" | "regionStart" | "regionEnd" | "separator";
 
-// First we need a type for the different kinds of content
+/**
+ * Represents the type of content that can be processed by the formatting pipeline.
+ *
+ * - `code`: Represents a block of code.
+ * - `string`: Represents a string literal.
+ * - `comment`: Represents a comment.
+ * - `empty`: Represents an empty line or whitespace.
+ */
 export type ContentType = "code" | "string" | "comment" | "empty";
 
-// Define what a segment looks like
+/**
+ * Represents a segment of content within a line.
+ */
 export interface ContentSegment {
+    /**
+     * The type of content (code, string, comment, empty).
+     */
     type: ContentType;
+
+    /**
+     * The actual content text.
+     */
     content: string;
+
+    /**
+     * Starting index in the original line.
+     */
     startIndex: number;
+
+    /**
+     * Ending index in the original line.
+     */
     endIndex: number;
+
+    /**
+     * Type information about the token.
+     */
     tokenType: TokenType;
-    priority?: number; // For determining preferred break points
+
+    /**
+     * Priority for determining break points.
+     * Optional.
+     */
+    priority?: number;
 }
 
-// Update ProcessedLine to include segments
+/**
+ * Represents a processed line in the formatting pipeline.
+ */
 export interface ProcessedLine {
+    /**
+     * The original unmodified line.
+     */
     originalString: string;
-    formattedString: string; // Add this field
+
+    /**
+     * The formatted version of the line.
+     */
+    formattedString: string;
+
+    /**
+     * Leading whitespace from the original line.
+     */
     leadingWhitespace: string;
+
+    /**
+     * Content with whitespace trimmed.
+     */
     trimmedContent: string;
+
+    /**
+     * Current line number.
+     */
     lineNumber: number;
+
+    /**
+     * Original line number before any transformations.
+     */
     originalLineNumber: number;
-    segments: ContentSegment[]; // Add segments array
+
+    /**
+     * Array of content segments in the line.
+     */
+    segments: ContentSegment[];
 }
 
+/**
+ * Represents an operation to be performed on a block of data.
+ */
 export interface BlockOperation {
+    /**
+     * The type of operation to be performed.
+     * - `insert`: Insert a new block.
+     * - `update`: Update an existing block.
+     * - `delete`: Delete an existing block.
+     */
     type: "insert" | "update" | "delete";
+    /**
+     * The index of the block on which the operation is to be performed.
+     * - For `insert`, the index is the position where the new block should be inserted.
+     * - For `update` and `delete`, the index is the position of the block to be updated or deleted.
+     */
     blockIndex: number;
+    /**
+     * The blocks involved in the operation.
+     */
     blocks: TypedBlock[];
 }
 
-// Configuration interface
+/**
+ * Configuration options for the formatter.
+ */
 export interface FormatterConfig {
+    /**
+     * Enables or disables debug mode.
+     * @default false
+     */
     debug?: boolean;
+
+    /**
+     * Determines whether to use spacing context.
+     * @default false
+     */
     useSpacingContext?: boolean;
+
+    /**
+     * Determines whether to use post-processing for spacing.
+     * @default false
+     */
     useSpacingPostProcessing?: boolean;
+
+    /**
+     * Preserves user-defined spacing.
+     * @default false
+     */
     preserveUserSpacing?: boolean;
+
+    /**
+     * The maximum number of consecutive blank lines allowed.
+     * @default 1
+     */
     maxConsecutiveBlankLines?: number;
+
+    /**
+     * The maximum length of a line.
+     * @default 80
+     */
     maxLineLength?: number;
+
+    /**
+     * The number of spaces or tabs to use for indentation.
+     * @default 4
+     */
     tabSize?: number;
+
+    /**
+     * The style of indentation to use: "tab" or "space".
+     * @default "space"
+     */
     indentStyle?: "tab" | "space";
-    showSegmentDetails?: boolean; // Add this line
+
+    /**
+     * Determines whether to show segment details.
+     * @default false
+     */
+    showSegmentDetails?: boolean;
 }
 
+/**
+ * Default configuration for the formatter.
+ *
+ * @property {boolean} debug - Enables or disables debug mode.
+ * @property {boolean} useSpacingContext - Determines if spacing context should be used.
+ * @property {boolean} useSpacingPostProcessing - Determines if spacing post-processing should be used.
+ * @property {boolean} preserveUserSpacing - Preserves user-defined spacing if set to true.
+ * @property {number} maxConsecutiveBlankLines - Maximum number of consecutive blank lines allowed.
+ * @property {number} maxLineLength - Maximum length of a line before wrapping.
+ * @property {number} tabSize - Number of spaces per tab.
+ * @property {"space" | "tab"} indentStyle - Style of indentation, either "space" or "tab".
+ * @property {boolean} showSegmentDetails - Shows segment details if set to true.
+ */
 export const DEFAULT_FORMATTER_CONFIG: FormatterConfig = {
     debug: false,
     useSpacingContext: true,
@@ -97,55 +296,178 @@ export const DEFAULT_FORMATTER_CONFIG: FormatterConfig = {
     maxLineLength: 90,
     tabSize: 4,
     indentStyle: "space",
-    showSegmentDetails: false, // Add this line
+    showSegmentDetails: false,
 };
 
-// Line and block structure interfaces
+/**
+ * Represents a line that has been processed by the formatting pipeline.
+ *
+ * @interface ProcessedLine
+ *
+ * @property {string} originalString - The original string of the line before any formatting.
+ * @property {string} formattedString - The string of the line after formatting.
+ * @property {string} leadingWhitespace - The leading whitespace characters of the line.
+ * @property {string} trimmedContent - The content of the line with leading and trailing whitespace removed.
+ * @property {number} lineNumber - The line number in the original document.
+ * @property {ContentSegment[]} segments - An array of content segments within the line.
+ */
 export interface ProcessedLine {
     originalString: string;
-    formattedString: string; // Add this field
+    formattedString: string;
     leadingWhitespace: string;
     trimmedContent: string;
     lineNumber: number;
-    segments: ContentSegment[]; // Add segments array
+    segments: ContentSegment[];
 }
 
+/**
+ * Represents the context of a block within a formatting pipeline.
+ */
 export interface BlockContext {
+    /**
+     * The parent block of the current block, if any.
+     */
     parentBlock?: TypedBlock;
+
+    /**
+     * The previous block in the sequence, if any.
+     */
     previousBlock?: TypedBlock;
+
+    /**
+     * Indicates whether the block is part of a chain.
+     */
     isPartOfChain: boolean;
+
+    /**
+     * The type of the parent block, or null if there is no parent block.
+     */
     parentBlockType: BlockType | null;
+
+    /**
+     * The depth of the block within the hierarchy.
+     */
     depth: number;
+
+    /**
+     * The position of the block within the chain, if it is part of one.
+     * Can be "first", "middle", or "last".
+     */
     chainPosition?: "first" | "middle" | "last";
 }
 
+/**
+ * Represents metadata for a block of code in the formatting pipeline.
+ */
 export interface BlockMetadata {
+    /**
+     * The type of flow control keyword associated with the block.
+     */
     flowType: FlowKeyword;
+
+    /**
+     * Indicates whether the block is the start of a flow control structure.
+     */
     isStart: boolean;
+
+    /**
+     * Indicates whether the block is in the middle of a flow control structure.
+     */
     isMiddle: boolean;
+
+    /**
+     * Indicates whether the block is the end of a flow control structure.
+     */
     isEnd: boolean;
+
+    /**
+     * Optional. Indicates whether the block is part of a case content.
+     */
     isCaseContent?: boolean;
+
+    /**
+     * Optional. The type of declaration associated with the block.
+     */
     declarationType?: DeclarationType;
+
+    /**
+     * Optional. The type of comment associated with the block.
+     */
     commentType?: CommentType;
 }
 
+/**
+ * Represents a block of processed lines with associated metadata and context.
+ */
 export interface TypedBlock {
+    /**
+     * The lines that make up the block.
+     */
     lines: ProcessedLine[];
+
+    /**
+     * The type of the block.
+     */
     blockType: BlockType;
+
+    /**
+     * Metadata associated with the block.
+     */
     metadata: BlockMetadata;
+
+    /**
+     * Context information for the block.
+     */
     context: BlockContext;
+
+    /**
+     * The starting line number of the block.
+     */
     startLineNumber: number;
+
+    /**
+     * The ending line number of the block.
+     */
     endLineNumber: number;
+
+    /**
+     * The first line of the next block, if any.
+     */
     nextBlockFirstLine?: ProcessedLine;
-    formatterInsights?: FormatterInsight[]; // Add this line
+
+    /**
+     * Insights provided by the formatter for this block, if any.
+     */
+    formatterInsights?: FormatterInsight[];
 }
 
+/**
+ * Represents the result of a debugging operation.
+ */
 export interface DebugResult {
     tableView: string;
     detailedView: string;
     blocks: TypedBlock[];
 }
 
+/**
+ * Represents the different types of tokens that can be identified in the formatting pipeline.
+ *
+ * @typedef {("keyword" | "separator" | "identifier" | "operator" | "number" | "stringLiteral" | "comment" | "empty" | "methodCall" | "propertyAccess" | "logicalOperator" | "incrementDecrement")} TokenTypeName
+ *
+ * @property {"keyword"} keyword - Represents a language keyword.
+ * @property {"separator"} separator - Represents a separator such as a comma or semicolon.
+ * @property {"identifier"} identifier - Represents an identifier such as a variable or function name.
+ * @property {"operator"} operator - Represents an operator such as +, -, *, /.
+ * @property {"number"} number - Represents a numeric literal.
+ * @property {"stringLiteral"} stringLiteral - Represents a string literal.
+ * @property {"comment"} comment - Represents a comment in the code.
+ * @property {"empty"} empty - Represents an empty token.
+ * @property {"methodCall"} methodCall - Represents a method call.
+ * @property {"propertyAccess"} propertyAccess - Represents property access.
+ * @property {"logicalOperator"} logicalOperator - Represents a logical operator such as && or ||.
+ * @property {"incrementDecrement"} incrementDecrement - Represents increment or decrement operators (++ or --).
+ */
 export type TokenTypeName =
     | "keyword"
     | "separator"
@@ -155,22 +477,48 @@ export type TokenTypeName =
     | "stringLiteral"
     | "comment"
     | "empty"
-    | "methodCall" // Add this
-    | "propertyAccess" // Add this
-    | "logicalOperator" // Add this
-    | "incrementDecrement"; // Add this
+    | "methodCall"
+    | "propertyAccess"
+    | "logicalOperator"
+    | "incrementDecrement";
 
+/**
+ * Represents a token type used in the formatting pipeline.
+ *
+ * @interface TokenType
+ * @property {TokenTypeName} type - The name of the token type.
+ * @property {boolean} breakable - Indicates if the token can be broken.
+ * @property {boolean} [breakBefore] - Indicates if a break should occur before the token.
+ * @property {boolean} [breakAfter] - Indicates if a break should occur after the token.
+ * @property {boolean} [isMethod] - Indicates if the token represents a method.
+ * @property {boolean} [isProperty] - Indicates if the token represents a property.
+ * @property {boolean} [isKeyword] - Indicates if the token represents a keyword.
+ */
 interface TokenType {
     type: TokenTypeName;
     breakable: boolean;
     breakBefore?: boolean;
     breakAfter?: boolean;
-    isMethod?: boolean; // Add this
-    isProperty?: boolean; // Add this
-    isKeyword?: boolean; // Add this
+    isMethod?: boolean;
+    isProperty?: boolean;
+    isKeyword?: boolean;
 }
 
 // Types for token processing
+/**
+ * Represents a token in the formatting pipeline.
+ *
+ * @interface Token
+ *
+ * @property {TokenTypeName} type - The type of the token.
+ * @property {string} content - The content of the token.
+ * @property {number} startIndex - The starting index of the token in the source text.
+ * @property {number} endIndex - The ending index of the token in the source text.
+ * @property {boolean} breakable - Indicates if the token can be broken into smaller parts.
+ * @property {boolean} [isMethod] - Optional. Indicates if the token represents a method.
+ * @property {boolean} [isProperty] - Optional. Indicates if the token represents a property.
+ * @property {boolean} [isKeyword] - Optional. Indicates if the token represents a keyword.
+ */
 interface Token {
     type: TokenTypeName;
     content: string;
@@ -182,21 +530,77 @@ interface Token {
     isKeyword?: boolean;
 }
 
+/**
+ * Represents the result of a processing operation.
+ *
+ * @interface ProcessingResult
+ *
+ * @property {Token | null} token - The processed token, or null if no token was processed.
+ * @property {number} newIndex - The new index position after processing.
+ */
 interface ProcessingResult {
     token: Token | null;
     newIndex: number;
 }
 
+/**
+ * Represents insights about a specific formatter's changes.
+ */
 export interface FormatterInsight {
+    /**
+     * The name of the formatter that made the change.
+     */
     formatterName: string;
+
+    /**
+     * The line number in the source code where the change was made.
+     */
     sourceLineNumber: number;
+
+    /**
+     * The type of change made by the formatter.
+     * - "spacing": Changes related to spacing.
+     * - "casing": Changes related to letter casing.
+     * - "splitting": Changes related to splitting code elements.
+     * - "other": Any other type of change.
+     */
     changeType: "spacing" | "casing" | "splitting" | "other";
+
+    /**
+     * A description of the change made by the formatter.
+     */
     description: string;
+
+    /**
+     * The code before the change was made.
+     */
     before: string;
+
+    /**
+     * The code after the change was made.
+     */
     after: string;
 }
 
-// Map token types to content types
+/**
+ * A mapping from token type names to content types.
+ * This is used to determine the content type for a given token type.
+ *
+ * @constant
+ * @type {Record<TokenTypeName, ContentType>}
+ * @property {ContentType} keyword - Represents code content type for keywords.
+ * @property {ContentType} separator - Represents code content type for separators.
+ * @property {ContentType} identifier - Represents code content type for identifiers.
+ * @property {ContentType} operator - Represents code content type for operators.
+ * @property {ContentType} number - Represents code content type for numbers.
+ * @property {ContentType} stringLiteral - Represents string content type for string literals.
+ * @property {ContentType} comment - Represents comment content type for comments.
+ * @property {ContentType} empty - Represents empty content type for empty tokens.
+ * @property {ContentType} methodCall - Represents code content type for method calls.
+ * @property {ContentType} propertyAccess - Represents code content type for property accesses.
+ * @property {ContentType} logicalOperator - Represents code content type for logical operators.
+ * @property {ContentType} incrementDecrement - Represents code content type for increment/decrement operators.
+ */
 export const TOKEN_TYPE_TO_CONTENT_TYPE: Record<TokenTypeName, ContentType> = {
     keyword: "code",
     separator: "code",
@@ -212,7 +616,23 @@ export const TOKEN_TYPE_TO_CONTENT_TYPE: Record<TokenTypeName, ContentType> = {
     incrementDecrement: "code",
 };
 
-// Define which token types should never be merged
+/**
+ * A list of token type names that are considered non-mergeable.
+ * These token types should not be merged during the formatting process.
+ *
+ * @constant
+ * @type {TokenTypeName[]}
+ * @default
+ * - "keyword"
+ * - "separator"
+ * - "operator"
+ * - "stringLiteral"
+ * - "number"
+ * - "methodCall"
+ * - "propertyAccess"
+ * - "logicalOperator"
+ * - "incrementDecrement"
+ */
 export const NON_MERGEABLE_TYPES: TokenTypeName[] = [
     "keyword",
     "separator",
@@ -225,92 +645,329 @@ export const NON_MERGEABLE_TYPES: TokenTypeName[] = [
     "incrementDecrement",
 ];
 
-// Configuration for the segment processor
+/**
+ * Configuration options for formatting segments.
+ *
+ * @property {number} [maxLineLength] - The maximum length of a line.
+ * @property {boolean} [debug] - Flag to enable or disable debug mode.
+ * @property {boolean} [preserveComments] - Flag to preserve comments during formatting.
+ */
 export interface SegmentConfig {
     maxLineLength?: number;
     debug?: boolean;
     preserveComments?: boolean; // New option
 }
 
+/**
+ * Default configuration for segment formatting.
+ *
+ * @constant
+ * @type {SegmentConfig}
+ * @property {number} maxLineLength - The maximum length of a line before it gets wrapped.
+ * @property {boolean} debug - Flag to enable or disable debug mode.
+ * @property {boolean} preserveComments - Flag to indicate whether comments should be preserved.
+ */
 export const DEFAULT_SEGMENT_CONFIG: SegmentConfig = {
     maxLineLength: 90,
     debug: false,
     preserveComments: true,
 };
 
-// Core syntax patterns
+/**
+ * A collection of regular expression patterns used for formatting and parsing code.
+ */
 export const patterns = {
     flow: {
         procedure: {
+            /**
+             * Matches the start of a procedure or class definition.
+             * Example: `:CLASS` or `:PROCEDURE`
+             */
             start: /:(?:CLASS|PROCEDURE)\b/i,
+
+            /**
+             * Matches the end of a procedure.
+             * Example: `:RETURN` or `:ENDPROC`
+             */
             end: /:(?:RETURN|ENDPROC)\b/i,
+
+            /**
+             * Matches the end of a procedure.
+             * Example: `:ENDPROC`
+             */
             endProc: /:ENDPROC\b/i,
+
+            /**
+             * Matches a return statement.
+             * Example: `:RETURN`
+             */
             return: /:RETURN\b/i,
         },
         conditional: {
+            /**
+             * Matches the start of an if statement.
+             * Example: `:IF`
+             */
             ifStart: /:IF\b/i,
+
+            /**
+             * Matches the end of an if statement.
+             * Example: `:ENDIF`
+             */
             ifEnd: /:ENDIF\b/i,
+
+            /**
+             * Matches an else statement.
+             * Example: `:ELSE`
+             */
             else: /:ELSE\b/i,
         },
         loop: {
+            /**
+             * Matches the start of a while loop.
+             * Example: `:WHILE`
+             */
             whileStart: /:WHILE\b/i,
+
+            /**
+             * Matches the continuation of a loop.
+             * Example: `:LOOP`
+             */
+            continue: /:LOOP\b/i,
+
+            /**
+             * Matches the end of a while loop.
+             * Example: `:ENDWHILE`
+             */
             whileEnd: /:ENDWHILE\b/i,
+
+            /**
+             * Matches an exit while statement.
+             * Example: `:EXITWHILE`
+             */
             exitWhile: /:EXITWHILE\b/i,
+
+            /**
+             * Matches the start of a for loop.
+             * Example: `:FOR`
+             */
             forStart: /:FOR\b/i,
+
+            /**
+             * Matches the end of a for loop.
+             * Example: `:NEXT`
+             */
             forEnd: /:NEXT\b/i,
         },
         switch: {
+            /**
+             * Matches the start of a switch case block.
+             * Example: `:BEGINCASE`
+             */
             start: /:BEGINCASE\b/i,
+
+            /**
+             * Matches a case branch in a switch case block.
+             * Example: `:CASE`
+             */
             branch: /:CASE\b/i,
+
+            /**
+             * Matches the default branch in a switch case block.
+             * Example: `:OTHERWISE`
+             */
             default: /:OTHERWISE\b/i,
+
+            /**
+             * Matches the end of a switch case block.
+             * Example: `:ENDCASE`
+             */
             end: /:ENDCASE\b/i,
+
+            /**
+             * Matches an exit case statement.
+             * Example: `:EXITCASE`
+             */
             exit: /:EXITCASE\b/i,
         },
         errorHandling: {
+            /**
+             * Matches the start of a try block.
+             * Example: `:TRY`
+             */
             tryStart: /:TRY\b/i,
+
+            /**
+             * Matches a catch block.
+             * Example: `:CATCH`
+             */
             catch: /:CATCH\b/i,
+
+            /**
+             * Matches a finally block.
+             * Example: `:FINALLY`
+             */
             finally: /:FINALLY\b/i,
+
+            /**
+             * Matches the end of a try block.
+             * Example: `:ENDTRY`
+             */
             tryEnd: /:ENDTRY\b/i,
+
+            /**
+             * Matches an error statement.
+             * Example: `:ERROR`
+             */
             error: /:ERROR\b/i,
+
+            /**
+             * Matches a resume statement.
+             * Example: `:RESUME`
+             */
             resume: /:RESUME\b/i,
         },
     },
     declaration: {
         types: {
+            /**
+             * Matches an include statement.
+             * Example: `:INCLUDE`
+             */
             include: /:INCLUDE\b/i,
+
+            /**
+             * Matches a declare statement.
+             * Example: `:DECLARE`
+             */
             declare: /:DECLARE\b/i,
+
+            /**
+             * Matches a public statement.
+             * Example: `:PUBLIC`
+             */
             public: /:PUBLIC\b/i,
+
+            /**
+             * Matches a parameters statement.
+             * Example: `:PARAMETERS`
+             */
             parameters: /:PARAMETERS\b/i,
+
+            /**
+             * Matches a default statement.
+             * Example: `:DEFAULT`
+             */
             default: /:DEFAULT\b/i,
         },
+        /**
+         * Matches a group of declaration statements.
+         * Example: `:PARAMETERS`, `:DEFAULT`, or `:DECLARE`
+         */
         group: /^:(?:PARAMETERS|DEFAULT|DECLARE)\b/i,
     },
     logic: {
+        /**
+         * Matches an assignment operation.
+         * Example: `:=`, `+=`, or `-=`
+         */
         assignment: /[:+-]=/,
+
+        /**
+         * Matches a function call.
+         * Example: `functionName(`
+         */
         functionCall: /\w+\s*\(/,
     },
+    /**
+     * Basic comment structure.
+     * Example: `/* This is a comment;`
+     */
     comment: {
+        /**
+         * Matches the start of a block comment.
+         * Example: `/**`
+         */
         block: /^\/\*\*/,
+
+        /**
+         * Matches a single line comment.
+         * Example: `/*`
+         */
         single: /^\/\*/,
+
+        /**
+         * Matches the end of a comment.
+         * Example: `;`
+         */
+        endComment: /;/,
+
         region: {
+            /**
+             * Matches the start of a region comment.
+             * Example: `/* region`
+             */
             start: /^\/\*\s*region\b/i,
+
+            /**
+             * Matches the end of a region comment.
+             * Example: `/* endregion`
+             */
             end: /^\/\*\s*endregion\b/i,
         },
+
+        /**
+         * Matches a separator comment.
+         * Example: `/* ====================`
+         */
         separator: /^\/\*\s*[=*-]{20}/,
     },
     structure: {
+        /**
+         * Matches a semicolon.
+         * Example: `;`
+         */
         semicolon: /;/,
+
+        /**
+         * Matches a multi-line statement.
+         * Example: Any line that does not end with a semicolon.
+         */
         multiLine: /[^;]\s*$/,
+
+        /**
+         * Matches a blank line.
+         * Example: Any line that contains only whitespace.
+         */
         blankLine: /^\s*$/,
+
+        /**
+         * Matches a new line character.
+         * Example: `\n` or `\r\n`
+         */
         newLine: /\r?\n/,
     },
     keyword: {
-        // Full keyword includes the colon
+        /**
+         * Matches a keyword with a colon prefix.
+         * Example: `:KEYWORD`
+         */
         pattern: /:[A-Za-z]+\b/i,
-        find: /:[A-Za-z]+\b/gi, // Global version for finding all matches
+
+        /**
+         * Matches all occurrences of keywords with a colon prefix.
+         * Example: `:KEYWORD`
+         */
+        find: /:[A-Za-z]+\b/gi,
     },
 };
 
+/**
+ * Creates a default token type object.
+ *
+ * @param type - The name of the token type.
+ * @returns An object representing the token type with its properties.
+ */
 function createDefaultTokenType(type: TokenTypeName): TokenType {
     return {
         type,
@@ -318,7 +975,11 @@ function createDefaultTokenType(type: TokenTypeName): TokenType {
     };
 }
 
-// Base formatter error
+/**
+ * Custom error class for formatting-related errors.
+ *
+ * @extends {Error}
+ */
 export class FormatterError extends Error {
     constructor(message: string) {
         super(message);
@@ -326,19 +987,41 @@ export class FormatterError extends Error {
     }
 }
 
-// Interface that all formatters must implement
+/**
+ * Interface that all code formatters must implement
+ */
 export interface CodeFormatter {
+    /**
+     * Formats an array of code blocks
+     * @param blocks The blocks to format
+     */
     format(blocks: TypedBlock[]): Promise<void>;
-    getName(): string; // Add method to get formatter name
-    getInsights(): FormatterInsight[]; // Add method to get insights
+
+    /**
+     * Gets the name of the formatter
+     * @returns Formatter name
+     */
+    getName(): string;
+
+    /**
+     * Gets formatting insights from the last format operation
+     * @returns Array of formatter insights
+     */
+    getInsights(): FormatterInsight[];
 }
 
 /**
- * Class responsible for identifying block types and their metadata in code.
+ * The `BlockIdentifier` class provides methods to identify and categorize different types of code blocks
+ * from an array of processed lines. It includes functionality to determine if blocks should be merged
+ * and to identify specific types of blocks such as comments, procedures, control flow statements, declarations,
+ * logic, loops, switch cases, and error handling blocks.
  */
 export class BlockIdentifier {
     /**
-     * Identify block type and metadata from processed lines
+     * Identifies the type of block and its metadata from the given lines of processed content.
+     *
+     * @param lines - An array of `ProcessedLine` objects representing the lines of code to be identified.
+     * @returns An object containing the `blockType` and `metadata` of the identified block.
      */
     public static identify(lines: ProcessedLine[]): {
         blockType: BlockType;
@@ -357,7 +1040,14 @@ export class BlockIdentifier {
     }
 
     /**
-     * Check if blocks should be merged
+     * Determines whether the current block should be merged with the previous block.
+     *
+     * @param prevBlock - The previous block of code.
+     * @param currentBlock - The current block of code.
+     * @returns `true` if the current block should be merged with the previous block, otherwise `false`.
+     *
+     * This method handles multi-line statements that are incomplete (no semicolon) and blocks that are explicitly joined (like a statement broken across lines).
+     * It returns `false` if the current block is a comment.
      */
     public static shouldMergeWithPrevious(
         prevBlock: TypedBlock,
@@ -384,7 +1074,14 @@ export class BlockIdentifier {
     }
 
     /**
-     * Check if line continues a previous statement
+     * Determines if a given line of code is an explicit continuation of the previous line.
+     *
+     * This method checks if the line is a comment or matches a pattern that indicates
+     * it is a continuation of the previous line. Continuation patterns include lines
+     * that start with operators or logical connectors.
+     *
+     * @param line - The line of code to check.
+     * @returns `true` if the line is an explicit continuation, `false` otherwise.
      */
     private static isExplicitContinuation(line: string): boolean {
         // Don't consider comments as continuations
@@ -397,6 +1094,17 @@ export class BlockIdentifier {
         return continuationPattern.test(line);
     }
 
+    /**
+     * Identifies the type of procedure block in a given line of text.
+     *
+     * This method checks if the provided line matches the start or end pattern
+     * of a procedure block. If a match is found, it returns an object containing
+     * the block type and metadata about the procedure block. If no match is found,
+     * it returns null.
+     *
+     * @param line - The line of text to be checked.
+     * @returns An object containing the block type and metadata if a match is found, or null if no match is found.
+     */
     private static identifyProcedure(
         line: string
     ): { blockType: BlockType; metadata: BlockMetadata } | null {
@@ -427,6 +1135,12 @@ export class BlockIdentifier {
         return null;
     }
 
+    /**
+     * Identifies if a given line matches any of the declaration patterns.
+     *
+     * @param line - The line of text to be checked against declaration patterns.
+     * @returns An object containing the block type and metadata if a match is found, otherwise null.
+     */
     private static identifyDeclaration(
         line: string
     ): { blockType: BlockType; metadata: BlockMetadata } | null {
@@ -447,6 +1161,19 @@ export class BlockIdentifier {
         return null;
     }
 
+    /**
+     * Identifies the type of comment in a given line of code.
+     *
+     * @param line - The line of code to analyze.
+     * @returns An object containing the block type and metadata if a comment is identified, or `null` if no comment is found.
+     *
+     * The returned metadata includes:
+     * - `flowType`: The flow type of the comment (always "other").
+     * - `isStart`: Indicates if the comment marks the start of a region.
+     * - `isMiddle`: Indicates if the comment is in the middle of a region or a standalone comment.
+     * - `isEnd`: Indicates if the comment marks the end of a region.
+     * - `commentType`: The specific type of comment (e.g., "regionStart", "regionEnd", "separator", "block", "single").
+     */
     private static identifyComment(
         line: string
     ): { blockType: BlockType; metadata: BlockMetadata } | null {
@@ -518,6 +1245,19 @@ export class BlockIdentifier {
         return null;
     }
 
+    /**
+     * Identifies the type of control flow statement in a given line of code.
+     *
+     * This method analyzes the provided line of code to determine if it contains
+     * a conditional statement, loop, switch block, or error handling block. It
+     * returns an object containing the block type and associated metadata if a
+     * control flow statement is identified, or `null` if no control flow statement
+     * is found.
+     *
+     * @param line - The line of code to analyze.
+     * @returns An object containing the block type and metadata if a control flow
+     * statement is identified, or `null` if no control flow statement is found.
+     */
     private static identifyControlFlow(
         line: string
     ): { blockType: BlockType; metadata: BlockMetadata } | null {
@@ -544,6 +1284,18 @@ export class BlockIdentifier {
         return null;
     }
 
+    /**
+     * Identifies the type of conditional block in a given line of code.
+     *
+     * @param line - The line of code to be analyzed.
+     * @returns An object containing the block type and metadata if a conditional block is identified, or null otherwise.
+     *
+     * The returned metadata includes:
+     * - `flowType`: The specific type of conditional flow (e.g., "ifStart", "ifEnd", "else").
+     * - `isStart`: Indicates if the line marks the start of a conditional block.
+     * - `isMiddle`: Indicates if the line is in the middle of a conditional block.
+     * - `isEnd`: Indicates if the line marks the end of a conditional block.
+     */
     private static identifyConditional(
         line: string
     ): { blockType: BlockType; metadata: BlockMetadata } | null {
@@ -586,6 +1338,18 @@ export class BlockIdentifier {
         return null;
     }
 
+    /**
+     * Identifies the type of loop and its metadata based on the given line of code.
+     *
+     * @param line - The line of code to be analyzed.
+     * @returns An object containing the block type and metadata if a loop pattern is matched, otherwise null.
+     *
+     * The returned metadata object contains:
+     * - `flowType`: The type of loop flow (e.g., "whileStart", "whileEnd", "exitWhile", "forStart", "forEnd").
+     * - `isStart`: A boolean indicating if the line marks the start of the loop.
+     * - `isMiddle`: A boolean indicating if the line is in the middle of the loop.
+     * - `isEnd`: A boolean indicating if the line marks the end of the loop.
+     */
     private static identifyLoop(
         line: string
     ): { blockType: BlockType; metadata: BlockMetadata } | null {
@@ -652,6 +1416,20 @@ export class BlockIdentifier {
         return null;
     }
 
+    /**
+     * Identifies the type of switch block and its metadata based on the given line of code.
+     *
+     * @param line - The line of code to be analyzed.
+     * @returns An object containing the block type and metadata if a match is found, otherwise null.
+     *
+     * The returned object has the following structure:
+     * - blockType: "switch"
+     * - metadata: An object containing:
+     *   - flowType: The type of switch flow (e.g., "caseStart", "caseBranch", "caseDefault", "caseEnd", "exitCase").
+     *   - isStart: A boolean indicating if this is the start of the switch block.
+     *   - isMiddle: A boolean indicating if this is a middle part of the switch block.
+     *   - isEnd: A boolean indicating if this is the end of the switch block.
+     */
     private static identifySwitch(
         line: string
     ): { blockType: BlockType; metadata: BlockMetadata } | null {
@@ -718,6 +1496,18 @@ export class BlockIdentifier {
         return null;
     }
 
+    /**
+     * Identifies the type of error handling block in a given line of code.
+     *
+     * @param line - The line of code to analyze.
+     * @returns An object containing the block type and metadata if an error handling block is identified, or `null` if no match is found.
+     *
+     * The returned metadata includes:
+     * - `flowType`: The specific type of error handling flow (e.g., "tryStart", "catch", "finally", "tryEnd", "error", "resume").
+     * - `isStart`: Indicates if the block is the start of an error handling flow.
+     * - `isMiddle`: Indicates if the block is in the middle of an error handling flow.
+     * - `isEnd`: Indicates if the block is the end of an error handling flow.
+     */
     private static identifyErrorHandling(
         line: string
     ): { blockType: BlockType; metadata: BlockMetadata } | null {
@@ -796,6 +1586,22 @@ export class BlockIdentifier {
         return null;
     }
 
+    /**
+     * Identifies the type of logic present in a given line of code.
+     *
+     * This method analyzes the provided line of code and determines whether it represents
+     * an assignment, a function call, or some other type of logic. It returns an object
+     * containing the block type and metadata about the flow type and position within the block.
+     *
+     * @param line - The line of code to analyze.
+     * @returns An object containing the block type and metadata about the flow type and position.
+     *
+     * @example
+     * ```typescript
+     * const result = identifyLogic("let x = 10;");
+     * // result: { blockType: "logic", metadata: { flowType: "assignment", isStart: false, isMiddle: true, isEnd: false } }
+     * ```
+     */
     private static identifyLogic(line: string): { blockType: BlockType; metadata: BlockMetadata } {
         // Check if it's an assignment
         if (patterns.logic.assignment.test(line)) {
@@ -835,14 +1641,20 @@ export class BlockIdentifier {
         };
     }
 }
+
 /**
- * Handles processing of code blocks for formatting
+ * Represents the state of comment parsing within a formatting pipeline.
  */
 interface CommentState {
     inBlockComment: boolean;
     blockCommentDepth: number;
 }
 
+/**
+ * The `BlockProcessor` class is responsible for processing text into structured blocks,
+ * handling comments, and formatting the blocks. It uses a `SegmentProcessor` to process
+ * individual lines and manages the state of block comments.
+ */
 export class BlockProcessor {
     private segmentProcessor: SegmentProcessor;
     private commentState: CommentState;
@@ -863,7 +1675,11 @@ export class BlockProcessor {
     }
 
     /**
-     * Process input text into blocks
+     * Processes the given text and splits it into typed blocks.
+     *
+     * @param text - The text to be processed.
+     * @returns An array of TypedBlock objects.
+     * @throws FormatterError - If an error occurs while processing the text.
      */
     public processText(text: string): TypedBlock[] {
         try {
@@ -876,7 +1692,13 @@ export class BlockProcessor {
     }
 
     /**
-     * Convert blocks back to text
+     * Converts an array of `TypedBlock` objects into a single formatted text string.
+     * Each block's lines are concatenated, using the `formattedString` property if available,
+     * otherwise falling back to the `originalString` property. Lines are separated by newline characters.
+     * Ensures that the resulting string has exactly one trailing newline.
+     *
+     * @param {TypedBlock[]} blocks - The array of `TypedBlock` objects to be converted to text.
+     * @returns {string} The concatenated and formatted text string.
      */
     public blocksToText(blocks: TypedBlock[]): string {
         let result = "";
@@ -896,7 +1718,21 @@ export class BlockProcessor {
     }
 
     /**
-     * Split input text into logical blocks
+     * Splits the given text into blocks of lines based on specific patterns and rules.
+     *
+     * @param text - The input text to be split into blocks.
+     * @returns An array of TypedBlock objects representing the split blocks.
+     *
+     * The function processes the input text line by line, grouping lines into blocks.
+     * It handles multi-line statements and merges blocks when necessary.
+     * Empty lines at the start of the file are skipped.
+     *
+     * The function uses the following steps:
+     * 1. Splits the input text into lines.
+     * 2. Iterates through each line, processing it and adding it to the current block.
+     * 3. Checks for the end of a block and creates a new block if necessary.
+     * 4. Merges blocks if they should be merged.
+     * 5. Handles any remaining lines after the iteration.
      */
     private splitIntoBlocks(text: string): TypedBlock[] {
         const lines = text.split(patterns.structure.newLine);
@@ -948,7 +1784,13 @@ export class BlockProcessor {
     }
 
     /**
-     * Process a single line of code
+     * Processes a single line of text and returns a `ProcessedLine` object containing
+     * various details about the line, such as its original and formatted content,
+     * leading whitespace, trimmed content, line numbers, and segments.
+     *
+     * @param line - The line of text to process.
+     * @param lineIndex - The index of the line in the original text.
+     * @returns A `ProcessedLine` object with details about the processed line.
      */
     private processLine(line: string, lineIndex: number): ProcessedLine {
         const trimmed = line.trim();
@@ -1017,7 +1859,13 @@ export class BlockProcessor {
     }
 
     /**
-     * Check if current line ends a block
+     * Determines if the given line marks the end of a block.
+     *
+     * This method checks if the trimmed content of the provided line
+     * matches the pattern for a semi-colon at the end of a statement.
+     *
+     * @param line - The processed line to check.
+     * @returns `true` if the line marks the end of a block, otherwise `false`.
      */
     private isBlockEnd(line: ProcessedLine): boolean {
         const content = line.trimmedContent;
@@ -1031,7 +1879,12 @@ export class BlockProcessor {
     }
 
     /**
-     * Create a new block from processed lines
+     * Creates a `TypedBlock` object from the given lines and context.
+     *
+     * @param lines - An array of `ProcessedLine` objects representing the lines to be included in the block.
+     * @param allLines - An array of all lines in the document as strings.
+     * @param currentIndex - The current index in the `allLines` array.
+     * @returns A `TypedBlock` object containing the lines, block identification, context, and line numbers.
      */
     private createBlock(
         lines: ProcessedLine[],
@@ -1059,6 +1912,21 @@ export class BlockProcessor {
         };
     }
 
+    /**
+     * Applies a series of block operations (insert, update, delete) to an array of TypedBlock objects.
+     *
+     * @param {TypedBlock[]} blocks - The array of blocks to which the operations will be applied.
+     * @param {BlockOperation[]} operations - The array of operations to apply to the blocks.
+     * @returns {TypedBlock[]} The updated array of blocks after all operations have been applied.
+     *
+     * The operations are sorted by block index in reverse order to handle deletions correctly.
+     * Each operation is then applied in sequence:
+     * - "insert": Inserts new blocks at the specified index.
+     * - "update": Replaces the block at the specified index with new blocks.
+     * - "delete": Removes the block at the specified index.
+     *
+     * After applying all operations, the line numbers and relationships of the blocks are updated.
+     */
     public applyBlockOperation(blocks: TypedBlock[], operations: BlockOperation[]): TypedBlock[] {
         // Sort operations by block index in reverse order to handle deletions
         operations.sort((a, b) => b.blockIndex - a.blockIndex);
@@ -1086,6 +1954,18 @@ export class BlockProcessor {
         return blocks;
     }
 
+    /**
+     * Updates the line numbers for each block and its lines.
+     *
+     * This method iterates through the provided blocks and assigns
+     * line numbers starting from `1`. Each block's `startLineNumber` is set
+     * to the current line number before iterating through its lines.
+     * Each line within the block is then assigned a line number sequentially.
+     * After processing all lines in a block, the block's `endLineNumber` is set
+     * to the last line number assigned.
+     *
+     * @param blocks - An array of `TypedBlock` objects to update with line numbers.
+     */
     private updateblockLineNumbers(blocks: TypedBlock[]): void {
         let currentLineNumber = 1;
 
@@ -1100,7 +1980,11 @@ export class BlockProcessor {
     }
 
     /**
-     * Get the next non-empty line
+     * Retrieves the next non-blank line from the given array of lines starting from the specified index.
+     *
+     * @param lines - An array of strings representing the lines to be processed.
+     * @param index - The starting index from which to search for the next non-blank line.
+     * @returns A `ProcessedLine` object representing the processed line and its index, or `undefined` if no non-blank line is found.
      */
     private getNextContentLine(lines: string[], index: number): ProcessedLine | undefined {
         while (index < lines.length) {
@@ -1113,7 +1997,17 @@ export class BlockProcessor {
     }
 
     /**
-     * Merge two blocks together
+     * Merges the lines and metadata of the source block into the target block.
+     *
+     * @param target - The block that will receive the merged content.
+     * @param source - The block whose content will be merged into the target block.
+     *
+     * The function performs the following operations:
+     * - Appends all lines from the source block to the target block.
+     * - Updates the target block's end line number to match the source block's end line number.
+     * - Updates the target block's next block first line to match the source block's next block first line.
+     * - If the target block is of type "switch" and the source block's metadata indicates it is case content,
+     *   the target block's metadata is updated to reflect that it contains case content.
      */
     private mergeBlocks(target: TypedBlock, source: TypedBlock): void {
         target.lines.push(...source.lines);
@@ -1129,7 +2023,13 @@ export class BlockProcessor {
     }
 
     /**
-     * Check if line is part of a block comment
+     * Determines if a given line is part of a block comment.
+     *
+     * This method checks if the provided line is within a block comment or starts a new block comment.
+     * It also updates the internal state of the comment handling to track the depth of nested block comments.
+     *
+     * @param line - The line of code to check.
+     * @returns `true` if the line is part of a block comment, `false` otherwise.
      */
     private isBlockComment(line: string): boolean {
         const trimmed = line.trim();
@@ -1159,8 +2059,9 @@ export class BlockProcessor {
         return false;
     }
 }
+
 /**
- * Main formatter pipeline that coordinates the formatting process
+ * Represents a pipeline for formatting code, consisting of multiple formatters and block operations.
  */
 export class FormatterPipeline {
     private formatters: CodeFormatter[] = [];
@@ -1168,19 +2069,28 @@ export class FormatterPipeline {
     private allInsights: FormatterInsight[] = [];
     private blockOperations: BlockOperation[] = [];
 
+    /**
+     * Initializes a new instance of the `FormatterPipeline` class.
+     *
+     * @param config - The configuration for the formatter pipeline. Defaults to `DEFAULT_FORMATTER_CONFIG`.
+     */
     constructor(private config: FormatterConfig = DEFAULT_FORMATTER_CONFIG) {
         this.blockProcessor = new BlockProcessor(config);
     }
 
     /**
-     * Add a formatter to the pipeline
+     * Adds a new formatter to the formatting pipeline.
+     *
+     * @param formatter - The formatter to be added to the pipeline.
      */
     public addFormatter(formatter: CodeFormatter): void {
         this.formatters.push(formatter);
     }
 
     /**
-     * Remove a formatter from the pipeline
+     * Removes the specified formatter from the list of formatters.
+     *
+     * @param formatter - The formatter to be removed.
      */
     public removeFormatter(formatter: CodeFormatter): void {
         const index = this.formatters.indexOf(formatter);
@@ -1190,7 +2100,12 @@ export class FormatterPipeline {
     }
 
     /**
-     * Process text through the formatting pipeline
+     * Processes the given text through a series of formatters, converting it to blocks,
+     * establishing relationships, and applying insights and operations.
+     *
+     * @param text - The input text to be processed.
+     * @returns A promise that resolves to the formatted text or a debug result.
+     * @throws {FormatterError} If the formatting process fails.
      */
     public async process(text: string): Promise<string | DebugResult> {
         try {
@@ -1252,12 +2167,21 @@ export class FormatterPipeline {
         }
     }
 
+    /**
+     * Registers a block operation to the formatting pipeline.
+     *
+     * @param operation - The block operation to be added to the pipeline.
+     */
     public registerBlockOperation(operation: BlockOperation): void {
         this.blockOperations.push(operation);
     }
 
     /**
-     * Establish relationships between blocks
+     * Establishes relationships between blocks in a given array of `TypedBlock`.
+     * This method sets up parent-child relationships, tracks procedure and control structure blocks,
+     * updates block context with depth and chain information, and manages a stack to handle nested blocks.
+     *
+     * @param blocks - An array of `TypedBlock` objects to process and establish relationships for.
      */
     private establishBlockRelationships(blocks: TypedBlock[]): void {
         let currentProcedure: TypedBlock | null = null;
@@ -1321,10 +2245,36 @@ export class FormatterPipeline {
         });
     }
 
+    /**
+     * Determines if the given block is a control structure.
+     *
+     * @param block - The block to check.
+     * @returns `true` if the block is a control structure (conditional, loop, switch, or error handling), otherwise `false`.
+     */
     private isControlStructure(block: TypedBlock): boolean {
         return ["conditional", "loop", "switch", "errorHandling"].includes(block.blockType);
     }
 
+    /**
+     * Determines the position of a block within a chain of blocks.
+     *
+     * @param block - The current block being evaluated.
+     * @param previousBlock - The block that precedes the current block.
+     * @param nextBlock - The block that follows the current block (optional).
+     * @returns The position of the block within the chain: "first", "middle", "last", or undefined if the block is not part of a recognized chain.
+     *
+     * The function handles two types of chains:
+     * 1. If/else chains:
+     *    - If the block is a conditional block with a flow type of "else":
+     *      - If there is no next block or the next block is not a conditional block with a flow type of "else", it returns "last".
+     *      - If the previous block has a flow type of "else", it returns "middle".
+     *      - Otherwise, it returns "first".
+     * 2. Case chains:
+     *    - If the block is a switch block with a flow type of "caseBranch" or "caseDefault":
+     *      - If there is no next block or the next block is not a switch block with a flow type of "caseBranch" or "caseDefault", it returns "last".
+     *      - If the previous block has a flow type of "caseBranch", it returns "middle".
+     *      - Otherwise, it returns "first".
+     */
     private determineChainPosition(
         block: TypedBlock,
         previousBlock: TypedBlock,
@@ -1357,6 +2307,24 @@ export class FormatterPipeline {
         return undefined;
     }
 
+    /**
+     * Generates a formatted table view of block analysis.
+     *
+     * @param blocks - An array of `TypedBlock` objects to be analyzed and formatted.
+     * @returns A string representing the formatted table view of the block analysis.
+     *
+     * The table includes the following columns:
+     * - Block: The index of the block.
+     * - StartLine: The starting line number of the block.
+     * - EndLine: The ending line number of the block.
+     * - Type: The type of the block.
+     * - Flow: The flow type metadata of the block.
+     * - Depth: The depth context of the block.
+     * - Chain: Indicates if the block is part of a chain and its position in the chain.
+     * - Segments: A summary of segment counts by token type within the block.
+     * - FirstLine: The truncated content of the first line of the block.
+     * - NextLine: The truncated content of the first line of the next block or "END" if there is no next block.
+     */
     private formatTableView(blocks: TypedBlock[]): string {
         const output: string[] = [];
 
@@ -1420,6 +2388,21 @@ export class FormatterPipeline {
         return output.join("\n");
     }
 
+    /**
+     * Formats a detailed view of the provided blocks, including insights and segment details.
+     *
+     * @param {TypedBlock[]} blocks - The blocks to format.
+     * @returns {string} The formatted detailed view as a string.
+     *
+     * The output includes:
+     * - A header for detailed block analysis.
+     * - Grouped insights by source line number.
+     * - Detailed information for each block, including type, flow, lines, depth, chain position, declaration type, comment type, and parent block type.
+     * - Formatter insights for lines within each block, sorted by formatter and change type.
+     * - Content comparison for each line, showing original and formatted strings.
+     * - Segments for each line, with truncated content displayed on a single line.
+     * - Optional segment details, including content, type, token type, breakable properties, and position.
+     */
     private formatDetailedView(blocks: TypedBlock[]): string {
         const output: string[] = [];
 
@@ -1557,6 +2540,13 @@ export class FormatterPipeline {
         return output.join("\n");
     }
 
+    /**
+     * Truncates a string to a specified maximum length and appends an ellipsis ("...") if the string exceeds the maximum length.
+     *
+     * @param str - The string to be truncated.
+     * @param maxLength - The maximum length of the string after truncation.
+     * @returns The truncated string with an ellipsis appended if it exceeds the maximum length.
+     */
     private truncateString(str: string, maxLength: number): string {
         if (str.length <= maxLength) {
             return str;
@@ -1565,7 +2555,9 @@ export class FormatterPipeline {
     }
 
     /**
-     * Get current formatter configuration
+     * Retrieves the current formatter configuration.
+     *
+     * @returns {FormatterConfig} A copy of the current configuration object.
      */
     public getConfig(): FormatterConfig {
         return { ...this.config };
@@ -1576,16 +2568,41 @@ export class FormatterPipeline {
 }
 
 /**
- * Handles segmentation of code lines into meaningful tokens
+ * A class responsible for processing segments of text based on a given configuration.
+ * It uses various regular expression patterns to identify and format different types of tokens.
  */
 export class SegmentProcessor {
+    /**
+     * Configuration for the segment processor.
+     */
     private readonly config: SegmentConfig;
+
+    /**
+     * State information for handling comments.
+     */
     private commentState: CommentState = {
         inBlockComment: false,
         blockCommentDepth: 0,
     };
 
-    // Core token patterns
+    /**
+     * A collection of regular expression patterns used for formatting.
+     *
+     * @property whitespace - Matches leading whitespace characters.
+     * @property incrementDecrement - Matches increment (++) or decrement (--) operators attached to a word.
+     * @property colonMethodCall - Matches method calls with a colon (e.g., `s:format(`).
+     * @property simpleMethodCall - Matches simple method calls (e.g., `usrmes(`).
+     * @property propertyAccess - Matches property access with a colon (e.g., `object:property`).
+     * @property keyword - Matches keywords that start with a colon and are not followed by another colon (e.g., `:keyword`).
+     * @property identifier - Matches valid identifiers (e.g., variable names).
+     * @property number - Matches numbers, including negative and decimal numbers.
+     * @property stringStart - Matches the start of a string, either single or double quotes.
+     * @property commentStart - Matches the start of a comment block (e.g., `/*`).
+     * @property operator - Matches various operators (e.g., `:=`, `==`, `===`, `!=`, `>=`, `<=`, `&&`, `||`, `+`, `-`, `*`, `/`, `%`, `<`, `>`).
+     * @property separator - Matches separators such as commas, semicolons, parentheses, brackets, and braces.
+     * @property colon - Matches a single colon character.
+     * @property logicalOperator - Matches logical operators in the form of `.T.`, `.F.`, `.AND.`, `.OR.`.
+     */
     private readonly patterns = {
         whitespace: /^\s+/,
         incrementDecrement: /^(?:\+\+|--)\w+|^\w+(?:\+\+|--)/, // Moved up in the patterns list
@@ -1609,7 +2626,14 @@ export class SegmentProcessor {
     }
 
     /**
-     * Process a line into segments
+     * Processes a line of text and returns an array of content segments.
+     *
+     * This method iterates through the given line, processes each token, and converts
+     * recognized tokens into content segments. Unrecognized characters are skipped.
+     * Finally, it merges adjacent segments before returning the result.
+     *
+     * @param line - The line of text to process.
+     * @returns An array of content segments derived from the processed line.
      */
     public processLine(line: string): ContentSegment[] {
         const segments: ContentSegment[] = [];
@@ -1636,7 +2660,23 @@ export class SegmentProcessor {
     }
 
     /**
-     * Process the next token in the line
+     * Processes the next token in the given line starting from the specified index.
+     *
+     * The method follows a specific order of processing:
+     * 1. Skips whitespace.
+     * 2. Processes comments if they start with `/*`.
+     * 3. Processes increment/decrement patterns.
+     * 4. Processes keywords (e.g., `:parameters`, `:if`, etc.).
+     * 5. Processes method calls and property access.
+     * 6. Processes separators and operators.
+     * 7. Processes values (strings, numbers, identifiers).
+     * 8. Processes logical operators (e.g., `.T.`, `.F.`, etc.).
+     *
+     * If none of the above patterns match, it skips any unrecognized character.
+     *
+     * @param line - The line of code to process.
+     * @param startIndex - The index to start processing from.
+     * @returns A `ProcessingResult` object containing the token and the new index, or `null` if no token is recognized.
      */
     private processNextToken(line: string, startIndex: number): ProcessingResult | null {
         const remaining = line.slice(startIndex);
@@ -1721,7 +2761,12 @@ export class SegmentProcessor {
     }
 
     /**
-     * Process string literals
+     * Processes a substring starting from a given index to identify and extract a string literal.
+     *
+     * @param line - The input string to process.
+     * @param startIndex - The index at which to start processing the string.
+     * @returns A `ProcessingResult` object containing the identified string literal and its metadata,
+     *          or `null` if no string literal is found.
      */
     private processString(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.stringStart);
@@ -1764,7 +2809,12 @@ export class SegmentProcessor {
     }
 
     /**
-     * Process comments
+     * Processes a comment in the given line starting from the specified index.
+     *
+     * @param line - The line of text to process.
+     * @param startIndex - The index in the line where the comment starts.
+     * @returns A `ProcessingResult` object containing the comment token and the new index,
+     *          or `null` if no comment start pattern is matched.
      */
     private processComment(line: string, startIndex: number): ProcessingResult | null {
         const remaining = line.slice(startIndex);
@@ -1818,7 +2868,12 @@ export class SegmentProcessor {
     }
 
     /**
-     * Process keywords
+     * Processes a keyword in the given line starting from the specified index.
+     *
+     * @param line - The line of text to process.
+     * @param startIndex - The index in the line to start processing from.
+     * @returns A `ProcessingResult` object containing the keyword token and the new index after the keyword,
+     *          or `null` if no keyword is found.
      */
     private processKeyword(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.keyword);
@@ -1840,7 +2895,11 @@ export class SegmentProcessor {
     }
 
     /**
-     * Process operators
+     * Processes an operator in the given line starting from the specified index.
+     *
+     * @param line - The line of text to process.
+     * @param startIndex - The index in the line where processing should start.
+     * @returns A `ProcessingResult` object containing the operator token and the new index, or `null` if no operator is found.
      */
     private processOperator(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.operator);
@@ -1861,7 +2920,12 @@ export class SegmentProcessor {
     }
 
     /**
-     * Process colon separately from other operators
+     * Processes a colon operator in the given line starting from the specified index.
+     *
+     * @param line - The line of text to process.
+     * @param startIndex - The index in the line to start processing from.
+     * @returns A `ProcessingResult` object containing the token information and the new index,
+     *          or `null` if no colon operator is found.
      */
     private processColon(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.colon);
@@ -1882,7 +2946,12 @@ export class SegmentProcessor {
     }
 
     /**
-     * Process separators
+     * Processes a separator in the given line starting from the specified index.
+     *
+     * @param line - The line of text to process.
+     * @param startIndex - The index in the line to start processing from.
+     * @returns A `ProcessingResult` object containing the separator token and the new index,
+     *          or `null` if no separator is found.
      */
     private processSeparator(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.separator);
@@ -1903,7 +2972,12 @@ export class SegmentProcessor {
     }
 
     /**
-     * Process identifiers
+     * Processes an identifier in the given line starting from the specified index.
+     *
+     * @param line - The line of text to process.
+     * @param startIndex - The index in the line where the identifier processing should start.
+     * @returns A `ProcessingResult` object containing the identifier token and the new index,
+     *          or `null` if no identifier is found.
      */
     private processIdentifier(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.identifier);
@@ -1924,7 +2998,12 @@ export class SegmentProcessor {
     }
 
     /**
-     * Process numbers
+     * Processes a number token from the given line starting at the specified index.
+     *
+     * @param line - The line of text to process.
+     * @param startIndex - The index to start processing from.
+     * @returns A `ProcessingResult` object containing the number token and the new index,
+     *          or `null` if no number token is found.
      */
     private processNumber(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.number);
@@ -1944,6 +3023,13 @@ export class SegmentProcessor {
         };
     }
 
+    /**
+     * Processes a method call in a given line of text starting from a specified index.
+     *
+     * @param line - The line of text to process.
+     * @param startIndex - The index in the line where the method call starts.
+     * @returns A `ProcessingResult` object containing details about the method call if a match is found, otherwise `null`.
+     */
     private processMethodCall(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.colonMethodCall);
         if (!match) {
@@ -1962,6 +3048,14 @@ export class SegmentProcessor {
         };
     }
 
+    /**
+     * Processes a line of text to identify and extract a property access pattern starting from a given index.
+     *
+     * @param line - The line of text to process.
+     * @param startIndex - The index in the line from which to start processing.
+     * @returns A `ProcessingResult` object containing the identified property access token and the new index after processing,
+     *          or `null` if no property access pattern is found.
+     */
     private processPropertyAccess(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.propertyAccess);
         if (!match) {
@@ -1980,6 +3074,13 @@ export class SegmentProcessor {
         };
     }
 
+    /**
+     * Processes a line of text to identify and extract a method call that uses a colon syntax.
+     *
+     * @param line - The line of text to process.
+     * @param startIndex - The index in the line where the search for the method call should start.
+     * @returns A `ProcessingResult` object containing details about the identified method call, or `null` if no method call is found.
+     */
     private processColonMethodCall(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.colonMethodCall);
         if (!match) {
@@ -1999,6 +3100,13 @@ export class SegmentProcessor {
         };
     }
 
+    /**
+     * Processes a simple method call in a given line of code starting from a specified index.
+     *
+     * @param line - The line of code to process.
+     * @param startIndex - The index in the line from which to start processing.
+     * @returns A `ProcessingResult` object containing details about the method call if a match is found, otherwise `null`.
+     */
     private processSimpleMethodCall(line: string, startIndex: number): ProcessingResult | null {
         const match = line.slice(startIndex).match(this.patterns.simpleMethodCall);
         if (!match) {
@@ -2019,7 +3127,10 @@ export class SegmentProcessor {
     }
 
     /**
-     * Convert a token to a content segment
+     * Converts a given token into a content segment.
+     *
+     * @param token - The token to be converted.
+     * @returns An object representing the content segment.
      */
     private convertTokenToSegment(token: Token): ContentSegment {
         return {
@@ -2035,7 +3146,17 @@ export class SegmentProcessor {
     }
 
     /**
-     * Determine if a string is breakable based on its content
+     * Determines if a given string is breakable based on certain criteria.
+     *
+     * @param content - The string to be evaluated.
+     * @returns `true` if the string is breakable, `false` otherwise.
+     *
+     * The function performs the following checks:
+     * - Removes the quotes from the string.
+     * - Returns `false` if the string length (excluding quotes) is less than 20 characters.
+     * - Returns `false` if the string consists of all uppercase letters and underscores.
+     * - Returns `false` if the string is a single word (alphanumeric characters only).
+     * - Returns `false` if the string starts with special characters ($, ?, #, @) followed by alphanumeric characters.
      */
     private isBreakableString(content: string): boolean {
         // Remove quotes
@@ -2061,7 +3182,14 @@ export class SegmentProcessor {
     }
 
     /**
-     * Merge adjacent segments of the same type when appropriate
+     * Merges adjacent content segments if they can be merged.
+     *
+     * This method iterates through the provided segments and merges adjacent segments
+     * that satisfy the merging criteria defined by `canMergeSegments`. The merged segments
+     * are then returned as a new array.
+     *
+     * @param segments - An array of content segments to be merged.
+     * @returns An array of merged content segments.
      */
     private mergeAdjacentSegments(segments: ContentSegment[]): ContentSegment[] {
         const merged: ContentSegment[] = [];
@@ -2089,7 +3217,17 @@ export class SegmentProcessor {
     }
 
     /**
-     * Check if two segments can be merged
+     * Determines whether two content segments can be merged.
+     *
+     * @param a - The first content segment.
+     * @param b - The second content segment.
+     * @returns `true` if the segments can be merged, `false` otherwise.
+     *
+     * The segments can be merged if:
+     * - They are of the same type.
+     * - They have the same token type.
+     * - They are contiguous (i.e., the end index of the first segment is the start index of the second segment).
+     * - Their token type is not in the list of non-mergeable types.
      */
     private canMergeSegments(a: ContentSegment, b: ContentSegment): boolean {
         // Only merge segments of the same type
@@ -2109,7 +3247,11 @@ export class SegmentProcessor {
     }
 
     /**
-     * Merge two segments together
+     * Merges two content segments into one.
+     *
+     * @param a - The first content segment.
+     * @param b - The second content segment.
+     * @returns A new content segment that combines the content and end index of the two segments.
      */
     private mergeSegments(a: ContentSegment, b: ContentSegment): ContentSegment {
         return {

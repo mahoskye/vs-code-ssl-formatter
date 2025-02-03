@@ -6,17 +6,16 @@ import {
     ProcessedLine,
 } from "./formattingPipeline";
 
-export class LongLineBreaker implements CodeFormatter {
+export class LineSplitter implements CodeFormatter {
     private insights: FormatterInsight[] = [];
-    private readonly maxLength: number;
-    private readonly continuationIndent: number = 11; // Standard SSL continuation indent
+    private maxLineLength: number;
 
-    constructor(maxLength: number = 90) {
-        this.maxLength = maxLength;
+    constructor(maxLineLength: number) {
+        this.maxLineLength = maxLineLength;
     }
 
     public getName(): string {
-        return "LongLineBreaker";
+        return "LineSplitter";
     }
 
     public getInsights(): FormatterInsight[] {
@@ -25,178 +24,383 @@ export class LongLineBreaker implements CodeFormatter {
 
     public async format(blocks: TypedBlock[]): Promise<void> {
         this.insights = [];
+        console.log(`\n[LineSplitter] Starting format with maxLineLength: ${this.maxLineLength}`);
 
-        blocks.forEach((block) => {
-            block.lines.forEach((line, lineIndex) => {
-                if (line.formattedString.length > this.maxLength) {
-                    // Skip lines that are single comments
-                    if (this.isSingleComment(line)) {
-                        return;
-                    }
+        for (const block of blocks) {
+            console.log(`\n[LineSplitter] Processing block of type: ${block.blockType}`);
 
-                    const breakPoints = this.findBreakPoints(line.segments);
+            for (let i = 0; i < block.lines.length; i++) {
+                const line = block.lines[i];
+                console.log(
+                    `\n[LineSplitter] Line ${line.lineNumber}: Length ${line.formattedString.length}`
+                );
+                console.log(`Content: "${line.trimmedContent}"`);
+
+                if (this.shouldBreakLine(line)) {
+                    console.log(
+                        `Line exceeds max length (${this.maxLineLength}), searching for break points...`
+                    );
+                    const breakPoints = this.findBreakPoints(line);
+
                     if (breakPoints.length > 0) {
+                        console.log(
+                            `Found ${
+                                breakPoints.length
+                            } break points at positions: ${breakPoints.join(", ")}`
+                        );
                         const newLines = this.breakLine(line, breakPoints);
-                        line.formattedString = newLines.join("\n");
+                        console.log("Breaking into new lines:");
+                        newLines.forEach((l, idx) =>
+                            console.log(`  ${idx + 1}: "${l.formattedString}"`)
+                        );
+
+                        block.lines.splice(i, 1, ...newLines);
+                        i += newLines.length - 1;
 
                         this.insights.push({
                             formatterName: this.getName(),
                             sourceLineNumber: line.originalLineNumber,
                             changeType: "splitting",
-                            description: "Long line broken into multiple lines",
+                            description: `Long line split into ${newLines.length} lines`,
                             before: line.originalString,
-                            after: newLines.join("\n"),
+                            after: newLines.map((l) => l.formattedString).join("\n"),
                         });
+                    } else {
+                        console.log("No suitable break points found, leaving line unchanged");
                     }
+                } else {
+                    console.log("Line does not need breaking");
                 }
-            });
-        });
+            }
+        }
     }
 
-    private isSingleComment(line: ProcessedLine): boolean {
-        return line.segments.length === 1 && line.segments[0].type === "comment";
+    private shouldBreakLine(line: ProcessedLine): boolean {
+        if (line.segments.some((seg) => seg.type === "comment")) {
+            console.log("[shouldBreakLine] Skipping comment line");
+            return false;
+        }
+
+        if (line.trimmedContent === "") {
+            console.log("[shouldBreakLine] Skipping empty line");
+            return false;
+        }
+
+        const shouldBreak = line.formattedString.length > this.maxLineLength;
+        console.log(
+            `[shouldBreakLine] Line length ${line.formattedString.length} > ${this.maxLineLength}? ${shouldBreak}`
+        );
+        return shouldBreak;
     }
 
-    private findBreakPoints(segments: ContentSegment[]): number[] {
+    private findBreakPoints(line: ProcessedLine): number[] {
+        console.log("\n[findBreakPoints] Analyzing segments for break points:");
         const breakPoints: number[] = [];
-        let currentLength = 0;
-        let lastGoodBreakPoint = -1;
-        let inString = false;
-        let stringStart = -1;
-        let functionCallDepth = 0;
+        const segments = line.segments;
+        let currentLength = line.leadingWhitespace.length;
 
-        // Prioritize operators over function calls
-        const breakOpportunities = [
-            { type: "operator", content: "+", priority: 1, breakBefore: true },
-            { type: "separator", content: ",", priority: 2, breakBefore: false },
-            { type: "operator", content: ":=", priority: 3, breakBefore: false },
-        ];
+        console.log(`Starting with leading whitespace length: ${currentLength}`);
 
-        segments.forEach((segment, index) => {
-            // Track function call depth
-            if (segment.type === "code" && segment.tokenType.type === "methodCall") {
-                functionCallDepth++;
-            } else if (segment.content === ")") {
-                functionCallDepth = Math.max(0, functionCallDepth - 1);
-            }
+        // Check if we're in a list context
+        const isListContext = this.isInsideList(segments, segments.length - 1);
+        if (isListContext) {
+            console.log("Detected list context - using list-specific breaking rules");
+            return this.findListBreakPoints(line);
+        }
 
-            // Track string segments
-            if (segment.type === "string") {
-                if (!inString) {
-                    inString = true;
-                    stringStart = index;
-                }
-            } else {
-                if (inString) {
-                    inString = false;
-                }
-            }
-
+        for (let i = 0; i < segments.length; i++) {
+            const segment = segments[i];
             currentLength += segment.content.length;
 
-            // Don't break inside strings or function calls unless necessary
-            if (
-                (inString &&
-                    currentLength - segments[stringStart].content.length < this.maxLength) ||
-                (functionCallDepth > 0 && currentLength < this.maxLength)
-            ) {
-                return;
-            }
+            console.log(`\nSegment ${i + 1}:`);
+            console.log(`  Type: ${segment.tokenType.type}`);
+            console.log(`  Content: "${segment.content}"`);
+            console.log(`  Current total length: ${currentLength}`);
 
-            // Check for break opportunities based on priority
-            for (const opportunity of breakOpportunities) {
-                if (
-                    segment.type === "code" &&
-                    segment.tokenType.type === opportunity.type &&
-                    segment.content.includes(opportunity.content)
-                ) {
-                    // For operators like '+', break before if specified
-                    if (opportunity.breakBefore) {
-                        lastGoodBreakPoint = index - 1;
-                    } else {
-                        lastGoodBreakPoint = index;
-                    }
-                    break;
+            if (currentLength > this.maxLineLength) {
+                console.log("  Length exceeds maximum, searching for break point...");
+                const breakPoint = this.findBestBreakPoint(segments, i);
+
+                if (breakPoint !== -1) {
+                    console.log(`  Found break point at position ${breakPoint}`);
+                    breakPoints.push(breakPoint);
+                    currentLength = line.leadingWhitespace.length + 4;
+                    console.log(`  Reset length to ${currentLength} (indent + 4)`);
+                } else {
+                    console.log("  No suitable break point found");
                 }
             }
-
-            // Only consider method calls as break points if we have no other options
-            if (
-                currentLength > this.maxLength &&
-                lastGoodBreakPoint === -1 &&
-                segment.tokenType.type === "methodCall"
-            ) {
-                lastGoodBreakPoint = index;
-            }
-
-            if (currentLength > this.maxLength && lastGoodBreakPoint !== -1) {
-                breakPoints.push(lastGoodBreakPoint);
-                currentLength = this.calculateRemainingLength(segments, lastGoodBreakPoint);
-            }
-        });
+        }
 
         return breakPoints;
     }
 
-    private calculateRemainingLength(segments: ContentSegment[], breakPoint: number): number {
-        return segments
-            .slice(breakPoint + 1)
-            .reduce((length, segment) => length + segment.content.length, 0);
+    private findBestBreakPoint(segments: ContentSegment[], currentIndex: number): number {
+        console.log("\n[findBestBreakPoint] Searching for break point before index:", currentIndex);
+
+        // Check for list context first
+        const isInList = this.isInsideList(segments, currentIndex);
+        if (isInList) {
+            console.log("  Context: Inside list structure");
+            // For lists, break after each comma
+            for (let i = currentIndex; i >= 0; i--) {
+                const segment = segments[i];
+                if (segment.tokenType.type === "separator" && segment.content === ",") {
+                    console.log(`    → Breaking after comma at ${segment.endIndex}`);
+                    return segment.endIndex;
+                }
+            }
+            // If no comma found but we're in a list, try to break after opening brace
+            for (let i = currentIndex; i >= 0; i--) {
+                const segment = segments[i];
+                if (segment.tokenType.type === "separator" && segment.content === "{") {
+                    console.log(`    → Breaking after opening brace at ${segment.endIndex}`);
+                    return segment.endIndex;
+                }
+            }
+        }
+
+        // Original priority-based breaking logic
+        const breakPriorities = [
+            { type: "operator", content: ["+", "-", "*", "/", ":="] },
+            { type: "separator", content: [","] },
+            { type: "methodCall", content: [] },
+            { type: "propertyAccess", content: [] },
+        ];
+
+        for (const priority of breakPriorities) {
+            console.log(`\nChecking priority type: ${priority.type}`);
+            if (priority.content.length) {
+                console.log(`Looking for content: ${priority.content.join(", ")}`);
+            }
+
+            for (let i = currentIndex; i >= 0; i--) {
+                const segment = segments[i];
+                console.log(`  Checking segment ${i}:`);
+                console.log(`    Type: ${segment.tokenType.type}`);
+                console.log(`    Content: "${segment.content.trim()}"`);
+
+                if (segment.tokenType.type === priority.type) {
+                    if (
+                        priority.content.length === 0 ||
+                        priority.content.includes(segment.content.trim())
+                    ) {
+                        // Check the current segment's type for break point placement
+                        console.log(`    Found candidate segment:`);
+                        console.log(`      Type: ${segment.tokenType.type}`);
+                        console.log(`      Content: "${segment.content.trim()}"`);
+
+                        if (segment.tokenType.type === "operator") {
+                            // For operators, break before the operator
+                            console.log(`    → Breaking before operator at ${segment.startIndex}`);
+                            return segment.startIndex;
+                        } else if (segment.tokenType.type === "separator") {
+                            // For separators, break after the separator
+                            console.log(`    → Breaking after separator at ${segment.endIndex}`);
+                            return segment.endIndex;
+                        }
+
+                        // For other types (method calls, property access), use default
+                        console.log(`    ✓ Using default break point at ${segment.endIndex}`);
+                        return segment.endIndex;
+                    }
+                }
+            }
+        }
+
+        console.log("  × No suitable break point found");
+        return -1;
     }
 
-    private breakLine(line: ProcessedLine, breakPoints: number[]): string[] {
-        const lines: string[] = [];
-        let currentLine = line.leadingWhitespace;
-        let lastEndIndex = 0;
-        let isFirstLine = true;
+    private isInsideList(segments: ContentSegment[], currentIndex: number): boolean {
+        let braceCount = 0;
+        let hasCommas = false;
+        let hasAssignment = false;
 
-        line.segments.forEach((segment, index) => {
-            if (breakPoints.includes(index - 1)) {
-                lines.push(currentLine.trimEnd());
-                // Calculate alignment based on first opening construct
-                const continuationIndent = isFirstLine
-                    ? this.calculateFirstLineIndent(line)
-                    : this.calculateContinuationIndent(line, false);
-                currentLine = " ".repeat(continuationIndent);
-                isFirstLine = false;
+        // First check if this is an assignment with a brace
+        for (let i = 0; i < segments.length; i++) {
+            const segment = segments[i];
+            if (segment.tokenType.type === "operator" && segment.content.includes(":=")) {
+                hasAssignment = true;
+            }
+            if (
+                hasAssignment &&
+                segment.tokenType.type === "separator" &&
+                segment.content === "{"
+            ) {
+                return true; // Definitely a list if we have := followed by {
+            }
+        }
+
+        // More detailed list structure check
+        for (let i = 0; i <= currentIndex; i++) {
+            const segment = segments[i];
+            if (segment.tokenType.type === "separator") {
+                if (segment.content === "{") {
+                    braceCount++;
+                } else if (segment.content === "}") {
+                    braceCount--;
+                } else if (segment.content === ",") {
+                    if (braceCount > 0) {
+                        hasCommas = true;
+                    }
+                }
+            }
+        }
+
+        return braceCount > 0 && hasCommas;
+    }
+
+    private findListBreakPoints(line: ProcessedLine): number[] {
+        const breakPoints: number[] = [];
+        const segments = line.segments;
+
+        // Find assignment operator and opening brace
+        const assignmentIndex = segments.findIndex(
+            (seg) => seg.tokenType.type === "operator" && seg.content.includes(":=")
+        );
+        const openBraceIndex = segments.findIndex(
+            (seg, index) => seg.tokenType.type === "separator" && seg.content === "{"
+        );
+
+        if (assignmentIndex !== -1) {
+            // Break after assignment operator
+            breakPoints.push(segments[assignmentIndex].endIndex);
+        }
+
+        if (openBraceIndex !== -1) {
+            // Break after opening brace
+            breakPoints.push(segments[openBraceIndex].endIndex);
+        }
+
+        // Break after each comma
+        for (let i = openBraceIndex + 1; i < segments.length; i++) {
+            const segment = segments[i];
+            if (segment.tokenType.type === "separator" && segment.content === ",") {
+                breakPoints.push(segment.endIndex);
+            }
+        }
+
+        // Find and add closing brace position
+        const closingBraceIndex = segments.findIndex(
+            (seg) => seg.tokenType.type === "separator" && seg.content === "}"
+        );
+        if (closingBraceIndex !== -1) {
+            breakPoints.push(segments[closingBraceIndex].startIndex);
+        }
+
+        console.log(`Found ${breakPoints.length} break points in list structure`);
+        return breakPoints;
+    }
+
+    private breakLine(line: ProcessedLine, breakPoints: number[]): ProcessedLine[] {
+        const newLines: ProcessedLine[] = [];
+        let startIndex = 0;
+        const baseIndent = line.leadingWhitespace;
+
+        // Find the opening string position for alignment
+        const stringStart = line.segments.find(
+            (seg) => seg.tokenType.type === "stringLiteral" || seg.tokenType.type === "methodCall"
+        );
+
+        // Calculate alignment based on the opening string position
+        const alignmentColumn = stringStart
+            ? baseIndent.length +
+              line.originalString.indexOf(stringStart.content) +
+              (stringStart.tokenType.type === "methodCall" ? stringStart.content.length : 0)
+            : baseIndent.length + 4;
+
+        const continuationIndent = " ".repeat(alignmentColumn);
+
+        console.log(`Alignment info:`);
+        console.log(`  Base indent: ${baseIndent.length} spaces`);
+        console.log(
+            `  String start position: ${
+                stringStart ? line.originalString.indexOf(stringStart.content) : "not found"
+            }`
+        );
+        console.log(`  Alignment column: ${alignmentColumn}`);
+
+        const isListContext = this.isInsideList(line.segments, line.segments.length - 1);
+
+        // Adjust list indentation based on context
+        const listIndent = isListContext
+            ? line.leadingWhitespace + "    ".repeat(2) // Double indent for list items
+            : continuationIndent;
+
+        for (let i = 0; i < breakPoints.length; i++) {
+            const endIndex = breakPoints[i];
+            const content = line.originalString.substring(startIndex, endIndex).trim();
+            const segments = this.sliceSegments(line.segments, startIndex, endIndex);
+
+            // Use special indentation for list items
+            let indent;
+            if (isListContext) {
+                if (content.includes(":=")) {
+                    indent = baseIndent; // Assignment line
+                } else if (content === "{") {
+                    indent = baseIndent + "    "; // Opening brace gets single indent
+                } else if (content === "}") {
+                    indent = baseIndent + "    "; // Closing brace gets single indent
+                } else {
+                    indent = baseIndent + "    ".repeat(2); // List items get double indent
+                }
+            } else {
+                indent = i === 0 ? baseIndent : continuationIndent;
             }
 
-            // Add proper spacing around operators and separators
-            if (index > 0 && segment.startIndex > lastEndIndex) {
-                currentLine += " ";
-            }
+            const newLine: ProcessedLine = {
+                originalString: line.originalString,
+                formattedString: indent + content,
+                leadingWhitespace: indent,
+                trimmedContent: content,
+                lineNumber: line.lineNumber,
+                originalLineNumber: line.originalLineNumber,
+                segments: segments,
+            };
+            newLines.push(newLine);
+            startIndex = endIndex;
+        }
 
-            currentLine += segment.content;
-            lastEndIndex = segment.endIndex;
+        // Handle final segment (which might be the closing brace)
+        const finalContent = line.originalString.substring(startIndex).trim();
+        let finalIndent;
+        if (isListContext) {
+            if (finalContent === "}") {
+                finalIndent = baseIndent + "    "; // Single indent for closing brace
+            } else if (finalContent.endsWith("};")) {
+                finalIndent = baseIndent + "    "; // Single indent for closing brace with semicolon
+            } else {
+                finalIndent = baseIndent + "    ".repeat(2); // Double indent for list items
+            }
+        } else {
+            finalIndent = continuationIndent;
+        }
+
+        newLines.push({
+            originalString: line.originalString,
+            formattedString: finalIndent + finalContent,
+            leadingWhitespace: finalIndent,
+            trimmedContent: finalContent,
+            lineNumber: line.lineNumber,
+            originalLineNumber: line.originalLineNumber,
+            segments: this.sliceSegments(line.segments, startIndex, line.originalString.length),
         });
 
-        if (currentLine.trim()) {
-            lines.push(currentLine);
-        }
-
-        return lines;
+        return newLines;
     }
 
-    private calculateFirstLineIndent(line: ProcessedLine): number {
-        // Find the first opening construct (like SQLExecute()
-        const firstSegment = line.segments[0];
-        if (firstSegment && firstSegment.type === "code") {
-            // Align with opening parenthesis or first content
-            return firstSegment.content.length + line.leadingWhitespace.length;
-        }
-        return line.leadingWhitespace.length + this.continuationIndent;
-    }
-
-    private calculateContinuationIndent(line: ProcessedLine, isFirstLine: boolean): number {
-        // Calculate base indentation from the original line
-        const baseIndent = line.leadingWhitespace.length;
-
-        // For first line breaks, align with the standard SSL continuation indent
-        if (isFirstLine) {
-            return baseIndent + this.continuationIndent;
-        }
-
-        // For subsequent breaks, maintain the same indentation as the first continuation
-        return baseIndent + this.continuationIndent;
+    private sliceSegments(
+        segments: ContentSegment[],
+        start: number,
+        end: number
+    ): ContentSegment[] {
+        return segments
+            .filter((seg) => seg.startIndex < end && seg.endIndex > start)
+            .map((seg) => ({
+                ...seg,
+                startIndex: Math.max(seg.startIndex - start, 0),
+                endIndex: Math.min(seg.endIndex - start, end - start),
+            }));
     }
 }
