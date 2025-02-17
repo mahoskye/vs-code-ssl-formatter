@@ -64,7 +64,7 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider, vsco
          * @property {"space" | "tab"} indentStyle - Specifies the indentation style, either "space" or "tab".
          */
         const pipelineConfig: FormatterConfig = {
-            debug: true,
+            debug: false,
             showSegmentDetails: true,
             useSpacingContext: true,
             useSpacingPostProcessing: true,
