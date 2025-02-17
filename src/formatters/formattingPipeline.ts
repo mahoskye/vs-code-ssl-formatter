@@ -441,6 +441,11 @@ export interface TypedBlock {
     formatterInsights?: FormatterInsight[];
 }
 
+export interface ItemListInfo {
+    hasList: boolean;
+    listType: "tuple" | "blockParameter" | "parameter" | "array" | "none";
+}
+
 /**
  * Represents the result of a debugging operation.
  */

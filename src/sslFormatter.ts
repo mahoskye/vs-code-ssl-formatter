@@ -81,7 +81,7 @@ export class SSLFormatter implements vscode.DocumentFormattingEditProvider, vsco
         // this.pipeline.addFormatter(new KeywordCasingFormatter());
         // this.pipeline.addFormatter(new SemicolonNewlineFormatter(this.pipeline));
         // this.pipeline.addFormatter(new OperatorSpacingFormatter());
-        this.pipeline.addFormatter(new LineSplitter(pipelineConfig.maxLineLength ?? 90));
+        this.pipeline.addFormatter(new LineSplitter(pipelineConfig.maxLineLength ?? 90, 6));
 
         // Listen for configuration changes
         vscode.workspace.onDidChangeConfiguration(this.handleConfigChange, this);

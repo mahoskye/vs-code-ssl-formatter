@@ -94,25 +94,32 @@ export class LineSplitter implements CodeFormatter {
 
                 for (let i = 0; i < block.lines.length; i++) {
                     const line = block.lines[i];
+                    console.debug(`[LineSplitter] Block Line ${i + 1}: \`${line.trimmedContent}\``);
+                }
+
+                for (let i = 0; i < block.lines.length; i++) {
+                    const line = block.lines[i];
                     console.debug(
                         `\n[LineSplitter] Line ${line.lineNumber}: Length ${line.formattedString.length}`
                     );
                     console.debug(`Content: \`${line.trimmedContent}\``);
-                    console.debug(`Is Long Line: ${this.isLongLine(line)}`);
-                    console.debug(`Has Multiple Semicolons: ${this.hasMultipleSemicolons(line)}`);
+                    console.debug(`Is Long Line: ${this.isLongLine(line) ? "✅" : "❌"}`);
+                    console.debug(
+                        `Has Multiple Semicolons: ${this.hasMultipleSemicolons(line) ? "✅" : "❌"}`
+                    );
                     const listInfo = this.containsItemList(block, line);
-                    if (this.hasList(block)) {
+                    if (listInfo.hasList) {
                         console.debug(`Has List of Type: ${listInfo.listType}`);
                         console.debug(`Items Per Line: ${this.itemsPerLine}`);
                         if (listInfo.listType === "blockParameter") {
                             console.debug(
-                                `List Items: ${this.getListItems(block, listInfo.listType).join(
+                                `List Items: 🧀 ${this.getListItems(block, listInfo.listType).join(
                                     " 🐭 "
                                 )}`
                             );
                         } else {
                             console.debug(
-                                `List Items: ${this.getListItems(block, listInfo.listType).join(
+                                `List Items: 🪰 ${this.getListItems(block, listInfo.listType).join(
                                     " 🐸 "
                                 )}`
                             );
@@ -120,8 +127,10 @@ export class LineSplitter implements CodeFormatter {
                     } else {
                         console.debug("Has List: ⛔");
                     }
-                    console.debug(`Is Comment Block: ${this.isCommentBlock(block)}`);
-                    console.debug(`Has Comment Segment: ${this.hasCommentSegment(line)}`);
+                    console.debug(`Is Comment Block: ${this.isCommentBlock(block) ? "✅" : "❌"}`);
+                    console.debug(
+                        `Has Comment Segment: ${this.hasCommentSegment(line) ? "✅" : "❌"}`
+                    );
                 }
             }
         } catch (e) {
@@ -213,7 +222,7 @@ export class LineSplitter implements CodeFormatter {
     /**
      * Checks if the given code contains an item list.
      *
-     * @param code - The code to be checked.
+     * @param block - The block to be checked.
      * @returns Information about the item list.
      */
     private containsItemList(block: TypedBlock, line: ProcessedLine): ItemListInfo {
@@ -228,7 +237,8 @@ export class LineSplitter implements CodeFormatter {
                 return { hasList: true, listType: "blockParameter" };
             }
 
-            const code = line.trimmedContent;
+            // Flatten the block's lines into a single string for easier matching
+            const code = block.lines.map((l) => l.trimmedContent).join("\n");
 
             const patterns = {
                 arrayLists: /\{(?:[^{}]|\{[^{}]*\})*\}/g,
@@ -300,12 +310,11 @@ export class LineSplitter implements CodeFormatter {
 
             const items: string[] = [];
             const { open, close } = this.getListWrappers(listType);
+            let depth = 0;
+            let currentItem = "";
+            let isInList = false;
 
             for (const line of block.lines) {
-                let depth = 0;
-                let currentItem = "";
-                let isInList = false;
-
                 for (const segment of line.segments) {
                     const content = segment.content.trim();
 
@@ -319,6 +328,7 @@ export class LineSplitter implements CodeFormatter {
                         depth++;
                         if (depth === 1) {
                             isInList = true;
+                            currentItem += content.substring(content.indexOf(open) + 1); // Start after the opening character
                             continue; // Skip the opening character
                         }
                     }
@@ -327,11 +337,16 @@ export class LineSplitter implements CodeFormatter {
                     if (content.includes(close)) {
                         depth--;
                         if (depth === 0) {
+                            const closingIndex = content.indexOf(close);
+                            if (closingIndex > 0) {
+                                currentItem += content.substring(0, closingIndex); // Add content before closing character
+                            }
                             if (currentItem.trim()) {
                                 items.push(currentItem.trim());
                             }
                             isInList = false;
-                            break; // We've found our complete list
+                            currentItem = ""; // Reset for next list
+                            continue;
                         }
                     }
 
