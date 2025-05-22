@@ -2,7 +2,7 @@
     "name": "vs-code-ssl-formatter",
     "displayName": "STARLIMS Scripting Language Formatter",
     "description": "Syntax highlighting, folding, and auto-completion for STARLIMS Scripting Language (SSL)",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "engines": {
         "vscode": "^1.94.0"
     },
