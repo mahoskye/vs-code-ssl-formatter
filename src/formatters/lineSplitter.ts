@@ -88,6 +88,7 @@ export class LineSplitter implements CodeFormatter {
             console.debug(
                 `\n[LineSplitter] Starting format with maxLineLength: ${this.maxLineLength}`
             );
+            console.debug(`Items Per Line: ${this.itemsPerLine}`);
 
             for (const block of blocks) {
                 console.debug(`\n[LineSplitter] Processing block of type: ${block.blockType}`);
@@ -99,38 +100,75 @@ export class LineSplitter implements CodeFormatter {
 
                 for (let i = 0; i < block.lines.length; i++) {
                     const line = block.lines[i];
+                    const splitType = this.getSplitType(block, line);
                     console.debug(
                         `\n[LineSplitter] Line ${line.lineNumber}: Length ${line.formattedString.length}`
                     );
                     console.debug(`Content: \`${line.trimmedContent}\``);
-                    console.debug(`Is Long Line: ${this.isLongLine(line) ? "✅" : "❌"}`);
-                    console.debug(
-                        `Has Multiple Semicolons: ${this.hasMultipleSemicolons(line) ? "✅" : "❌"}`
-                    );
-                    const listInfo = this.containsItemList(block, line);
-                    if (listInfo.hasList) {
-                        console.debug(`Has List of Type: ${listInfo.listType}`);
-                        console.debug(`Items Per Line: ${this.itemsPerLine}`);
-                        if (listInfo.listType === "blockParameter") {
-                            console.debug(
-                                `List Items: 🧀 ${this.getListItems(block, listInfo.listType).join(
-                                    " 🐭 "
-                                )}`
-                            );
-                        } else {
-                            console.debug(
-                                `List Items: 🪰 ${this.getListItems(block, listInfo.listType).join(
-                                    " 🐸 "
-                                )}`
-                            );
+                    console.debug(`Split Type: ${splitType}`);
+
+                    let contentToEvaluate = line.trimmedContent;
+                    if (this.hasMultipleSemicolons(line)) {
+                        console.debug(`Has Multiple Semicolons: ✅`);
+                        // Process the block/segment up to the first semicolon
+                        const segments = line.segments;
+                        for (const segment of segments) {
+                            if (segment.content.includes(";")) {
+                                contentToEvaluate = segment.content.split(";")[0];
+                                console.debug(
+                                    `Content up to first semicolon: ${contentToEvaluate}`
+                                );
+                                break;
+                            }
                         }
                     } else {
-                        console.debug("Has List: ⛔");
+                        console.debug(`Has Multiple Semicolons: ❌`);
                     }
-                    console.debug(`Is Comment Block: ${this.isCommentBlock(block) ? "✅" : "❌"}`);
-                    console.debug(
-                        `Has Comment Segment: ${this.hasCommentSegment(line) ? "✅" : "❌"}`
-                    );
+
+                    switch (splitType) {
+                        case "comment":
+                            console.debug(
+                                `Is Comment Block: ${this.isCommentBlock(block) ? "✅" : "❌"}`
+                            );
+                            console.debug(
+                                `Has Comment Segment: ${this.hasCommentSegment(line) ? "✅" : "❌"}`
+                            );
+                            break;
+                        case "parameter":
+                        case "blockParameter":
+                        case "array":
+                        case "tuple":
+                            console.debug(`Is Long Line: ${this.isLongLine(line) ? "✅" : "❌"}`);
+                            console.debug(
+                                `Has Comment Segment: ${this.hasCommentSegment(line) ? "✅" : "❌"}`
+                            );
+                            const listInfo = this.containsItemList(block, line);
+                            if (listInfo.hasList) {
+                                console.debug(`Has List of Type: ${listInfo.listType}`);
+                                console.debug(
+                                    `List Items: ${
+                                        listInfo.listType === "blockParameter" ? "🧀" : "🪰"
+                                    } ${this.getListItems(block, listInfo.listType).join(
+                                        listInfo.listType === "blockParameter" ? " 🐭 " : " 🐸 "
+                                    )}`
+                                );
+                            } else {
+                                console.debug("Has List: ⛔");
+                            }
+                            break;
+                        case "concat":
+                            console.debug(`Is Long Line: ${this.isLongLine(line) ? "✅" : "❌"}`);
+                            console.debug(
+                                `Has Comment Segment: ${this.hasCommentSegment(line) ? "✅" : "❌"}`
+                            );
+                            break;
+                        default:
+                            console.debug(`Is Long Line: ${this.isLongLine(line) ? "✅" : "❌"}`);
+                            console.debug(
+                                `Has Comment Segment: ${this.hasCommentSegment(line) ? "✅" : "❌"}`
+                            );
+                            break;
+                    }
                 }
             }
         } catch (e) {
@@ -421,6 +459,58 @@ export class LineSplitter implements CodeFormatter {
         } catch (e) {
             console.error(`Error retrieving list items: ${e}`);
             return [];
+        }
+    }
+
+    private getSplitType(block: TypedBlock, line: ProcessedLine): string {
+        try {
+            // First check for list types since those represent the main code structure
+            const listInfo = this.containsItemList(block, line);
+            if (listInfo.hasList) {
+                return listInfo.listType;
+            }
+
+            // Check for string concatenation
+            const hasConcat = line.segments.some(
+                (segment) =>
+                    segment.tokenType?.type === "operator" && segment.content.trim() === "+"
+            );
+            if (hasConcat) {
+                return "concat";
+            }
+
+            // If no code-specific split types are found, check if it's a pure comment
+            if (this.isCommentBlock(block) || this.isOnlyComment(line)) {
+                return "comment";
+            }
+
+            return "none";
+        } catch (e) {
+            console.error(`Error determining split type: ${e}`);
+            return "none";
+        }
+    }
+
+    /**
+     * Determines if a line contains only comment content.
+     * @param line - The line to check
+     * @returns true if the line contains only comments and no code
+     */
+    private isOnlyComment(line: ProcessedLine): boolean {
+        try {
+            // Filter out empty/whitespace segments
+            const nonEmptySegments = line.segments.filter(
+                (segment) => segment.type !== "empty" && segment.content.trim().length > 0
+            );
+
+            // Check if all non-empty segments are comments
+            return (
+                nonEmptySegments.length > 0 &&
+                nonEmptySegments.every((segment) => segment.type === "comment")
+            );
+        } catch (e) {
+            console.error(`Error checking if line is only comment: ${e}`);
+            return false;
         }
     }
 }
