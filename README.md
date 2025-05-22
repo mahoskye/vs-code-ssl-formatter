@@ -1,6 +1,6 @@
 # STARLIMS Scripting Language Formatter
 
-This Visual Studio Code extension provides syntax highlighting, folding, and auto-completion for STARLIMS Scripting Language (SSL).
+This Visual Studio Code extension provides syntax highlighting, folding, auto-completion, error detection, and semantic highlighting for STARLIMS Scripting Language (SSL).
 
 ## Disclaimer
 
@@ -15,6 +15,11 @@ STARLIMS® is a registered trademark of Abbott Informatics Corporation. This ext
 -   Special highlighting for folds in the minimap
 -   Auto-completion support for SSL files
 -   Custom completion items configurable through VS Code settings
+-   Error detection based on SSL EBNF grammar
+-   Semantic highlighting for better code visualization
+-   Proper comment handling (/\* ... ; format)
+-   Support for SSL-specific language constructs
+-   Validation against formal SSL grammar
 
 ## Installation
 

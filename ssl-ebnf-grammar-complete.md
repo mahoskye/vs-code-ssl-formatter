@@ -181,7 +181,7 @@ EndTryStatement ::= ":" "ENDTRY"
 
 ErrorBlockStanza ::= ErrorMarker {Statement} (* For :ERROR structure *)
 ErrorMarker ::= ":" "ERROR"
-(* :RESUME statement removed based on v11 testing feedback *)
+(* :RESUME statement removed based on v11 testing feedback - should be removed from formatting pipeline as well *)
 
 (* Declaration statements *)
 DeclarationStatement ::= (
@@ -211,9 +211,11 @@ ExecFunctionCall ::= "ExecFunction" "(" StringLiteral "," ArrayLiteral ")" (* *)
 ArgumentList ::= Expression {"," Expression}
 
 (* Comment statements *)
-CommentStatement ::= BlockComment | SingleLineComment
-BlockComment ::= "/*" {Character} ";" (* SSL comments start with /* and end with ;. Patterns like '/* region Name;' are parsed as BlockComment. *)
-SingleLineComment ::= "/*" {Character} ";"
+CommentStatement ::= BlockComment | SingleLineComment | RegionComment | EndRegionComment
+BlockComment ::= "/*" {Character} ";" (* SSL block comments span multiple lines *)
+SingleLineComment ::= "/*" {Character} ";" (* SSL single line comments appear on a single line *)
+RegionComment ::= "/*" "region" {Character} ";" (* Comments used for region markers *)
+EndRegionComment ::= "/*" "endregion" {Character} ";" (* Comments used for endregion markers *)
 
 (* Special structures *)
 LabelStatement ::= ":" "LABEL" Identifier (* Used with Branch() *)
