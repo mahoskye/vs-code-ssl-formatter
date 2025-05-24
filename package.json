@@ -57,7 +57,8 @@
                         "default": {
                             "Array Functions": [],
                             "Database Functions": [],
-                            "Runtime Functions to Get/Return a DATASET": [],
+                            "ODBC Extensions": [],
+                            "Runtime Functions to get/return a DATASET": [],
                             "Data Type Functions": [],
                             "Date Functions": [],
                             "E-mail Functions": [],
@@ -72,16 +73,18 @@
                                     "documentation": "This function is used for demonstration purposes."
                                 }
                             ],
+                            "String Functions": [],
+                            "Statements": [],
                             "Numeric Functions": [],
                             "Process Functions": [],
                             "Security Functions": [],
                             "Serial Communications Functions": [],
-                            "String Functions": [],
-                            "Statements": [],
                             "UDP Functions": [],
                             "Internal Functions": [],
                             "Error Handling": [],
-                            "Web Specific Functions": []
+                            "Web Specific Functions": [],
+                            "Operators": [],
+                            "Literals": []
                         },
                         "description": "Custom completions for SSL"
                     },

@@ -3,8 +3,6 @@ import { SSLFoldingProvider } from "./sslFoldingProvider";
 import { SSLCompletionProvider } from "./sslCompletionProvider";
 import { SSLHoverProvider } from "./sslHoverProvider";
 import { SSLFormatter } from "./sslFormatter";
-import { SSLDiagnosticProvider } from "./parser/diagnostic";
-import { SSLSemanticTokensProvider } from "./parser/semanticHighlighting";
 
 /**
  * This function is called when the extension is activated.
@@ -19,13 +17,15 @@ export function activate(context: vscode.ExtensionContext) {
     const foldingProvider = vscode.languages.registerFoldingRangeProvider(
         selector,
         sslFoldingProvider
-    );
-
-    // Register the completion item provider
+    ); // Register the completion item provider
     const sslCompletionProvider = new SSLCompletionProvider();
     const completionProvider = vscode.languages.registerCompletionItemProvider(
         selector,
-        sslCompletionProvider
+        sslCompletionProvider,
+        ":",
+        "(",
+        ",",
+        " " // Trigger characters for completion
     );
 
     // Register the hover provider
@@ -39,19 +39,6 @@ export function activate(context: vscode.ExtensionContext) {
         formatter
     );
 
-    // Register the diagnostic provider
-    const sslDiagnosticProvider = new SSLDiagnosticProvider();
-    context.subscriptions.push(sslDiagnosticProvider);
-
-    // Register semantic tokens provider
-    const semanticTokensProvider = new SSLSemanticTokensProvider();
-    const semanticTokensProviderRegistration =
-        vscode.languages.registerDocumentSemanticTokensProvider(
-            selector,
-            semanticTokensProvider,
-            semanticTokensProvider.getLegend()
-        );
-
     // Register the command to reload completion items
     const reloadCommand = vscode.commands.registerCommand("sslFormatter.reloadCompletions", () => {
         sslCompletionProvider.loadCompletionItems();
@@ -64,36 +51,7 @@ export function activate(context: vscode.ExtensionContext) {
         completionProvider,
         hoverProvider,
         formattingProvider,
-        semanticTokensProviderRegistration,
         reloadCommand
-    );
-
-    // Update diagnostics for the active editor when the extension is activated
-    if (vscode.window.activeTextEditor) {
-        sslDiagnosticProvider.updateDiagnostics(vscode.window.activeTextEditor.document);
-    }
-
-    // Update diagnostics when the active editor changes
-    context.subscriptions.push(
-        vscode.window.onDidChangeActiveTextEditor((editor) => {
-            if (editor) {
-                sslDiagnosticProvider.updateDiagnostics(editor.document);
-            }
-        })
-    );
-
-    // Update diagnostics when the document changes
-    context.subscriptions.push(
-        vscode.workspace.onDidChangeTextDocument((event) => {
-            sslDiagnosticProvider.updateDiagnostics(event.document);
-        })
-    );
-
-    // Clear diagnostics when a document is closed
-    context.subscriptions.push(
-        vscode.workspace.onDidCloseTextDocument((document) => {
-            sslDiagnosticProvider.clearDiagnostics(document);
-        })
     );
 }
 

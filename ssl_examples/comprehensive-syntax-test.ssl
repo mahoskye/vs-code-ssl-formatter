@@ -1,0 +1,288 @@
+/* region Comprehensive SSL EBNF Grammar Test File;
+
+/* Test basic data types and literals;
+:DECLARE sText, nNumber, bFlag, arArray, dDate;
+sText := "Hello World";
+nNumber := 123.456;
+bFlag := .T.;
+arArray := {1, 2.5, "text", .F., NIL};
+dDate := {2024, 12, 23, 14, 30, 0};
+
+/* Test scientific notation;
+nScientific1 := 1.23e5;
+nScientific2 := 4.56E-3;
+nInvalid := 0.5e1;  /* Valid format */
+
+/* Test unary operators;
+nPositive := +123;
+nNegative := -456;
+bNot := !bFlag;
+bLogicalNot := .NOT. bFlag;
+
+/* Test increment/decrement operators;
+nCounter := 0;
+nCounter++;
+++nCounter;
+nCounter--;
+--nCounter;
+
+/* Test assignment operators;
+nValue := 10;
+nValue += 5;
+nValue -= 2;
+nValue *= 3;
+nValue /= 2;
+nValue ^= 2;
+
+/* Test comparison operators;
+bEqual := (nValue = 10);
+bExactEqual := (nValue == 10);
+bNotEqual := (nValue != 5);
+bNotEqual2 := (nValue <> 5);
+bLess := (nValue < 20);
+bGreater := (nValue > 5);
+bLessEqual := (nValue <= 15);
+bGreaterEqual := (nValue >= 10);
+
+/* Test logical operators;
+bResult := .T. .AND. .F.;
+bResult := .T. .OR. .F.;
+bResult := .NOT. .T.;
+
+/* Test arrays and indexing;
+arItems := {1, 2, {3, 4}, "text"};
+nFirst := arItems[1];
+nNested := arItems[3][1];
+nMultiDim := arItems[1, 2];  /* Multi-dimensional access */
+
+/* Test property access and method calls;
+oObject := CreateUDObject("MyClass");
+sProperty := oObject:PropertyName;
+nResult := oObject:MethodCall();
+nResult2 := oObject:MethodWithParams(123, "test");
+
+/* Test function calls - all three types;
+/* Direct function calls;
+nLength := Len(sText);
+sUpper := Upper(sText);
+dToday := Today();
+nRandom := Rand();
+
+/* DoProc function calls;
+nResult := DoProc("MyProcedure", {123, "param"});
+
+/* ExecFunction calls;
+nResult := ExecFunction("ExternalFunc", {456, "param"});
+
+/* Test SQL statements;
+arResults := SqlExecute("SELECT * FROM table WHERE id = ?id? AND name LIKE ?pattern?", {123, "%test%"});
+nCount := LSearch("SELECT count(*) FROM users WHERE active = ?", 1);
+
+/* Test bitwise functions;
+nBitAnd := _AND(255, 128);
+nBitOr := _OR(64, 32);
+nBitXor := _XOR(15, 7);
+nBitNot := _NOT(255);
+
+/* Test code blocks;
+fnLambda := {|x| x * x};
+fnMultiParam := {|x, y| x + y};
+
+/* Test string literals - all three formats;
+sDoubleQuote := "Double quoted string";
+sSingleQuote := 'Single quoted string';
+sBracketQuote := [Bracket quoted string];
+
+/* Test control structures;
+:IF bFlag;
+    /* Conditional code;
+    :FOR nI := 1 :TO 10;
+        /* Loop code;
+        :BEGINCASE;
+        :CASE nI = 1;
+            /* First case;
+        :CASE nI > 5;
+            /* Large case;
+        :OTHERWISE;
+            /* Default case;
+        :ENDCASE;
+    :NEXT;
+:ELSE;
+    /* Alternative code;
+:ENDIF;
+
+/* Test while loop;
+nCounter := 0;
+:WHILE nCounter < 10;
+    nCounter++;
+    :IF nCounter = 5;
+        :EXITWHILE;
+    :ENDIF;
+:ENDWHILE;
+
+/* Test error handling;
+:TRY;
+    /* Code that might fail;
+    nResult := nValue / 0;
+:CATCH;
+    /* Error handling;
+    sError := "Division by zero";
+:FINALLY;
+    /* Cleanup code;
+    nValue := 0;
+:ENDTRY;
+
+/* Test legacy error handling;
+:ERROR;
+    /* Error occurred;
+    :RETURN .F.;
+
+/* Test labels and branching;
+:LABEL StartLabel;
+nValue := 123;
+Branch("LABEL StartLabel");
+
+/* Test regions;
+:REGION DataProcessing;
+/* Processing code here;
+:ENDREGION;
+
+/* Test inline code;
+:BEGININLINECODE "TestCode";
+/* Inline code content;
+:ENDINLINECODE;
+
+/* Test procedure definition;
+:PROCEDURE TestProcedure;
+:PARAMETERS sInput, nValue;
+:DEFAULT sInput, "default", nValue, 0;
+
+    /* Local variables;
+    :DECLARE sLocal, nLocal;
+    sLocal := sInput;
+    nLocal := nValue;
+    
+    /* Return value;
+    :RETURN sLocal;
+:ENDPROC;
+
+/* Test class definition;
+:CLASS MyTestClass;
+:INHERIT BaseClass;
+
+:DECLARE sClassName, nVersion;
+
+:PROCEDURE Initialize;
+:PARAMETERS sName;
+    sClassName := sName;
+    nVersion := 1;
+:ENDPROC;
+
+/* Test all built-in functions;
+/* String functions;
+nLen := Len(sText);
+sUpper := Upper(sText);
+sLower := Lower(sText);
+sLeft := Left(sText, 5);
+sRight := Right(sText, 5);
+sMid := Mid(sText, 2, 3);
+sTrim := Trim(sText);
+sReplace := Replace(sText, "Hello", "Hi");
+nInStr := InStr(sText, "World");
+sSubStr := SubStr(sText, 2, 3);
+sLimsString := LimsString(123);
+
+/* Data type functions;
+nVal := Val("123");
+sStr := Str(123);
+bIsNil := IsNil(nValue);
+sType := Type(nValue);
+bEmpty := Empty(sText);
+
+/* Date functions;
+dToday := Today();
+dNow := Now();
+dCtoD := CtoD("12/23/2024");
+sDtoC := DtoC(dToday);
+sTime := Time();
+nYear := Year(dToday);
+nMonth := Month(dToday);
+nDay := Day(dToday);
+nHour := Hour(dNow);
+nMinute := Minute(dNow);
+nSecond := Second(dNow);
+
+/* Math functions;
+nInt := Int(123.456);
+nRound := Round(123.456, 2);
+nAbs := Abs(-123);
+nMax := Max(10, 20);
+nMin := Min(10, 20);
+nMod := Mod(10, 3);
+nSqrt := Sqrt(16);
+nPower := Power(2, 3);
+nLog := Log(10);
+nExp := Exp(1);
+nSin := Sin(3.14159);
+nCos := Cos(3.14159);
+nTan := Tan(3.14159);
+nASin := ASin(0.5);
+nACos := ACos(0.5);
+nATan := ATan(0.5);
+nATan2 := ATan2(1, 1);
+nCeiling := Ceiling(123.456);
+nFloor := Floor(123.456);
+nRand := Rand();
+RandSeed(123);
+
+/* Character functions;
+nChr := Chr(65);
+nAsc := Asc("A");
+
+/* Data conversion;
+nCtoN := CtoN("123");
+sNtoC := NtoC(123);
+
+/* Array functions;
+nASize := ASize(arArray);
+ADel(arArray, 1);
+AIns(arArray, 1, "new");
+nAScan := AScan(arArray, "text");
+ASort(arArray);
+arCopy := ACopy(arArray);
+arClone := AClone(arArray);
+AEval(arArray, {|x| Upper(x)});
+AAdd(arArray, "new item");
+
+/* File functions;
+bExists := FileExists("test.txt");
+FileDelete("old.txt");
+FileCopy("source.txt", "dest.txt");
+FileMove("old.txt", "new.txt");
+nSize := FileSize("data.dat");
+dTime := FileTime("data.dat");
+bDirExists := DirExists("c:\temp");
+DirCreate("c:\temp\new");
+DirDelete("c:\temp\old");
+arFiles := GetFiles("c:\temp\*.txt");
+arDirs := GetDirs("c:\temp");
+
+/* Special functions;
+sValidate := Validate("validation_rule", "value");
+nIIF := IIF(bFlag, 1, 0);
+
+/* Test Hungarian notation variables;
+sName := "String variable";
+nCount := 42;
+bIsValid := .T.;
+arItems := {1, 2, 3};
+oObject := CreateUDObject();
+
+/* Test complex expressions;
+nComplex := (nValue + 10) * (nCount - 5) / 2 + nRand;
+bComplex := (bFlag .AND. (nValue > 10)) .OR. .NOT. bIsValid;
+
+/* Test dynamic code execution;
+ExecUDF("DynamicCode", {sText, nValue});
+
+/* endregion;

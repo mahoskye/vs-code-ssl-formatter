@@ -1,0 +1,106 @@
+/* region Test SSL Syntax Highlighting;
+
+:CLASS TestClass;
+:INHERIT BaseClass;
+
+:DECLARE sName, nCount, bIsValid, arItems, oObject;
+
+:PROCEDURE TestMethod;
+:PARAMETERS sInput, nValue;
+:DEFAULT sInput, "default";
+
+/* Initialize variables;
+sName := "Test String";
+nCount := 123;
+bIsValid := .T.;
+arItems := {1, 2.5, "text", .F., NIL};
+oObject := CreateUDObject("MyClass");
+
+/* Test number formats;
+nFloat := 123.456;
+nScientific := 1.23e5;
+nDate := {2024, 12, 23, 14, 30, 0};
+
+/* Test operators;
+nResult := nValue + 10;
+nResult += 5;
+bFlag := (nValue > 10) .AND. (sInput != "");
+
+/* Test SQL;
+arResults := SqlExecute("SELECT * FROM table WHERE id = ?id? AND name LIKE ?pattern?", {123, "%test%"});
+arSearch := LSearch("SELECT count(*) FROM users WHERE active = ?", 1);
+
+/* Test control structures;
+:IF bIsValid;
+    :FOR nI := 1 :TO Len(arItems);
+        :BEGINCASE;
+        :CASE arItems[nI] = 1;
+            /* First item;
+        :CASE arItems[nI] > 2;
+            /* Large item;
+        :OTHERWISE;
+            /* Default case;
+        :ENDCASE;
+    :NEXT;
+:ELSE;
+    :TRY;
+        DoProc("ProcessError", {sInput});
+    :CATCH;
+        /* Handle error;
+    :FINALLY;
+        /* Cleanup;
+    :ENDTRY;
+:ENDIF;
+
+/* Test property access;
+sProperty := oObject:PropertyName;
+nResult := oObject:MethodCall();
+
+/* Test array access;
+nItem := arItems[1];
+nMulti := arItems[1, 2];
+nChained := arItems[1][2];
+
+/* Test bitwise functions;
+nBitwise := _AND(255, 128);
+nOr := _OR(64, 32);
+nXor := _XOR(15, 7);
+nNot := _NOT(255);
+
+/* Test code blocks;
+fnLambda := {|x| x * x};
+
+/* Test built-in functions;
+nLength := Len(sName);
+sUpper := Upper(sName);
+dToday := Today();
+dNow := Now();
+nInt := Int(nFloat);
+nAbs := Abs(-10);
+
+/* Test file functions;
+bExists := FileExists("test.txt");
+nSize := FileSize("data.dat");
+
+/* Test array functions;
+nArraySize := ASize(arItems);
+AScan(arItems, {|x| x > 2});
+
+:RETURN .T.;
+:ENDPROC;
+
+/* Test branches and labels;
+:LABEL MyLabel;
+Branch("LABEL MyLabel");
+
+/* Test regions;
+:REGION DataProcessing;
+/* Processing code here;
+:ENDREGION;
+
+/* Test inline code;
+:BEGININLINECODE "TestCode";
+/* Inline code content;
+:ENDINLINECODE;
+
+/* endregion;

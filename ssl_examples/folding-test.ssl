@@ -1,0 +1,187 @@
+/* region SSL Folding Test File;
+/* This file tests all folding constructs supported by the SSL folding provider;
+
+/* Test 1: Basic keyword regions;
+:REGION BasicRegion;
+    :DECLARE sVariable;
+    sVariable := "test";
+:ENDREGION;
+
+/* Test 2: Comment regions;
+/* region Comment Region Test;
+    /* This should fold as a comment region;
+    :DECLARE sCommentTest;
+/* endregion;
+
+/* Test 3: Procedure definitions;
+:PROCEDURE TestProcedure;
+:PARAMETERS sInput, nValue;
+:DEFAULT sInput, "default", nValue, 0;
+    
+    :DECLARE sLocal;
+    sLocal := sInput;
+    
+    /* Test nested if within procedure;
+    :IF nValue > 0;
+        sLocal := sLocal + " positive";
+    :ELSE;
+        sLocal := sLocal + " negative or zero";
+    :ENDIF;
+    
+    :RETURN sLocal;
+:ENDPROC;
+
+/* Test 4: Class definition;
+:CLASS TestClass;
+:INHERIT BaseClass;
+
+    :DECLARE sClassName, nVersion;
+    
+    :PROCEDURE Initialize;
+    :PARAMETERS sName;
+        sClassName := sName;
+        nVersion := 1;
+    :ENDPROC;
+    
+    :PROCEDURE GetInfo;
+        :RETURN sClassName + " v" + Str(nVersion);
+    :ENDPROC;
+
+/* Test 5: Complex control structures;
+:DECLARE nCounter, arItems;
+arItems := {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+
+:FOR nI := 1 :TO Len(arItems);
+    :BEGINCASE;
+    :CASE arItems[nI] < 3;
+        /* Small numbers;
+        nCounter += 1;
+    :CASE arItems[nI] >= 3 .AND. arItems[nI] <= 7;
+        /* Medium numbers;
+        nCounter += 2;
+    :OTHERWISE;
+        /* Large numbers;
+        nCounter += 3;
+    :ENDCASE;
+:NEXT;
+
+/* Test 6: While loop with nested conditions;
+nCounter := 0;
+:WHILE nCounter < 10;
+    nCounter++;
+    
+    :IF nCounter = 5;
+        /* Skip 5;
+        :LOOP;
+    :ENDIF;
+    
+    :IF nCounter = 8;
+        :EXITWHILE;
+    :ENDIF;
+:ENDWHILE;
+
+/* Test 7: Error handling structures;
+:TRY;
+    /* Code that might fail;
+    nResult := 100 / nCounter;
+    
+    :IF nResult > 50;
+        /* Additional processing;
+        nResult := nResult * 2;
+    :ENDIF;
+:CATCH;
+    /* Error handling;
+    nResult := 0;
+    
+    :IF .T.;
+        /* Log error;
+        sError := "Division error occurred";
+    :ENDIF;
+:FINALLY;
+    /* Cleanup code;
+    nCounter := 0;
+    
+    :IF nResult = 0;
+        /* Reset state;
+        sError := "";
+    :ENDIF;
+:ENDTRY;
+
+/* Test 8: Legacy error handling;
+:ERROR;
+    /* Legacy error handling;
+    :RETURN .F.;
+
+/* Test 9: Inline code blocks;
+:BEGININLINECODE "TestCode";
+    /* This is inline code;
+    :DECLARE sInlineVar;
+    sInlineVar := "inline content";
+    
+    :IF .T.;
+        /* Nested structure in inline code;
+        sInlineVar := sInlineVar + " processed";
+    :ENDIF;
+:ENDINLINECODE;
+
+/* Test 10: Complex nested structure;
+:PROCEDURE ComplexTest;
+:PARAMETERS nLevel;
+    
+    :IF nLevel > 0;
+        :FOR nI := 1 :TO nLevel;
+            :BEGINCASE;
+            :CASE nI = 1;
+                :TRY;
+                    /* First level;
+                    nResult := nI * 10;
+                :CATCH;
+                    nResult := 0;
+                :ENDTRY;
+            :CASE nI = 2;
+                :WHILE nI < 5;
+                    :IF nI % 2 = 0;
+                        /* Even number;
+                        nI += 2;
+                    :ELSE;
+                        /* Odd number;
+                        nI += 1;
+                    :ENDIF;
+                :ENDWHILE;
+            :OTHERWISE;
+                /* Default case;
+                nResult := nI;
+            :ENDCASE;
+        :NEXT;
+    :ELSE;
+        /* Base case;
+        :RETURN 0;
+    :ENDIF;
+    
+    :RETURN nResult;
+:ENDPROC;
+
+/* Test 11: String handling edge cases;
+sStringTest1 := "This is a string with : and other chars";
+sStringTest2 := 'Single quote string with : and keywords like :IF';
+sStringTest3 := [Bracket string with :PROCEDURE and other keywords];
+
+/* Test 12: Multiple else conditions;
+:DECLARE bCondition1, bCondition2;
+bCondition1 := .T.;
+bCondition2 := .F.;
+
+:IF bCondition1;
+    /* First condition;
+    sResult := "condition1";
+:ELSE;
+    :IF bCondition2;
+        /* Second condition;
+        sResult := "condition2";
+    :ELSE;
+        /* Default condition;
+        sResult := "default";
+    :ENDIF;
+:ENDIF;
+
+/* endregion;

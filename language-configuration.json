@@ -25,8 +25,9 @@
     ],
     "folding": {
         "markers": {
-            "start": "^\\s*(:REGION|/\\*region|:PROCEDURE|:IF|:WHILE|:FOR|:BEGINCASE|:CLASS|:TRY|:BEGININLINECODE)\\b",
-            "end": "^\\s*(:ENDREGION|/\\*endregion|:ENDPROC|:ENDIF|:ENDWHILE|:NEXT|:ENDCASE|:ENDTRY|:ENDINLINECODE)\\b"
-        }
+            "start": "^\\s*(:REGION|/\\*\\s*region|:PROCEDURE|:CLASS|:IF|:WHILE|:FOR|:BEGINCASE|:TRY|:ERROR|:BEGININLINECODE|:CASE|:OTHERWISE|:ELSE|:CATCH|:FINALLY)\\b",
+            "end": "^\\s*(:ENDREGION|/\\*\\s*endregion|:ENDPROC|:ENDIF|:ENDWHILE|:NEXT|:ENDCASE|:ENDTRY|:ENDINLINECODE)\\b"
+        },
+        "offSide": true
     }
 }
