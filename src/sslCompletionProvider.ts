@@ -37,7 +37,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
     constructor() {
         this.loadCompletionItems();
         this.loadPrivateConfig();
-        this.createSnippets();
+        // this.createSnippets(); // Removed: Snippets are now loaded from configuration
         // Reload completion items when configuration changes
         vscode.workspace.onDidChangeConfiguration(this.onConfigurationChanged.bind(this));
     }
@@ -51,6 +51,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
         this.completionItems = [];
         this.keywordItems = [];
         this.functionItems = [];
+        this.snippetItems = []; // Initialize snippetItems
 
         for (const category in userCompletions) {
             const items = userCompletions[category];
@@ -64,6 +65,8 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
                         this.keywordItems.push(completionItem);
                     } else if (item.kind === "function") {
                         this.functionItems.push(completionItem);
+                    } else if (item.kind === "snippet") {
+                        this.snippetItems.push(completionItem); // Ensure snippets are added to snippetItems
                     }
                 });
             }
@@ -99,6 +102,9 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
                                 this.keywordItems.push(completionItem);
                             } else if (item.kind === "function") {
                                 this.functionItems.push(completionItem);
+                            } else if (item.kind === "snippet") {
+                                // Added: Handle snippets from private config
+                                this.snippetItems.push(completionItem);
                             }
                         });
                     }
@@ -107,92 +113,6 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
         } catch (error) {
             console.warn("Could not load private configuration:", error);
         }
-    }
-    /**
-     * Creates SSL-specific code snippets
-     */
-    private createSnippets() {
-        this.snippetItems = [];
-
-        // Common SSL patterns
-        const snippets = [
-            {
-                label: "if-else",
-                insertText:
-                    ":IF ${1:condition};\n\t${2:// true branch}\n:ELSE;\n\t${3:// false branch}\n:ENDIF;",
-                detail: "IF-ELSE statement",
-                documentation: "Creates an IF-ELSE conditional statement",
-            },
-            {
-                label: "while-loop",
-                insertText: ":WHILE ${1:condition};\n\t${2:// loop body}\n:ENDWHILE;",
-                detail: "WHILE loop",
-                documentation: "Creates a WHILE loop",
-            },
-            {
-                label: "for-loop",
-                insertText: ":FOR ${1:i} := ${2:1} :TO ${3:10};\n\t${4:// loop body}\n:NEXT;",
-                detail: "FOR loop",
-                documentation: "Creates a FOR loop",
-            },
-            {
-                label: "try-catch",
-                insertText:
-                    ":TRY;\n\t${1:// code that might throw}\n:CATCH;\n\t${2:// error handling}\n:ENDTRY;",
-                detail: "TRY-CATCH block",
-                documentation: "Creates a TRY-CATCH error handling block",
-            },
-            {
-                label: "procedure",
-                insertText:
-                    ":PROCEDURE ${1:ProcName};\n:PARAMETERS ${2:param1, param2};\n\t${3:// procedure body}\n:RETURN ${4:result};\n:ENDPROC;",
-                detail: "Procedure definition",
-                documentation: "Creates a procedure definition",
-            },
-            {
-                label: "case-switch",
-                insertText:
-                    ":BEGINCASE;\n:CASE ${1:condition1};\n\t${2:// case 1}\n:CASE ${3:condition2};\n\t${4:// case 2}\n:OTHERWISE;\n\t${5:// default case}\n:ENDCASE;",
-                detail: "CASE statement",
-                documentation: "Creates a CASE switch statement",
-            },
-            {
-                label: "declare-vars",
-                insertText: ":DECLARE ${1:variable1}, ${2:variable2};",
-                detail: "Variable declaration",
-                documentation: "Declares variables",
-            },
-            {
-                label: "class-definition",
-                insertText:
-                    ":CLASS ${1:ClassName};\n:INHERIT ${2:ParentClass};\n\n:DECLARE ${3:field1}, ${4:field2};\n\n:PROCEDURE ${5:MethodName};\n:PARAMETERS ${6:param1};\n\t${7:// method body}\n:RETURN ${8:result};\n:ENDPROC;",
-                detail: "Class definition",
-                documentation: "Creates a class definition with inheritance and methods",
-            },
-            {
-                label: "error-handling",
-                insertText: ":ERROR;\n\t${1:// error handling code}\n:RETURN ${2:result};",
-                detail: "Error handling block",
-                documentation: "Creates an error handling block",
-            },
-            {
-                label: "region",
-                insertText: ":REGION ${1:RegionName};\n\t${2:// code here}\n:ENDREGION;",
-                detail: "Code region",
-                documentation: "Creates a collapsible code region",
-            },
-        ];
-
-        snippets.forEach((snippet) => {
-            const item = new vscode.CompletionItem(
-                snippet.label,
-                vscode.CompletionItemKind.Snippet
-            );
-            item.insertText = new vscode.SnippetString(snippet.insertText);
-            item.detail = snippet.detail;
-            item.documentation = new vscode.MarkdownString(snippet.documentation);
-            this.snippetItems.push(item);
-        });
     }
 
     /**
