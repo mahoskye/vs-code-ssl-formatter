@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { SSLFoldingProvider } from "./sslFoldingProvider";
 import { SSLCompletionProvider } from "./sslCompletionProvider";
 import { SSLHoverProvider } from "./sslHoverProvider";
-import { SSLFormatter } from "./sslFormatter";
+import { SSLFormatter } from "../src_old/sslFormatter";
 
 /**
  * This function is called when the extension is activated.

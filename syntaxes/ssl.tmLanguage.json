@@ -2,30 +2,23 @@
     "name": "STARLIMS Scripting Language",
     "scopeName": "source.ssl",
     "patterns": [
-        { "include": "#keywords" },
-        { "include": "#strings" },
         { "include": "#comments" },
-        { "include": "#functions" },
+        { "include": "#strings" },
+        { "include": "#code-blocks" },
         { "include": "#arrays" },
-        { "include": "#built-in-literals" },
         { "include": "#numbers" },
+        { "include": "#built-in-literals" },
+        { "include": "#keywords" },
+        { "include": "#functions" },
+        { "include": "#method-calls" },
+        { "include": "#property-access" },
         { "include": "#operators" },
         { "include": "#logical-operators" },
         { "include": "#comparison-operators" },
         { "include": "#assignment-operators" },
         { "include": "#increment-operators" },
         { "include": "#unary-operators" },
-        { "include": "#property-access" },
-        { "include": "#method-calls" },
         { "include": "#indexers" },
-        { "include": "#sql-statements" },
-        { "include": "#bitwise-functions" },
-        { "include": "#code-blocks" },
-        { "include": "#date-literals" },
-        { "include": "#region-markers" },
-        { "include": "#dynamic-code" },
-        { "include": "#object-operations" },
-        { "include": "#branching" },
         { "include": "#variables" }
     ],
     "repository": {
@@ -33,39 +26,39 @@
             "patterns": [
                 {
                     "name": "keyword.control.conditional.ssl",
-                    "match": "(?<!\\w)(:IF|:ELSE|:ENDIF)\\b"
+                    "match": "(?i)(?<!\\w)(:IF|:ELSE|:ENDIF)\\b"
                 },
                 {
                     "name": "keyword.control.loop.ssl",
-                    "match": "(?<!\\w)(:WHILE|:ENDWHILE|:EXITWHILE|:FOR|:TO|:NEXT|:EXITFOR|:LOOP)\\b"
+                    "match": "(?i)(?<!\\w)(:WHILE|:ENDWHILE|:EXITWHILE|:FOR|:TO|:NEXT|:EXITFOR|:LOOP)\\b"
                 },
                 {
                     "name": "keyword.control.case.ssl",
-                    "match": "(?<!\\w)(:BEGINCASE|:CASE|:OTHERWISE|:EXITCASE|:ENDCASE)\\b"
+                    "match": "(?i)(?<!\\w)(:BEGINCASE|:CASE|:OTHERWISE|:EXITCASE|:ENDCASE)\\b"
                 },
                 {
                     "name": "keyword.control.exception.ssl",
-                    "match": "(?<!\\w)(:TRY|:CATCH|:FINALLY|:ENDTRY|:ERROR)\\b"
+                    "match": "(?i)(?<!\\w)(:TRY|:CATCH|:FINALLY|:ENDTRY|:ERROR)\\b"
                 },
                 {
                     "name": "keyword.control.flow.ssl",
-                    "match": "(?<!\\w)(:RETURN|:LABEL)\\b"
+                    "match": "(?i)(?<!\\w)(:RETURN|:LABEL)\\b"
                 },
                 {
                     "name": "keyword.declaration.ssl",
-                    "match": "(?<!\\w)(:DECLARE|:PARAMETERS|:DEFAULT|:PUBLIC|:INCLUDE)\\b"
+                    "match": "(?i)(?<!\\w)(:DECLARE|:PARAMETERS|:DEFAULT|:PUBLIC|:INCLUDE)\\b"
                 },
                 {
                     "name": "keyword.procedure.ssl",
-                    "match": "(?<!\\w)(:PROCEDURE|:ENDPROC)\\b"
+                    "match": "(?i)(?<!\\w)(:PROCEDURE|:ENDPROC)\\b"
                 },
                 {
                     "name": "keyword.class.ssl",
-                    "match": "(?<!\\w)(:CLASS|:INHERIT)\\b"
+                    "match": "(?i)(?<!\\w)(:CLASS|:INHERIT)\\b"
                 },
                 {
                     "name": "keyword.region.ssl",
-                    "match": "(?<!\\w)(:REGION|:ENDREGION|:BEGININLINECODE|:ENDINLINECODE)\\b"
+                    "match": "(?i)(?<!\\w)(:REGION|:ENDREGION|:BEGININLINECODE|:ENDINLINECODE)\\b"
                 }
             ]
         },
@@ -75,29 +68,37 @@
                     "name": "string.quoted.double.ssl",
                     "begin": "\"",
                     "end": "\"",
-                    "patterns": [
-                        {
-                            "name": "constant.character.escape.ssl",
-                            "match": "\\\\."
-                        }
-                    ]
+                    "patterns": [{ "include": "#sql-parameters-internal" }]
                 },
                 {
                     "name": "string.quoted.single.ssl",
                     "begin": "'",
                     "end": "'",
-                    "patterns": [
-                        {
-                            "name": "constant.character.escape.ssl",
-                            "match": "\\\\."
-                        }
-                    ]
+                    "patterns": [{ "include": "#sql-parameters-internal" }]
                 },
                 {
                     "name": "string.quoted.bracket.ssl",
                     "begin": "\\[",
                     "end": "\\]",
-                    "contentName": "string.quoted.bracket.content.ssl"
+                    "contentName": "string.quoted.bracket.content.ssl",
+                    "patterns": [{ "include": "#sql-parameters-internal" }]
+                }
+            ]
+        },
+        "sql-parameters-internal": {
+            "patterns": [
+                {
+                    "name": "meta.sql-parameter.named.ssl",
+                    "match": "(\\?)([a-zA-Z_][a-zA-Z0-9_]*)(\\?)",
+                    "captures": {
+                        "1": { "name": "punctuation.definition.sql-parameter.begin.ssl" },
+                        "2": { "name": "variable.parameter.sql.ssl" },
+                        "3": { "name": "punctuation.definition.sql-parameter.end.ssl" }
+                    }
+                },
+                {
+                    "name": "constant.character.sql.parameter.placeholder.ssl",
+                    "match": "(?<![a-zA-Z0-9_\\?])\\?(?![a-zA-Z0-9_\\?])"
                 }
             ]
         },
@@ -105,7 +106,7 @@
             "patterns": [
                 {
                     "name": "comment.block.region.ssl",
-                    "begin": "/\\*\\s*(region|endregion)\\b",
+                    "begin": "(?i)/\\*\\s*(region|endregion)\\b",
                     "end": ";",
                     "beginCaptures": {
                         "0": { "name": "punctuation.definition.comment.begin.ssl" },
@@ -113,13 +114,7 @@
                     },
                     "endCaptures": {
                         "0": { "name": "punctuation.definition.comment.end.ssl" }
-                    },
-                    "patterns": [
-                        {
-                            "name": "entity.name.section.ssl",
-                            "match": "[^;]*"
-                        }
-                    ]
+                    }
                 },
                 {
                     "name": "comment.block.ssl",
@@ -130,13 +125,7 @@
                     },
                     "endCaptures": {
                         "0": { "name": "punctuation.definition.comment.end.ssl" }
-                    },
-                    "patterns": [
-                        {
-                            "name": "comment.block.content.ssl",
-                            "match": "[^;]*"
-                        }
-                    ]
+                    }
                 }
             ]
         },
@@ -144,58 +133,65 @@
             "patterns": [
                 {
                     "name": "support.function.special.ssl",
-                    "match": "\\b(DoProc|ExecFunction|ExecUDF|Branch)(?=\\s*\\()",
+                    "match": "(?i)\\b(DoProc|ExecFunction|ExecUDF|Branch)(?=\\s*\\()",
                     "captures": {
-                        "1": { "name": "entity.name.function.special.ssl" }
+                        "1": { "name": "support.function.name.ssl" }
                     }
                 },
                 {
                     "name": "support.function.database.ssl",
-                    "match": "\\b(SqlExecute|LSearch)(?=\\s*\\()",
+                    "match": "(?i)\\b(SqlExecute|LSearch)(?=\\s*\\()",
                     "captures": {
-                        "1": { "name": "entity.name.function.database.ssl" }
+                        "1": { "name": "support.function.name.ssl" }
                     }
                 },
                 {
                     "name": "support.function.object.ssl",
-                    "match": "\\b(CreateUDObject)(?=\\s*\\()",
+                    "match": "(?i)\\b(CreateUDObject)(?=\\s*\\()",
                     "captures": {
-                        "1": { "name": "entity.name.function.object.ssl" }
+                        "1": { "name": "support.function.name.ssl" }
+                    }
+                },
+                {
+                    "name": "support.function.bitwise.ssl",
+                    "match": "(?i)\\b(_AND|_OR|_NOT|_XOR)(?=\\s*\\()",
+                    "captures": {
+                        "1": { "name": "support.function.name.ssl" }
                     }
                 },
                 {
                     "name": "support.function.builtin.ssl",
-                    "match": "\\b(Len|CtoD|Today|Now|Upper|Lower|Left|Right|Mid|Trim|Val|Str|IsNil|Type|Empty|DtoC|CtoN|NtoC|Time|Year|Month|Day|Hour|Minute|Second|Chr|Asc|InStr|SubStr|Replace|LimsString|Date|Validate|IIF)(?=\\s*\\()",
+                    "match": "(?i)\\b(Len|CtoD|Today|Now|Upper|Lower|Left|Right|Mid|Trim|Val|Str|IsNil|Type|Empty|DtoC|CtoN|NtoC|Time|Year|Month|Day|Hour|Minute|Second|Chr|Asc|InStr|SubStr|Replace|LimsString|Date|Validate|IIF)(?=\\s*\\()",
                     "captures": {
-                        "1": { "name": "entity.name.function.builtin.ssl" }
+                        "1": { "name": "support.function.name.ssl" }
                     }
                 },
                 {
                     "name": "support.function.math.ssl",
-                    "match": "\\b(Int|Round|Abs|Max|Min|Mod|Sqrt|Power|Log|Exp|Sin|Cos|Tan|ASin|ACos|ATan|ATan2|Ceiling|Floor|Rand|RandSeed)(?=\\s*\\()",
+                    "match": "(?i)\\b(Int|Round|Abs|Max|Min|Mod|Sqrt|Power|Log|Exp|Sin|Cos|Tan|ASin|ACos|ATan|ATan2|Ceiling|Floor|Rand|RandSeed)(?=\\s*\\()",
                     "captures": {
-                        "1": { "name": "entity.name.function.math.ssl" }
+                        "1": { "name": "support.function.name.ssl" }
                     }
                 },
                 {
                     "name": "support.function.array.ssl",
-                    "match": "\\b(ASize|ADel|AIns|AScan|ASort|ACopy|AClone|AEval|AAdd)(?=\\s*\\()",
+                    "match": "(?i)\\b(ASize|ADel|AIns|AScan|ASort|ACopy|AClone|AEval|AAdd)(?=\\s*\\()",
                     "captures": {
-                        "1": { "name": "entity.name.function.array.ssl" }
+                        "1": { "name": "support.function.name.ssl" }
                     }
                 },
                 {
                     "name": "support.function.file.ssl",
-                    "match": "\\b(FileExists|FileDelete|FileCopy|FileMove|FileSize|FileTime|DirExists|DirCreate|DirDelete|GetFiles|GetDirs)(?=\\s*\\()",
+                    "match": "(?i)\\b(FileExists|FileDelete|FileCopy|FileMove|FileSize|FileTime|DirExists|DirCreate|DirDelete|GetFiles|GetDirs)(?=\\s*\\()",
                     "captures": {
-                        "1": { "name": "entity.name.function.file.ssl" }
+                        "1": { "name": "support.function.name.ssl" }
                     }
                 },
                 {
-                    "name": "support.function.general.ssl",
+                    "name": "meta.function-call.general.ssl",
                     "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\()",
                     "captures": {
-                        "1": { "name": "entity.name.function.ssl" }
+                        "1": { "name": "support.function.name.general.ssl" }
                     }
                 }
             ]
@@ -203,33 +199,12 @@
         "arrays": {
             "patterns": [
                 {
-                    "name": "meta.array.ssl",
+                    "name": "meta.array.literal.ssl",
                     "begin": "\\{",
                     "end": "\\}",
-                    "beginCaptures": {
-                        "0": { "name": "punctuation.definition.array.begin.ssl" }
-                    },
-                    "endCaptures": {
-                        "0": { "name": "punctuation.definition.array.end.ssl" }
-                    },
-                    "patterns": [
-                        { "include": "#arrays" },
-                        { "include": "#strings" },
-                        { "include": "#numbers" },
-                        { "include": "#built-in-literals" },
-                        { "include": "#functions" },
-                        { "include": "#property-access" },
-                        { "include": "#method-calls" },
-                        { "include": "#operators" },
-                        { "include": "#logical-operators" },
-                        { "include": "#comparison-operators" },
-                        { "include": "#variables" },
-                        { "include": "#code-blocks" },
-                        {
-                            "name": "punctuation.separator.array.ssl",
-                            "match": ","
-                        }
-                    ]
+                    "beginCaptures": { "0": { "name": "punctuation.definition.array.begin.ssl" } },
+                    "endCaptures": { "0": { "name": "punctuation.definition.array.end.ssl" } },
+                    "patterns": [{ "include": "$self" }]
                 }
             ]
         },
@@ -237,18 +212,15 @@
             "patterns": [
                 {
                     "name": "constant.language.boolean.true.ssl",
-                    "match": "(?<!\\w)\\.T\\.(?!\\w)"
+                    "match": "(?i)(?<!\\w)\\.T\\.(?!\\w)"
                 },
                 {
                     "name": "constant.language.boolean.false.ssl",
-                    "match": "(?<!\\w)\\.F\\.(?!\\w)"
+                    "match": "(?i)(?<!\\w)\\.F\\.(?!\\w)"
                 },
                 {
                     "name": "constant.language.nil.ssl",
-                    "match": "\\bNIL\\b",
-                    "captures": {
-                        "0": { "name": "constant.language.null.ssl" }
-                    }
+                    "match": "(?i)\\bNIL\\b"
                 }
             ]
         },
@@ -260,7 +232,7 @@
                 },
                 {
                     "name": "constant.numeric.decimal.ssl",
-                    "match": "\\b([0-9]*\\.[0-9]+)\\b"
+                    "match": "\\b([0-9]+\\.[0-9]+)\\b"
                 },
                 {
                     "name": "constant.numeric.integer.ssl",
@@ -272,15 +244,31 @@
             "patterns": [
                 {
                     "name": "keyword.operator.arithmetic.ssl",
-                    "match": "(\\+|\\-|\\*|\\/|\\%|\\^)"
+                    "match": "(\\+|\\-|\\*|\\/|%|\\^)"
                 },
                 {
-                    "name": "keyword.operator.logical.ssl",
-                    "match": "(!)"
+                    "name": "punctuation.accessor.ssl",
+                    "match": ":"
                 },
                 {
-                    "name": "punctuation.definition.ssl",
-                    "match": "(\\.|\\:|;|,|\\(|\\)|\\[|\\]|\\{|\\})"
+                    "name": "punctuation.terminator.statement.ssl",
+                    "match": ";"
+                },
+                {
+                    "name": "punctuation.separator.comma.ssl",
+                    "match": ","
+                },
+                {
+                    "name": "punctuation.definition.parameters.begin.ssl",
+                    "match": "\\("
+                },
+                {
+                    "name": "punctuation.definition.parameters.end.ssl",
+                    "match": "\\)"
+                },
+                {
+                    "name": "punctuation.definition.dot.ssl",
+                    "match": "\\."
                 }
             ]
         },
@@ -288,15 +276,15 @@
             "patterns": [
                 {
                     "name": "keyword.operator.logical.and.ssl",
-                    "match": "\\b\\.AND\\.\\b"
+                    "match": "(?i)\\b\\.AND\\.\\b"
                 },
                 {
                     "name": "keyword.operator.logical.or.ssl",
-                    "match": "\\b\\.OR\\.\\b"
+                    "match": "(?i)\\b\\.OR\\.\\b"
                 },
                 {
                     "name": "keyword.operator.logical.not.ssl",
-                    "match": "\\b\\.NOT\\.\\b"
+                    "match": "(?i)\\b\\.NOT\\.\\b"
                 }
             ]
         },
@@ -308,7 +296,7 @@
                 },
                 {
                     "name": "keyword.operator.comparison.inequality.ssl",
-                    "match": "(!=|<>)"
+                    "match": "(!=)"
                 },
                 {
                     "name": "keyword.operator.comparison.relational.ssl",
@@ -336,11 +324,7 @@
             "patterns": [
                 {
                     "name": "keyword.operator.unary.ssl",
-                    "match": "(?<![a-zA-Z0-9_])(-|\\+|!)(?![=])"
-                },
-                {
-                    "name": "keyword.operator.logical.not.ssl",
-                    "match": "\\b\\.NOT\\.\\b"
+                    "match": "(?<![a-zA-Z0-9_.:])(-|\\+|!)(?![=])"
                 }
             ]
         },
@@ -348,10 +332,11 @@
             "patterns": [
                 {
                     "name": "meta.property-access.ssl",
-                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*):([a-zA-Z_][a-zA-Z0-9_]*)\\b(?!\\s*\\()",
+                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)(:)([a-zA-Z_][a-zA-Z0-9_]*)\\b(?!\\s*\\()",
                     "captures": {
-                        "1": { "name": "variable.other.object.ssl" },
-                        "2": { "name": "variable.other.property.ssl" }
+                        "1": { "name": "variable.object.ssl" },
+                        "2": { "name": "punctuation.accessor.ssl" },
+                        "3": { "name": "variable.property.ssl" }
                     }
                 }
             ]
@@ -360,10 +345,11 @@
             "patterns": [
                 {
                     "name": "meta.method-call.ssl",
-                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*):([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\()",
+                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)(:)([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\()",
                     "captures": {
-                        "1": { "name": "variable.other.object.ssl" },
-                        "2": { "name": "entity.name.function.method.ssl" }
+                        "1": { "name": "variable.object.ssl" },
+                        "2": { "name": "punctuation.accessor.ssl" },
+                        "3": { "name": "support.function.method.ssl" }
                     }
                 }
             ]
@@ -371,74 +357,14 @@
         "indexers": {
             "patterns": [
                 {
-                    "name": "meta.indexer.ssl",
+                    "name": "meta.array.access.ssl",
                     "begin": "\\[",
                     "end": "\\]",
                     "beginCaptures": {
-                        "0": { "name": "punctuation.squarebracket.open.ssl" }
+                        "0": { "name": "punctuation.definition.indexer.begin.ssl" }
                     },
-                    "endCaptures": {
-                        "0": { "name": "punctuation.squarebracket.close.ssl" }
-                    },
-                    "patterns": [
-                        { "include": "#numbers" },
-                        { "include": "#variables" },
-                        { "include": "#strings" },
-                        { "include": "#functions" },
-                        {
-                            "name": "punctuation.separator.array.ssl",
-                            "match": ","
-                        }
-                    ]
-                }
-            ]
-        },
-        "sql-statements": {
-            "patterns": [
-                {
-                    "name": "meta.sql-parameter.ssl",
-                    "match": "(\\?)([a-zA-Z_][a-zA-Z0-9_]*)(\\?)",
-                    "captures": {
-                        "1": { "name": "constant.character.sql.parameter.delimiter.ssl" },
-                        "2": { "name": "variable.parameter.sql.ssl" },
-                        "3": { "name": "constant.character.sql.parameter.delimiter.ssl" }
-                    }
-                },
-                {
-                    "name": "constant.character.sql.parameter.placeholder.ssl",
-                    "match": "(?<!\\?)\\?(?!\\?)",
-                    "captures": {
-                        "0": { "name": "constant.character.sql.placeholder.ssl" }
-                    }
-                },
-                {
-                    "name": "string.quoted.sql.embedded.ssl",
-                    "begin": "(?i)(SqlExecute|LSearch)\\s*\\(\\s*\"",
-                    "end": "\"",
-                    "beginCaptures": {
-                        "0": { "name": "string.quoted.double.sql.begin.ssl" }
-                    },
-                    "endCaptures": {
-                        "0": { "name": "string.quoted.double.sql.end.ssl" }
-                    },
-                    "patterns": [
-                        {
-                            "name": "keyword.other.sql.ssl",
-                            "match": "(?i)\\b(SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|JOIN|INNER|LEFT|RIGHT|ORDER|BY|GROUP|HAVING|DISTINCT|COUNT|SUM|AVG|MIN|MAX|AND|OR|NOT|IS|NULL|LIKE|IN|EXISTS|BETWEEN|UNION|CREATE|DROP|ALTER|TABLE|DATABASE|INDEX|VIEW|PROCEDURE|FUNCTION)\\b"
-                        },
-                        { "include": "#sql-statements" }
-                    ]
-                }
-            ]
-        },
-        "bitwise-functions": {
-            "patterns": [
-                {
-                    "name": "support.function.bitwise.ssl",
-                    "match": "\\b(_AND|_OR|_XOR|_NOT)(?=\\s*\\()",
-                    "captures": {
-                        "1": { "name": "entity.name.function.bitwise.ssl" }
-                    }
+                    "endCaptures": { "0": { "name": "punctuation.definition.indexer.end.ssl" } },
+                    "patterns": [{ "include": "$self" }]
                 }
             ]
         },
@@ -446,129 +372,44 @@
             "patterns": [
                 {
                     "name": "meta.code-block.literal.ssl",
-                    "begin": "\\{\\|",
-                    "end": "\\|\\}",
+                    "begin": "(\\{\\|)",
+                    "end": "(\\})",
                     "beginCaptures": {
-                        "0": { "name": "punctuation.definition.code-block.begin.ssl" }
+                        "1": { "name": "punctuation.definition.code-block.begin.ssl" }
                     },
                     "endCaptures": {
-                        "0": { "name": "punctuation.definition.code-block.end.ssl" }
+                        "1": { "name": "punctuation.definition.code-block.end.ssl" }
                     },
                     "patterns": [
-                        { "include": "#variables" },
-                        { "include": "#operators" },
-                        { "include": "#logical-operators" },
-                        { "include": "#comparison-operators" },
-                        { "include": "#arithmetic-operators" },
-                        { "include": "#numbers" },
-                        { "include": "#strings" },
-                        { "include": "#functions" },
-                        { "include": "#property-access" },
-                        { "include": "#method-calls" },
                         {
-                            "name": "punctuation.separator.parameters.ssl",
-                            "match": "\\|"
+                            "begin": "(?<=^\\{\\|)\\s*",
+                            "end": "\\|",
+                            "endCaptures": {
+                                "0": { "name": "punctuation.separator.code-block.parameters.ssl" }
+                            },
+                            "patterns": [
+                                {
+                                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b",
+                                    "name": "variable.parameter.code-block.ssl"
+                                },
+                                { "match": ",", "name": "punctuation.separator.comma.ssl" },
+                                { "include": "$self" }
+                            ]
+                        },
+                        {
+                            "begin": "(?<=\\|)",
+                            "end": "(?=\\})",
+                            "patterns": [{ "include": "$self" }]
                         }
                     ]
-                }
-            ]
-        },
-        "date-literals": {
-            "patterns": [
-                {
-                    "name": "constant.other.date.ssl",
-                    "match": "\\{\\s*[0-9]{1,4}\\s*,\\s*[0-9]{1,2}\\s*,\\s*[0-9]{1,2}(?:\\s*,\\s*[0-9]{1,2}\\s*,\\s*[0-9]{1,2}\\s*,\\s*[0-9]{1,2})?\\s*\\}",
-                    "captures": {
-                        "0": { "name": "constant.other.date.literal.ssl" }
-                    }
-                }
-            ]
-        },
-        "region-markers": {
-            "patterns": [
-                {
-                    "name": "meta.region.ssl",
-                    "match": "(:REGION|:ENDREGION)\\s+([a-zA-Z_][a-zA-Z0-9_\\s]*)",
-                    "captures": {
-                        "1": { "name": "keyword.region.ssl" },
-                        "2": { "name": "entity.name.section.ssl" }
-                    }
                 }
             ]
         },
         "variables": {
             "patterns": [
                 {
-                    "name": "variable.other.string.ssl",
-                    "match": "\\b([sS][A-Z][a-zA-Z0-9_]*)\\b",
-                    "captures": {
-                        "1": { "name": "variable.other.string.hungarian.ssl" }
-                    }
-                },
-                {
-                    "name": "variable.other.number.ssl",
-                    "match": "\\b([nN][A-Z][a-zA-Z0-9_]*)\\b",
-                    "captures": {
-                        "1": { "name": "variable.other.number.hungarian.ssl" }
-                    }
-                },
-                {
-                    "name": "variable.other.boolean.ssl",
-                    "match": "\\b([bB][A-Z][a-zA-Z0-9_]*)\\b",
-                    "captures": {
-                        "1": { "name": "variable.other.boolean.hungarian.ssl" }
-                    }
-                },
-                {
-                    "name": "variable.other.array.ssl",
-                    "match": "\\b([aA][rR][A-Z][a-zA-Z0-9_]*)\\b",
-                    "captures": {
-                        "1": { "name": "variable.other.array.hungarian.ssl" }
-                    }
-                },
-                {
-                    "name": "variable.other.object.ssl",
-                    "match": "\\b([oO][A-Z][a-zA-Z0-9_]*)\\b",
-                    "captures": {
-                        "1": { "name": "variable.other.object.hungarian.ssl" }
-                    }
-                },
-                {
                     "name": "variable.other.ssl",
-                    "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
-                }
-            ]
-        },
-        "dynamic-code": {
-            "patterns": [
-                {
-                    "name": "support.function.dynamic.ssl",
-                    "match": "\\b(ExecUDF)(?=\\s*\\()",
-                    "captures": {
-                        "1": { "name": "entity.name.function.dynamic.ssl" }
-                    }
-                }
-            ]
-        },
-        "object-operations": {
-            "patterns": [
-                {
-                    "name": "support.function.object.creation.ssl",
-                    "match": "\\b(CreateUDObject)(?=\\s*\\()",
-                    "captures": {
-                        "1": { "name": "entity.name.function.object.ssl" }
-                    }
-                }
-            ]
-        },
-        "branching": {
-            "patterns": [
-                {
-                    "name": "support.function.control.ssl",
-                    "match": "\\b(Branch)(?=\\s*\\()",
-                    "captures": {
-                        "1": { "name": "entity.name.function.control.ssl" }
-                    }
+                    "match": "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b"
                 }
             ]
         }

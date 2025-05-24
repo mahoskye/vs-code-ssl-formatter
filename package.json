@@ -89,42 +89,42 @@
                                 {
                                     "label": "if-else",
                                     "kind": "snippet",
-                                    "insertText": ":IF ${1:condition};\\n\\t${2:// true branch}\\n:ELSE;\\n\\t${3:// false branch}\\n:ENDIF;",
+                                    "insertText": ":IF ${1:condition};\n\t${2:/* true branch;}\n:ELSE;\n\t${3:/* false branch;}\n:ENDIF;",
                                     "detail": "IF-ELSE statement",
                                     "documentation": "Creates an IF-ELSE conditional statement"
                                 },
                                 {
                                     "label": "while-loop",
                                     "kind": "snippet",
-                                    "insertText": ":WHILE ${1:condition};\\n\\t${2:// loop body}\\n:ENDWHILE;",
+                                    "insertText": ":WHILE ${1:condition};\n\t${2:/* loop body;}\n:ENDWHILE;",
                                     "detail": "WHILE loop",
                                     "documentation": "Creates a WHILE loop"
                                 },
                                 {
                                     "label": "for-loop",
                                     "kind": "snippet",
-                                    "insertText": ":FOR ${1:i} := ${2:1} :TO ${3:10};\\n\\t${4:// loop body}\\n:NEXT;",
+                                    "insertText": ":FOR ${1:i} := ${2:1} :TO ${3:10};\n\t${4:/* loop body;}\n:NEXT;",
                                     "detail": "FOR loop",
                                     "documentation": "Creates a FOR loop"
                                 },
                                 {
                                     "label": "try-catch",
                                     "kind": "snippet",
-                                    "insertText": ":TRY;\\n\\t${1:// code that might throw}\\n:CATCH;\\n\\t${2:// error handling}\\n:ENDTRY;",
+                                    "insertText": ":TRY;\n\t${1:/* code that might throw;}\n:CATCH;\n\t${2:/* error handling;}\n:ENDTRY;",
                                     "detail": "TRY-CATCH block",
                                     "documentation": "Creates a TRY-CATCH error handling block"
                                 },
                                 {
                                     "label": "procedure",
                                     "kind": "snippet",
-                                    "insertText": ":PROCEDURE ${1:ProcName};\\n:PARAMETERS ${2:param1, param2};\\n\\t${3:// procedure body}\\n:RETURN ${4:result};\\n:ENDPROC;",
+                                    "insertText": ":PROCEDURE ${1:ProcName};\n:PARAMETERS ${2:param1, param2};\n\t/* ${3:procedure body};\n:RETURN ${4:result};\n:ENDPROC;",
                                     "detail": "Procedure definition",
                                     "documentation": "Creates a procedure definition"
                                 },
                                 {
                                     "label": "case-switch",
                                     "kind": "snippet",
-                                    "insertText": ":BEGINCASE;\\n:CASE ${1:condition1};\\n\\t${2:// case 1}\\n:CASE ${3:condition2};\\n\\t${4:// case 2}\\n:OTHERWISE;\\n\\t${5:// default case}\\n:ENDCASE;",
+                                    "insertText": ":BEGINCASE;\n:CASE ${1:condition1};\n\t${2:/* case 1;}\n:CASE ${3:condition2};\n\t${4:/* case 2;}\n:OTHERWISE;\n\t${5:/* default case;}\n:ENDCASE;",
                                     "detail": "CASE statement",
                                     "documentation": "Creates a CASE switch statement"
                                 },
@@ -138,21 +138,21 @@
                                 {
                                     "label": "class-definition",
                                     "kind": "snippet",
-                                    "insertText": ":CLASS ${1:ClassName};\\n:INHERIT ${2:ParentClass};\\n\\n:DECLARE ${3:field1}, ${4:field2};\\n\\n:PROCEDURE ${5:MethodName};\\n:PARAMETERS ${6:param1};\\n\\t${7:// method body}\\n:RETURN ${8:result};\\n:ENDPROC;",
+                                    "insertText": ":CLASS ${1:ClassName};\n:INHERIT ${2:ParentClass};\n\n:DECLARE ${3:field1}, ${4:field2};\n\n:PROCEDURE ${5:MethodName};\n:PARAMETERS ${6:param1};\n\t${7:/* method body;}\n:RETURN ${8:result};\n:ENDPROC;",
                                     "detail": "Class definition",
                                     "documentation": "Creates a class definition with inheritance and methods"
                                 },
                                 {
                                     "label": "error-handling",
                                     "kind": "snippet",
-                                    "insertText": ":ERROR;\\n\\t${1:// error handling code}\\n:RETURN ${2:result};",
+                                    "insertText": ":ERROR;\n\t${1:/* error handling code;}\n:RETURN ${2:result};",
                                     "detail": "Error handling block",
                                     "documentation": "Creates an error handling block"
                                 },
                                 {
                                     "label": "region",
                                     "kind": "snippet",
-                                    "insertText": ":REGION ${1:RegionName};\\n\\t${2:// code here}\\n:ENDREGION;",
+                                    "insertText": "/* region ${1:RegionName};\n\t${2:/* code here;}\n/* endregion;",
                                     "detail": "Code region",
                                     "documentation": "Creates a collapsible code region"
                                 }
