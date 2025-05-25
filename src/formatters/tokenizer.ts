@@ -280,7 +280,8 @@ export class SSLTokenizer {
         let tokenStartLine = this.line;
         let tokenStartColumn = this.column;
 
-        const char = this.advance(); // Consumes current char and moves position forward        // If the character just advanced was a newline, then the token itself is the newline.
+        const char = this.advance(); // Consumes current char and moves position forward
+        // If the character just advanced was a newline, then the token itself is the newline.
         // Its starting position was correct. The main line/column update for the *next* token
         // happens in the switch cases for '\n' and '\r'.
 
@@ -290,7 +291,7 @@ export class SSLTokenizer {
             return;
         }
 
-        if (char === '\\"' || char === "'") {
+        if (char === '"' || char === "'") {
             this.startString(char, tokenStartLine, tokenStartColumn, tokenStartOffset);
             return;
         }
