@@ -66,11 +66,6 @@ The SSL completion provider has been thoroughly reviewed and updated based on th
 6. **Operators**: All operators defined in the EBNF are included
 7. **Literals**: Boolean, string, numeric, array, and special literals
 
-### Notable Corrections
-
--   **Removed `:STEP` reference**: Confirmed `:STEP` is not valid in SSL v11 (already corrected in EBNF)
--   **Proper FOR loop syntax**: `:FOR variable := start :TO end` (no `:STEP` clause)
-
 ## Testing and Validation
 
 ### Test Coverage

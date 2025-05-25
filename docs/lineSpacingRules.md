@@ -85,8 +85,6 @@ ERROR BLOCK SPACING:
 
 1. Two blank lines before `:ERROR` block
 2. One blank line after `:ERROR` declaration
-3. One blank line before `:RESUME`
-4. One blank line after `:RESUME`
 
 REGION SPACING:
 

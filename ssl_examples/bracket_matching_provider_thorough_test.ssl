@@ -1,0 +1,152 @@
+/* SSL Bracket Matching Provider Thorough Test File;
+
+/* Test 1: Basic Procedure;
+:PROCEDURE BasicProc;
+    /* Cursor here, should highlight :PROCEDURE and :ENDPROC;
+:ENDPROC;
+
+/* Test 2: Nested IF/ELSEIF/ELSE;
+:PROCEDURE NestedIfTest; :PARAMETERS condition1, condition2;
+    :IF condition1;
+        /* Cursor in IF, highlights :IF/:ENDIF;
+        :IF condition2;
+            /* Cursor in nested IF, highlights inner :IF/:ENDIF;
+        :ELSE;
+            /* Cursor in nested ELSE, highlights inner :IF/:ENDIF;
+        :ENDIF;
+    :ELSE;
+        /* Cursor in ELSE, highlights outer :IF/:ENDIF;
+    :ENDIF;
+:ENDPROC;
+
+/* Test 3: WHILE and FOR Loops;
+:PROCEDURE LoopTest; :DECLARE i, count;
+    count := 0;
+    :WHILE count < 10;
+        /* Cursor in WHILE, highlights :WHILE/:ENDWHILE;
+        count++;
+        :FOR i := 1 :TO 5;
+            /* Cursor in FOR, highlights :FOR/:NEXT;
+            :IF i == 3;
+                /* Cursor in IF, highlights :IF/:ENDIF;
+                :EXITFOR;
+            :ENDIF;
+        :NEXT;
+        :IF count == 5;
+            :EXITWHILE;
+        :ENDIF;
+    :ENDWHILE;
+:ENDPROC;
+
+/* Test 4: BEGINCASE/CASE/OTHERWISE/ENDCASE;
+:PROCEDURE CaseTest; :PARAMETERS value;
+    :BEGINCASE;
+        /* Cursor in BEGINCASE, highlights :BEGINCASE/:ENDCASE;
+    :CASE value == 1;
+        /* Cursor in CASE, highlights :BEGINCASE/:ENDCASE;
+    :CASE value == 2;
+        /* Cursor in CASE, highlights :BEGINCASE/:ENDCASE;
+    :OTHERWISE;
+                /* Cursor in OTHERWISE, highlights :BEGINCASE/:ENDCASE;
+    :ENDCASE;
+:ENDPROC;
+
+/* Test 5: TRY/CATCH/FINALLY;
+:PROCEDURE TryCatchTest;
+    :TRY;
+        /* Cursor in TRY, highlights :TRY/:ENDTRY;
+        DoProc("MayFail");
+    :CATCH e;
+        /* Cursor in CATCH, highlights :TRY/:ENDTRY;
+    :FINALLY;
+        /* Cursor in FINALLY, highlights :TRY/:ENDTRY;
+    :ENDTRY;
+:ENDPROC;
+
+/* Test 6: CLASS Definition;
+:CLASS MyTestClass :INHERIT BaseTestClass;
+    /* Cursor in CLASS, highlights :CLASS/:ENDCLASS;
+    :DECLARE memberVar;
+
+    :PROCEDURE ClassMethod;
+        /* Cursor in PROC, highlights :PROCEDURE/:ENDPROC;
+    :ENDPROC;
+:ENDCLASS;
+
+/* Test 7: REGION Directive;
+:REGION MyRegion;
+    /* Cursor in REGION, highlights :REGION/:ENDREGION;
+:ENDREGION;
+
+/* Test 8: BEGININLINECODE/ENDINLINECODE;
+:BEGININLINECODE "TestInline";
+    /* Cursor in BEGININLINECODE, highlights :BEGININLINECODE/:ENDINLINECODE;
+:ENDINLINECODE;
+
+
+/* Test 10: Unmatched Blocks - Cursor on opening keyword;
+:PROCEDURE UnmatchedProc;
+    /* No highlight expected, or highlight indicates missing end;
+
+:IF .T.;
+    /* No highlight expected for IF if ENDIF is missing;
+
+/* Test 11: Unmatched Blocks - Cursor on closing keyword (less common to test this way);
+    /* :ENDIF; commented out; /* Cursor here, no opening match;
+
+/* Test 12: Cursor outside any block ;
+/* Cursor here, no highlight expected ;
+
+/* Test 13: Multiple blocks at the same level ;
+:PROCEDURE ProcA;
+:ENDPROC;
+/* Cursor between ProcA and ProcB ;
+:PROCEDURE ProcB;
+    /* Cursor in ProcB ;
+:ENDPROC;
+
+/* Test 14: Keywords in comments or strings - should NOT match ;
+:PROCEDURE CommentStringTest;
+    /* This is a :IF keyword in a comment ;
+    sTest := "This is a :WHILE keyword in a string";
+    :IF .T.;
+        /* This :ENDIF is real ;
+    :ENDIF;
+:ENDPROC;
+
+/* Test 15: Complex Nesting ;
+:PROCEDURE ComplexNesting;
+    :DECLARE x, y, z;
+    :TRY;
+        :IF x > 0;
+            :WHILE y < 10;
+                :BEGINCASE;
+                :CASE z == 1;
+                    /* Deeply nested cursor ;
+                :OTHERWISE;
+                :ENDCASE;
+            :ENDWHILE;
+        :ELSE;
+            :FOR i := 1 :TO 3;
+            :NEXT;
+        :ENDIF;
+    :CATCH;
+    :ENDTRY;
+:ENDPROC;
+
+/* Test 16: ACCESSOR/MUTATOR blocks within a CLASS ;
+:CLASS AccessorTestClass;
+    :DECLARE _prop;
+    :ACCESSOR MyProperty;
+        :GET;
+            /* Cursor in GET, highlights :GET/:ENDGET or :ACCESSOR/:ENDACCESSOR ;
+            :RETURN _prop;
+        :ENDGET;
+        :SET (value);
+            /* Cursor in SET, highlights :SET/:ENDSET or :ACCESSOR/:ENDACCESSOR ;
+            _prop := value;
+        :ENDSET;
+    :ENDACCESSOR;
+:ENDCLASS;
+
+/* End of Bracket Matching Test File ;

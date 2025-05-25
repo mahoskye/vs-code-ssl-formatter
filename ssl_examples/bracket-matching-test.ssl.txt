@@ -1,0 +1,163 @@
+/* SSL Bracket Matching Test File
+   This file demonstrates the bracket/block matching functionality;
+
+/* region Test Procedures;
+
+:PROCEDURE TestConditional;
+:PARAMETERS value;
+:DECLARE result;
+
+/* Test nested IF statements;
+:IF value > 0;
+    :IF value > 100;
+        result := "Large positive";
+    :ELSE;
+        result := "Small positive";
+    :ENDIF;
+:ELSE;
+    :IF value < 0;
+        result := "Negative";
+    :ELSE;
+        result := "Zero";
+    :ENDIF;
+:ENDIF;
+
+:RETURN result;
+:ENDPROC;
+
+:PROCEDURE TestLoops;
+:PARAMETERS maxCount;
+:DECLARE i, j, total;
+
+total := 0;
+
+/* Test nested loops;
+:WHILE total < maxCount;
+    :FOR i := 1 :TO 10;
+        :FOR j := 1 :TO 5;
+            total += 1;
+            :IF total >= maxCount;
+                :EXITFOR;
+            :ENDIF;
+        :NEXT;
+        
+        :IF total >= maxCount;
+            :EXITFOR;
+        :ENDIF;
+    :NEXT;
+:ENDWHILE;
+
+:RETURN total;
+:ENDPROC;
+
+:PROCEDURE TestCaseStatement;
+:PARAMETERS inputValue;
+:DECLARE result;
+
+:BEGINCASE;
+:CASE inputValue = 1;
+    result := "One";
+:CASE inputValue = 2;
+    result := "Two";
+:CASE inputValue = 3;
+    result := "Three";
+:OTHERWISE;
+    result := "Other";
+:ENDCASE;
+
+:RETURN result;
+:ENDPROC;
+
+:PROCEDURE TestErrorHandling;
+:PARAMETERS data;
+:DECLARE result, processedData;
+
+/* Test TRY-CATCH-FINALLY structure;
+:TRY;
+    :IF data = NIL;
+        /* Force an error;
+        result := 1 / 0;
+    :ELSE;
+        processedData := DoProc("ProcessData", {data});
+        result := processedData;
+    :ENDIF;
+:CATCH;
+    /* Handle the error;
+    result := "Error occurred during processing";
+:FINALLY;
+    /* Cleanup operations;
+    processedData := NIL;
+:ENDTRY;
+
+:RETURN result;
+:ENDPROC;
+
+:PROCEDURE TestLegacyErrorHandling;
+:PARAMETERS riskyOperation;
+
+/* Test legacy ERROR handling;
+:ERROR;
+    :RETURN "Error in risky operation";
+
+/* Perform risky operation;
+DoProc("RiskyFunction", {riskyOperation});
+
+:RETURN "Success";
+:ENDPROC;
+
+/* endregion;
+
+/* region Inline Code Tests;
+
+:BEGININLINECODE "TestBlock";
+    /* This is inline code that can be retrieved later;
+    :DECLARE inlineVar;
+    inlineVar := "Inline code example";
+    :RETURN inlineVar;
+:ENDINLINECODE;
+
+/* endregion;
+
+/* region Class Definition Test;
+
+:CLASS TestProcessor;
+:INHERIT BaseProcessor;
+
+:DECLARE items, count;
+
+:PROCEDURE Initialize;
+    items := {};
+    count := 0;
+    :RETURN .T.;
+:ENDPROC;
+
+:PROCEDURE AddItem;
+:PARAMETERS item;
+    items := {items, item};
+    count += 1;
+    :RETURN count;
+:ENDPROC;
+
+:PROCEDURE ProcessAll;
+:DECLARE i, result;
+
+    result := {};
+    
+    :FOR i := 1 :TO count;
+        :TRY;
+            /* Process each item;
+            :IF items[i]:isValid;
+                result := {result, DoProc("ProcessItem", {items[i]})};
+            :ENDIF;
+        :CATCH;
+            /* Skip invalid items;
+            result := {result, NIL};
+        :ENDTRY;
+    :NEXT;
+    
+    :RETURN result;
+:ENDPROC;
+
+/* Note: Class ends at end of file in SSL v11;
+
+/* endregion;

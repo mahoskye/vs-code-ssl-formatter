@@ -11,7 +11,7 @@ dDate := {2024, 12, 23, 14, 30, 0};
 /* Test scientific notation;
 nScientific1 := 1.23e5;
 nScientific2 := 4.56E-3;
-nInvalid := 0.5e1;  /* Valid format */
+nInvalid := 0.5e1;  /* Valid format;
 
 /* Test unary operators;
 nPositive := +123;
@@ -53,7 +53,7 @@ bResult := .NOT. .T.;
 arItems := {1, 2, {3, 4}, "text"};
 nFirst := arItems[1];
 nNested := arItems[3][1];
-nMultiDim := arItems[1, 2];  /* Multi-dimensional access */
+nMultiDim := arItems[1, 2];  /* Multi-dimensional access;
 
 /* Test property access and method calls;
 oObject := CreateUDObject("MyClass");

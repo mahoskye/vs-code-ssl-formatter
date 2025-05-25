@@ -154,7 +154,7 @@ WhileStatement ::= ":" "WHILE" Expression
 EndWhileStatement ::= ":" "ENDWHILE"
 ExitWhileStatement ::= ":" "EXITWHILE"
 ForLoop ::= ForStatement {Statement} NextStatement
-ForStatement ::= ":" "FOR" Identifier ":=" Expression ":" "TO" Expression (* :STEP clause removed based on feedback *)
+ForStatement ::= ":" "FOR" Identifier ":=" Expression ":" "TO" Expression
 NextStatement ::= ":" "NEXT"
 ExitForStatement ::= ":" "EXITFOR"
 LoopContinue ::= ":" "LOOP" (* Represents a 'continue' for the current loop iteration *)
@@ -181,7 +181,6 @@ EndTryStatement ::= ":" "ENDTRY"
 
 ErrorBlockStanza ::= ErrorMarker {Statement} (* For :ERROR structure *)
 ErrorMarker ::= ":" "ERROR"
-(* :RESUME statement removed based on v11 testing feedback - should be removed from formatting pipeline as well *)
 
 (* Declaration statements *)
 DeclarationStatement ::= (

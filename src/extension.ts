@@ -2,7 +2,8 @@ import * as vscode from "vscode";
 import { SSLFoldingProvider } from "./sslFoldingProvider";
 import { SSLCompletionProvider } from "./sslCompletionProvider";
 import { SSLHoverProvider } from "./sslHoverProvider";
-import { SSLFormatter } from "../src_old/sslFormatter";
+import { SSLFormattingProvider } from "./formatters/formattingProvider";
+import { SSLBracketMatchingProvider } from "./sslBracketMatchingProvider";
 
 /**
  * This function is called when the extension is activated.
@@ -26,14 +27,19 @@ export function activate(context: vscode.ExtensionContext) {
         "(",
         ",",
         " " // Trigger characters for completion
-    );
-
-    // Register the hover provider
+    ); // Register the hover provider
     const sslHoverProvider = new SSLHoverProvider();
     const hoverProvider = vscode.languages.registerHoverProvider(selector, sslHoverProvider);
 
+    // Register the bracket matching provider
+    const sslBracketMatchingProvider = new SSLBracketMatchingProvider();
+    const bracketMatchingProvider = vscode.languages.registerDocumentHighlightProvider(
+        selector,
+        sslBracketMatchingProvider
+    );
+
     // Register the formatter
-    const formatter = new SSLFormatter();
+    const formatter = new SSLFormattingProvider();
     const formattingProvider = vscode.languages.registerDocumentFormattingEditProvider(
         "ssl",
         formatter
@@ -43,13 +49,12 @@ export function activate(context: vscode.ExtensionContext) {
     const reloadCommand = vscode.commands.registerCommand("sslFormatter.reloadCompletions", () => {
         sslCompletionProvider.loadCompletionItems();
         vscode.window.showInformationMessage("SSL completion items reloaded.");
-    });
-
-    // Add all providers and commands to the extension's subscriptions
+    }); // Add all providers and commands to the extension's subscriptions
     context.subscriptions.push(
         foldingProvider,
         completionProvider,
         hoverProvider,
+        bracketMatchingProvider,
         formattingProvider,
         reloadCommand
     );

@@ -49,9 +49,7 @@ export type BlockType =
  * - `"tryStart"`: Indicates the start of a try block.
  * - `"catch"`: Indicates a catch block.
  * - `"finally"`: Indicates a finally block.
- * - `"tryEnd"`: Indicates the end of a try block.
- * - `"error"`: Indicates an error statement.
- * - `"resume"`: Indicates a resume statement.
+ * - `"tryEnd"`: Indicates the end of a try block. * - `"error"`: Indicates an error statement.
  * - `"assignment"`: Indicates an assignment statement.
  * - `"functionCall"`: Indicates a function call.
  * - `"other"`: Indicates any other type of statement not covered by the above keywords.
@@ -78,7 +76,6 @@ export type FlowKeyword =
     | "finally"
     | "tryEnd"
     | "error"
-    | "resume"
     | "assignment"
     | "functionCall"
     | "other";
@@ -825,12 +822,6 @@ export const patterns = {
              * Example: `:ERROR`
              */
             error: /:ERROR\b/i,
-
-            /**
-             * Matches a resume statement.
-             * Example: `:RESUME`
-             */
-            resume: /:RESUME\b/i,
         },
     },
     declaration: {
@@ -1508,7 +1499,7 @@ export class BlockIdentifier {
      * @returns An object containing the block type and metadata if an error handling block is identified, or `null` if no match is found.
      *
      * The returned metadata includes:
-     * - `flowType`: The specific type of error handling flow (e.g., "tryStart", "catch", "finally", "tryEnd", "error", "resume").
+     * - `flowType`: The specific type of error handling flow (e.g., "tryStart", "catch", "finally", "tryEnd", "error").
      * - `isStart`: Indicates if the block is the start of an error handling flow.
      * - `isMiddle`: Indicates if the block is in the middle of an error handling flow.
      * - `isEnd`: Indicates if the block is the end of an error handling flow.
@@ -1569,18 +1560,6 @@ export class BlockIdentifier {
                 blockType: "errorHandling",
                 metadata: {
                     flowType: "error",
-                    isStart: false,
-                    isMiddle: true,
-                    isEnd: false,
-                },
-            };
-        }
-
-        if (patterns.flow.errorHandling.resume.test(line)) {
-            return {
-                blockType: "errorHandling",
-                metadata: {
-                    flowType: "resume",
                     isStart: false,
                     isMiddle: true,
                     isEnd: false,

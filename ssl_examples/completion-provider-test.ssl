@@ -1,66 +1,66 @@
 /* SSL Completion Provider Test File
  * This file contains various scenarios to test the completion provider
  * based on the SSL EBNF grammar
- */
+ ;
 
-/* Test 1: Basic statement keywords at line start */
-
-
-/* Test 2: Procedure definition */
+/* Test 1: Basic statement keywords at line start;
 
 
-/* Test 3: Conditional statements */
+/* Test 2: Procedure definition;
 
 
-/* Test 4: Loop constructs */
+/* Test 3: Conditional statements;
 
 
-/* Test 5: Function calls */
+/* Test 4: Loop constructs;
 
 
-/* Test 6: Object creation and property access */
+/* Test 5: Function calls;
 
 
-/* Test 7: Array operations */
+/* Test 6: Object creation and property access;
 
 
-/* Test 8: Error handling */
+/* Test 7: Array operations;
 
 
-/* Test 9: Class definition */
+/* Test 8: Error handling;
 
 
-/* Test 10: SQL operations */
+/* Test 9: Class definition;
 
 
-/* Test 11: Assignment operators */
+/* Test 10: SQL operations;
+
+
+/* Test 11: Assignment operators;
 sValue := 
 sValue += 
 nCount *= 
 
-/* Test 12: Logical operators */
+/* Test 12: Logical operators;
 bResult := .T. .AND. 
 bResult := .F. .OR. 
 
-/* Test 13: String functions */
+/* Test 13: String functions;
 sText := 
 nLength := 
 
-/* Test 14: Date functions */
+/* Test 14: Date functions;
 dToday := 
-sTime := 
+sTime :=
 
-/* Test 15: Literals */
+/* Test 15: Literals ;
 bFlag := 
 nValue := 
 sText := 
 aArray := 
 
-/* Test 16: SQL parameters */
+/* Test 16: SQL parameters ;
 sQuery := "SELECT * FROM table WHERE id = ?id? AND name = ?";
 
-/* Test 17: FOR loop :TO completion */
+/* Test 17: FOR loop :TO completion ;
 :FOR i := 1 
 
-/* Test 18: Property access */
+/* Test 18: Property access ;
 myObject:

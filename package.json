@@ -192,7 +192,19 @@
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
-        "test": "node ./out/test/runTest.js"
+        "test": "node ./out/test/runTest.js",
+        "test:tokenizer": "npm run compile && node ./out/test/runTest.js formattingProvider/tokenizer.test.js --bail",
+        "test:parser": "npm run compile && node ./out/test/runTest.js formattingProvider/parser.test.js --bail",
+        "test:formattingProvider": "npm run compile && node ./out/test/runTest.js formattingProvider/**/*.test.js --bail",
+        "test:bracketMatching": "npm run compile && node ./out/test/runTest.js bracketMatchingProvider/**/*.test.js --bail",
+        "test:completion": "npm run compile && node ./out/test/runTest.js completionProvider/**/*.test.js --bail",
+        "test:folding": "npm run compile && node ./out/test/runTest.js foldingProvider/**/*.test.js --bail",
+        "test:hover": "npm run compile && node ./out/test/runTest.js hoverProvider/**/*.test.js --bail",
+        "test:all": "npm run compile && node ./out/test/runTest.js",
+        "test:individual": "npm run compile && node ./out/test/runTest.js ${1}",
+        "test:suite": "npm run compile && node ./out/test/runTest.js --suite ${1}",
+        "test:file": "npm run compile && node ./out/test/runTest.js --file ${1}",
+        "test:first-fail": "npm run compile && node ./out/test/runTest.js --bail"
     },
     "devDependencies": {
         "@types/glob": "^8.1.0",

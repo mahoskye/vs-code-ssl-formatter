@@ -5,7 +5,15 @@
     "brackets": [
         ["{", "}"],
         ["[", "]"],
-        ["(", ")"]
+        ["(", ")"],
+        [":IF", ":ENDIF"],
+        [":WHILE", ":ENDWHILE"],
+        [":FOR", ":NEXT"],
+        [":PROCEDURE", ":ENDPROC"],
+        [":BEGINCASE", ":ENDCASE"],
+        [":TRY", ":ENDTRY"],
+        [":REGION", ":ENDREGION"],
+        [":BEGININLINECODE", ":ENDINLINECODE"]
     ],
     "autoClosingPairs": [
         { "open": "{", "close": "}" },

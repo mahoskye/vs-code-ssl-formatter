@@ -1,4 +1,4 @@
-/* Test file for SSL hover provider */
+/* Test file for SSL hover provider;
 
 :IF bCondition;
     sMessage := "Hello World";
@@ -10,7 +10,7 @@
 :ENDWHILE;
 
 :TRY;
-    /* Some risky operation */
+    /* Some risky operation;
 :CATCH;
-    /* Error handling */
+    /* Error handling;
 :ENDTRY;
