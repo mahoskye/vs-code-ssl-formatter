@@ -1,5 +1,4 @@
 import * as assert from "assert";
-import { describe, it } from "mocha";
 import { SSLParser, ASTNode, ASTNodeType } from "../../src/formatters/parser";
 import { SSLTokenizer, Token } from "../../src/formatters/tokenizer";
 

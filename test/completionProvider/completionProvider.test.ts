@@ -2,7 +2,6 @@ import * as assert from "assert";
 import * as vscode from "vscode";
 import { SSLCompletionProvider } from "../../src/sslCompletionProvider";
 import { EOL } from "os";
-import { describe, it, beforeEach, afterEach } from "mocha";
 
 // Helper function to create a mock TextDocument (can be shared or adapted from bracketMatchingProvider.test.ts)
 function createMockDocument(lines: string[]): vscode.TextDocument {
@@ -16,7 +15,6 @@ function createMockDocument(lines: string[]): vscode.TextDocument {
         isClosed: false,
         save: () => Promise.resolve(true),
         eol: EOL === "\r\n" ? vscode.EndOfLine.CRLF : vscode.EndOfLine.LF,
-        encoding: "utf8",
         lineCount: lines.length,
         lineAt: (lineOrPosition: number | vscode.Position): vscode.TextLine => {
             const lineNumber =

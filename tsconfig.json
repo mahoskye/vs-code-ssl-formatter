@@ -9,7 +9,7 @@
         "strict": true,
         "esModuleInterop": true,
         "typeRoots": ["./node_modules/@types"],
-        "types": ["mocha", "node"]
+        "types": ["jest", "node"]
     },
     "exclude": ["node_modules", ".vscode-test", "src/old"]
 }

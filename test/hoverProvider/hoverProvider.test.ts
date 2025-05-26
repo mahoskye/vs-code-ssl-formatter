@@ -1,7 +1,6 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
 import { SSLHoverProvider } from "../../src/sslHoverProvider";
-import { describe, it, beforeEach, afterEach } from "mocha"; // Explicit import for describe, it, beforeEach, and afterEach
 
 // import * as sinon from "sinon"; // Removed sinon
 
@@ -17,7 +16,6 @@ function createMockDocument(lines: string[]): vscode.TextDocument {
         isClosed: false,
         save: () => Promise.resolve(true),
         eol: vscode.EndOfLine.LF,
-        encoding: "utf8",
         lineCount: lines.length,
         lineAt: (line: number | vscode.Position) => {
             const lineNumber = typeof line === "number" ? line : line.line;

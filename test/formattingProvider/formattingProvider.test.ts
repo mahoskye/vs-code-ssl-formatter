@@ -2,7 +2,6 @@ import * as assert from "assert";
 import * as vscode from "vscode";
 import { SSLFormattingProvider } from "../../src/formatters/formattingProvider";
 import { FormattingOptions as InternalFormattingOptions } from "../../src/formatters/formattingProvider"; // Renamed to avoid conflict
-import { describe, it, beforeEach, afterEach } from "mocha";
 
 // Helper function to run the formatter
 async function formatDocument(

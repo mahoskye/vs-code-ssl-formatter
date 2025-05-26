@@ -1,7 +1,6 @@
 import * as assert from "assert";
 import * as vscode from "vscode";
 import { SSLFoldingProvider } from "../../src/sslFoldingProvider";
-import { describe, it, beforeEach, afterEach } from "mocha";
 
 // Helper function to create a mock TextDocument
 function createMockDocument(lines: string[]): vscode.TextDocument {
@@ -15,7 +14,6 @@ function createMockDocument(lines: string[]): vscode.TextDocument {
         isClosed: false,
         save: () => Promise.resolve(true),
         eol: vscode.EndOfLine.LF,
-        encoding: "utf8",
         lineCount: lines.length,
         lineAt: (line: number | vscode.Position) => {
             const lineNumber = typeof line === "number" ? line : line.line;

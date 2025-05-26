@@ -1,5 +1,4 @@
 import * as assert from "assert";
-import { describe, it } from "mocha";
 import { SSLTokenizer, TokenType, Token } from "../../src/formatters/tokenizer";
 
 describe("SSLTokenizer", () => {
