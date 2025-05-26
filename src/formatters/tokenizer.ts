@@ -325,26 +325,14 @@ export class SSLTokenizer {
             return;
         }
         if (char === '"') {
-            // Emit separate double quote token instead of bundling with string
-            this.addToken(
-                TokenType.doubleQuote,
-                char,
-                tokenStartLine,
-                tokenStartColumn,
-                tokenStartOffset
-            );
+            // Start string parsing mode for double-quoted strings
+            this.startString(char, tokenStartLine, tokenStartColumn, tokenStartOffset);
             return;
         }
 
         if (char === "'") {
-            // Emit separate single quote token instead of bundling with string
-            this.addToken(
-                TokenType.singleQuote,
-                char,
-                tokenStartLine,
-                tokenStartColumn,
-                tokenStartOffset
-            );
+            // Start string parsing mode for single-quoted strings
+            this.startString(char, tokenStartLine, tokenStartColumn, tokenStartOffset);
             return;
         }
         if (char === "[") {
@@ -558,7 +546,7 @@ export class SSLTokenizer {
                     );
                 } else {
                     this.addToken(
-                        TokenType.invalid,
+                        TokenType.bang,
                         "!",
                         tokenStartLine,
                         tokenStartColumn,
@@ -721,7 +709,7 @@ export class SSLTokenizer {
                 break;
             case "\n": // Actual newline character LF
                 this.addToken(
-                    TokenType.invalid,
+                    TokenType.newline,
                     "\n",
                     tokenStartLine, // The line where \n started
                     tokenStartColumn, // The column where \n started
@@ -739,7 +727,7 @@ export class SSLTokenizer {
                     newlineValue += "\n";
                 }
                 this.addToken(
-                    TokenType.invalid,
+                    TokenType.newline,
                     newlineValue,
                     tokenStartLine,
                     tokenStartColumn,

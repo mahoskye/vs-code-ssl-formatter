@@ -192,27 +192,19 @@ describe("SSLTokenizer", () => {
 
     describe("Literals", () => {
         it("should tokenize string literals with double quotes", () => {
-            // Test 5 - Now expects separate quote tokens
+            // Test 5 - String literals are now parsed as single tokens
             tokenizer = new SSLTokenizer('"hello world";');
             const tokens = tokenizer.tokenize();
-            assertToken(tokens[0], TokenType.doubleQuote, '"', 1, 1, 0);
-            assertToken(tokens[1], TokenType.identifier, "hello", 1, 2, 1);
-            assertToken(tokens[2], TokenType.whitespace, " ", 1, 7, 6);
-            assertToken(tokens[3], TokenType.identifier, "world", 1, 8, 7);
-            assertToken(tokens[4], TokenType.doubleQuote, '"', 1, 13, 12);
-            assertToken(tokens[5], TokenType.semicolon, ";", 1, 14, 13);
-            assertToken(tokens[6], TokenType.eof, "", 1, 15, 14);
+            assertToken(tokens[0], TokenType.stringLiteral, '"hello world"', 1, 1, 0);
+            assertToken(tokens[1], TokenType.semicolon, ";", 1, 14, 13);
+            assertToken(tokens[2], TokenType.eof, "", 1, 15, 14);
         });
         it("should tokenize string literals with single quotes", () => {
             tokenizer = new SSLTokenizer("'another string';");
             const tokens = tokenizer.tokenize();
-            assertToken(tokens[0], TokenType.singleQuote, "'", 1, 1, 0);
-            assertToken(tokens[1], TokenType.identifier, "another", 1, 2, 1);
-            assertToken(tokens[2], TokenType.whitespace, " ", 1, 9, 8);
-            assertToken(tokens[3], TokenType.identifier, "string", 1, 10, 9);
-            assertToken(tokens[4], TokenType.singleQuote, "'", 1, 16, 15);
-            assertToken(tokens[5], TokenType.semicolon, ";", 1, 17, 16);
-            assertToken(tokens[6], TokenType.eof, "", 1, 18, 17);
+            assertToken(tokens[0], TokenType.stringLiteral, "'another string'", 1, 1, 0);
+            assertToken(tokens[1], TokenType.semicolon, ";", 1, 17, 16);
+            assertToken(tokens[2], TokenType.eof, "", 1, 18, 17);
         });
 
         it("should tokenize number literals (integer and decimal)", () => {
@@ -359,23 +351,22 @@ describe("SSLTokenizer", () => {
             const tokens = tokenizer.tokenize();
             assertToken(tokens[0], TokenType.whitespace, "  \t  ");
         });
-
         it("should tokenize newlines", () => {
             // Test 8
             // Input: LF, CR, LF
             // Hypothesis:
-            // 1. LF is tokenized as INVALID with value "\n" (advances line, offset by 1)
-            // 2. CR LF is tokenized as INVALID with value "\r\n" (advances line, offset by 2)
+            // 1. LF is tokenized as NEWLINE with value "\n" (advances line, offset by 1)
+            // 2. CR LF is tokenized as NEWLINE with value "\r\n" (advances line, offset by 2)
             tokenizer = new SSLTokenizer("\n\r\n");
             const tokens = tokenizer.tokenize();
             assert.strictEqual(
                 tokens.length,
                 3,
-                "Expected 3 tokens for \n\r\n (INVALID \n, INVALID \r\n, EOF)"
+                "Expected 3 tokens for \n\r\n (NEWLINE \n, NEWLINE \r\n, EOF)"
             );
             if (tokens.length === 3) {
-                assertToken(tokens[0], TokenType.invalid, "\n", 1, 1, 0); // From input \n
-                assertToken(tokens[1], TokenType.invalid, "\r\n", 2, 1, 1); // From input \r\n
+                assertToken(tokens[0], TokenType.newline, "\n", 1, 1, 0); // From input \n
+                assertToken(tokens[1], TokenType.newline, "\r\n", 2, 1, 1); // From input \r\n
                 assertToken(tokens[2], TokenType.eof, "", 3, 1, 3); // EOF after \n (len 1) and \r\n (len 2)
             }
         });
@@ -399,17 +390,15 @@ describe("SSLTokenizer", () => {
             assertToken(tokens[7], TokenType.numberLiteral, "10", 1, 9, 8);
             assertToken(tokens[8], TokenType.semicolon, ";", 1, 11, 10);
             // \n token
-            assertToken(tokens[9], TokenType.invalid, "\n", 1, 12, 11); // Line 1 (start), value \n, offset after ;
+            assertToken(tokens[9], TokenType.newline, "\n", 1, 12, 11); // Line 1 (start), value \n, offset after ;
             // After this token: Line 2, Offset 11 + 1 = 12
             assertToken(tokens[10], TokenType.whitespace, "  ", 2, 1, 12); // Line 2, Col 1, Offset after \n token
             assertToken(tokens[11], TokenType.identifier, "y", 2, 3, 14); // Offset 12 + 2 = 14            assertToken(tokens[12], TokenType.whitespace, " ", 2, 4, 15);
             assertToken(tokens[13], TokenType.assign, ":=", 2, 5, 16);
-            assertToken(tokens[14], TokenType.whitespace, " ", 2, 7, 18); // Before opening quote
-            assertToken(tokens[15], TokenType.doubleQuote, '"', 2, 8, 19); // Opening quote
-            assertToken(tokens[16], TokenType.identifier, "test", 2, 9, 20); // String content
-            assertToken(tokens[17], TokenType.doubleQuote, '"', 2, 13, 24); // Closing quote
-            assertToken(tokens[18], TokenType.semicolon, ";", 2, 14, 25); // ;
-            assertToken(tokens[19], TokenType.eof, "", 2, 15, 26); // EOF
+            assertToken(tokens[14], TokenType.whitespace, " ", 2, 7, 18); // Before string literal
+            assertToken(tokens[15], TokenType.stringLiteral, '"test"', 2, 8, 19); // String literal
+            assertToken(tokens[16], TokenType.semicolon, ";", 2, 14, 25); // ;
+            assertToken(tokens[17], TokenType.eof, "", 2, 15, 26); // EOF
         });
     });
 
@@ -444,7 +433,7 @@ describe("SSLTokenizer", () => {
             if (lastTokenL1) {
                 assertToken(
                     tokens[tokens.indexOf(lastTokenL1) + 1],
-                    TokenType.invalid,
+                    TokenType.newline,
                     "\n",
                     1,
                     lastTokenL1.position.column + 1,
@@ -482,46 +471,30 @@ describe("SSLTokenizer", () => {
             if (lParenPrint) {
                 assertToken(lParenPrint, TokenType.lparen, "(", 6, 10, 162);
             }
-            const quoteOpenExpensive = tokens.find(
+            const expensiveStringToken = tokens.find(
                 (t) =>
-                    t.value === '"' &&
-                    t.type === TokenType.doubleQuote &&
-                    t.position.line === 6 &&
-                    t.position.offset === (lParenPrint?.position.offset ?? 0) + 1
+                    t.value === '"Expensive!"' &&
+                    t.type === TokenType.stringLiteral &&
+                    t.position.line === 6
             );
-            assert.ok(quoteOpenExpensive, "Opening quote for 'Expensive!' not found at line 6");
-            if (quoteOpenExpensive) {
-                assertToken(quoteOpenExpensive, TokenType.doubleQuote, '"', 6, 11, 163);
+            assert.ok(expensiveStringToken, "String literal 'Expensive!' not found at line 6");
+            if (expensiveStringToken) {
+                assertToken(
+                    expensiveStringToken,
+                    TokenType.stringLiteral,
+                    '"Expensive!"',
+                    6,
+                    11,
+                    163
+                );
             }
-            const expensiveToken = tokens.find(
-                (t) => t.value === "Expensive" && t.position.line === 6
-            );
-            assert.ok(expensiveToken, "Token 'Expensive' not found at line 6");
-            if (expensiveToken) {
-                assertToken(expensiveToken, TokenType.identifier, "Expensive", 6, 12, 164);
-            }
-            const exclamationToken = tokens.find((t) => t.value === "!" && t.position.line === 6);
-            assert.ok(exclamationToken, "Token '!' not found at line 6");
-            if (exclamationToken) {
-                assertToken(exclamationToken, TokenType.invalid, "!", 6, 21, 173);
-            }
-            const quoteCloseExpensive = tokens.find(
-                (t) =>
-                    t.value === '"' &&
-                    t.type === TokenType.doubleQuote &&
-                    t.position.line === 6 &&
-                    t.position.offset === (exclamationToken?.position.offset ?? 0) + 1
-            );
-            assert.ok(quoteCloseExpensive, "Closing quote for 'Expensive!' not found at line 6");
-            if (quoteCloseExpensive) {
-                assertToken(quoteCloseExpensive, TokenType.doubleQuote, '"', 6, 22, 174);
-            }
-
             const rParenPrint = tokens.find(
                 (t) =>
                     t.value === ")" &&
                     t.position.line === 6 &&
-                    t.position.offset === (quoteCloseExpensive?.position.offset ?? 0) + 1
+                    t.position.offset ===
+                        (expensiveStringToken?.position.offset ?? 0) +
+                            (expensiveStringToken?.value.length ?? 0)
             );
             assert.ok(rParenPrint, "Token ')' after Expensive! string not found at line 6");
             if (rParenPrint) {
@@ -538,13 +511,12 @@ describe("SSLTokenizer", () => {
             if (semicolonAfterPrint) {
                 assertToken(semicolonAfterPrint, TokenType.semicolon, ";", 6, 24, 176);
             }
-
             const lastTokenL6 = semicolonAfterPrint; // Semicolon is the last significant token on L6 before newline
             assert.ok(lastTokenL6, "Semicolon on L6 not found");
             if (lastTokenL6) {
                 assertToken(
                     tokens[tokens.indexOf(lastTokenL6) + 1],
-                    TokenType.invalid,
+                    TokenType.newline,
                     "\n",
                     6,
                     lastTokenL6.position.column + 1,
@@ -568,19 +540,12 @@ describe("SSLTokenizer", () => {
                 "Should end with EOF"
             );
         });
-        it("should handle unterminated string as string literal up to EOF", () => {
-            // Test 11 - With separate quote tokenization, the opening quote is a valid DOUBLE_QUOTE token
+        it("should handle unterminated string as invalid token", () => {
+            // Test 11 - Unterminated strings are now handled as single invalid tokens
             tokenizer = new SSLTokenizer('"this is not closed');
             const tokens = tokenizer.tokenize();
-            assertToken(tokens[0], TokenType.doubleQuote, '"', 1, 1, 0);
-            assertToken(tokens[1], TokenType.identifier, "this", 1, 2, 1);
-            assertToken(tokens[2], TokenType.whitespace, " ", 1, 6, 5);
-            assertToken(tokens[3], TokenType.identifier, "is", 1, 7, 6);
-            assertToken(tokens[4], TokenType.whitespace, " ", 1, 9, 8);
-            assertToken(tokens[5], TokenType.identifier, "not", 1, 10, 9);
-            assertToken(tokens[6], TokenType.whitespace, " ", 1, 13, 12);
-            assertToken(tokens[7], TokenType.identifier, "closed", 1, 14, 13);
-            assertToken(tokens[8], TokenType.eof, "", 1, 20, 19);
+            assertToken(tokens[0], TokenType.invalid, '"this is not closed', 1, 1, 0);
+            assertToken(tokens[1], TokenType.eof, "", 1, 20, 19);
         });
 
         it("should handle unterminated comment as comment up to EOF", () => {
@@ -645,19 +610,17 @@ describe("SSLTokenizer", () => {
             assertToken(tokens[19], TokenType.whitespace, " ", 1, 73, 72);
             assertToken(tokens[20], TokenType.comma, ",", 1, 74, 73);
             assertToken(tokens[21], TokenType.whitespace, " ", 1, 75, 74);
-            assertToken(tokens[22], TokenType.doubleQuote, '"', 1, 76, 75); // Opening quote - corrected to DOUBLE_QUOTE
-            assertToken(tokens[23], TokenType.default, "default", 1, 77, 76); // Content, changed IDENTIFIER to DEFAULT
-            assertToken(tokens[24], TokenType.doubleQuote, '"', 1, 84, 83); // Closing quote - corrected to DOUBLE_QUOTE
-            assertToken(tokens[25], TokenType.whitespace, " ", 1, 85, 84);
-            assertToken(tokens[26], TokenType.comma, ",", 1, 86, 85);
-            assertToken(tokens[27], TokenType.whitespace, " ", 1, 87, 86);
-            assertToken(tokens[28], TokenType.identifier, "param2", 1, 88, 87);
-            assertToken(tokens[29], TokenType.whitespace, " ", 1, 94, 93);
-            assertToken(tokens[30], TokenType.comma, ",", 1, 95, 94);
-            assertToken(tokens[31], TokenType.whitespace, " ", 1, 96, 95);
-            assertToken(tokens[32], TokenType.numberLiteral, "123", 1, 97, 96);
-            assertToken(tokens[33], TokenType.semicolon, ";", 1, 100, 99);
-            assertToken(tokens[34], TokenType.eof, "", 1, 101, 100);
+            assertToken(tokens[22], TokenType.stringLiteral, '"default"', 1, 76, 75); // String literal
+            assertToken(tokens[23], TokenType.whitespace, " ", 1, 85, 84);
+            assertToken(tokens[24], TokenType.comma, ",", 1, 86, 85);
+            assertToken(tokens[25], TokenType.whitespace, " ", 1, 87, 86);
+            assertToken(tokens[26], TokenType.identifier, "param2", 1, 88, 87);
+            assertToken(tokens[27], TokenType.whitespace, " ", 1, 94, 93);
+            assertToken(tokens[28], TokenType.comma, ",", 1, 95, 94);
+            assertToken(tokens[29], TokenType.whitespace, " ", 1, 96, 95);
+            assertToken(tokens[30], TokenType.numberLiteral, "123", 1, 97, 96);
+            assertToken(tokens[31], TokenType.semicolon, ";", 1, 100, 99);
+            assertToken(tokens[32], TokenType.eof, "", 1, 101, 100);
         });
     });
 
