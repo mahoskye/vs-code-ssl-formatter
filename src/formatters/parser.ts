@@ -108,7 +108,9 @@ export class SSLParser {
             return this.parseParameters();
         }
         if (this.check(TokenType.singleLineComment) || this.check(TokenType.blockComment)) {
-            return this.parseComment();
+            // Skip comments - they should not appear in the AST
+            this.advance();
+            return null;
         }
 
         // Default: try to parse as expression statement
@@ -398,16 +400,6 @@ export class SSLParser {
         }
 
         return node;
-    }
-
-    private parseComment(): ASTNode {
-        const token = this.advance();
-        return {
-            type: ASTNodeType.comment,
-            value: token.value,
-            children: [],
-            line: token.position.line,
-        };
     }
 
     private parseExpressionStatement(): ASTNode | null {
@@ -826,8 +818,104 @@ export class SSLParser {
                     line: lbraceToken.position.line,
                 };
             }
+        } // Handle bitwise operations as function calls
+        if (this.match(TokenType.bitwiseAnd, TokenType.bitwiseOr, TokenType.bitwiseNot)) {
+            const token = this.previous();
+
+            // Bitwise operations must be followed by '('
+            if (this.check(TokenType.lparen)) {
+                this.advance(); // consume '('
+
+                const args: ASTNode[] = [];
+
+                // Parse function arguments
+                if (!this.check(TokenType.rparen)) {
+                    do {
+                        const arg = this.parseExpression();
+                        if (arg) {
+                            args.push(arg);
+                        }
+                    } while (this.match(TokenType.comma));
+                }
+
+                this.consume(TokenType.rparen, "Expected ')' after function arguments");
+                return {
+                    type: ASTNodeType.callExpression,
+                    value: token.value,
+                    children: args,
+                    line: token.position.line,
+                };
+            }
+
+            // If not followed by '(', treat as invalid
+            return null;
         }
 
+        // Handle CreateUDObject as function call
+        if (this.match(TokenType.createUDObject)) {
+            const token = this.previous();
+
+            // CreateUDObject must be followed by '('
+            if (this.check(TokenType.lparen)) {
+                this.advance(); // consume '('
+
+                const args: ASTNode[] = [];
+
+                // Parse function arguments
+                if (!this.check(TokenType.rparen)) {
+                    do {
+                        const arg = this.parseExpression();
+                        if (arg) {
+                            args.push(arg);
+                        }
+                    } while (this.match(TokenType.comma));
+                }
+
+                this.consume(TokenType.rparen, "Expected ')' after function arguments");
+                return {
+                    type: ASTNodeType.callExpression,
+                    value: token.value,
+                    children: args,
+                    line: token.position.line,
+                };
+            }
+
+            // If not followed by '(', treat as invalid
+            return null;
+        }
+
+        // Handle ExecUDF as function call
+        if (this.match(TokenType.execUDF)) {
+            const token = this.previous();
+
+            // ExecUDF must be followed by '('
+            if (this.check(TokenType.lparen)) {
+                this.advance(); // consume '('
+
+                const args: ASTNode[] = [];
+
+                // Parse function arguments
+                if (!this.check(TokenType.rparen)) {
+                    do {
+                        const arg = this.parseExpression();
+                        if (arg) {
+                            args.push(arg);
+                        }
+                    } while (this.match(TokenType.comma));
+                }
+
+                this.consume(TokenType.rparen, "Expected ')' after function arguments");
+                return {
+                    type: ASTNodeType.callExpression,
+                    value: token.value,
+                    children: args,
+                    line: token.position.line,
+                };
+            }
+
+            // If not followed by '(', treat as invalid
+            return null;
+        }
         if (this.match(TokenType.identifier)) {
             const token = this.previous();
 
@@ -854,6 +942,77 @@ export class SSLParser {
                     children: args,
                     line: token.position.line,
                 };
+            }
+
+            // Check if this is array access (identifier followed by '[')
+            if (this.check(TokenType.lbracket)) {
+                let baseNode: ASTNode = {
+                    type: ASTNodeType.identifier,
+                    value: token.value,
+                    children: [],
+                    line: token.position.line,
+                };
+
+                // Parse array subscripts (supports chained access like arr[1][2])
+                while (this.check(TokenType.lbracket)) {
+                    this.advance(); // consume '['
+
+                    const subscriptArgs: ASTNode[] = [];
+
+                    // Parse array subscript expressions (supports comma-separated like arr[1,2])
+                    if (!this.check(TokenType.rbracket)) {
+                        do {
+                            const arg = this.parseExpression();
+                            if (arg) {
+                                subscriptArgs.push(arg);
+                            }
+                        } while (this.match(TokenType.comma));
+                    }
+
+                    this.consume(TokenType.rbracket, "Expected ']' after array subscript");
+
+                    // Create array access node
+                    baseNode = {
+                        type: ASTNodeType.arrayAccess,
+                        value: token.value, // Keep original identifier name
+                        children: [baseNode, ...subscriptArgs],
+                        line: token.position.line,
+                    };
+                }
+                return baseNode;
+            }
+
+            // Check if this is property access (identifier followed by ':')
+            if (this.check(TokenType.colon)) {
+                this.advance(); // consume ':'
+
+                // Expect an identifier after the colon
+                if (this.check(TokenType.identifier)) {
+                    const propertyToken = this.advance();
+
+                    return {
+                        type: ASTNodeType.memberExpression,
+                        value: `${token.value}:${propertyToken.value}`,
+                        children: [
+                            {
+                                type: ASTNodeType.identifier,
+                                value: token.value,
+                                children: [],
+                                line: token.position.line,
+                            },
+                            {
+                                type: ASTNodeType.identifier,
+                                value: propertyToken.value,
+                                children: [],
+                                line: propertyToken.position.line,
+                            },
+                        ],
+                        line: token.position.line,
+                    };
+                } else {
+                    // Invalid property access, backtrack
+                    this.current--; // Put back the colon
+                }
             }
 
             // Simple identifier
