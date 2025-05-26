@@ -284,7 +284,7 @@ IntegerPart ::= Digit {Digit}
 DecimalPart ::= "." Digit {Digit} (* Ensures at least one digit after the decimal point *)
 Exponent    ::= ("e" | "E") ["-"] Digit {Digit}
 
-StringLiteral ::= '"' {Character} '"' | "'" {Character} "'" | "[" {Character} "]" (* *)
+StringLiteral ::= '"' {Character} '"' | "'" {Character} "'" (* *)
 BooleanLiteral ::= ".T." | ".F." (* TRUE and FALSE also mentioned in EBNF notes but .T./.F. are canonical *)
 ArrayLiteral ::= "{" [ExpressionList] "}" | "{" ArrayLiteral {"," ArrayLiteral} "}"
 NilLiteral ::= "NIL" (* *)
@@ -357,7 +357,7 @@ Symbol ::= (* Any printable character, specific exclusions depend on context lik
 
 22. **Inline Code and Regions**: Special blocks for storing and retrieving code snippets can be created using `:BEGININLINECODE`/`:ENDINLINECODE` and `:REGION`/`:ENDREGION`.
 
-23. **String Delimiters**: Strings can be delimited using double quotes (`"`), single quotes (`'`), or square brackets (`[` and `]`).
+23. **String Delimiters**: Strings can be delimited using double quotes (`"`) or single quotes (`'`).
 
 24. **Assignment Operators**: In addition to the standard assignment operator (`:=`), SSL supports compound assignment operators (`+=`, `-=`, `*=`, `/=`, `^=`).
 

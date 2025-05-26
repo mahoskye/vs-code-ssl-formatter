@@ -17,6 +17,7 @@ function createMockDocument(lines: string[]): vscode.TextDocument {
         isClosed: false,
         save: () => Promise.resolve(true),
         eol: vscode.EndOfLine.LF,
+        encoding: "utf8",
         lineCount: lines.length,
         lineAt: (line: number | vscode.Position) => {
             const lineNumber = typeof line === "number" ? line : line.line;

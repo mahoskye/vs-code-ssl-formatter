@@ -48,6 +48,19 @@ export enum TokenType {
     begininlinecode = "BEGININLINECODE",
     endinlinecode = "ENDINLINECODE",
 
+    // Keywords - Built-in Functions / Commands
+    doProc = "DOPROC",
+    execFunction = "EXECFUNCTION",
+    execUDF = "EXECUDF",
+    branch = "BRANCH",
+    sqlExecute = "SQLEXECUTE",
+    lSearch = "LSEARCH",
+    createUDObject = "CREATEUDOBJECT",
+    bitwiseAnd = "_AND",
+    bitwiseOr = "_OR",
+    bitwiseXor = "_XOR",
+    bitwiseNot = "_NOT",
+
     // Assignment Operators
     assign = "ASSIGN", // :=
     plusAssign = "PLUS_ASSIGN", // Re-typed to ensure no hidden characters
@@ -63,13 +76,18 @@ export enum TokenType {
     greaterThan = "GREATER_THAN", // >
     lessEqual = "LESS_EQUAL", // <=
     greaterEqual = "GREATER_EQUAL", // >=
-    simpleEquals = "SIMPLE_EQUALS", // =    // Arithmetic Operators
+    simpleEquals = "SIMPLE_EQUALS", // =
+
+    // Arithmetic Operators
     plus = "PLUS", // +
     minus = "MINUS", // -
     multiply = "MULTIPLY", // *
     divide = "DIVIDE", // /
-    modulo = "MODULO", // ^
+    modulo = "MODULO", // %
     power = "POWER", // ^
+
+    // Unary Operators & Special Single-Character Operators
+    bang = "BANG", // !
 
     // Increment/Decrement
     increment = "INCREMENT", // ++
@@ -81,9 +99,7 @@ export enum TokenType {
     not = "NOT", // .NOT.
 
     // SQL Parameters
-    sqlParameter = "SQL_PARAMETER", // ?param? or ?
-
-    // Delimiters
+    sqlParameter = "SQL_PARAMETER", // ?param? or ?    // Delimiters
     colon = "COLON", // :
     semicolon = "SEMICOLON", // ;
     comma = "COMMA", // ,
@@ -94,6 +110,11 @@ export enum TokenType {
     lbrace = "LBRACE", // {
     rbrace = "RBRACE", // }
     pipe = "PIPE", // | (for code blocks)
+    lBracePipe = "LBRACE_PIPE", // {|
+    dot = "DOT", // .
+    questionMark = "QUESTION_MARK", // ?    // Quote tokens for string delimiters
+    doubleQuote = "DOUBLE_QUOTE", // "
+    singleQuote = "SINGLE_QUOTE", // '
 
     // Literals
     stringLiteral = "STRING_LITERAL",
@@ -194,6 +215,19 @@ export class SSLTokenizer {
 
         // Literals
         ["NIL", TokenType.nilLiteral],
+
+        // Built-in Functions / Commands (should be matched case-insensitively like other keywords)
+        ["DOPROC", TokenType.doProc],
+        ["EXECFUNCTION", TokenType.execFunction],
+        ["EXECUDF", TokenType.execUDF],
+        ["BRANCH", TokenType.branch],
+        ["SQLEXECUTE", TokenType.sqlExecute],
+        ["LSEARCH", TokenType.lSearch],
+        ["CREATEUDOBJECT", TokenType.createUDObject],
+        ["_AND", TokenType.bitwiseAnd],
+        ["_OR", TokenType.bitwiseOr],
+        ["_XOR", TokenType.bitwiseXor],
+        ["_NOT", TokenType.bitwiseNot],
     ]);
 
     constructor(input: string) {
@@ -238,7 +272,7 @@ export class SSLTokenizer {
                 this.position
             );
             this.addToken(
-                TokenType.stringLiteral,
+                TokenType.invalid, // Changed from TokenType.stringLiteral
                 unterminatedStringValue,
                 this.stringState.stringStartLine,
                 this.stringState.stringStartColumn,
@@ -290,15 +324,39 @@ export class SSLTokenizer {
             this.scanStringContent(char, tokenStartLine, tokenStartColumn, tokenStartOffset);
             return;
         }
-
-        if (char === '"' || char === "'") {
-            this.startString(char, tokenStartLine, tokenStartColumn, tokenStartOffset);
+        if (char === '"') {
+            // Emit separate double quote token instead of bundling with string
+            this.addToken(
+                TokenType.doubleQuote,
+                char,
+                tokenStartLine,
+                tokenStartColumn,
+                tokenStartOffset
+            );
             return;
         }
 
+        if (char === "'") {
+            // Emit separate single quote token instead of bundling with string
+            this.addToken(
+                TokenType.singleQuote,
+                char,
+                tokenStartLine,
+                tokenStartColumn,
+                tokenStartOffset
+            );
+            return;
+        }
         if (char === "[") {
             if (this.isStringDelimiterBracket()) {
-                this.startString(char, tokenStartLine, tokenStartColumn, tokenStartOffset);
+                // Emit separate bracket token even for string brackets
+                this.addToken(
+                    TokenType.lbracket,
+                    char,
+                    tokenStartLine,
+                    tokenStartColumn,
+                    tokenStartOffset
+                );
                 return;
             } else {
                 this.addToken(
@@ -605,13 +663,25 @@ export class SSLTokenizer {
                 );
                 break;
             case "{":
-                this.addToken(
-                    TokenType.lbrace,
-                    "{",
-                    tokenStartLine,
-                    tokenStartColumn,
-                    tokenStartOffset
-                );
+                if (this.current() === "|") {
+                    // Check for {| pattern
+                    this.advance(); // consume the |
+                    this.addToken(
+                        TokenType.lBracePipe,
+                        "{|",
+                        tokenStartLine,
+                        tokenStartColumn,
+                        tokenStartOffset
+                    );
+                } else {
+                    this.addToken(
+                        TokenType.lbrace,
+                        "{",
+                        tokenStartLine,
+                        tokenStartColumn,
+                        tokenStartOffset
+                    );
+                }
                 break;
             case "}":
                 this.addToken(
@@ -626,6 +696,24 @@ export class SSLTokenizer {
                 this.addToken(
                     TokenType.modulo,
                     "%",
+                    tokenStartLine,
+                    tokenStartColumn,
+                    tokenStartOffset
+                );
+                break;
+            case "?":
+                this.addToken(
+                    TokenType.questionMark,
+                    "?",
+                    tokenStartLine,
+                    tokenStartColumn,
+                    tokenStartOffset
+                );
+                break;
+            case "|":
+                this.addToken(
+                    TokenType.pipe,
+                    "|",
                     tokenStartLine,
                     tokenStartColumn,
                     tokenStartOffset
@@ -871,9 +959,21 @@ export class SSLTokenizer {
             }
         } else {
             // Not a valid dot operator (e.g., '.', '.A', or '.AND' not closed by '.')
-            // Treat as invalid up to where we scanned.
-            const invalidSequence = this.input.substring(startOffset, this.position);
-            this.addToken(TokenType.invalid, invalidSequence, startLine, startColumn, startOffset);
+            const scannedSequence = this.input.substring(startOffset, this.position);
+
+            // If it's just a standalone dot, treat as DOT token
+            if (scannedSequence === ".") {
+                this.addToken(TokenType.dot, ".", startLine, startColumn, startOffset);
+            } else {
+                // Otherwise, treat as invalid (e.g., '.A', '.AND' without closing dot)
+                this.addToken(
+                    TokenType.invalid,
+                    scannedSequence,
+                    startLine,
+                    startColumn,
+                    startOffset
+                );
+            }
         }
     }
 

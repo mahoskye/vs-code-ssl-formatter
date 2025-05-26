@@ -21,7 +21,7 @@ export enum ASTNodeType {
     binaryExpression = "binaryExpression",
     unaryExpression = "unaryExpression",
     callExpression = "callExpression",
-    memberExpression = "memberExpression",
+    memberExpression = "memberExpression", // Keep for obj:prop
     assignmentExpression = "assignmentExpression",
     identifier = "identifier",
     literal = "literal",
@@ -29,6 +29,9 @@ export enum ASTNodeType {
     declaration = "declaration",
     parameter = "parameter",
     statement = "statement",
+    codeBlockLiteral = "codeBlockLiteral",
+    arrayAccess = "arrayAccess", // Added for myArray[index]
+    arraySubscript = "arraySubscript", // Added for [index] or [index, index2]
     unknown = "unknown",
 }
 
@@ -73,7 +76,6 @@ export class SSLParser {
 
         return program;
     }
-
     private parseStatement(): ASTNode | null {
         if (this.check(TokenType.procedure)) {
             return this.parseProcedure();
@@ -102,6 +104,9 @@ export class SSLParser {
         if (this.check(TokenType.declare)) {
             return this.parseDeclaration();
         }
+        if (this.check(TokenType.parameters)) {
+            return this.parseParameters();
+        }
         if (this.check(TokenType.singleLineComment) || this.check(TokenType.blockComment)) {
             return this.parseComment();
         }
@@ -109,7 +114,6 @@ export class SSLParser {
         // Default: try to parse as expression statement
         return this.parseExpressionStatement();
     }
-
     private parseProcedure(): ASTNode {
         const node: ASTNode = {
             type: ASTNodeType.procedure,
@@ -129,16 +133,21 @@ export class SSLParser {
             node.children.push(nameNode);
         }
 
-        // Parse parameters if present
+        // Parse inline parameters if present (immediately after procedure name)
         if (this.check(TokenType.parameters)) {
             node.children.push(this.parseParameters());
         }
 
         // Parse procedure body
         while (!this.check(TokenType.endproc) && !this.isAtEnd()) {
-            const statement = this.parseStatement();
-            if (statement) {
-                node.children.push(statement);
+            // Check for parameters as a separate statement within the procedure
+            if (this.check(TokenType.parameters)) {
+                node.children.push(this.parseParameters());
+            } else {
+                const statement = this.parseStatement();
+                if (statement) {
+                    node.children.push(statement);
+                }
             }
         }
 
@@ -334,7 +343,6 @@ export class SSLParser {
         // This would need to be refined based on actual SSL class syntax
         return node;
     }
-
     private parseDeclaration(): ASTNode {
         const node: ASTNode = {
             type: ASTNodeType.declaration,
@@ -344,19 +352,25 @@ export class SSLParser {
 
         this.consume(TokenType.declare, "Expected ':DECLARE'");
 
-        // Parse variable name
-        if (this.check(TokenType.identifier)) {
+        // Parse variable names (can be multiple, separated by commas)
+        while (this.check(TokenType.identifier)) {
             const nameNode: ASTNode = {
                 type: ASTNodeType.identifier,
                 value: this.advance().value,
                 children: [],
             };
             node.children.push(nameNode);
+
+            // Check for comma and continue parsing more identifiers
+            if (this.check(TokenType.comma)) {
+                this.advance(); // consume comma
+            } else {
+                break; // no more identifiers
+            }
         }
 
         return node;
     }
-
     private parseParameters(): ASTNode {
         const node: ASTNode = {
             type: ASTNodeType.parameter,
@@ -366,8 +380,8 @@ export class SSLParser {
 
         this.consume(TokenType.parameters, "Expected ':PARAMETERS'");
 
-        // Parse parameter list (simplified)
-        while (!this.isAtEnd() && this.check(TokenType.identifier)) {
+        // Parse parameter list with comma separation
+        while (this.check(TokenType.identifier)) {
             const paramNode: ASTNode = {
                 type: ASTNodeType.identifier,
                 value: this.advance().value,
@@ -375,8 +389,11 @@ export class SSLParser {
             };
             node.children.push(paramNode);
 
+            // Check for comma and continue parsing more parameters
             if (this.check(TokenType.comma)) {
-                this.advance();
+                this.advance(); // consume comma
+            } else {
+                break; // no more parameters
             }
         }
 
@@ -459,7 +476,6 @@ export class SSLParser {
 
     private parseComparison(): ASTNode | null {
         let expr = this.parseTerm();
-
         while (
             this.match(
                 TokenType.equals,
@@ -467,7 +483,8 @@ export class SSLParser {
                 TokenType.lessThan,
                 TokenType.greaterThan,
                 TokenType.lessEqual,
-                TokenType.greaterEqual
+                TokenType.greaterEqual,
+                TokenType.simpleEquals
             )
         ) {
             const operator = this.previous();
@@ -527,9 +544,8 @@ export class SSLParser {
 
         return expr;
     }
-
     private parseUnary(): ASTNode | null {
-        if (this.match(TokenType.not, TokenType.minus, TokenType.plus)) {
+        if (this.match(TokenType.not, TokenType.minus, TokenType.plus, TokenType.bang)) {
             const operator = this.previous();
             const right = this.parseUnary();
 
@@ -547,6 +563,8 @@ export class SSLParser {
     }
 
     private parsePrimary(): ASTNode | null {
+        const initialCurrent = this.current; // Save current position for backtracking
+
         if (
             this.match(
                 TokenType.stringLiteral,
@@ -564,8 +582,281 @@ export class SSLParser {
             };
         }
 
+        // Attempt to parse DateLiteral with a lookahead
+        if (this.check(TokenType.lbrace)) {
+            // Lookahead to differentiate DateLiteral from ArrayLiteral or CodeBlockLiteral
+            // A DateLiteral looks like: { Number, Number, Number ... }
+            // An ArrayLiteral could be: { Expression, Expression ... } or {}
+            // A CodeBlockLiteral looks like: {| IdentifierList | ExpressionList }
+
+            const initialCurrent = this.current; // Save current position for backtracking if lookahead fails
+
+            if (
+                this.tokens[initialCurrent + 1]?.type === TokenType.numberLiteral &&
+                this.tokens[initialCurrent + 2]?.type === TokenType.comma &&
+                this.tokens[initialCurrent + 3]?.type === TokenType.numberLiteral &&
+                this.tokens[initialCurrent + 4]?.type === TokenType.comma &&
+                this.tokens[initialCurrent + 5]?.type === TokenType.numberLiteral
+            ) {
+                // Strong indication of a DateLiteral, proceed to parse
+                const lbraceToken = this.advance(); // consume {
+                const dateParts: ASTNode[] = [];
+                let value = lbraceToken.value;
+
+                // Parse Year, Month, Day
+                for (let i = 0; i < 3; i++) {
+                    if (this.check(TokenType.numberLiteral)) {
+                        const numToken = this.advance();
+                        dateParts.push({
+                            type: ASTNodeType.literal,
+                            value: numToken.value,
+                            children: [],
+                            line: numToken.position.line,
+                        });
+                        value += numToken.value;
+                        if (i < 2) {
+                            if (this.check(TokenType.comma)) {
+                                value += this.advance().value; // consume ,
+                            } else {
+                                this.current = initialCurrent; // Backtrack
+                                return null; // Not a valid date literal structure
+                            }
+                        }
+                    } else {
+                        this.current = initialCurrent; // Backtrack
+                        return null; // Not a valid date literal structure
+                    }
+                }
+
+                // Optionally parse Hour, Minute, Second
+                if (this.check(TokenType.comma)) {
+                    value += this.advance().value; // consume , before Hour
+                    for (let i = 0; i < 3; i++) {
+                        if (this.check(TokenType.numberLiteral)) {
+                            const numToken = this.advance();
+                            dateParts.push({
+                                type: ASTNodeType.literal,
+                                value: numToken.value,
+                                children: [],
+                                line: numToken.position.line,
+                            });
+                            value += numToken.value;
+                            if (i < 2) {
+                                if (this.check(TokenType.comma)) {
+                                    value += this.advance().value; // consume ,
+                                } else {
+                                    this.current = initialCurrent; // Backtrack
+                                    return null; // Incomplete time part
+                                }
+                            }
+                        } else {
+                            this.current = initialCurrent; // Backtrack
+                            return null; // Incomplete time part
+                        }
+                    }
+                }
+
+                if (this.check(TokenType.rbrace)) {
+                    value += this.advance().value; // consume }
+                    return {
+                        type: ASTNodeType.literal, // Consider ASTNodeType.dateLiteral if defined
+                        value: value,
+                        children: dateParts,
+                        line: lbraceToken.position.line,
+                    };
+                } else {
+                    this.current = initialCurrent; // Backtrack, missing closing brace
+                    return null;
+                }
+            }
+            // If lookahead doesn't match DateLiteral, current remains initialCurrent
+            // Fall through to other parsing logic (e.g., array, code block, or parenthesized expression)
+        }
+
+        // Attempt to parse CodeBlockLiteral: {| IdentifierList | ExpressionList }
+        if (this.check(TokenType.lBracePipe)) {
+            // Corrected to check for lbracePipe
+            const lbracePipeToken = this.advance(); // consume {|
+
+            const params: ASTNode[] = [];
+            let value = lbracePipeToken.value; // Start with {| token value
+
+            // Parse IdentifierList (optional)
+            if (this.check(TokenType.identifier)) {
+                do {
+                    const identToken = this.advance();
+                    params.push({
+                        type: ASTNodeType.identifier,
+                        value: identToken.value,
+                        children: [],
+                        line: identToken.position.line,
+                    });
+                    value += identToken.value;
+                    if (this.check(TokenType.comma)) {
+                        value += this.advance().value; // consume ,
+                    }
+                } while (this.check(TokenType.identifier));
+            }
+
+            if (this.check(TokenType.pipe)) {
+                value += this.advance().value; // consume |
+            } else {
+                // This is not a valid code block, backtrack or handle error
+                this.current = initialCurrent; // Backtrack
+                return null;
+            }
+
+            const expressions: ASTNode[] = [];
+            // Parse ExpressionList
+            do {
+                const expr = this.parseExpression();
+                if (expr) {
+                    expressions.push(expr);
+                    if (expr.raw) {
+                        value += expr.raw;
+                    } else if (expr.value) {
+                        value += expr.value;
+                    }
+                }
+                // Consume comma if present before the next expression
+                if (this.check(TokenType.comma)) {
+                    if (this.tokens[this.current + 1]?.type !== TokenType.rbrace) {
+                        // Ensure comma is not before closing brace
+                        value += this.advance().value;
+                    } else {
+                        // Comma before closing brace, likely an error or end of list
+                        break;
+                    }
+                } else if (!this.check(TokenType.rbrace)) {
+                    // No comma, and not a closing brace, means end of expression list or syntax error
+                    break;
+                }
+            } while (!this.check(TokenType.rbrace) && !this.isAtEnd());
+
+            if (this.check(TokenType.rbrace)) {
+                value += this.advance().value; // consume }
+
+                // Group expressions into a single node if there are multiple, or use the single expression directly
+                const expressionNodeChildren = expressions;
+                let expressionNode: ASTNode | null = null;
+
+                if (expressions.length > 0) {
+                    expressionNode = {
+                        type: ASTNodeType.expression, // Or a more specific type like ASTNodeType.expressionList
+                        children: expressionNodeChildren,
+                        line:
+                            expressions.length > 0
+                                ? expressions[0].line
+                                : lbracePipeToken.position.line,
+                        // value: expressions.map(e => e.value || e.raw).join(\', \') // Optional: raw text of expressions
+                    };
+                }
+
+                const finalChildren: ASTNode[] = [];
+                if (params.length > 0) {
+                    // Group params into a single node if there are multiple, or use the single param directly
+                    if (params.length === 1) {
+                        finalChildren.push(params[0]);
+                    } else {
+                        finalChildren.push({
+                            type: ASTNodeType.parameter, // Or a more specific type like ASTNodeType.identifierList
+                            children: params,
+                            line:
+                                params.length > 0 ? params[0].line : lbracePipeToken.position.line,
+                        });
+                    }
+                }
+                if (expressionNode) {
+                    finalChildren.push(expressionNode);
+                }
+
+                return {
+                    type: ASTNodeType.codeBlockLiteral,
+                    value: value,
+                    children: finalChildren,
+                    line: lbracePipeToken.position.line,
+                };
+            } else {
+                // Missing closing brace, backtrack or handle error
+                this.current = initialCurrent; // Backtrack
+                return null;
+            }
+        }
+
+        // Parse ArrayLiteral: { ExpressionList } or {}
+        if (this.match(TokenType.lbrace)) {
+            const lbraceToken = this.previous();
+            const elements: ASTNode[] = [];
+            let value = lbraceToken.value;
+
+            if (!this.check(TokenType.rbrace)) {
+                do {
+                    const element = this.parseExpression();
+                    if (element) {
+                        elements.push(element);
+                        if (element.raw) {
+                            value += element.raw;
+                        } else if (element.value) {
+                            value += element.value;
+                        }
+                    }
+                    if (this.check(TokenType.comma)) {
+                        value += this.advance().value; // consume comma
+                    }
+                } while (
+                    this.check(TokenType.comma) ||
+                    (!this.check(TokenType.rbrace) && elements.length > 0)
+                );
+            }
+
+            if (this.check(TokenType.rbrace)) {
+                value += this.advance().value; // consume }
+                return {
+                    type: ASTNodeType.literal, // ArrayLiteral type
+                    value: value,
+                    children: elements,
+                    line: lbraceToken.position.line,
+                };
+            } else {
+                // Missing closing brace, create error or handle appropriately
+                return {
+                    type: ASTNodeType.literal,
+                    value: value,
+                    children: elements,
+                    line: lbraceToken.position.line,
+                };
+            }
+        }
+
         if (this.match(TokenType.identifier)) {
             const token = this.previous();
+
+            // Check if this is a function call (identifier followed by '(')
+            if (this.check(TokenType.lparen)) {
+                this.advance(); // consume '('
+
+                const args: ASTNode[] = [];
+
+                // Parse function arguments
+                if (!this.check(TokenType.rparen)) {
+                    do {
+                        const arg = this.parseExpression();
+                        if (arg) {
+                            args.push(arg);
+                        }
+                    } while (this.match(TokenType.comma));
+                }
+
+                this.consume(TokenType.rparen, "Expected ')' after function arguments");
+                return {
+                    type: ASTNodeType.callExpression,
+                    value: token.value,
+                    children: args,
+                    line: token.position.line,
+                };
+            }
+
+            // Simple identifier
             return {
                 type: ASTNodeType.identifier,
                 value: token.value,

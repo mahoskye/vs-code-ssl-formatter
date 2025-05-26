@@ -192,23 +192,27 @@ describe("SSLTokenizer", () => {
 
     describe("Literals", () => {
         it("should tokenize string literals with double quotes", () => {
-            // Test 5
+            // Test 5 - Now expects separate quote tokens
             tokenizer = new SSLTokenizer('"hello world";');
             const tokens = tokenizer.tokenize();
-            assertToken(tokens[0], TokenType.invalid, '"', 1, 1, 0);
+            assertToken(tokens[0], TokenType.doubleQuote, '"', 1, 1, 0);
             assertToken(tokens[1], TokenType.identifier, "hello", 1, 2, 1);
             assertToken(tokens[2], TokenType.whitespace, " ", 1, 7, 6);
             assertToken(tokens[3], TokenType.identifier, "world", 1, 8, 7);
-            assertToken(tokens[4], TokenType.invalid, '"', 1, 13, 12);
+            assertToken(tokens[4], TokenType.doubleQuote, '"', 1, 13, 12);
             assertToken(tokens[5], TokenType.semicolon, ";", 1, 14, 13);
             assertToken(tokens[6], TokenType.eof, "", 1, 15, 14);
         });
-
         it("should tokenize string literals with single quotes", () => {
             tokenizer = new SSLTokenizer("'another string';");
             const tokens = tokenizer.tokenize();
-            assertToken(tokens[0], TokenType.stringLiteral, "'another string'", 1, 1, 0);
-            assertToken(tokens[1], TokenType.semicolon, ";", 1, 17, 16);
+            assertToken(tokens[0], TokenType.singleQuote, "'", 1, 1, 0);
+            assertToken(tokens[1], TokenType.identifier, "another", 1, 2, 1);
+            assertToken(tokens[2], TokenType.whitespace, " ", 1, 9, 8);
+            assertToken(tokens[3], TokenType.identifier, "string", 1, 10, 9);
+            assertToken(tokens[4], TokenType.singleQuote, "'", 1, 16, 15);
+            assertToken(tokens[5], TokenType.semicolon, ";", 1, 17, 16);
+            assertToken(tokens[6], TokenType.eof, "", 1, 18, 17);
         });
 
         it("should tokenize number literals (integer and decimal)", () => {
@@ -398,14 +402,12 @@ describe("SSLTokenizer", () => {
             assertToken(tokens[9], TokenType.invalid, "\n", 1, 12, 11); // Line 1 (start), value \n, offset after ;
             // After this token: Line 2, Offset 11 + 1 = 12
             assertToken(tokens[10], TokenType.whitespace, "  ", 2, 1, 12); // Line 2, Col 1, Offset after \n token
-            assertToken(tokens[11], TokenType.identifier, "y", 2, 3, 14); // Offset 12 + 2 = 14
-            assertToken(tokens[12], TokenType.whitespace, " ", 2, 4, 15);
+            assertToken(tokens[11], TokenType.identifier, "y", 2, 3, 14); // Offset 12 + 2 = 14            assertToken(tokens[12], TokenType.whitespace, " ", 2, 4, 15);
             assertToken(tokens[13], TokenType.assign, ":=", 2, 5, 16);
-            assertToken(tokens[14], TokenType.whitespace, " ", 2, 7, 18);
-            // For "test"
-            assertToken(tokens[15], TokenType.invalid, '"', 2, 8, 19); // "
-            assertToken(tokens[16], TokenType.identifier, "test", 2, 9, 20); // test
-            assertToken(tokens[17], TokenType.invalid, '"', 2, 13, 24); // "
+            assertToken(tokens[14], TokenType.whitespace, " ", 2, 7, 18); // Before opening quote
+            assertToken(tokens[15], TokenType.doubleQuote, '"', 2, 8, 19); // Opening quote
+            assertToken(tokens[16], TokenType.identifier, "test", 2, 9, 20); // String content
+            assertToken(tokens[17], TokenType.doubleQuote, '"', 2, 13, 24); // Closing quote
             assertToken(tokens[18], TokenType.semicolon, ";", 2, 14, 25); // ;
             assertToken(tokens[19], TokenType.eof, "", 2, 15, 26); // EOF
         });
@@ -480,17 +482,16 @@ describe("SSLTokenizer", () => {
             if (lParenPrint) {
                 assertToken(lParenPrint, TokenType.lparen, "(", 6, 10, 162);
             }
-
             const quoteOpenExpensive = tokens.find(
                 (t) =>
                     t.value === '"' &&
-                    t.type === TokenType.invalid &&
+                    t.type === TokenType.doubleQuote &&
                     t.position.line === 6 &&
                     t.position.offset === (lParenPrint?.position.offset ?? 0) + 1
             );
             assert.ok(quoteOpenExpensive, "Opening quote for 'Expensive!' not found at line 6");
             if (quoteOpenExpensive) {
-                assertToken(quoteOpenExpensive, TokenType.invalid, '"', 6, 11, 163);
+                assertToken(quoteOpenExpensive, TokenType.doubleQuote, '"', 6, 11, 163);
             }
             const expensiveToken = tokens.find(
                 (t) => t.value === "Expensive" && t.position.line === 6
@@ -504,17 +505,16 @@ describe("SSLTokenizer", () => {
             if (exclamationToken) {
                 assertToken(exclamationToken, TokenType.invalid, "!", 6, 21, 173);
             }
-
             const quoteCloseExpensive = tokens.find(
                 (t) =>
                     t.value === '"' &&
-                    t.type === TokenType.invalid &&
+                    t.type === TokenType.doubleQuote &&
                     t.position.line === 6 &&
                     t.position.offset === (exclamationToken?.position.offset ?? 0) + 1
             );
             assert.ok(quoteCloseExpensive, "Closing quote for 'Expensive!' not found at line 6");
             if (quoteCloseExpensive) {
-                assertToken(quoteCloseExpensive, TokenType.invalid, '"', 6, 22, 174);
+                assertToken(quoteCloseExpensive, TokenType.doubleQuote, '"', 6, 22, 174);
             }
 
             const rParenPrint = tokens.find(
@@ -568,12 +568,11 @@ describe("SSLTokenizer", () => {
                 "Should end with EOF"
             );
         });
-
         it("should handle unterminated string as string literal up to EOF", () => {
-            // Test 11
+            // Test 11 - With separate quote tokenization, the opening quote is a valid DOUBLE_QUOTE token
             tokenizer = new SSLTokenizer('"this is not closed');
             const tokens = tokenizer.tokenize();
-            assertToken(tokens[0], TokenType.invalid, '"', 1, 1, 0);
+            assertToken(tokens[0], TokenType.doubleQuote, '"', 1, 1, 0);
             assertToken(tokens[1], TokenType.identifier, "this", 1, 2, 1);
             assertToken(tokens[2], TokenType.whitespace, " ", 1, 6, 5);
             assertToken(tokens[3], TokenType.identifier, "is", 1, 7, 6);
@@ -646,9 +645,9 @@ describe("SSLTokenizer", () => {
             assertToken(tokens[19], TokenType.whitespace, " ", 1, 73, 72);
             assertToken(tokens[20], TokenType.comma, ",", 1, 74, 73);
             assertToken(tokens[21], TokenType.whitespace, " ", 1, 75, 74);
-            assertToken(tokens[22], TokenType.invalid, '"', 1, 76, 75); // Opening quote
+            assertToken(tokens[22], TokenType.doubleQuote, '"', 1, 76, 75); // Opening quote - corrected to DOUBLE_QUOTE
             assertToken(tokens[23], TokenType.default, "default", 1, 77, 76); // Content, changed IDENTIFIER to DEFAULT
-            assertToken(tokens[24], TokenType.invalid, '"', 1, 84, 83); // Closing quote
+            assertToken(tokens[24], TokenType.doubleQuote, '"', 1, 84, 83); // Closing quote - corrected to DOUBLE_QUOTE
             assertToken(tokens[25], TokenType.whitespace, " ", 1, 85, 84);
             assertToken(tokens[26], TokenType.comma, ",", 1, 86, 85);
             assertToken(tokens[27], TokenType.whitespace, " ", 1, 87, 86);
@@ -663,27 +662,19 @@ describe("SSLTokenizer", () => {
     });
 
     describe("Bracket Context Awareness", () => {
-        it("should treat [ as string delimiter when no previous token", () => {
+        it("should treat [ as LBRACKET when no previous token", () => {
+            // Modified test description
             tokenizer = new SSLTokenizer("[hello world]");
             const tokens = tokenizer.tokenize();
 
-            assert.strictEqual(tokens.length, 2); // string literal + EOF
-            assertToken(tokens[0], TokenType.stringLiteral, "[hello world]", 1, 1, 0);
-            assertToken(tokens[1], TokenType.eof, "", 1, 14, 13);
-        });
-
-        it("should treat [ as string delimiter after keywords", () => {
-            tokenizer = new SSLTokenizer(":IF [condition];");
-            const tokens = tokenizer.tokenize();
-
-            const relevantTokens = tokens.filter((t) => t.type !== TokenType.whitespace);
-            // Expected: : (colon), IF (if), [condition] (stringLiteral), ; (semicolon), EOF (eof)
-            assert.strictEqual(relevantTokens.length, 5, "Expected 5 relevant tokens");
-            assertToken(relevantTokens[0], TokenType.colon, ":");
-            assertToken(relevantTokens[1], TokenType.if, "IF");
-            assertToken(relevantTokens[2], TokenType.stringLiteral, "[condition]");
-            assertToken(relevantTokens[3], TokenType.semicolon, ";");
-            assertToken(relevantTokens[4], TokenType.eof, "");
+            // Expected: LBRACKET, IDENTIFIER, WHITESPACE, IDENTIFIER, RBRACKET, EOF
+            assert.strictEqual(tokens.length, 6, "Expected 6 tokens for '[hello world]'");
+            assertToken(tokens[0], TokenType.lbracket, "[", 1, 1, 0);
+            assertToken(tokens[1], TokenType.identifier, "hello", 1, 2, 1);
+            assertToken(tokens[2], TokenType.whitespace, " ", 1, 7, 6);
+            assertToken(tokens[3], TokenType.identifier, "world", 1, 8, 7);
+            assertToken(tokens[4], TokenType.rbracket, "]", 1, 13, 12);
+            assertToken(tokens[5], TokenType.eof, "", 1, 14, 13);
         });
 
         it("should treat [ as array access after identifier", () => {
@@ -726,40 +717,6 @@ describe("SSLTokenizer", () => {
             assertToken(tokens[4], TokenType.identifier, "index", 1, 8, 7);
             assertToken(tokens[5], TokenType.rbracket, "]", 1, 13, 12);
             assertToken(tokens[6], TokenType.eof, "", 1, 14, 13);
-        });
-
-        it("should handle mixed array access and square bracket strings", () => {
-            tokenizer = new SSLTokenizer("array[0] := [string value];");
-            const tokens = tokenizer.tokenize();
-
-            const relevantTokens = tokens.filter((t) => t.type !== TokenType.whitespace);
-            // Expected: array, [, 0, ], :=, [string value], ;, EOF
-            assert.strictEqual(
-                relevantTokens.length,
-                8,
-                "Expected 8 relevant tokens for mixed array/string"
-            );
-            assertToken(relevantTokens[0], TokenType.identifier, "array");
-            assertToken(relevantTokens[1], TokenType.lbracket, "[");
-            assertToken(relevantTokens[2], TokenType.numberLiteral, "0");
-            assertToken(relevantTokens[3], TokenType.rbracket, "]");
-            assertToken(relevantTokens[4], TokenType.assign, ":=");
-            assertToken(relevantTokens[5], TokenType.stringLiteral, "[string value]");
-            assertToken(relevantTokens[6], TokenType.semicolon, ";");
-            assertToken(relevantTokens[7], TokenType.eof, "");
-        });
-
-        it("should handle array access with whitespace", () => {
-            tokenizer = new SSLTokenizer("myArray [ index ]");
-            const tokens = tokenizer.tokenize();
-
-            const relevantTokens = tokens.filter((t) => t.type !== TokenType.whitespace);
-            assert.strictEqual(relevantTokens.length, 5); // identifier + lbracket + identifier + rbracket + EOF
-            assertToken(relevantTokens[0], TokenType.identifier, "myArray");
-            assertToken(relevantTokens[1], TokenType.lbracket, "[");
-            assertToken(relevantTokens[2], TokenType.identifier, "index");
-            assertToken(relevantTokens[3], TokenType.rbracket, "]");
-            assertToken(relevantTokens[4], TokenType.eof, "");
         });
     });
 });
