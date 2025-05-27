@@ -17,7 +17,7 @@ module.exports = {
     verbose: true,
     testTimeout: 30000,
     // Add these for debugging hanging tests
-    forceExit: true,
+    // forceExit: true, // Commented out to see if Jest provides more info
     detectOpenHandles: true,
     // Module name mapping for VS Code API
     moduleNameMapper: {

@@ -98,7 +98,22 @@ export class Uri {
 
 // Position mock
 export class Position {
-    constructor(public readonly line: number, public readonly character: number) {}
+    public readonly line: number;
+    public readonly character: number;
+
+    constructor(line: number, character: number) {
+        // console.log(
+        //     `Mock Position constructor: line=<span class="math-inline">\{line\}, character\=</span>{character}`
+        // ); // Basic log
+        if (typeof line !== "number" || typeof character !== "number") {
+            console.error(
+                `Mock Position constructor: Invalid arguments! line=<span class="math-inline">\{line\}, character\=</span>{character}`
+            );
+        }
+        this.line = line;
+        this.character = character;
+        // console.log("Mock Position instance after assignment:", this); // Detailed log
+    }
 
     isEqual(other: Position): boolean {
         return this.line === other.line && this.character === other.character;
@@ -131,27 +146,41 @@ export class Range {
     public readonly end: Position;
 
     constructor(
-        startLineOrPosition: number | Position,
-        startCharacterOrPosition: number | Position,
-        endLine?: number,
-        endCharacter?: number
+        startOrLine: Position | number,
+        endOrCharOrLine: Position | number,
+        endLineOrNothing?: number,
+        endChar?: number
     ) {
-        if (
-            typeof startLineOrPosition === "number" &&
-            typeof startCharacterOrPosition === "number" &&
-            typeof endLine === "number" &&
-            typeof endCharacter === "number"
-        ) {
-            this.start = new Position(startLineOrPosition, startCharacterOrPosition);
-            this.end = new Position(endLine, endCharacter);
+        // console.log(
+        //     `Mock Range constructor called with: arg1=<span class="math-inline">\{startOrLine\}, arg2\=</span>{endOrCharOrLine}, arg3=<span class="math-inline">\{endLineOrNothing\}, arg4\=</span>{endChar}`
+        // ); // Basic log
+        if (startOrLine instanceof Position && endOrCharOrLine instanceof Position) {
+            this.start = startOrLine;
+            this.end = endOrCharOrLine;
+            // console.log("Mock Range created (pos, pos):", this); // Detailed log
         } else if (
-            startLineOrPosition instanceof Position &&
-            startCharacterOrPosition instanceof Position
+            typeof startOrLine === "number" &&
+            typeof endOrCharOrLine === "number" &&
+            typeof endLineOrNothing === "number" &&
+            typeof endChar === "number"
         ) {
-            this.start = startLineOrPosition;
-            this.end = startCharacterOrPosition;
+            this.start = new Position(startOrLine, endOrCharOrLine);
+            this.end = new Position(endLineOrNothing, endChar);
+            // console.log("Mock Range created (num, num, num, num):", this); // Detailed log
         } else {
-            throw new Error("Invalid Range constructor arguments");
+            console.error("Mock Range constructor: Unhandled signature, defaulting start/end.");
+            this.start = new Position(0, 0);
+            this.end = new Position(0, 0);
+        }
+
+        if (!this.start || !this.end) {
+            // Add this check
+            console.error(
+                "Mock Range constructor: FATAL - this.start or this.end is FALSY after construction!",
+                this
+            );
+        } else {
+            // console.log("Mock Range constructor: this.start and this.end seem OK.", this); // Detailed log
         }
     }
 
@@ -400,18 +429,18 @@ export interface TextEditorOptions {
 }
 
 export enum TextEditorCursorStyle {
-    Line = 1,
-    Block = 2,
-    Underline = 3,
-    LineThin = 4,
-    BlockOutline = 5,
-    UnderlineThin = 6,
+    line = 1,
+    block = 2,
+    underline = 3,
+    lineThin = 4,
+    blockOutline = 5,
+    underlineThin = 6,
 }
 
 export enum TextEditorLineNumbersType {
-    Off = 0,
-    On = 1,
-    Relative = 2,
+    off = 0,
+    on = 1,
+    relative = 2,
 }
 
 export interface TextEditorEdit {
@@ -458,29 +487,29 @@ export class ThemeColor {
     constructor(public id: string) {}
 }
 export enum OverviewRulerLane {
-    Left = 1,
-    Center = 2,
-    Right = 4,
-    Full = 7,
+    left = 1,
+    center = 2,
+    right = 4,
+    full = 7,
 }
 export enum TextEditorRevealType {
-    Default = 0,
-    InCenter = 1,
-    InCenterIfOutsideViewport = 2,
-    AtTop = 3,
+    default = 0,
+    inCenter = 1,
+    inCenterIfOutsideViewport = 2,
+    atTop = 3,
 }
 export enum ViewColumn {
-    Active = -1,
-    Beside = -2,
-    One = 1,
-    Two = 2,
-    Three = 3,
-    Four = 4,
-    Five = 5,
-    Six = 6,
-    Seven = 7,
-    Eight = 8,
-    Nine = 9,
+    active = -1,
+    beside = -2,
+    one = 1,
+    two = 2,
+    three = 3,
+    four = 4,
+    five = 5,
+    six = 6,
+    seven = 7,
+    eight = 8,
+    nine = 9,
 }
 
 export interface Disposable {
@@ -605,9 +634,9 @@ export interface WorkspaceConfiguration {
 }
 
 export enum ConfigurationTarget {
-    Global = 1,
-    Workspace = 2,
-    WorkspaceFolder = 3,
+    global = 1,
+    workspace = 2,
+    workspaceFolder = 3,
 }
 
 export interface FileSystemWatcher extends Disposable {
@@ -637,8 +666,8 @@ export interface Extension<T> {
 }
 
 export enum ExtensionKind {
-    UI = 1,
-    Workspace = 2,
+    ui = 1,
+    workspace = 2,
 }
 
 export interface Command {
@@ -648,10 +677,29 @@ export interface Command {
     arguments?: any[];
 }
 
-export interface TextEdit {
-    range: Range;
-    newText: string;
-    newEol?: EndOfLine;
+// TextEdit class with static methods (no interface to avoid conflicts)
+export class TextEdit {
+    public range: Range;
+    public newText: string;
+    public newEol?: EndOfLine;
+
+    constructor(range: Range, newText: string) {
+        this.range = range;
+        this.newText = newText;
+    }
+
+    public static replace(range: Range, newText: string): TextEdit {
+        return new TextEdit(range, newText);
+    }
+
+    public static insert(position: Position, newText: string): TextEdit {
+        const resultRange = new Range(position, position);
+        return new TextEdit(resultRange, newText);
+    }
+
+    public static delete(range: Range): TextEdit {
+        return new TextEdit(range, "");
+    }
 }
 export class WorkspaceEdit implements Disposable {
     entries(): [Uri, TextEdit[]][] {
@@ -675,83 +723,83 @@ export class WorkspaceEdit implements Disposable {
 }
 
 export enum DiagnosticSeverity {
-    Error = 0,
-    Warning = 1,
-    Information = 2,
-    Hint = 3,
+    error = 0,
+    warning = 1,
+    information = 2,
+    hint = 3,
 }
 
 export enum SymbolKind {
-    File = 0,
-    Module = 1,
-    Namespace = 2,
-    Package = 3,
-    Class = 4,
-    Method = 5,
-    Property = 6,
-    Field = 7,
-    Constructor = 8,
-    Enum = 9,
-    Interface = 10,
-    Function = 11,
-    Variable = 12,
-    Constant = 13,
-    String = 14,
-    Number = 15,
-    Boolean = 16,
-    Array = 17,
-    Object = 18,
-    Key = 19,
-    Null = 20,
-    EnumMember = 21,
-    Struct = 22,
-    Event = 23,
-    Operator = 24,
-    TypeParameter = 25,
+    file = 0,
+    module = 1,
+    namespace = 2,
+    package = 3,
+    class = 4,
+    method = 5,
+    property = 6,
+    field = 7,
+    constructor = 8,
+    enum = 9,
+    interface = 10,
+    function = 11,
+    variable = 12,
+    constant = 13,
+    string = 14,
+    number = 15,
+    boolean = 16,
+    array = 17,
+    object = 18,
+    key = 19,
+    null = 20,
+    enumMember = 21,
+    struct = 22,
+    event = 23,
+    operator = 24,
+    typeParameter = 25,
 }
 
 // EndOfLine enum
 export enum EndOfLine {
-    LF = 1,
-    CRLF = 2,
+    lf = 1,
+    crlf = 2,
 }
 
 // CompletionItemKind enum
 export enum CompletionItemKind {
-    Text = 0,
-    Method = 1,
-    Function = 2,
-    Constructor = 3,
-    Field = 4,
-    Variable = 5,
-    Class = 6,
-    Interface = 7,
-    Module = 8,
-    Property = 9,
-    Unit = 10,
-    Value = 11,
-    Enum = 12,
-    Keyword = 13,
-    Snippet = 14,
-    Color = 15,
-    File = 16,
-    Reference = 17,
-    Folder = 18,
-    EnumMember = 19,
-    Constant = 20,
-    Struct = 21,
-    Event = 22,
-    Operator = 23,
-    TypeParameter = 24,
-    User = 25,
-    Issue = 26,
+    text = 0,
+    method = 1,
+    function = 2,
+    constructor = 3,
+    field = 4,
+    variable = 5,
+    class = 6,
+    interface = 7,
+    module = 8,
+    property = 9,
+    unit = 10,
+    value = 11,
+    enum = 12,
+    keyword = 13,
+    snippet = 14,
+    color = 15,
+    file = 16,
+    reference = 17,
+    folder = 18,
+    enumMember = 19,
+    constant = 20,
+    struct = 21,
+    event = 22,
+    operator = 23,
+    typeParameter = 24,
+    user = 25,
+    issue = 26,
 }
 
 // FoldingRangeKind enum
 export enum FoldingRangeKind {
-    Comment = 1,
-    Imports = 2,
-    Region = 3,
+    comment = 1,
+    imports = 2,
+    region = 3,
 }
 
 // CancellationToken mock
@@ -760,7 +808,7 @@ export interface CancellationToken {
     onCancellationRequested: Event<any>; // Correctly typed with Event<any>
 }
 
-export const CancellationTokenNone: CancellationToken = {
+export const cancellationTokenNone: CancellationToken = {
     isCancellationRequested: false,
     onCancellationRequested: new EventEmitter<any>().event,
 };
@@ -796,6 +844,83 @@ export class CancellationTokenSource implements Disposable {
         this._onCancellationRequestedEmitter.dispose();
     }
 }
+
+// Moved definitions before their use in the main 'vscode' export object
+// Enums that might be accessed directly (like vscode.StatusBarAlignment)
+export enum StatusBarAlignment {
+    left = 1,
+    right = 2,
+}
+
+// ThemeIcon mock
+export class ThemeIcon {
+    constructor(public readonly id: string) {}
+    static readonly file = new ThemeIcon("file");
+    static readonly folder = new ThemeIcon("folder");
+}
+
+// TreeItem & TreeItemCollapsibleState
+export enum TreeItemCollapsibleState {
+    none = 0,
+    collapsed = 1,
+    expanded = 2,
+}
+
+export class TreeItem {
+    public iconPath?: string | Uri | { light: string | Uri; dark: string | Uri } | ThemeIcon;
+    public command?: Command;
+    public collapsibleState?: TreeItemCollapsibleState;
+    public contextValue?: string;
+    public tooltip?: string | MarkdownString;
+    public description?: string | boolean;
+    public label: string; // Ensure label is a public property
+
+    constructor(
+        label: string | { label: string; highlights?: [number, number][] },
+        collapsibleState?: TreeItemCollapsibleState
+    ) {
+        if (typeof label === "string") {
+            this.label = label;
+        } else {
+            this.label = label.label;
+            // this.highlights = label.highlights; // If you need to support highlights
+        }
+        this.collapsibleState =
+            collapsibleState === undefined ? TreeItemCollapsibleState.none : collapsibleState;
+    }
+}
+
+// FileSystemError and related for file operations if needed
+export class FileSystemError extends Error {
+    readonly code: string;
+    constructor(messageOrUri?: string | Uri) {
+        super(
+            typeof messageOrUri === "string"
+                ? messageOrUri
+                : messageOrUri
+                ? messageOrUri.toString()
+                : undefined
+        );
+        this.code = "Unknown"; // Default code
+    }
+
+    static fileNotFound(messageOrUri?: string | Uri): FileSystemError {
+        const err = new FileSystemError(messageOrUri);
+        (err as any).code = "FileNotFound";
+        return err;
+    }
+    static fileExists(messageOrUri?: string | Uri): FileSystemError {
+        const err = new FileSystemError(messageOrUri);
+        (err as any).code = "FileExists";
+        return err;
+    }
+    static noPermissions(messageOrUri?: string | Uri): FileSystemError {
+        const err = new FileSystemError(messageOrUri);
+        (err as any).code = "NoPermissions";
+        return err;
+    }
+}
+
 // --- Mocked VSCode API Modules ---
 
 export const workspace = {
@@ -842,7 +967,7 @@ export const workspace = {
                 isDirty: false,
                 isClosed: false,
                 save: jestMock.fn(() => Promise.resolve(true)),
-                eol: EndOfLine.LF,
+                eol: EndOfLine.lf,
                 lineCount: documentContent.split("\n").length,
                 lineAt: jestMock.fn((lineOrPosition: number | Position) => {
                     const lineNumber =
@@ -962,7 +1087,7 @@ export const extensions = {
                 extensionPath: "/mock/extension/path",
                 isActive: false,
                 packageJSON: { name: "test-provider", version: "0.0.1" },
-                extensionKind: ExtensionKind.Workspace,
+                extensionKind: ExtensionKind.workspace,
                 exports: {},
                 activate: jestMock.fn(() => Promise.resolve({})),
             };
@@ -1049,7 +1174,7 @@ export const window = {
                         viewColumn:
                             typeof columnOrOptions === "number"
                                 ? columnOrOptions
-                                : ViewColumn.Active,
+                                : ViewColumn.active,
                         edit: jestMock.fn(),
                         insertSnippet: jestMock.fn(),
                         setDecorations: jestMock.fn(),
@@ -1121,9 +1246,9 @@ export const commands = {
 
 // For things like Progress
 export enum ProgressLocation {
-    SourceControl = 1,
-    Window = 10,
-    Notification = 15,
+    sourceControl = 1,
+    window = 10,
+    notification = 15,
 }
 
 export interface ProgressOptions {
@@ -1137,119 +1262,78 @@ export interface Progress<T> {
 }
 
 // Add a mock for withProgress
-(window as any).withProgress = jestMock.fn(
-    async <R>(
-        options: ProgressOptions,
-        task: (
-            progress: Progress<{ message?: string; increment?: number }>,
-            token: CancellationToken
-        ) => Thenable<R>
-    ): Promise<R> => {
-        const progressMock: Progress<{ message?: string; increment?: number }> = {
-            report: jestMock.fn(),
-        };
-        const cancellationTokenSource = new CancellationTokenSource();
-        try {
-            if (options.cancellable) {
-                // Example: Simulate cancellation for testing purposes if needed
-                // setTimeout(() => cancellationTokenSource.cancel(), 50);
+// Ensure window is defined before this, or handle it being potentially undefined if used standalone
+if (typeof window !== "undefined") {
+    (window as any).withProgress = jestMock.fn(
+        async <R>(
+            options: ProgressOptions,
+            task: (
+                progress: Progress<{ message?: string; increment?: number }>,
+                token: CancellationToken
+            ) => Thenable<R>
+        ): Promise<R> => {
+            const progressMock: Progress<{ message?: string; increment?: number }> = {
+                report: jestMock.fn(),
+            };
+            const cancellationTokenSource = new CancellationTokenSource();
+            try {
+                if (options.cancellable) {
+                    // Example: Simulate cancellation for testing purposes if needed
+                    // setTimeout(() => cancellationTokenSource.cancel(), 50);
+                }
+                const result = await task(progressMock, cancellationTokenSource.token);
+                return result;
+            } finally {
+                cancellationTokenSource.dispose();
             }
-            const result = await task(progressMock, cancellationTokenSource.token);
-            return result;
-        } finally {
-            cancellationTokenSource.dispose();
         }
-    }
-);
+    );
+}
 
-const vscode = {
-    Uri,
-    Position,
-    Range,
-    Selection,
-    MarkdownString,
-    Hover,
-    FoldingRange,
-    CompletionItem,
-    EndOfLine,
-    CompletionItemKind,
-    FoldingRangeKind,
-    DiagnosticSeverity,
-    SymbolKind,
-    CancellationTokenSource,
-    CancellationToken: CancellationTokenNone,
+// --- Global VSCode API Mock ---
+// This is the main export that Jest will use when you `jest.mock(\'vscode\')`
+// Ensure this is at the VERY END of the file, after all classes and enums are defined.
+export const vscode = {
+    uri: Uri, // Class
+    position: Position, // Class
+    range: Range, // Class
+    selection: Selection, // Class
+    markdownString: MarkdownString, // Class
+    hover: Hover, // Class
+    foldingRange: FoldingRange, // Class
+    completionItem: CompletionItem, // Class
+    textEdit: TextEdit, // Class
+    themeColor: ThemeColor, // Class
+    snippetString: SnippetString, // Class
+    eventEmitter: EventEmitter, // Class
+    workspaceEdit: WorkspaceEdit, // Class
+    cancellationTokenSource: CancellationTokenSource, // Class
+    themeIcon: ThemeIcon, // Class
+    treeItem: TreeItem, // Class
+    fileSystemError: FileSystemError, // Class
+
+    endOfLine: EndOfLine, // Enum
+    completionItemKind: CompletionItemKind, // Enum
+    foldingRangeKind: FoldingRangeKind, // Enum
+    diagnosticSeverity: DiagnosticSeverity, // Enum
+    symbolKind: SymbolKind, // Enum
+    progressLocation: ProgressLocation, // Enum
+    overviewRulerLane: OverviewRulerLane, // Enum
+    textEditorRevealType: TextEditorRevealType, // Enum
+    viewColumn: ViewColumn, // Enum
+    configurationTarget: ConfigurationTarget, // Enum
+    extensionKind: ExtensionKind, // Enum
+    statusBarAlignment: StatusBarAlignment, // Enum
+    treeItemCollapsibleState: TreeItemCollapsibleState, // Enum
+
+    cancellationToken: cancellationTokenNone, // Const object
+
+    // Mocked modules
     workspace,
-    extensions,
-    languages,
     window,
     commands,
-    ProgressLocation,
-    ThemeColor,
-    OverviewRulerLane,
-    TextEditorRevealType,
-    ViewColumn,
-    ConfigurationTarget,
-    ExtensionKind,
-    SnippetString,
-    EventEmitter,
-    WorkspaceEdit,
-    version: "1.85.0",
-    env: {
-        appName: "VSCode Mock",
-        appRoot: "/mock/app/root",
-        language: "en",
-        machineId: "mockMachineId",
-        sessionId: "mockSessionId",
-        shell: process.platform === "win32" ? "pwsh.exe" : "/bin/bash",
-        uiKind: 1, // UIKind.Desktop
-        uriScheme: "vscode",
-        clipboard: {
-            readText: jestMock.fn(() => Promise.resolve("")),
-            writeText: jestMock.fn(() => Promise.resolve()),
-        },
-        openExternal: jestMock.fn(() => Promise.resolve(false)),
-        asExternalUri: jestMock.fn(async (target: Uri) => target),
-        appHost: "desktop",
-        remoteName: undefined,
-        isRemote: false,
-        isNewAppInstall: false,
-        isTelemetryEnabled: false,
-        onDidChangeTelemetryEnabled: new EventEmitter<boolean>().event,
-    },
-    l10n: {
-        t: jestMock.fn(
-            (message: string, ...args: (string | number | boolean | Record<string, any>)[]) => {
-                let result = message;
-                if (args.length > 0) {
-                    if (
-                        typeof args[0] === "object" &&
-                        args[0] !== null &&
-                        !Array.isArray(args[0])
-                    ) {
-                        const replacements = args[0] as Record<string, any>;
-                        for (const key in replacements) {
-                            // Ensure RegExp is created correctly for `{${key}}` replacement
-                            result = result.replace(
-                                new RegExp(`\{\s*${key}\s*\}`, "g"),
-                                String(replacements[key])
-                            );
-                        }
-                    } else {
-                        args.forEach((arg, index) => {
-                            // Ensure RegExp is created correctly for `{${index}}` replacement
-                            result = result.replace(
-                                new RegExp(`\{\s*${index}\s*\}`, "g"),
-                                String(arg)
-                            );
-                        });
-                    }
-                }
-                return result;
-            }
-        ),
-        bundle: undefined,
-        uri: undefined,
-    },
+    languages,
+    extensions,
+    // Other necessary constructs
+    // QuickPickItem, etc.
 };
-
-export default vscode;

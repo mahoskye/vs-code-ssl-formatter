@@ -4,12 +4,11 @@
  */
 
 import * as vscode from "vscode";
-import { SSLTokenizer, Token, TokenType } from "./tokenizer";
-import { SSLParser, ASTNode, ASTNodeType } from "./parser";
+import { SSLTokenizer } from "./tokenizer"; // Changed from tokenizeSSL
+import { SSLParser, ASTNode, ASTNodeType } from "./parser"; // Changed from parseTokens and added ASTNode, ASTNodeType
 
-export interface FormattingOptions {
-    tabSize: number;
-    insertSpaces: boolean;
+export interface FormattingOptions extends vscode.FormattingOptions {
+    // Potentially add custom options here if needed beyond vscode.FormattingOptions
     maxLineLength: number;
     indentStyle: "space" | "tab";
 }
@@ -35,22 +34,29 @@ export interface FormattingContext {
  */
 export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvider {
     private rules: FormattingRule[];
-
     constructor() {
         this.rules = [
-            new IndentationRule(),
             new OperatorSpacingRule(),
+            new CommaSpacingRule(),
             new BlockAlignmentRule(),
             new ColonSpacingRule(),
-            new CommaSpacingRule(),
+            new IndentationRule(), // Apply indentation last
         ];
     }
 
     public async provideDocumentFormattingEdits(
+        // Added async
         document: vscode.TextDocument,
-        options: vscode.FormattingOptions,
+        options: FormattingOptions, // Use our extended options type
         token: vscode.CancellationToken
     ): Promise<vscode.TextEdit[]> {
+        // Changed return type
+        if (token.isCancellationRequested) {
+            return [];
+        }
+
+        const fullText = document.getText();
+
         try {
             const text = document.getText();
 
@@ -60,15 +66,29 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
                 maxLineLength: 90, // Default SSL line length
                 indentStyle: options.insertSpaces ? "space" : "tab",
             };
-
-            const formattedText = await this.formatText(text, formattingOptions, token);
+            const formattedText = await this.formatText(text, formattingOptions, token); // Defensive check: ensure formattedText is a string
+            if (typeof formattedText !== "string" || formattedText === undefined) {
+                console.error(
+                    "formatText returned invalid result:",
+                    typeof formattedText,
+                    formattedText
+                );
+                return []; // Return no edits if formatting failed
+            }
 
             // Return a single edit that replaces the entire document
             const lastLineId = document.lineCount - 1;
-            const lastLineLength = document.lineAt(lastLineId).text.length;
-            const range = new vscode.Range(0, 0, lastLineId, lastLineLength);
+            const lineAtLast = document.lineAt(lastLineId); // Get the TextLine object
+            const lastLineLength = lineAtLast ? lineAtLast.text.length : 0; // Ensure lineAtLast is not undefined
 
-            return [vscode.TextEdit.replace(range, formattedText)];
+            // console.log(
+            //     `SSLFormattingProvider: lineCount=<span class="math-inline">\{document\.lineCount\}, lastLineId\=</span>{lastLineId}, lastLineLength=${lastLineLength}`
+            // );
+
+            const range = new vscode.Range(0, 0, lastLineId, lastLineLength);
+            // console.log("SSLFormattingProvider: Created range:", JSON.stringify(range));
+            const edit = vscode.TextEdit.replace(range, formattedText);
+            return [edit];
         } catch (error) {
             console.error("SSL Formatting error:", error);
             vscode.window.showErrorMessage(
@@ -82,26 +102,38 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
         options: FormattingOptions,
         token: vscode.CancellationToken
     ): Promise<string> {
+        const startTime = Date.now();
+        const MAX_PROCESSING_TIME = 5000; // 5 second timeout
+
         let ast: ASTNode;
 
         try {
             // Check cancellation before expensive operations
-            if (token.isCancellationRequested) {
+            if (token && token.isCancellationRequested) {
                 return text;
             }
 
             // Tokenize the input
-            const tokenizer = new SSLTokenizer(text);
-            const tokens = tokenizer.tokenize();
+            const tokenizer = new SSLTokenizer(text); // Corrected usage
+            const tokens = tokenizer.tokenize(); // Corrected usage
 
-            // Check cancellation again
-            if (token.isCancellationRequested) {
+            // Check cancellation and timeout
+            if (token && token.isCancellationRequested) {
+                return text;
+            }
+            if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+                console.warn("SSL Formatting timeout during tokenization");
                 return text;
             }
 
             // Parse into AST for structural understanding
-            const parser = new SSLParser(tokens);
-            ast = parser.parse();
+            const parser = new SSLParser(tokens); // Corrected usage
+            ast = parser.parse(); // Corrected usage
+
+            if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+                console.warn("SSL Formatting timeout during parsing");
+                return text;
+            }
         } catch (error) {
             console.error("SSL Tokenizer/Parser error, proceeding without AST:", error);
             // Create a minimal AST to avoid crashes
@@ -113,8 +145,25 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
         const formattedLines: string[] = [];
         let currentIndentLevel = 0;
         let currentBlockType: string | null = null;
-        for (let i = 0; i < lines.length; i++) {
-            if (token.isCancellationRequested) {
+
+        // Safety limit for very large files
+        const MAX_LINES = 10000;
+        const actualLines = Math.min(lines.length, MAX_LINES);
+
+        if (lines.length > MAX_LINES) {
+            console.warn(
+                `SSL Formatting limiting processing to ${MAX_LINES} lines (original: ${lines.length})`
+            );
+        }
+
+        for (let i = 0; i < actualLines; i++) {
+            // Check timeout every line for safety
+            if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+                console.warn(`SSL Formatting timeout at line ${i + 1}/${lines.length}`);
+                return text;
+            }
+
+            if (token && token.isCancellationRequested) {
                 return text;
             }
 
@@ -125,11 +174,6 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
             if (trimmedLine === "") {
                 formattedLines.push("");
                 continue;
-            }
-
-            // Add cancellation check every 10 lines for very large files
-            if (i % 10 === 0 && token.isCancellationRequested) {
-                return text;
             }
 
             // Analyze line context FIRST to determine proper indentation for current line
@@ -150,8 +194,9 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
                 lineNumber: i + 1,
                 options: options,
                 ast: ast,
-            }; // Apply formatting rules
+            }; // Apply formatting rules with safety limits
             let formattedLine = trimmedLine;
+
             for (const rule of this.rules) {
                 try {
                     const result = rule.apply(formattedLine, context);
@@ -192,7 +237,6 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
             currentIndentLevel = lineContext.indentLevel;
             currentBlockType = lineContext.blockType;
         }
-
         const result = formattedLines.join("\n");
 
         // Defensive check: ensure we return a string
@@ -389,27 +433,32 @@ class OperatorSpacingRule implements FormattingRule {
         return result;
     }
     private addSpacingAroundOperator(text: string, operator: string, checkUnary = false): string {
-        // Early return if operator not found
-        if (!text.includes(operator)) {
-            return text;
+        const leadingWhitespaceMatch = text.match(/^(\s*)/);
+        const leadingWhitespace = leadingWhitespaceMatch ? leadingWhitespaceMatch[0] : "";
+        const contentText = text.substring(leadingWhitespace.length);
+
+        // Early return if operator not found in content
+        if (!contentText.includes(operator)) {
+            return text; // Return original full text, which includes its original leading whitespace
         }
 
-        // Don't modify operators inside strings or comments
-        if (this.isInsideStringOrComment(text, operator)) {
-            return text;
+        // Don't modify operators inside strings or comments (check on contentText)
+        if (this.isInsideStringOrComment(contentText, operator)) {
+            return text; // Return original full text
         }
 
         // Escape special regex characters but keep the operator as a single unit
         const escapedOperator = operator.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         const regex = new RegExp(`(\S)\s*${escapedOperator}\s*(\S)`, "g");
 
-        // Replace with spaced operator and normalize multiple spaces
-        let result = text.replace(regex, `$1 ${operator} $2`);
+        // Replace with spaced operator on contentText
+        let processedContent = contentText.replace(regex, `$1 ${operator} $2`);
 
-        // Clean up extra spaces but preserve string structure
-        result = result.replace(/\s{2,}/g, " ");
+        // Clean up extra spaces within the processedContent.
+        // This line matches the user's restored file (applied to content): processedContent.replace(/\s{2,}/g, " ")
+        processedContent = processedContent.replace(/\s{2,}/g, " ");
 
-        return result;
+        return leadingWhitespace + processedContent;
     }
     private isInsideStringOrComment(text: string, operator: string): boolean {
         // Find all occurrences of the operator
@@ -485,10 +534,31 @@ class ColonSpacingRule implements FormattingRule {
             // Ensure single space after colon for keywords
             const keywordMatch = trimmedLine.match(/^:(\w+)\s*/);
             if (keywordMatch) {
-                const keyword = keywordMatch[1];
-                const rest = trimmedLine.substring(keywordMatch[0].length);
-                const indentString = line.substring(0, line.indexOf(":"));
-                return `${indentString}:${keyword.toUpperCase()}${rest ? " " + rest : ""}`;
+                const keyword = keywordMatch[1]; // Get the rest of the line and preserve semicolons
+                let rest = trimmedLine.substring(keywordMatch[0].length);
+
+                // Check if rest ends with semicolon to preserve it properly
+                const hasSemicolon = rest.endsWith(";");
+
+                // If there's a semicolon, remove it temporarily for trimming
+                if (hasSemicolon) {
+                    rest = rest.substring(0, rest.length - 1).trim();
+                    // Add semicolon back with no space before it
+                    rest = rest ? rest + ";" : ";";
+                } else {
+                    rest = rest.trim();
+                }
+
+                // Get all whitespace up to the first non-whitespace character
+                const leadingWhitespace = line.substring(0, line.length - line.trimStart().length);
+
+                // Handle case with empty rest but with semicolon
+                if (rest === ";") {
+                    return `${leadingWhitespace}:${keyword.toUpperCase()};`;
+                }
+
+                // Use the existing indentation plus the keyword formatting with proper spacing
+                return `${leadingWhitespace}:${keyword.toUpperCase()}${rest ? " " + rest : ""}`;
             }
         }
         return line;
