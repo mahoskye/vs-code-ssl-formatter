@@ -53,6 +53,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
     ): Promise<vscode.TextEdit[]> {
         try {
             const text = document.getText();
+
             const formattingOptions: FormattingOptions = {
                 tabSize: options.tabSize,
                 insertSpaces: options.insertSpaces,
@@ -76,29 +77,45 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
             return [];
         }
     }
-
     private async formatText(
         text: string,
         options: FormattingOptions,
         token: vscode.CancellationToken
     ): Promise<string> {
-        // Tokenize the input
-        const tokenizer = new SSLTokenizer(text);
-        const tokens = tokenizer.tokenize();
+        let ast: ASTNode;
 
-        // Parse into AST for structural understanding
-        const parser = new SSLParser(tokens);
-        const ast = parser.parse();
+        try {
+            // Check cancellation before expensive operations
+            if (token.isCancellationRequested) {
+                return text;
+            }
+
+            // Tokenize the input
+            const tokenizer = new SSLTokenizer(text);
+            const tokens = tokenizer.tokenize();
+
+            // Check cancellation again
+            if (token.isCancellationRequested) {
+                return text;
+            }
+
+            // Parse into AST for structural understanding
+            const parser = new SSLParser(tokens);
+            ast = parser.parse();
+        } catch (error) {
+            console.error("SSL Tokenizer/Parser error, proceeding without AST:", error);
+            // Create a minimal AST to avoid crashes
+            ast = { type: ASTNodeType.program, children: [] };
+        }
 
         // Process line by line with context from AST
         const lines = text.split(/\r?\n/);
         const formattedLines: string[] = [];
         let currentIndentLevel = 0;
         let currentBlockType: string | null = null;
-
         for (let i = 0; i < lines.length; i++) {
             if (token.isCancellationRequested) {
-                throw new Error("Formatting cancelled");
+                return text;
             }
 
             const line = lines[i];
@@ -108,28 +125,63 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
             if (trimmedLine === "") {
                 formattedLines.push("");
                 continue;
-            } // Create formatting context BEFORE updating state
+            }
+
+            // Add cancellation check every 10 lines for very large files
+            if (i % 10 === 0 && token.isCancellationRequested) {
+                return text;
+            }
+
+            // Analyze line context FIRST to determine proper indentation for current line
+            const trimmedLowerLine = trimmedLine.toLowerCase();
+            let lineIndentLevel = currentIndentLevel;
+
+            // Block end keywords and intermediate keywords should be at the same level as their opening keyword
+            if (this.isBlockEnd(trimmedLowerLine) || this.isIntermediateBlock(trimmedLowerLine)) {
+                lineIndentLevel = Math.max(0, currentIndentLevel - 1);
+            }
+
+            // Create formatting context with correct indentation
             const context: FormattingContext = {
-                indentLevel: currentIndentLevel,
+                indentLevel: lineIndentLevel,
                 blockType: currentBlockType,
                 previousLine: i > 0 ? lines[i - 1] : null,
                 nextLine: i < lines.length - 1 ? lines[i + 1] : null,
                 lineNumber: i + 1,
                 options: options,
                 ast: ast,
-            };
-
-            // Apply formatting rules
+            }; // Apply formatting rules
             let formattedLine = trimmedLine;
             for (const rule of this.rules) {
-                formattedLine = rule.apply(formattedLine, context);
+                try {
+                    const result = rule.apply(formattedLine, context);
+                    // Defensive check: ensure rule doesn't return undefined/null
+                    if (result === undefined || result === null) {
+                        console.error(
+                            `SSL Formatting rule "${rule.name}" returned ${result} for input: "${formattedLine}"`
+                        );
+                        // Keep the previous value if rule returns undefined/null
+                    } else if (typeof result !== "string") {
+                        console.error(
+                            `SSL Formatting rule "${
+                                rule.name
+                            }" returned non-string: ${typeof result} for input: "${formattedLine}"`
+                        );
+                        // Keep the previous value if rule returns non-string
+                    } else {
+                        formattedLine = result;
+                    }
+                } catch (error) {
+                    console.error(`SSL Formatting rule "${rule.name}" threw error:`, error);
+                    // Keep the previous value if rule throws error
+                }
             }
 
             formattedLines.push(formattedLine);
 
-            // Update context based on line content AFTER formatting
+            // Update context based on line content for NEXT iteration
             const lineContext = this.analyzeLineContext(
-                trimmedLine,
+                trimmedLowerLine,
                 ast,
                 i,
                 currentIndentLevel,
@@ -141,7 +193,15 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
             currentBlockType = lineContext.blockType;
         }
 
-        return formattedLines.join("\n");
+        const result = formattedLines.join("\n");
+
+        // Defensive check: ensure we return a string
+        if (typeof result !== "string") {
+            console.error(`formatText returning non-string: ${typeof result}`, result);
+            return text; // Return original text if something went wrong
+        }
+
+        return result;
     }
 
     private analyzeLineContext(
@@ -271,44 +331,20 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 class IndentationRule implements FormattingRule {
     name = "Indentation";
     description = "Ensures consistent indentation for SSL blocks";
-
     apply(line: string, context: FormattingContext): string {
         // Don't indent empty lines or comments at start of line
         if (line.trim() === "" || line.trim().startsWith("/*")) {
             return line.trim();
         }
 
-        const trimmedLine = line.trim().toLowerCase();
-        let indentLevel = context.indentLevel;
-
-        // Block end keywords and intermediate keywords should be at the same level as their opening keyword
-        if (this.isBlockEnd(trimmedLine) || this.isIntermediateBlock(trimmedLine)) {
-            indentLevel = Math.max(0, context.indentLevel - 1);
-        }
+        // Use the context's indentLevel directly (it's already calculated correctly)
+        const indentLevel = context.indentLevel;
 
         const indentString = context.options.insertSpaces
             ? " ".repeat(context.options.tabSize * indentLevel)
             : "\t".repeat(indentLevel);
 
         return indentString + line.trim();
-    }
-
-    private isBlockEnd(line: string): boolean {
-        const blockEnds = [
-            ":endproc",
-            ":endif",
-            ":endwhile",
-            ":next",
-            ":endcase",
-            ":endtry",
-            ":endregion",
-            ":endinlinecode",
-        ];
-        return blockEnds.some((keyword) => line.startsWith(keyword));
-    }
-    private isIntermediateBlock(line: string): boolean {
-        const intermediates = [":else", ":case", ":otherwise", ":catch", ":finally"];
-        return intermediates.some((keyword) => line.startsWith(keyword));
     }
 }
 
@@ -353,6 +389,11 @@ class OperatorSpacingRule implements FormattingRule {
         return result;
     }
     private addSpacingAroundOperator(text: string, operator: string, checkUnary = false): string {
+        // Early return if operator not found
+        if (!text.includes(operator)) {
+            return text;
+        }
+
         // Don't modify operators inside strings or comments
         if (this.isInsideStringOrComment(text, operator)) {
             return text;
@@ -360,8 +401,15 @@ class OperatorSpacingRule implements FormattingRule {
 
         // Escape special regex characters but keep the operator as a single unit
         const escapedOperator = operator.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const regex = new RegExp(`\\s*${escapedOperator}\\s*`, "g");
-        return text.replace(regex, ` ${operator} `).replace(/\s+/g, " ");
+        const regex = new RegExp(`(\S)\s*${escapedOperator}\s*(\S)`, "g");
+
+        // Replace with spaced operator and normalize multiple spaces
+        let result = text.replace(regex, `$1 ${operator} $2`);
+
+        // Clean up extra spaces but preserve string structure
+        result = result.replace(/\s{2,}/g, " ");
+
+        return result;
     }
     private isInsideStringOrComment(text: string, operator: string): boolean {
         // Find all occurrences of the operator

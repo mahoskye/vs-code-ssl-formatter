@@ -15,8 +15,12 @@ module.exports = {
     moduleFileExtensions: ['ts', 'js'],
     setupFilesAfterEnv: ['<rootDir>/test/jest-setup.ts'],
     verbose: true,
-    testTimeout: 30000,    // Module name mapping for VS Code API
+    testTimeout: 30000,
+    // Add these for debugging hanging tests
+    forceExit: true,
+    detectOpenHandles: true,
+    // Module name mapping for VS Code API
     moduleNameMapper: {
-        '^vscode$': '<rootDir>/test/__mocks__/vscode.js'
+        '^vscode$': '<rootDir>/test/__mocks__/vscode.ts'
     }
 };
