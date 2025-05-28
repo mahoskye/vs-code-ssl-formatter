@@ -204,6 +204,7 @@
         "test:folding": "jest --testPathPattern=foldingProvider",
         "test:hover": "jest --testPathPattern=hoverProvider",
         "test:formatting": "jest --testPathPattern=test/formattingProvider",
+        "test:blockAlignment": "jest --testPathPattern=blockAlignmentRules.test",
         "test:formattingProvider": "jest --testPathPattern=formattingProvider.test",
         "test:colonSpacing": "jest --testPathPattern=colonSpacingRules.test",
         "test:commaSpacing": "jest --testPathPattern=commaSpacingRules.test",

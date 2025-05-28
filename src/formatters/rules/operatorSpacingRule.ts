@@ -30,40 +30,41 @@ export class OperatorSpacingRule implements FormattingRule {
      * Format operators using tokenized context for accuracy
      */
     private formatOperatorsWithTokens(line: string, tokens: Token[]): string {
-        let result = line;
-        let offset = 0;
+        const parts: string[] = [];
+        let currentPos = 0;
+        // Ensure tokens are sorted by position, as the tokenizer might not guarantee order in all edge cases.
+        const sortedTokens = [...tokens].sort((a, b) => a.position.offset - b.position.offset);
 
-        // Process operator tokens from right to left to maintain positions
-        const operatorTokens = tokens.filter((token) => this.isOperatorToken(token.type)).reverse();
-
-        for (const operatorToken of operatorTokens) {
-            const operatorPos = operatorToken.position.offset + offset;
-            const operatorValue = operatorToken.value;
-
-            // Skip if position is invalid
-            if (operatorPos < 0 || operatorPos >= result.length) {
-                continue;
+        for (const token of sortedTokens) {
+            // Add whitespace before this token from the original line
+            if (token.position.offset > currentPos) {
+                parts.push(line.substring(currentPos, token.position.offset));
             }
 
-            // Skip operators inside strings or comments (already handled by tokenizer)
-            if (this.isStringOrCommentToken(operatorToken, tokens)) {
-                continue;
+            // Process the token itself
+            // Pass sortedTokens to helper functions consistently
+            if (
+                this.isOperatorToken(token.type) &&
+                !this.isStringOrCommentToken(token, sortedTokens)
+            ) {
+                const spacing = this.getOperatorSpacing(token, sortedTokens); // Removed 'position' argument
+                if (spacing) {
+                    parts.push(this.applySpacing(token.value, spacing));
+                } else {
+                    parts.push(token.value); // No specific spacing rule, use token value as is
+                }
+            } else {
+                parts.push(token.value); // Not an operator or should be skipped, use token value as is
             }
-
-            // Handle special cases based on SSL grammar
-            const spacing = this.getOperatorSpacing(operatorToken, tokens, operatorPos);
-
-            if (spacing) {
-                const newOperatorText = this.applySpacing(operatorValue, spacing);
-                const before = result.substring(0, operatorPos);
-                const after = result.substring(operatorPos + operatorValue.length);
-
-                result = before + newOperatorText + after;
-                offset += newOperatorText.length - operatorValue.length;
-            }
+            currentPos = token.position.offset + token.value.length;
         }
 
-        return result;
+        // Add any trailing whitespace after the last token from the original line
+        if (currentPos < line.length) {
+            parts.push(line.substring(currentPos));
+        }
+
+        return parts.join("");
     }
 
     /**
@@ -140,10 +141,10 @@ export class OperatorSpacingRule implements FormattingRule {
      */
     private getOperatorSpacing(
         operatorToken: Token,
-        tokens: Token[],
-        position: number
+        tokens: Token[]
+        // position: number // Removed unused parameter
     ): { before: boolean; after: boolean } | null {
-        const tokenType = operatorToken.tokenType;
+        const tokenType = operatorToken.type;
         const operatorValue = operatorToken.value;
 
         // Special handling for SSL-specific operators
@@ -201,7 +202,9 @@ export class OperatorSpacingRule implements FormattingRule {
      */
     private isUnaryOperator(operatorToken: Token, tokens: Token[]): boolean {
         const operatorIndex = tokens.indexOf(operatorToken);
-        if (operatorIndex === 0) return true;
+        if (operatorIndex === 0) {
+            return true;
+        }
 
         const prevToken = tokens[operatorIndex - 1];
 
@@ -351,7 +354,9 @@ export class OperatorSpacingRule implements FormattingRule {
 
         while (true) {
             const pos = processedContent.indexOf(operator, startPos);
-            if (pos === -1) break;
+            if (pos === -1) {
+                break;
+            }
 
             if (this.isPositionInStringOrComment(processedContent, pos)) {
                 startPos = pos + operator.length;
@@ -381,22 +386,26 @@ export class OperatorSpacingRule implements FormattingRule {
     /**
      * Check if single-char operator is part of compound operator
      */ private shouldSkipSingleCharOperator(text: string, operator: string): boolean {
-        if (operator.length !== 1) return false;
+        if (operator.length !== 1) {
+            return false;
+        }
 
         const compoundOperators: Record<string, string[]> = {
-            "=": [":=", "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "^="],
-            "+": ["+=", "++"],
-            "-": ["-=", "--"],
-            "*": ["*="],
-            "/": ["/="],
-            "^": ["^="],
-            "<": ["<="],
-            ">": [">="],
-            "!": ["!="],
+            opEquals: [":=", "==", "!=", "<=", ">=", "+=", "-=", "*=", "/=", "^="],
+            opPlus: ["+=", "++"],
+            opMinus: ["-=", "--"],
+            opMultiply: ["*="],
+            opDivide: ["/="],
+            opPower: ["^="],
+            opLessThan: ["<="],
+            opGreaterThan: [">="],
+            opBang: ["!="],
         };
 
         const compounds = compoundOperators[operator];
-        if (!compounds) return false;
+        if (!compounds) {
+            return false;
+        }
 
         return compounds.some((compound: string) => text.includes(compound));
     }
@@ -405,7 +414,9 @@ export class OperatorSpacingRule implements FormattingRule {
      * Check if position is inside string or comment (legacy)
      */
     private isPositionInStringOrComment(text: string, position: number): boolean {
-        if (position < 0 || position >= text.length) return false;
+        if (position < 0 || position >= text.length) {
+            return false;
+        }
 
         const beforePosition = text.substring(0, position);
 

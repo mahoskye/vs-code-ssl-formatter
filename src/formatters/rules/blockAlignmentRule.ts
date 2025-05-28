@@ -1,5 +1,5 @@
 import { FormattingRule, FormattingContext } from "../formattingProvider";
-import { TokenType } from "../../core/tokenizer";
+import { TokenType, SSLTokenizer, Token } from "../../core/tokenizer";
 
 /**
  * Handles alignment of multi-line statements in SSL code
@@ -9,255 +9,176 @@ export class BlockAlignmentRule implements FormattingRule {
     name = "Block Alignment";
     description = "Aligns multi-line statements, arrays, function calls, and SQL queries properly";
 
-    private readonly INDENT_SIZE = 4;
-
-    // SSL keywords that start blocks requiring indentation
-    private readonly BLOCK_START_KEYWORDS = new Set([
-        ":IF",
-        ":WHILE",
-        ":FOR",
-        ":BEGINCASE",
-        ":CASE",
-        ":OTHERWISE",
-        ":TRY",
-        ":CATCH",
-        ":FINALLY",
-        ":PROCEDURE",
-        ":REGION",
-        ":BEGININLINECODE",
-        ":CLASS",
-        ":ERROR",
-    ]);
-
-    // SSL keywords that end blocks
-    private readonly BLOCK_END_KEYWORDS = new Set([
-        ":ENDIF",
-        ":ENDWHILE",
-        ":NEXT",
-        ":ENDCASE",
-        ":ENDTRY",
-        ":ENDPROC",
-        ":ENDREGION",
-        ":ENDINLINECODE",
-    ]);
-
-    // Keywords that continue blocks at same level
-    private readonly BLOCK_CONTINUE_KEYWORDS = new Set([
-        ":ELSE",
-        ":ELSEIF",
-        ":CASE",
-        ":OTHERWISE",
-        ":CATCH",
-        ":FINALLY",
-    ]);
-
     apply(line: string, context: FormattingContext): string {
         const trimmedLine = line.trim();
 
         if (trimmedLine.length === 0) {
-            return line; // Preserve empty lines
+            return line; // Preserve empty lines, indentation handled by provider
         }
+
+        // Primary indentation is now handled by formattingProvider.ts.
+        // This rule focuses on intra-line alignment for specific constructs.
+
+        // Use tokens from context directly
+        const tokens = context.lineTokens;
 
         // Handle different types of multi-line constructs
-        if (this.isArrayLiteral(trimmedLine, context)) {
-            return this.alignArrayLiteral(line, context);
+        if (context.constructType === "array" || this.lineSuggestsArray(tokens)) {
+            return this.alignArrayLiteral(trimmedLine, context, tokens);
         }
 
-        if (this.isFunctionCall(trimmedLine, context)) {
-            return this.alignFunctionCall(line, context);
+        if (context.constructType === "functionCall" || this.lineSuggestsFunctionCall(tokens)) {
+            return this.alignFunctionCall(trimmedLine, context, tokens);
         }
 
-        if (this.isSqlStatement(trimmedLine, context)) {
-            return this.alignSqlStatement(line, context);
+        if (context.constructType === "sqlStatement" || this.lineSuggestsSqlStatement(tokens)) {
+            return this.alignSqlStatement(trimmedLine, context, tokens);
         }
 
-        if (this.isBlockStructure(trimmedLine)) {
-            return this.alignBlockStructure(line, context);
-        }
+        // Block structure alignment (e.g. :IF/:ENDIF) is primarily handled by provider's indentLevel.
+        // This rule might add minor adjustments if needed in the future, but for now, it defers.
+        // if (this.isBlockStructure(tokens)) {
+        //     return this.alignBlockStructure(line, tokens, context);
+        // }
 
-        // Default case: apply standard indentation based on block depth
-        return this.applyStandardIndentation(line, context);
+        return trimmedLine; // Return trimmed line; provider adds indentation
     }
 
-    private isArrayLiteral(line: string, context: FormattingContext): boolean {
-        // Check if line is part of an array literal: { ... }
-        return (
-            line.includes("{") ||
-            line.includes("}") ||
-            (context.inMultiLineConstruct && context.constructType === "array")
+    private lineSuggestsArray(tokens: Token[]): boolean {
+        return tokens.some(
+            (token) => token.type === TokenType.lbrace || token.type === TokenType.rbrace
         );
     }
 
-    private isFunctionCall(line: string, context: FormattingContext): boolean {
-        // Check for function calls with parameters spanning multiple lines
-        const funcCallPattern = /\w+\s*\(/;
-        return (
-            funcCallPattern.test(line) ||
-            (context.inMultiLineConstruct && context.constructType === "function")
+    private lineSuggestsFunctionCall(tokens: Token[]): boolean {
+        for (let i = 0; i < tokens.length - 1; i++) {
+            if (
+                tokens[i].type === TokenType.identifier &&
+                tokens[i + 1].type === TokenType.lparen
+            ) {
+                return true;
+            }
+        }
+        const funcCallKeywords = [
+            TokenType.doProc,
+            TokenType.execFunction,
+            TokenType.execUDF,
+            TokenType.createUDObject,
+            TokenType.sqlExecute, // Can also be SQL, but often has parens
+            TokenType.lSearch,
+        ];
+        if (tokens.length > 0 && funcCallKeywords.includes(tokens[0].type)) {
+            if (tokens.length > 1 && tokens[1].type === TokenType.lparen) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private lineSuggestsSqlStatement(tokens: Token[]): boolean {
+        return tokens.some(
+            (token) => token.type === TokenType.sqlExecute || token.type === TokenType.lSearch
         );
     }
 
-    private isSqlStatement(line: string, context: FormattingContext): boolean {
-        // Check for SQL statements (SqlExecute, LSearch)
-        const sqlPattern = /(SqlExecute|LSearch)\s*\(/i;
-        return (
-            sqlPattern.test(line) ||
-            (context.inMultiLineConstruct && context.constructType === "sql")
-        );
-    }
-
-    private isBlockStructure(line: string): boolean {
-        const upperLine = line.toUpperCase();
-        return (
-            Array.from(this.BLOCK_START_KEYWORDS).some((keyword) => upperLine.includes(keyword)) ||
-            Array.from(this.BLOCK_END_KEYWORDS).some((keyword) => upperLine.includes(keyword)) ||
-            Array.from(this.BLOCK_CONTINUE_KEYWORDS).some((keyword) => upperLine.includes(keyword))
-        );
-    }
-
-    private alignArrayLiteral(line: string, context: FormattingContext): string {
+    private alignArrayLiteral(line: string, context: FormattingContext, tokens: Token[]): string {
+        // Basic alignment for array elements.
+        // Assumes one element per line for multi-line arrays, or aligns elements on the same line.
+        // TODO: Implement more sophisticated alignment, e.g., aligning values if multiple key-value pairs are on one line.
         const trimmedLine = line.trim();
-        const baseIndent = this.getBaseIndentation(context);
-
-        // Opening brace
+        if (trimmedLine.startsWith("{") && trimmedLine.endsWith("}")) {
+            // Single line array: { elem1, elem2 }
+            // Apply spacing around commas, braces (handled by other rules or basic trimming here)
+            let content = trimmedLine.substring(1, trimmedLine.length - 1).trim();
+            // Basic comma spacing, other rules might do more
+            content = content
+                .split(",")
+                .map((s) => s.trim())
+                .join(", ");
+            return `{ ${content} }`;
+        }
         if (trimmedLine.startsWith("{")) {
-            return baseIndent + trimmedLine;
+            return "{ " + trimmedLine.substring(1).trimStart();
         }
-
-        // Closing brace
-        if (trimmedLine.startsWith("}")) {
-            return baseIndent + trimmedLine;
+        if (trimmedLine.endsWith("}")) {
+            return trimmedLine.substring(0, trimmedLine.length - 1).trimEnd() + " }";
         }
-
-        // Array elements - indent one level from base
-        if (context.inMultiLineConstruct && context.constructType === "array") {
-            const elementIndent = baseIndent + " ".repeat(this.INDENT_SIZE);
-            return elementIndent + trimmedLine;
+        // For lines within a multi-line array, ensure they are simply trimmed.
+        // The main indentation is handled by the provider.
+        // If a line starts with a comma, ensure one space after it.
+        if (trimmedLine.startsWith(",")) {
+            return ", " + trimmedLine.substring(1).trimStart();
         }
-
-        return line;
+        return trimmedLine;
     }
 
-    private alignFunctionCall(line: string, context: FormattingContext): string {
+    private alignFunctionCall(line: string, context: FormattingContext, tokens: Token[]): string {
+        // Basic alignment for function call arguments.
+        // TODO: Implement alignment of arguments, especially if they span multiple lines or have named parameters.
         const trimmedLine = line.trim();
-        const baseIndent = this.getBaseIndentation(context);
-
-        // Function name and opening parenthesis
-        if (trimmedLine.includes("(") && !trimmedLine.includes(")")) {
-            return baseIndent + trimmedLine;
-        }
-
-        // Parameters - align with first parameter or indent from function name
-        if (context.inMultiLineConstruct && context.constructType === "function") {
-            // For SSL DoProc calls: DoProc("functionName", {param1, param2})
-            if (trimmedLine.includes("DoProc") || trimmedLine.includes("ExecFunction")) {
-                const paramIndent = baseIndent + " ".repeat(this.INDENT_SIZE);
-                return paramIndent + trimmedLine;
-            }
-
-            // For regular function calls, align parameters
-            const paramIndent = baseIndent + " ".repeat(this.INDENT_SIZE);
-            return paramIndent + trimmedLine;
-        }
-
-        return line;
-    }
-
-    private alignSqlStatement(line: string, context: FormattingContext): string {
-        const trimmedLine = line.trim();
-        const baseIndent = this.getBaseIndentation(context);
-
-        // SQL function call
-        if (trimmedLine.match(/(SqlExecute|LSearch)\s*\(/i)) {
-            return baseIndent + trimmedLine;
-        }
-
-        // SQL string content - apply SQL formatting
-        if (context.inMultiLineConstruct && context.constructType === "sql") {
-            const sqlIndent = baseIndent + " ".repeat(this.INDENT_SIZE);
-
-            // SQL keywords should be aligned
-            const sqlKeywords = [
-                "SELECT",
-                "FROM",
-                "WHERE",
-                "ORDER BY",
-                "GROUP BY",
-                "HAVING",
-                "JOIN",
-                "INNER JOIN",
-                "LEFT JOIN",
-                "RIGHT JOIN",
-            ];
-            const upperTrimmed = trimmedLine.toUpperCase();
-
-            for (const keyword of sqlKeywords) {
-                if (upperTrimmed.startsWith(keyword)) {
-                    return sqlIndent + trimmedLine;
-                }
-            }
-
-            // Other SQL content gets additional indentation
-            return sqlIndent + " ".repeat(this.INDENT_SIZE) + trimmedLine;
-        }
-
-        return line;
-    }
-
-    private alignBlockStructure(line: string, context: FormattingContext): string {
-        const trimmedLine = line.trim();
-        const upperLine = trimmedLine.toUpperCase();
-        let baseIndent = this.getBaseIndentation(context);
-
-        // Block end keywords reduce indentation
-        if (Array.from(this.BLOCK_END_KEYWORDS).some((keyword) => upperLine.includes(keyword))) {
-            if (context.blockDepth > 0) {
-                baseIndent = " ".repeat((context.blockDepth - 1) * this.INDENT_SIZE);
-            }
-            return baseIndent + trimmedLine;
-        }
-
-        // Block continue keywords stay at same level as their opening block
+        // If line starts with '(', typically a continuation of parameters
         if (
-            Array.from(this.BLOCK_CONTINUE_KEYWORDS).some((keyword) => upperLine.includes(keyword))
+            trimmedLine.startsWith("(") &&
+            tokens.length > 0 &&
+            tokens[0].type === TokenType.lparen
         ) {
-            if (context.blockDepth > 0) {
-                baseIndent = " ".repeat((context.blockDepth - 1) * this.INDENT_SIZE);
-            }
-            return baseIndent + trimmedLine;
+            // This is likely the start of parameters on a new line, or just wrapped parameters.
+            // Provider handles base indent. We ensure content after '(' is trimmed.
+            return "(" + trimmedLine.substring(1).trimStart();
         }
-
-        // Block start keywords
-        if (Array.from(this.BLOCK_START_KEYWORDS).some((keyword) => upperLine.includes(keyword))) {
-            return baseIndent + trimmedLine;
-        }
-
-        return line;
-    }
-
-    private applyStandardIndentation(line: string, context: FormattingContext): string {
-        const trimmedLine = line.trim();
-        const baseIndent = this.getBaseIndentation(context);
-
-        // Comments preserve their relative positioning but respect block depth
-        if (trimmedLine.startsWith("/*")) {
-            return baseIndent + trimmedLine;
-        }
-
-        // Variable declarations and assignments
+        // If line ends with ')', typically the end of parameters
         if (
-            trimmedLine.startsWith(":DECLARE") ||
-            trimmedLine.startsWith(":PARAMETERS") ||
-            trimmedLine.includes(":=")
+            trimmedLine.endsWith(")") &&
+            tokens.length > 0 &&
+            tokens[tokens.length - 1].type === TokenType.rparen
         ) {
-            return baseIndent + trimmedLine;
+            return trimmedLine.substring(0, trimmedLine.length - 1).trimEnd() + ")";
         }
-
-        // Default: apply base indentation
-        return baseIndent + trimmedLine;
+        // If a line starts with a comma (argument separator)
+        if (trimmedLine.startsWith(",")) {
+            return ", " + trimmedLine.substring(1).trimStart();
+        }
+        // For other lines within a multi-line function call, just trim.
+        return trimmedLine;
     }
 
-    private getBaseIndentation(context: FormattingContext): string {
-        return " ".repeat(context.blockDepth * this.INDENT_SIZE);
+    private alignSqlStatement(line: string, context: FormattingContext, tokens: Token[]): string {
+        // Basic alignment for SQL statements.
+        // TODO: Implement more specific SQL keyword alignment (SELECT, FROM, WHERE, etc.)
+        // For now, mainly ensures trimming and consistent continuation if needed.
+        const trimmedLine = line.trim();
+        // Example: If a line starts with a common SQL keyword that should be on its own line or indented.
+        const sqlKeywords = [
+            "SELECT",
+            "FROM",
+            "WHERE",
+            "AND",
+            "OR",
+            "ORDER",
+            "GROUP",
+            "BY",
+            "INSERT",
+            "INTO",
+            "VALUES",
+            "UPDATE",
+            "SET",
+            "DELETE",
+        ];
+        const firstTokenText = tokens.length > 0 ? tokens[0].value.toUpperCase() : ""; // Changed token.text to token.value
+
+        if (sqlKeywords.includes(firstTokenText) && !line.toUpperCase().startsWith("SQLEXECUTE")) {
+            // This is a very basic heuristic. More advanced SQL formatting is complex.
+            // The main indentation is handled by the provider. This rule might adjust sub-indentation for SQL parts.
+            // For now, just return the trimmed line.
+        }
+        // If a line starts with a comma (often in SELECT lists or VALUES)
+        if (trimmedLine.startsWith(",")) {
+            return ", " + trimmedLine.substring(1).trimStart();
+        }
+        return trimmedLine;
     }
+
+    // Removed isArrayLiteral, isFunctionCall, isSqlStatement, isBlockStructure as their logic is integrated or simplified.
+    // The blockStartTokenTypes, blockEndTokenTypes, blockContinueTokenTypes are also not directly used in this simplified version
+    // as the primary indentation and block detection is now in formattingProvider.
 }

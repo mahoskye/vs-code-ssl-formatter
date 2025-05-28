@@ -32,6 +32,7 @@ export enum TokenType {
     public = "PUBLIC",
     include = "INCLUDE",
     class = "CLASS",
+    endclass = "ENDCLASS", // Added
     inherit = "INHERIT",
 
     // Keywords - Control
@@ -83,7 +84,7 @@ export enum TokenType {
     minus = "MINUS", // -
     multiply = "MULTIPLY", // *
     divide = "DIVIDE", // /
-    modulo = "MODULO", // %
+    modulo = "MODULO", // ^
     power = "POWER", // ^
 
     // Unary Operators & Special Single-Character Operators
@@ -141,7 +142,6 @@ export enum TokenType {
 
 export interface Token {
     type: TokenType;
-    tokenType: TokenType;
     value: string;
     position: Position;
     length: number;
@@ -201,6 +201,7 @@ export class SSLTokenizer {
         ["PUBLIC", TokenType.public],
         ["INCLUDE", TokenType.include],
         ["CLASS", TokenType.class],
+        ["ENDCLASS", TokenType.endclass], // Added
         ["INHERIT", TokenType.inherit], // Control
         ["RETURN", TokenType.return],
         ["EXITWHILE", TokenType.exitwhile],
@@ -1107,7 +1108,6 @@ export class SSLTokenizer {
     ): void {
         this.tokens.push({
             type,
-            tokenType: type,
             value,
             position: {
                 line: startLine,

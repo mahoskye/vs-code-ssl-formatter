@@ -1,5 +1,6 @@
 import { BlockAlignmentRule } from "../../src/formatters/rules/blockAlignmentRule";
 import { FormattingContext } from "../../src/formatters/formattingProvider";
+import { ASTNodeType } from "../../src/core/parser"; // Added import for ASTNodeType
 
 describe("BlockAlignmentRule", () => {
     let rule: BlockAlignmentRule;
@@ -21,6 +22,9 @@ describe("BlockAlignmentRule", () => {
             blockDepth: 0,
             inMultiLineConstruct: false,
             constructType: null,
+            lineTokens: [],
+            ast: { type: ASTNodeType.program, children: [], line: 0 }, // Corrected to lowercase 'program'
+            enclosingASTBlockType: null,
         };
     });
 
