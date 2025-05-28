@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import { SSLTokenizer, TokenType, Token } from "../../src/formatters/tokenizer";
+import { SSLTokenizer, TokenType, Token } from "../../src/core/tokenizer";
 
 describe("SSLTokenizer", () => {
     let tokenizer: SSLTokenizer;

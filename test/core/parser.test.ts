@@ -1,6 +1,6 @@
 import * as assert from "assert";
-import { SSLParser, ASTNode, ASTNodeType } from "../../src/formatters/parser";
-import { SSLTokenizer, Token } from "../../src/formatters/tokenizer";
+import { SSLParser, ASTNode, ASTNodeType } from "../../src/core/parser";
+import { SSLTokenizer, Token } from "../../src/core/tokenizer";
 
 describe("SSLParser - EBNF Grammar Compliant Tests", () => {
     const tokenize = (text: string): Token[] => {

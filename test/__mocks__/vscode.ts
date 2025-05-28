@@ -1291,40 +1291,76 @@ if (typeof window !== "undefined") {
 }
 
 // --- Global VSCode API Mock ---
-// This is the main export that Jest will use when you `jest.mock(\'vscode\')`
+// This is the main export that Jest will use when you `jest.mock('vscode')`
 // Ensure this is at the VERY END of the file, after all classes and enums are defined.
 export const vscode = {
-    uri: Uri, // Class
-    position: Position, // Class
-    range: Range, // Class
-    selection: Selection, // Class
-    markdownString: MarkdownString, // Class
-    hover: Hover, // Class
-    foldingRange: FoldingRange, // Class
-    completionItem: CompletionItem, // Class
-    textEdit: TextEdit, // Class
-    themeColor: ThemeColor, // Class
-    snippetString: SnippetString, // Class
-    eventEmitter: EventEmitter, // Class
-    workspaceEdit: WorkspaceEdit, // Class
-    cancellationTokenSource: CancellationTokenSource, // Class
-    themeIcon: ThemeIcon, // Class
-    treeItem: TreeItem, // Class
-    fileSystemError: FileSystemError, // Class
+    // Classes should be directly accessible as constructors
+    Uri: Uri, // Class constructor
+    Position: Position, // Class constructor
+    Range: Range, // Class constructor - THIS WAS MISSING THE CAPITAL R
+    Selection: Selection, // Class constructor
+    MarkdownString: MarkdownString, // Class constructor
+    Hover: Hover, // Class constructor
+    FoldingRange: FoldingRange, // Class constructor
+    CompletionItem: CompletionItem, // Class constructor
+    TextEdit: TextEdit, // Class constructor
+    ThemeColor: ThemeColor, // Class constructor
+    SnippetString: SnippetString, // Class constructor
+    EventEmitter: EventEmitter, // Class constructor
+    WorkspaceEdit: WorkspaceEdit, // Class constructor
+    CancellationTokenSource: CancellationTokenSource, // Class constructor
+    ThemeIcon: ThemeIcon, // Class constructor
+    TreeItem: TreeItem, // Class constructor
+    FileSystemError: FileSystemError, // Class constructor
 
-    endOfLine: EndOfLine, // Enum
-    completionItemKind: CompletionItemKind, // Enum
-    foldingRangeKind: FoldingRangeKind, // Enum
-    diagnosticSeverity: DiagnosticSeverity, // Enum
-    symbolKind: SymbolKind, // Enum
-    progressLocation: ProgressLocation, // Enum
-    overviewRulerLane: OverviewRulerLane, // Enum
-    textEditorRevealType: TextEditorRevealType, // Enum
-    viewColumn: ViewColumn, // Enum
-    configurationTarget: ConfigurationTarget, // Enum
-    extensionKind: ExtensionKind, // Enum
-    statusBarAlignment: StatusBarAlignment, // Enum
-    treeItemCollapsibleState: TreeItemCollapsibleState, // Enum
+    // Also keep lowercase versions for compatibility
+    uri: Uri,
+    position: Position,
+    range: Range,
+    selection: Selection,
+    markdownString: MarkdownString,
+    hover: Hover,
+    foldingRange: FoldingRange,
+    completionItem: CompletionItem,
+    textEdit: TextEdit,
+    themeColor: ThemeColor,
+    snippetString: SnippetString,
+    eventEmitter: EventEmitter,
+    workspaceEdit: WorkspaceEdit,
+    cancellationTokenSource: CancellationTokenSource,
+    themeIcon: ThemeIcon,
+    treeItem: TreeItem,
+    fileSystemError: FileSystemError,
+
+    // Enums
+    EndOfLine: EndOfLine,
+    CompletionItemKind: CompletionItemKind,
+    FoldingRangeKind: FoldingRangeKind,
+    DiagnosticSeverity: DiagnosticSeverity,
+    SymbolKind: SymbolKind,
+    ProgressLocation: ProgressLocation,
+    OverviewRulerLane: OverviewRulerLane,
+    TextEditorRevealType: TextEditorRevealType,
+    ViewColumn: ViewColumn,
+    ConfigurationTarget: ConfigurationTarget,
+    ExtensionKind: ExtensionKind,
+    StatusBarAlignment: StatusBarAlignment,
+    TreeItemCollapsibleState: TreeItemCollapsibleState,
+
+    // Also keep lowercase enum versions for compatibility
+    endOfLine: EndOfLine,
+    completionItemKind: CompletionItemKind,
+    foldingRangeKind: FoldingRangeKind,
+    diagnosticSeverity: DiagnosticSeverity,
+    symbolKind: SymbolKind,
+    progressLocation: ProgressLocation,
+    overviewRulerLane: OverviewRulerLane,
+    textEditorRevealType: TextEditorRevealType,
+    viewColumn: ViewColumn,
+    configurationTarget: ConfigurationTarget,
+    extensionKind: ExtensionKind,
+    statusBarAlignment: StatusBarAlignment,
+    treeItemCollapsibleState: TreeItemCollapsibleState,
 
     cancellationToken: cancellationTokenNone, // Const object
 
@@ -1334,6 +1370,4 @@ export const vscode = {
     commands,
     languages,
     extensions,
-    // Other necessary constructs
-    // QuickPickItem, etc.
 };
