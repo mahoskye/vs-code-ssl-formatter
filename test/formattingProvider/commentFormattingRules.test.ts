@@ -49,7 +49,7 @@ describe("Comment Formatting Rules", () => {
 / * This is a procedure comment;
 nVariable = 1;
 :ENDPROC;`;
-            const expected = `:PROCEDURE TestProc
+            const expected = `:PROCEDURE TestProc;
 /* This is a procedure comment;
 nVariable = 1;
 :ENDPROC;`;
@@ -93,9 +93,9 @@ nVariable = 1;
             const input = `/  *Comment with two spaces;
 /\t*Comment with tab;
 /    *Comment with four spaces;`;
-            const expected = `/*Comment with two spaces;
-/*Comment with tab;
-/*Comment with four spaces;`;
+            const expected = `/* Comment with two spaces;
+/* Comment with tab;
+/* Comment with four spaces;`;
             const result = await formatDocument(provider, input);
             assert.strictEqual(result, expected);
         },
@@ -117,6 +117,78 @@ nVariable = 1;
 :PROCEDURE Method;
     /* Method comment;
 :ENDPROC;`;
+            const result = await formatDocument(provider, input);
+            assert.strictEqual(result, expected);
+        },
+        TESTTIMEOUT
+    );
+
+    it(
+        "should format region comments properly",
+        async () => {
+            const input = `/ * region Test Section;
+nVariable := 1;
+/ * endregion;`;
+            const expected = `/* region Test Section;
+nVariable := 1;
+/* endregion;`;
+            const result = await formatDocument(provider, input);
+            assert.strictEqual(result, expected);
+        },
+        TESTTIMEOUT
+    );
+
+    it(
+        "should ensure comments end with semicolon",
+        async () => {
+            const input = "/* Comment without semicolon";
+            const expected = "/* Comment without semicolon;";
+            const result = await formatDocument(provider, input);
+            assert.strictEqual(result, expected);
+        },
+        TESTTIMEOUT
+    );
+
+    it(
+        "should handle single space after /* for readability",
+        async () => {
+            const input = "/*Comment without space after asterisk;";
+            const expected = "/* Comment without space after asterisk;";
+            const result = await formatDocument(provider, input);
+            assert.strictEqual(result, expected);
+        },
+        TESTTIMEOUT
+    );
+
+    it(
+        "should normalize multiple spaces after /*",
+        async () => {
+            const input = "/*    Multiple spaces after asterisk;";
+            const expected = "/* Multiple spaces after asterisk;";
+            const result = await formatDocument(provider, input);
+            assert.strictEqual(result, expected);
+        },
+        TESTTIMEOUT
+    );
+
+    it(
+        "should handle empty comments",
+        async () => {
+            const input = "/*;";
+            const expected = "/*;";
+            const result = await formatDocument(provider, input);
+            assert.strictEqual(result, expected);
+        },
+        TESTTIMEOUT
+    );
+
+    it(
+        "should format region comments with proper casing",
+        async () => {
+            const input = `/* REGION test section;
+/* ENDREGION;`;
+            const expected = `/* region test section;
+/* endregion;`;
             const result = await formatDocument(provider, input);
             assert.strictEqual(result, expected);
         },

@@ -33,6 +33,9 @@ export interface FormattingContext {
     lineNumber: number;
     options: FormattingOptions;
     ast?: ASTNode;
+    blockDepth: number;
+    inMultiLineConstruct: boolean;
+    constructType: string | null;
 }
 
 /**
@@ -199,9 +202,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
             // :CASE statements should be at the current indentation level (not reduced)
             else if (trimmedLowerLine.startsWith(":case")) {
                 lineIndentLevel = currentIndentLevel;
-            }
-
-            // Create formatting context with correct indentation
+            } // Create formatting context with correct indentation
             const context: FormattingContext = {
                 indentLevel: lineIndentLevel,
                 blockType: currentBlockType,
@@ -210,6 +211,9 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
                 lineNumber: i + 1,
                 options: options,
                 ast: ast,
+                blockDepth: lineIndentLevel,
+                inMultiLineConstruct: this.isMultiLineConstruct(line, i, lines),
+                constructType: this.getConstructType(line, currentBlockType),
             }; // Apply formatting rules with safety limits
             let formattedLine = trimmedLine;
 
@@ -388,5 +392,65 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
             return "CLASS";
         }
         return "UNKNOWN";
+    }
+
+    private isMultiLineConstruct(line: string, lineIndex: number, lines: string[]): boolean {
+        const trimmedLine = line.trim();
+
+        // Check for multi-line array literals
+        if (trimmedLine.includes("{") && !trimmedLine.includes("}")) {
+            return true;
+        }
+
+        // Check for multi-line function calls (DoProc, ExecFunction)
+        if (trimmedLine.match(/(DoProc|ExecFunction)\s*\(/) && !trimmedLine.includes(");")) {
+            return true;
+        }
+
+        // Check for multi-line SQL statements
+        if (trimmedLine.match(/(SqlExecute|LSearch)\s*\(/) && !trimmedLine.includes(");")) {
+            return true;
+        }
+
+        // Look ahead to see if we're in a multi-line construct
+        for (let i = lineIndex - 1; i >= 0; i--) {
+            const prevLine = lines[i].trim();
+            if (prevLine.includes("{") && !prevLine.includes("}")) {
+                return true;
+            }
+            if (
+                prevLine.match(/(DoProc|ExecFunction|SqlExecute|LSearch)\s*\(/) &&
+                !prevLine.includes(");")
+            ) {
+                return true;
+            }
+            // Stop looking if we hit a complete statement
+            if (prevLine.endsWith(";") || prevLine.endsWith("}")) {
+                break;
+            }
+        }
+
+        return false;
+    }
+
+    private getConstructType(line: string, currentBlockType: string | null): string | null {
+        const trimmedLine = line.trim();
+
+        // Array literal
+        if (trimmedLine.includes("{") || trimmedLine.includes("}")) {
+            return "array";
+        }
+
+        // Function calls
+        if (trimmedLine.match(/(DoProc|ExecFunction)\s*\(/)) {
+            return "function";
+        }
+
+        // SQL statements
+        if (trimmedLine.match(/(SqlExecute|LSearch)\s*\(/)) {
+            return "sql";
+        }
+
+        return currentBlockType;
     }
 }

@@ -1082,11 +1082,11 @@ export class SSLParser {
     private isAtEnd(): boolean {
         return this.current >= this.tokens.length || this.peek().type === TokenType.eof;
     }
-
     private peek(): Token {
         if (this.current >= this.tokens.length) {
             return {
                 type: TokenType.eof,
+                tokenType: TokenType.eof,
                 value: "",
                 position: { line: 0, column: 0, offset: 0 },
                 length: 0,

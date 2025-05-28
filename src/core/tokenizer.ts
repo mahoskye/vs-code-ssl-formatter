@@ -91,12 +91,13 @@ export enum TokenType {
 
     // Increment/Decrement
     increment = "INCREMENT", // ++
-    decrement = "DECREMENT", // --
-
-    // Logical Operators
+    decrement = "DECREMENT", // --    // Logical Operators
     and = "AND", // .AND.
     or = "OR", // .OR.
     not = "NOT", // .NOT.
+    logicalAnd = "LOGICAL_AND", // &&
+    logicalOr = "LOGICAL_OR", // ||
+    logicalNot = "LOGICAL_NOT", // !
 
     // SQL Parameters
     sqlParameter = "SQL_PARAMETER", // ?param? or ?    // Delimiters
@@ -140,6 +141,7 @@ export enum TokenType {
 
 export interface Token {
     type: TokenType;
+    tokenType: TokenType;
     value: string;
     position: Position;
     length: number;
@@ -1096,7 +1098,6 @@ export class SSLTokenizer {
         // In all other cases, treat as string delimiter
         return true;
     }
-
     private addToken(
         type: TokenType,
         value: string,
@@ -1106,6 +1107,7 @@ export class SSLTokenizer {
     ): void {
         this.tokens.push({
             type,
+            tokenType: type,
             value,
             position: {
                 line: startLine,
