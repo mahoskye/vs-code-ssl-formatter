@@ -1,6 +1,6 @@
 module.exports = {
     preset: 'ts-jest',
-    testEnvironment: 'node',
+    testEnvironment: './test/failFastEnvironment.ts',
     roots: ['<rootDir>/test'],
     testMatch: [
         '**/test/**/*.test.ts'
@@ -16,6 +16,7 @@ module.exports = {
     setupFilesAfterEnv: ['<rootDir>/test/jest-setup.ts'],
     verbose: true,
     testTimeout: 30000,
+    // bail: 1, // Stop running tests after the first failure
     // Add these for debugging hanging tests
     // forceExit: true, // Commented out to see if Jest provides more info
     detectOpenHandles: true,

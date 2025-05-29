@@ -27,87 +27,66 @@ export class CommaSpacingRule implements FormattingRule {
 
     private formatCommasWithTokens(line: string, tokens: Token[]): string {
         let result = line;
-        let offset = 0; // Track cumulative changes to line length
-
-        // Process comma tokens from right to left to maintain token positions
-        const commaTokens = tokens.filter((token) => token.type === TokenType.comma).reverse();
+        // Process comma tokens from right to left.
+        // Their `position.offset` refers to the original line.
+        // When modifying `result` from right to left, the absolute positions
+        // of commas to the left are not affected by changes to their right.
+        const commaTokens = tokens
+            .filter((token) => token.type === TokenType.comma)
+            .sort((a, b) => b.position.offset - a.position.offset); // Explicit sort R-L
 
         for (const commaToken of commaTokens) {
-            const commaPos = commaToken.position.offset + offset;
+            const commaPos = commaToken.position.offset; // Use original offset directly
 
-            // Skip if comma position is invalid
+            // Boundary checks for safety, though with correct R-L, commaPos should be valid in current result
             if (commaPos < 0 || commaPos >= result.length) {
                 continue;
             }
 
-            // Check if we need to add or normalize space after comma
             const afterCommaPos = commaPos + 1;
 
             if (afterCommaPos < result.length) {
-                const charAfterComma = result[afterCommaPos];
-                const restOfLine = result.substring(afterCommaPos);
-
-                // Check for existing whitespace after comma
-                const whitespaceMatch = restOfLine.match(/^(\s*)/);
+                // Comma is not the last char
+                const restOfLineAfterComma = result.substring(afterCommaPos);
+                const whitespaceMatch = restOfLineAfterComma.match(/^(\\s*)/);
                 const existingWhitespace = whitespaceMatch ? whitespaceMatch[1] : "";
 
-                // Determine desired spacing based on context
-                let desiredSpacing = " "; // Default: single space
-
-                // Special cases where no space is needed
+                let desiredSpacing = " ";
+                // Pass current `result` to shouldSkipSpacing
                 if (this.shouldSkipSpacing(result, commaPos, tokens)) {
                     desiredSpacing = "";
                 }
 
-                // Apply spacing if different from current
                 if (existingWhitespace !== desiredSpacing) {
-                    const beforeComma = result.substring(0, afterCommaPos);
-                    const afterWhitespace = result.substring(
+                    const beforeCommaPart = result.substring(0, commaPos + 1); // Includes the comma
+                    const afterExistingWhitespacePart = result.substring(
                         afterCommaPos + existingWhitespace.length
                     );
-
-                    result = beforeComma + desiredSpacing + afterWhitespace;
-                    offset += desiredSpacing.length - existingWhitespace.length;
+                    result = beforeCommaPart + desiredSpacing + afterExistingWhitespacePart;
                 }
             }
+            // Else: Comma is the last character on the line.
+            // Current logic doesn't explicitly add a space if missing and desired here,
+            // but shouldSkipSpacing would likely return true for EOL cases anyway.
         }
-
         return result;
     }
 
-    private shouldSkipSpacing(line: string, commaPos: number, tokens: Token[]): boolean {
+    // Ensure shouldSkipSpacing uses the current line state
+    private shouldSkipSpacing(currentLine: string, commaPos: number, tokens: Token[]): boolean {
         // Check if comma is at end of line
-        if (commaPos >= line.length - 1) {
+        if (commaPos >= currentLine.length - 1) {
+            // Use currentLine
             return true;
         }
 
         // Check if followed by closing bracket/brace/paren
-        const nextChar = line[commaPos + 1];
+        const nextChar = currentLine[commaPos + 1]; // Use currentLine
         if (nextChar === "}" || nextChar === "]" || nextChar === ")") {
             return true;
         }
 
-        // Check for array literal context where compact formatting might be preferred
-        const prevBraceToken = this.findPreviousToken(tokens, commaPos, TokenType.lbrace);
-        const nextBraceToken = this.findNextToken(tokens, commaPos, TokenType.rbrace);
-
-        if (prevBraceToken && nextBraceToken) {
-            // In array literal - check if it's a compact array
-            const arrayContent = line.substring(
-                prevBraceToken.position.offset + 1,
-                nextBraceToken.position.offset
-            );
-
-            // If array is short and simple, keep compact
-            if (arrayContent.length < 30 && !arrayContent.includes("\n")) {
-                const elements = arrayContent.split(",");
-                if (elements.every((elem) => elem.trim().match(/^[a-zA-Z0-9_"'.]+$/))) {
-                    return false; // Still add space for readability
-                }
-            }
-        }
-
-        return false;
+        return false; // Default: do not skip spacing (i.e., a space is generally desired).
     }
 
     private findPreviousToken(

@@ -7,41 +7,95 @@ import { TokenType, SSLTokenizer, Token } from "../../core/tokenizer";
  */
 export class BlockAlignmentRule implements FormattingRule {
     name = "Block Alignment";
-    description = "Aligns multi-line statements, arrays, function calls, and SQL queries properly";
+    description =
+        "Aligns multi-line statements, arrays, function calls, and SQL queries properly. Also handles base indentation for block keywords and content lines.";
+
+    // Define these sets for keyword categorization
+    private readonly keywordsIndentCurrentDepth = new Set([
+        ":IF",
+        ":WHILE",
+        ":FOR",
+        ":BEGINCASE",
+        ":TRY",
+        ":PROCEDURE",
+        ":REGION",
+        ":ERROR",
+    ]);
+    private readonly keywordsIndentPreviousDepth = new Set([
+        ":ELSE",
+        ":ELSEIF",
+        ":ENDIF",
+        ":ENDWHILE",
+        ":NEXT",
+        ":CASE",
+        ":OTHERWISE",
+        ":ENDCASE",
+        ":CATCH",
+        ":FINALLY",
+        ":ENDTRY",
+        ":ENDPROC",
+        ":ENDREGION",
+    ]);
 
     apply(line: string, context: FormattingContext): string {
-        const trimmedLine = line.trim();
+        const originalTrimmedLine = line.trim();
 
-        if (trimmedLine.length === 0) {
-            return line; // Preserve empty lines, indentation handled by provider
+        if (originalTrimmedLine.length === 0) {
+            return line; // Preserve empty lines
         }
 
-        // Primary indentation is now handled by formattingProvider.ts.
-        // This rule focuses on intra-line alignment for specific constructs.
+        const indentChar = context.options.insertSpaces ? " " : "\\t";
+        const indentUnitSize = context.options.insertSpaces ? context.options.tabSize : 1;
 
-        // Use tokens from context directly
-        const tokens = context.lineTokens;
+        let firstWord = "";
+        // Try to extract a keyword if the line starts with ":":
+        if (originalTrimmedLine.startsWith(":")) {
+            let endOfKeyword = originalTrimmedLine.length;
+            const spaceIdx = originalTrimmedLine.indexOf(" ");
+            const semicolonIdx = originalTrimmedLine.indexOf(";");
 
-        // Handle different types of multi-line constructs
+            // Find the earliest of space, semicolon, or end of string
+            if (spaceIdx !== -1) {
+                endOfKeyword = spaceIdx;
+            }
+            if (semicolonIdx !== -1 && semicolonIdx < endOfKeyword) {
+                endOfKeyword = semicolonIdx;
+            }
+            firstWord = originalTrimmedLine.substring(0, endOfKeyword).toUpperCase();
+        }
+
+        let indentDepth = context.blockDepth; // Default for content lines
+
+        if (this.keywordsIndentCurrentDepth.has(firstWord)) {
+            indentDepth = context.blockDepth;
+        } else if (this.keywordsIndentPreviousDepth.has(firstWord)) {
+            indentDepth = Math.max(0, context.blockDepth - 1);
+        }
+        // If firstWord was not a recognized keyword, or line didn't start with ":",
+        // indentDepth remains context.blockDepth, which is correct for content lines.
+
+        // The alignXXX methods handle internal alignment of constructs.
+        // They return the processed content, which then needs to be prefixed with block indentation.
+        let lineContent = originalTrimmedLine;
+        const tokens = context.lineTokens; // Used by lineSuggestsXXX methods
+
         if (context.constructType === "array" || this.lineSuggestsArray(tokens)) {
-            return this.alignArrayLiteral(trimmedLine, context, tokens);
+            lineContent = this.alignArrayLiteral(originalTrimmedLine, context, tokens);
+        } else if (
+            context.constructType === "functionCall" ||
+            this.lineSuggestsFunctionCall(tokens)
+        ) {
+            lineContent = this.alignFunctionCall(originalTrimmedLine, context, tokens);
+        } else if (
+            context.constructType === "sqlStatement" ||
+            this.lineSuggestsSqlStatement(tokens)
+        ) {
+            lineContent = this.alignSqlStatement(originalTrimmedLine, context, tokens);
         }
+        // If none of the above specific constructs, lineContent remains originalTrimmedLine.
 
-        if (context.constructType === "functionCall" || this.lineSuggestsFunctionCall(tokens)) {
-            return this.alignFunctionCall(trimmedLine, context, tokens);
-        }
-
-        if (context.constructType === "sqlStatement" || this.lineSuggestsSqlStatement(tokens)) {
-            return this.alignSqlStatement(trimmedLine, context, tokens);
-        }
-
-        // Block structure alignment (e.g. :IF/:ENDIF) is primarily handled by provider's indentLevel.
-        // This rule might add minor adjustments if needed in the future, but for now, it defers.
-        // if (this.isBlockStructure(tokens)) {
-        //     return this.alignBlockStructure(line, tokens, context);
-        // }
-
-        return trimmedLine; // Return trimmed line; provider adds indentation
+        const indentationString = indentChar.repeat(indentDepth * indentUnitSize);
+        return indentationString + lineContent;
     }
 
     private lineSuggestsArray(tokens: Token[]): boolean {

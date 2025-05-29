@@ -46,15 +46,21 @@ export interface FormattingContext {
  */
 export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvider {
     private rules: FormattingRule[];
-    constructor() {
-        this.rules = [
-            new CommentFormattingRule(), // Apply comment formatting first
-            new OperatorSpacingRule(),
-            new CommaSpacingRule(),
-            new BlockAlignmentRule(),
-            new ColonSpacingRule(),
-            new IndentationRule(), // Apply indentation last
-        ];
+
+    constructor(rulesToApply?: FormattingRule[]) {
+        if (rulesToApply && rulesToApply.length > 0) {
+            this.rules = rulesToApply;
+        } else {
+            // Default to all rules if none are specified
+            this.rules = [
+                new CommentFormattingRule(),
+                new OperatorSpacingRule(),
+                new CommaSpacingRule(),
+                new BlockAlignmentRule(),
+                new ColonSpacingRule(),
+                new IndentationRule(),
+            ];
+        }
     }
 
     public async provideDocumentFormattingEdits(

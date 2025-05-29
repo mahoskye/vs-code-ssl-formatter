@@ -1,13 +1,15 @@
-import * as assert from "assert";
 import { SSLFormattingProvider } from "../../src/formatters/formattingProvider";
+import { ColonSpacingRule } from "../../src/formatters/rules/colonSpacingRule"; // Corrected path
 import { formatDocument } from "../helpers/formatDocument";
+import * as assert from "assert";
 
 describe("Colon Spacing Rules", () => {
     let provider: SSLFormattingProvider;
     const TESTTIMEOUT = 5000; // 5 seconds
 
     beforeEach(() => {
-        provider = new SSLFormattingProvider();
+        // Instantiate provider with only ColonSpacingRule for isolated testing
+        provider = new SSLFormattingProvider([new ColonSpacingRule()]);
     });
 
     describe("Basic Colon Keyword Formatting", () => {

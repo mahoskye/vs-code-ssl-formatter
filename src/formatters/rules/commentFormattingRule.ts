@@ -6,39 +6,91 @@ import { SSLTokenizer, TokenType } from "../../core/tokenizer";
  */
 export class CommentFormattingRule implements FormattingRule {
     name = "Comment Formatting";
-    description = "Ensures proper formatting of SSL comments";
+    description =
+        "Ensures proper formatting of SSL comments, including start/end syntax, spacing, and region tags.";
 
     apply(line: string, context: FormattingContext): string {
-        let result = line;
+        const originalLine = line;
 
-        // Handle SSL comment formatting based on the grammar
-        // SSL comments start with /* and end with ;
+        const leadingWhitespaceMatch = line.match(/^(\s*)/);
+        const leadingWhitespace = leadingWhitespaceMatch ? leadingWhitespaceMatch[0] : "";
 
-        // Fix spacing in comment start - remove space between / and *
-        result = result.replace(/\/\s+\*/g, "/*");
+        let contentToProcess = line.substring(leadingWhitespace.length);
+        const trailingWhitespaceMatch = contentToProcess.match(/(\s*)$/);
+        const trailingWhitespace = trailingWhitespaceMatch ? trailingWhitespaceMatch[0] : "";
 
-        // Ensure proper comment termination with semicolon
-        // Handle block comments that might span multiple lines
-        if (result.includes("/*") && !result.includes(";")) {
-            // If this is a comment line without semicolon termination, add it
-            const trimmed = result.trim();
-            if (trimmed.startsWith("/*") && !trimmed.endsWith(";")) {
-                result = result.replace(/\s*$/, ";");
+        contentToProcess = contentToProcess.substring(
+            0,
+            contentToProcess.length - trailingWhitespace.length
+        );
+
+        if (
+            contentToProcess.length === 0 &&
+            leadingWhitespace.length + trailingWhitespace.length === originalLine.length
+        ) {
+            // Line is only whitespace, or empty
+            return originalLine;
+        }
+
+        let formattedContent = contentToProcess;
+
+        // 1. Normalize comment start: "/ *" to "/*", including various whitespace characters like tabs
+        // This replacement should only happen if it's at the beginning of the contentToProcess
+        if (formattedContent.match(/^\/\s+\*/)) {
+            // Checks for / followed by one or more whitespace chars (space, tab, etc.) then *
+            formattedContent = formattedContent.replace(/^\/\s+\*/, "/*");
+        }
+
+        // Only proceed if it actually starts with "/*"
+        if (formattedContent.startsWith("/*")) {
+            // 2. Handle region/endregion: normalize to lowercase and ensure single space after keyword
+            const lowerContent = formattedContent.toLowerCase();
+            if (lowerContent.startsWith("/* region")) {
+                const regionContentMatch = formattedContent.match(
+                    /^\/\*\s*region\s+(.*?)(;)?\s*$/i
+                );
+                if (regionContentMatch) {
+                    const regionText = regionContentMatch[1].trim();
+                    formattedContent = `/* region ${regionText}`;
+                } else {
+                    // Malformed but clearly a region attempt, normalize start
+                    formattedContent = "/* region";
+                }
+            } else if (lowerContent.startsWith("/* endregion")) {
+                formattedContent = "/* endregion";
+            }
+            // 3. Ensure single space after "/*" (unless "/*;" or already spaced, or region/endregion handled above)
+            else if (
+                formattedContent !== "/*" && // Will become "/*;" later if just "/*"
+                !formattedContent.startsWith("/* region") &&
+                !formattedContent.startsWith("/* endregion")
+            ) {
+                if (formattedContent.match(/^\/\*[^\s;]/)) {
+                    // e.g., /*Something or /*;
+                    if (formattedContent !== "/*;") {
+                        // don't add space if it's just /*;
+                        formattedContent = formattedContent.replace(/^\/\*([^;])/, "/* $1");
+                    }
+                } else {
+                    // Normalize multiple spaces to one, e.g., /*   Something
+                    formattedContent = formattedContent.replace(/^\/\*\s{2,}([^;])/, "/* $1");
+                }
+            }
+
+            // 4. Ensure comments end with a semicolon
+            if (!formattedContent.endsWith(";")) {
+                formattedContent += ";";
+            }
+
+            // If the formatted content is different from the initial content (after stripping whitespace)
+            if (formattedContent !== contentToProcess) {
+                return leadingWhitespace + formattedContent + trailingWhitespace;
             }
         }
 
-        // Handle region comments - ensure proper casing and format
-        result = result.replace(/\/\*\s*region\s+/gi, "/* region ");
-        result = result.replace(/\/\*\s*endregion\s*/gi, "/* endregion ");
-
-        // Ensure single space after /* for readability (except for empty comments)
-        result = result.replace(/\/\*([^\s;])/g, "/* $1");
-
-        // Handle special case where comment content might need formatting
-        // Preserve the internal structure but ensure consistent spacing
-        result = result.replace(/\/\*\s{2,}/g, "/* ");
-
-        return result;
+        // If no relevant changes were made or it's not a comment this rule handles,
+        // return the original line to avoid unintended modifications.
+        return originalLine;
     }
 
     /**
