@@ -1,12 +1,38 @@
-import { BlockAlignmentRule } from "../../src/formatters/rules/blockAlignmentRule";
-import { FormattingContext } from "../../src/formatters/formattingProvider";
 import { ASTNodeType } from "../../src/core/parser"; // Added import for ASTNodeType
+import { BlockAlignmentRule } from "../../src/formatters/rules/blockAlignmentRule"; // Added import for BlockAlignmentRule
+import { FormattingContext } from "../../src/formatters/formattingProvider"; // Added import for FormattingContext
+import { SSLFormattingProvider } from "../../src/formatters/formattingProvider"; // Added import for SSLFormattingProvider
+
+// Add this section to mock console.warn
+let originalConsoleWarn: any;
+
+beforeAll(() => {
+    originalConsoleWarn = console.warn;
+    console.warn = (...args: any[]) => {
+        if (
+            args.length > 0 &&
+            typeof args[0] === "string" &&
+            args[0].includes("IndentationRule not found in SSLFormattingProvider")
+        ) {
+            // Suppress the specific warning
+            return;
+        }
+        originalConsoleWarn.apply(console, args);
+    };
+});
+
+afterAll(() => {
+    console.warn = originalConsoleWarn; // Restore original console.warn
+});
 
 describe("BlockAlignmentRule", () => {
     let rule: BlockAlignmentRule;
     let context: FormattingContext;
+    let provider: SSLFormattingProvider; // Added provider
     beforeEach(() => {
         rule = new BlockAlignmentRule();
+        // Instantiate provider with only BlockAlignmentRule for isolated testing
+        provider = new SSLFormattingProvider([new BlockAlignmentRule()]);
         context = {
             indentLevel: 0,
             blockType: null,
@@ -25,6 +51,7 @@ describe("BlockAlignmentRule", () => {
             lineTokens: [],
             ast: { type: ASTNodeType.program, children: [], line: 0 }, // Corrected to lowercase 'program'
             enclosingASTBlockType: null,
+            currentLineBaseIndentLevel: 0, // Added missing property
         };
     });
 
