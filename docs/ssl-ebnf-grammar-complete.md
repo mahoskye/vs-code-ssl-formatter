@@ -10,7 +10,7 @@ This EBNF (Extended Backus-Naur Form) grammar serves as a formal definition of t
 2. **Parser Implementation**: Building parsers that can validate and process SSL code.
 3. **Reference Documentation**: Providing a definitive reference for valid language constructs.
 
-While this grammar defines what is syntactically valid in SSL, it does not prescribe specific formatting preferences or coding conventions - those are covered in the separate SSL Style Guide.
+While this grammar defines what is syntactically valid in SSL, it does not prescribe specific formatting preferences or coding conventions - those are covered in the separate SSL Style Guide. For instance, the preferred formatting for skipped parameters in lists (e.g., `param1,,param3`) is to not include a space after the first comma. Such stylistic choices are handled by the formatter.
 
 ## Common SSL Code Patterns
 
@@ -139,7 +139,7 @@ DefaultParameterDeclaration ::= ":" "DEFAULT" DefaultParameterList
 
 (* Parameter lists *)
 ParameterList ::= Identifier {"," Identifier}
-DefaultParameterList ::= Identifier "," Expression {"," Identifier "," Expression}
+DefaultParameterList ::= Identifier "," Expression
 
 (* Conditional statements *)
 ConditionalStatement ::= IfStatement | ElseStatement | EndIfStatement

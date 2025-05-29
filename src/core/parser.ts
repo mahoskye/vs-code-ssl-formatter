@@ -55,22 +55,49 @@ export class SSLParser {
             (token) => token.type !== TokenType.whitespace && token.type !== TokenType.newline
         );
     }
-
     public parse(): ASTNode {
         const program: ASTNode = {
             type: ASTNodeType.program,
             children: [],
         };
 
+        let lastPosition = -1;
+        let stuckCount = 0;
+        const MAX_STUCK_ATTEMPTS = 10;
+
         while (!this.isAtEnd()) {
+            const currentPosition = this.current;
+
+            // Check if we're stuck (not making progress)
+            if (currentPosition === lastPosition) {
+                stuckCount++;
+                if (stuckCount >= MAX_STUCK_ATTEMPTS) {
+                    console.warn(
+                        `Parser stuck at position ${currentPosition}, breaking out of parse loop`
+                    );
+                    break;
+                }
+            } else {
+                stuckCount = 0; // Reset stuck counter if we made progress
+            }
+
+            lastPosition = currentPosition;
+
             try {
                 const statement = this.parseStatement();
                 if (statement) {
                     program.children.push(statement);
                 }
+
+                // Ensure we always make progress - if parseStatement didn't advance, do it manually
+                if (this.current === currentPosition && !this.isAtEnd()) {
+                    this.advance();
+                }
             } catch (error) {
-                // Skip problematic tokens and continue
-                this.advance();
+                // Skip problematic tokens and continue - ensure we advance
+                if (!this.isAtEnd()) {
+                    this.advance();
+                }
             }
         }
 
@@ -773,9 +800,7 @@ export class SSLParser {
                 this.current = initialCurrent; // Backtrack
                 return null;
             }
-        }
-
-        // Parse ArrayLiteral: { ExpressionList } or {}
+        } // Parse ArrayLiteral: { ExpressionList } or {}
         if (this.match(TokenType.lbrace)) {
             const lbraceToken = this.previous();
             const elements: ASTNode[] = [];
@@ -792,13 +817,19 @@ export class SSLParser {
                             value += element.value;
                         }
                     }
+
+                    // Check for comma and consume it if present
                     if (this.check(TokenType.comma)) {
                         value += this.advance().value; // consume comma
+                        // If next token is closing brace, break (trailing comma case)
+                        if (this.check(TokenType.rbrace)) {
+                            break;
+                        }
+                    } else {
+                        // No comma, so we're done with the list
+                        break;
                     }
-                } while (
-                    this.check(TokenType.comma) ||
-                    (!this.check(TokenType.rbrace) && elements.length > 0)
-                );
+                } while (!this.check(TokenType.rbrace) && !this.isAtEnd());
             }
 
             if (this.check(TokenType.rbrace)) {

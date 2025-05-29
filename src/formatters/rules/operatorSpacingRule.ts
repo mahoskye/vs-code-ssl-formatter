@@ -8,10 +8,15 @@ import { SSLTokenizer, TokenType, Token } from "../../core/tokenizer";
 export class OperatorSpacingRule implements FormattingRule {
     name = "Operator Spacing";
     description = "Ensures proper spacing around operators using SSL tokenizer";
-
     apply(line: string, context: FormattingContext): string {
         try {
-            // Use SSL tokenizer for accurate parsing
+            // Special case for .AND. and .OR. logical operators
+            if (line.includes(".AND.") || line.includes(".OR.") || line.includes(".NOT.")) {
+                // Use a regex-based approach for these specific operators
+                line = this.handleLogicalOperators(line);
+            }
+
+            // Continue with normal tokenizer-based processing
             const tokenizer = new SSLTokenizer(line);
             const tokens = tokenizer.tokenize();
 
@@ -25,6 +30,33 @@ export class OperatorSpacingRule implements FormattingRule {
             return this.fallbackOperatorFormatting(line);
         }
     }
+    /**
+     * Handle the specific case of logical operators (.AND., .OR., .NOT.)
+     */
+    private handleLogicalOperators(line: string): string {
+        // For each operator: first remove all spaces around it, then add exactly one space on each side
+        // This ensures consistent spacing regardless of the input
+
+        // Handle .AND. operator
+        line = line.replace(/\s*\.AND\.\s*/g, ".AND."); // Remove all spaces
+        line = line.replace(/\.AND\./g, " .AND. "); // Add one space on each side
+
+        // Handle .OR. operator
+        line = line.replace(/\s*\.OR\.\s*/g, ".OR."); // Remove all spaces
+        line = line.replace(/\.OR\./g, " .OR. "); // Add one space on each side
+
+        // Handle .NOT. operator
+        line = line.replace(/\s*\.NOT\.\s*/g, ".NOT."); // Remove all spaces
+        line = line.replace(/\.NOT\./g, " .NOT. "); // Add one space on each side
+
+        // Fix cases where we added a space at the beginning of the line
+        line = line.replace(/^\s*(\.AND\.|\.OR\.|\.NOT\.)/, "$1");
+
+        // Fix double spaces that might have been created
+        line = line.replace(/\s{2,}/g, " ");
+
+        return line;
+    }
 
     /**
      * Format operators using tokenized context for accuracy
@@ -36,27 +68,25 @@ export class OperatorSpacingRule implements FormattingRule {
         const sortedTokens = [...tokens].sort((a, b) => a.position.offset - b.position.offset);
 
         for (const token of sortedTokens) {
-            // Add whitespace before this token from the original line
+            // Add original whitespace/text between the last token and current token
             if (token.position.offset > currentPos) {
                 parts.push(line.substring(currentPos, token.position.offset));
             }
 
-            // Process the token itself
-            // Pass sortedTokens to helper functions consistently
             if (
                 this.isOperatorToken(token.type) &&
                 !this.isStringOrCommentToken(token, sortedTokens)
             ) {
-                const spacing = this.getOperatorSpacing(token, sortedTokens); // Removed 'position' argument
+                const spacing = this.getOperatorSpacing(token, sortedTokens);
                 if (spacing) {
                     parts.push(this.applySpacing(token.value, spacing));
                 } else {
-                    parts.push(token.value); // No specific spacing rule, use token value as is
+                    parts.push(token.value); // No specific spacing rule, use original
                 }
             } else {
-                parts.push(token.value); // Not an operator or should be skipped, use token value as is
+                parts.push(token.value); // Not an operator or in string/comment
             }
-            currentPos = token.position.offset + token.value.length;
+            currentPos = token.position.offset + token.length;
         }
 
         // Add any trailing whitespace after the last token from the original line
@@ -64,7 +94,11 @@ export class OperatorSpacingRule implements FormattingRule {
             parts.push(line.substring(currentPos));
         }
 
-        return parts.join("");
+        let result = parts.join("");
+        // Clean up multiple spaces that might have been introduced by combining original spacing and applied spacing.
+        result = result.replace(/\s{2,}/g, " ");
+
+        return result.trim();
     }
 
     /**
@@ -99,12 +133,13 @@ export class OperatorSpacingRule implements FormattingRule {
 
             // Increment/Decrement (special handling needed)
             TokenType.increment, // ++
-            TokenType.decrement, // --
-
-            // Logical operators (handled as keywords in SSL)
+            TokenType.decrement, // --            // Logical operators (handled as keywords in SSL)
             TokenType.logicalAnd, // .AND.
             TokenType.logicalOr, // .OR.
             TokenType.logicalNot, // .NOT.
+            TokenType.and, // .AND.
+            TokenType.or, // .OR.
+            TokenType.not, // .NOT.
         ]);
 
         return operatorTypes.has(tokenType);
@@ -183,6 +218,12 @@ export class OperatorSpacingRule implements FormattingRule {
 
             case TokenType.logicalAnd: // .AND.
             case TokenType.logicalOr: // .OR.
+            case TokenType.and: // .AND.
+            case TokenType.or: // .OR.
+                return { before: true, after: true };
+
+            case TokenType.logicalNot: // .NOT.
+            case TokenType.not: // .NOT.
                 return { before: true, after: true };
 
             case TokenType.colon: // :
@@ -202,40 +243,70 @@ export class OperatorSpacingRule implements FormattingRule {
      */
     private isUnaryOperator(operatorToken: Token, tokens: Token[]): boolean {
         const operatorIndex = tokens.indexOf(operatorToken);
-        if (operatorIndex === 0) {
+        if (operatorIndex === -1) {
+            // Should not happen if token is from the tokens array
+            return false;
+        }
+
+        // Find the previous non-whitespace token
+        let prevSemanticToken: Token | null = null;
+        for (let i = operatorIndex - 1; i >= 0; i--) {
+            const currentScannedToken = tokens[i];
+            if (
+                currentScannedToken.type !== TokenType.whitespace &&
+                currentScannedToken.type !== TokenType.newline
+            ) {
+                prevSemanticToken = currentScannedToken;
+                break;
+            }
+        }
+
+        if (prevSemanticToken === null) {
+            // Operator is at the beginning of the line (or only preceded by whitespace)
             return true;
         }
 
-        const prevToken = tokens[operatorIndex - 1];
+        const prevTokenType = prevSemanticToken.type;
 
-        // Unary if preceded by operators, keywords, or punctuation
+        // Unary if preceded by operators, keywords, or punctuation that can start an expression or sub-expression
         const unaryPrecedingTypes = new Set([
-            TokenType.assign,
-            TokenType.plusAssign,
-            TokenType.minusAssign,
-            TokenType.multAssign,
-            TokenType.divAssign,
-            TokenType.powerAssign,
-            TokenType.equals,
-            TokenType.notEquals,
-            TokenType.lessThan,
-            TokenType.greaterThan,
-            TokenType.lessEqual,
-            TokenType.greaterEqual,
-            TokenType.simpleEquals,
-            TokenType.lparen,
-            TokenType.lbrace,
-            TokenType.lbracket,
-            TokenType.comma,
-            TokenType.semicolon,
-            TokenType.if,
-            TokenType.while,
-            TokenType.for,
-            TokenType.case,
-            TokenType.return,
+            TokenType.assign, // :=
+            TokenType.plusAssign, // +=
+            TokenType.minusAssign, // -=
+            TokenType.multAssign, // *=
+            TokenType.divAssign, // /=
+            TokenType.powerAssign, // ^=
+            TokenType.equals, // ==
+            TokenType.notEquals, // !=
+            TokenType.lessThan, // <
+            TokenType.greaterThan, // >
+            TokenType.lessEqual, // <=
+            TokenType.greaterEqual, // >=
+            TokenType.simpleEquals, // = (e.g. IF a = -b)
+            TokenType.lparen, // (
+            TokenType.lbrace, // {
+            TokenType.lbracket, // [
+            TokenType.comma, // ,
+            TokenType.semicolon, // ; (e.g. ;-5)
+            TokenType.if, // IF -a
+            TokenType.while, // WHILE -a
+            TokenType.for, // FOR i := -10
+            TokenType.case, // CASE -1
+            TokenType.return, // RETURN -1
+            TokenType.to, // FOR I := 1 :TO -N
+            // Other operators that can precede a unary operator
+            TokenType.plus,
+            TokenType.minus,
+            TokenType.multiply,
+            TokenType.divide,
+            TokenType.power,
+            TokenType.modulo,
+            TokenType.and, // .AND.
+            TokenType.or, // .OR.
+            // TokenType.not, // .NOT. is usually unary itself, .NOT. -5 is rare.
         ]);
 
-        return unaryPrecedingTypes.has(prevToken.type);
+        return unaryPrecedingTypes.has(prevTokenType);
     }
 
     /**
@@ -254,7 +325,6 @@ export class OperatorSpacingRule implements FormattingRule {
         // Property access: identifier : identifier
         return prevToken.type === TokenType.identifier && nextToken.type === TokenType.identifier;
     }
-
     /**
      * Apply spacing to operator
      */
@@ -262,6 +332,18 @@ export class OperatorSpacingRule implements FormattingRule {
         operatorValue: string,
         spacing: { before: boolean; after: boolean }
     ): string {
+        // Special handling for dot operators like .AND. .OR. .NOT.
+        if (operatorValue.startsWith(".") && operatorValue.endsWith(".")) {
+            // For logical operators, we want just one space before and after
+            return spacing.before && spacing.after
+                ? ` ${operatorValue} `
+                : spacing.before
+                ? ` ${operatorValue}`
+                : spacing.after
+                ? `${operatorValue} `
+                : operatorValue;
+        }
+
         let result = operatorValue;
 
         if (spacing.before) {
@@ -327,8 +409,7 @@ export class OperatorSpacingRule implements FormattingRule {
 
     /**
      * Legacy string-based operator spacing (fallback)
-     */
-    private addSpacingAroundOperator(text: string, operator: string): string {
+     */ private addSpacingAroundOperator(text: string, operator: string): string {
         const leadingWhitespaceMatch = text.match(/^(\s*)/);
         const leadingWhitespace = leadingWhitespaceMatch ? leadingWhitespaceMatch[0] : "";
         const contentText = text.substring(leadingWhitespace.length);
@@ -336,6 +417,28 @@ export class OperatorSpacingRule implements FormattingRule {
         // Early return if operator not found
         if (!contentText.includes(operator)) {
             return text;
+        } // Special handling for dot operators like .AND. .OR. .NOT.
+        if (operator.startsWith(".") && operator.endsWith(".")) {
+            // First, normalize to have exactly one space before and after
+            const regex = new RegExp(`\\s*${operator.replace(/\./g, "\\.")}\\s*`, "g");
+            let processedContent = contentText.replace(regex, ` ${operator} `);
+
+            // Handle case with no spaces before
+            processedContent = processedContent.replace(
+                new RegExp(`([^\\s])${operator.replace(/\./g, "\\.")}\\s`, "g"),
+                `$1 ${operator} `
+            );
+
+            // Handle case with no spaces after
+            processedContent = processedContent.replace(
+                new RegExp(`\\s${operator.replace(/\./g, "\\.")}([^\\s])`, "g"),
+                ` ${operator} $1`
+            );
+
+            // Fix double spaces
+            processedContent = processedContent.replace(/\s{2,}/g, " ");
+
+            return leadingWhitespace + processedContent;
         }
 
         // Skip processing of single-char operators that are part of compound operators

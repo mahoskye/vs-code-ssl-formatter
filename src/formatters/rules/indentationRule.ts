@@ -1,84 +1,170 @@
-import { FormattingRule, FormattingContext } from "../formattingProvider";
+import { FormattingRule, FormattingContext, SSLFormattingProvider } from "../formattingProvider";
+import { Token, TokenType } from "../../core/tokenizer";
+import { ASTNode, ASTNodeType } from "../../core/parser";
+import { getIndentationString } from "../../utils/indentationUtils";
 
 /**
  * Handles consistent indentation for SSL blocks
  */
 export class IndentationRule implements FormattingRule {
-    name = "IndentationRule"; // Changed name to be unique and reflect it's a class name
+    name = "IndentationRule";
     description = "Ensures consistent indentation for SSL blocks";
 
-    apply(line: string, context: FormattingContext): string {
-        // The core indentation logic has been moved to formattingProvider.ts (analyzeLineContext and formatText loop).
-        // This rule might be deprecated or repurposed for very specific indentation adjustments
-        // not covered by the main logic, or for ensuring lines adhere to the calculated indentLevel.
+    private provider: SSLFormattingProvider;
 
-        // For now, this rule will simply ensure the line is trimmed and the pre-calculated indentation is applied.
-        // However, the formattingProvider already does this after all rules run.
-        // So, this rule, in its current state, might be redundant if formattingProvider handles final indentation.
-
-        if (line.trim() === "") {
-            // formattingProvider should handle empty line indentation (e.g. keep as is, or remove all whitespace)
-            return ""; // Return empty string, provider will handle if it should be empty or just whitespace
-        }
-
-        // The `indentLevel` in `context` is already determined by `analyzeLineContext`.
-        // The `formattingProvider` applies this indentation *after* all rules.
-        // Therefore, this rule should not re-apply or calculate indentation itself.
-        // It could, in the future, be used for complex adjustments *before* the final indentation pass.
-
-        // Return the line as is; formattingProvider will handle the final indentation.
-        return line;
+    constructor(provider: SSLFormattingProvider) {
+        this.provider = provider;
     }
 
-    // The methods below are now largely superseded by logic in formattingProvider.ts
-    // and the use of lineTokens/AST for more accurate context analysis.
-    // They are kept here for reference or potential future use in a more limited capacity.
+    apply(line: string, context: FormattingContext): string {
+        const trimmedLine = line.trim();
+        if (trimmedLine === "") {
+            // Let the provider handle the final state of empty lines (e.g., truly empty or just whitespace for indent level).
+            // For now, returning "" means it might be stripped if other rules don't add whitespace.
+            // Or, provider could ensure it's at least `getIndentationString(context.currentLineBaseIndentLevel, ...)`
+            return "";
+        }
 
-    private shouldNotIndent(line: string): boolean {
-        // This logic might be better placed in analyzeLineContext or handled by specific token types.
-        if (line.startsWith("/*")) {
-            return true;
+        // Labels should have zero indent, overriding other calculations.
+        if (context.lineTokens.length > 0 && context.lineTokens[0].type === TokenType.colon) {
+            return trimmedLine; // No leading space for labels
         }
-        if (line.startsWith(":PROCEDURE")) {
-            return true;
+
+        let indentLevelForThisLine = context.currentLineBaseIndentLevel;
+
+        // --- AST-based indentation logic ---
+        if (context.ast && context.ast.children.length > 0) {
+            const enclosingAstBlock = this.provider.findEnclosingASTBlockNode(
+                context.ast,
+                context.lineNumber
+            );
+            if (enclosingAstBlock) {
+                const astBlockDepth = this.provider.getASTNodeDepth(context.ast, enclosingAstBlock);
+
+                if (line.includes("NIL .AND.")) {
+                    console.log(
+                        `[IndentationRule] NIL Line ${context.lineNumber}: enclosingAstBlock type=${enclosingAstBlock.type}, line=${enclosingAstBlock.line}, astBlockDepth=${astBlockDepth}, currentLineBaseIndentLevel=${context.currentLineBaseIndentLevel}, enclosingASTBlockTypeFromContext=${context.enclosingASTBlockType}`
+                    );
+                }
+
+                if (enclosingAstBlock.type === ASTNodeType.program) {
+                    // Directly under program node.
+                    // Top-level statements and top-level blocks (PROCEDURE, CLASS, IF at root) should generally be indent 0.
+                    // currentLineBaseIndentLevel should be 0 if we are at the global scope.
+                    indentLevelForThisLine = 0;
+                } else {
+                    // Enclosed in a non-program AST block
+                    if (
+                        enclosingAstBlock.line === context.lineNumber &&
+                        this.provider.isASTBlockType(enclosingAstBlock.type)
+                    ) {
+                        // An AST block (e.g. IF, WHILE body) starts on this line. Its indent is currentLineBaseIndentLevel.
+                        indentLevelForThisLine = context.currentLineBaseIndentLevel;
+                    } else {
+                        // Line is inside an existing AST block. Its indent should be astBlockDepth.
+                        indentLevelForThisLine = astBlockDepth;
+                    }
+                }
+            }
         }
-        if (line.startsWith(":CLASS")) {
+        // --- End AST-based indentation logic ---
+
+        // --- Keyword-based adjustments for the current line ---
+        // Adjust for block-ending or intermediate keywords on the *current* line (e.g. ELSE, ENDIF should be outdented)
+        const firstSignificantToken = context.lineTokens.find(
+            (t) =>
+                t.type !== TokenType.whitespace &&
+                t.type !== TokenType.singleLineComment &&
+                t.type !== TokenType.blockComment &&
+                t.type !== TokenType.regionComment &&
+                t.type !== TokenType.endregionComment
+        );
+        if (firstSignificantToken) {
+            if (
+                this.isBlockEndToken(firstSignificantToken, context.lineTokens) ||
+                this.isMiddleBlockToken(firstSignificantToken, context.lineTokens)
+            ) {
+                indentLevelForThisLine = Math.max(0, context.currentLineBaseIndentLevel - 1);
+            }
+            // Note: isBlockStartToken is primarily for the *next* line's indent, handled by provider's analyzeLineContext.
+            // However, if AST logic didn't place it correctly (e.g. a :IF at top level), this could be a fallback.
+            // But the AST logic for program children (setting to 0) should handle top-level blocks.
+        }
+        // --- End Keyword-based adjustments ---
+
+        if (line.includes("NIL .AND.")) {
+            console.log(
+                `[IndentationRule] NIL Line ${context.lineNumber}: Final indentLevelForThisLine = ${indentLevelForThisLine}, from base ${context.currentLineBaseIndentLevel}`
+            );
+        }
+
+        // Ensure indentLevel is not negative
+        indentLevelForThisLine = Math.max(0, indentLevelForThisLine);
+
+        const indentationString = getIndentationString(
+            indentLevelForThisLine,
+            context.options.indentStyle === "tab" ? 1 : context.options.tabSize,
+            context.options.indentStyle === "tab"
+        );
+        return indentationString + trimmedLine;
+    }
+
+    // Helper methods for token-based keyword checks
+    public isBlockStartToken(token: Token, allLineTokens: Token[]): boolean {
+        const keyword = token.value.toUpperCase();
+        // Keywords that open a new indentation level for subsequent lines
+        const startKeywords = [
+            ":IF",
+            ":WHILE",
+            ":FOR",
+            ":PROCEDURE",
+            ":CLASS",
+            ":BEGINCASE",
+            ":TRY",
+            ":REGION",
+            ":BEGININLINECODE",
+            // Note: :SWITCH is handled by :BEGINCASE in some SSL versions
+        ];
+        if (startKeywords.includes(keyword)) {
+            // Special case: "IF ... THEN" on a single line. "THEN" doesn't start a new block itself for the *next* line's indent.
+            // This is more about next line's depth, which provider handles.
+            // For this rule, we are mostly concerned with current line's placement.
             return true;
         }
         return false;
     }
 
-    private calculateIndentLevel(line: string, context: FormattingContext): number {
-        // This is now the primary responsibility of analyzeLineContext in formattingProvider.
-        // Kept for reference.
-        if (this.isBlockEnd(line)) {
-            return Math.max(0, context.indentLevel - 1);
-        }
-        if (this.isMiddleBlock(line)) {
-            return Math.max(0, context.indentLevel - 1);
-        }
-        return context.indentLevel;
-    }
-
-    private isBlockEnd(line: string): boolean {
-        // Prefer token-based checks (see analyzeLineContext in formattingProvider)
-        const blockEndKeywords = [
-            ":ENDPROC",
+    public isBlockEndToken(token: Token, allLineTokens: Token[]): boolean {
+        const keyword = token.value.toUpperCase();
+        const endKeywords = [
             ":ENDIF",
             ":ENDWHILE",
             ":NEXT",
+            /* for :FOR */ ":ENDPROC",
+            ":ENDCLASS",
             ":ENDCASE",
             ":ENDTRY",
             ":ENDREGION",
             ":ENDINLINECODE",
-            ":ENDCLASS", // Added
         ];
-        return blockEndKeywords.some((keyword) => line.toUpperCase().startsWith(keyword));
+        return endKeywords.includes(keyword);
     }
 
-    private isMiddleBlock(line: string): boolean {
-        // Prefer token-based checks (see analyzeLineContext in formattingProvider)
-        const middleBlockKeywords = [":ELSE", ":CATCH", ":FINALLY", ":CASE", ":OTHERWISE"];
-        return middleBlockKeywords.some((keyword) => line.toUpperCase().startsWith(keyword));
+    public isMiddleBlockToken(token: Token, allLineTokens: Token[]): boolean {
+        const keyword = token.value.toUpperCase();
+        const middleKeywords = [
+            ":ELSE",
+            ":CASE",
+            ":OTHERWISE", // for :BEGINCASE
+            ":CATCH",
+            ":FINALLY", // for :TRY
+        ];
+        return middleKeywords.includes(keyword);
     }
+
+    // Original helper methods (can be removed or adapted if fully superseded)
+    // private shouldNotIndent(line: string): boolean { ... }
+    // private calculateIndentLevel(line: string, context: FormattingContext): number { ... }
+    // private isBlockEnd(line: string): boolean { ... } // Superseded by token version
+    // private isMiddleBlock(line: string): boolean { ... } // Superseded by token version
 }

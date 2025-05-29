@@ -78,7 +78,6 @@ export async function formatDocument(
 
     try {
         const cancellationTokenSource = new vscode.CancellationTokenSource();
-
         const edits = await provider.provideDocumentFormattingEdits(
             mockDocument as vscode.TextDocument,
             mockVscodeOptions,

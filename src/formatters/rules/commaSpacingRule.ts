@@ -27,48 +27,65 @@ export class CommaSpacingRule implements FormattingRule {
 
     private formatCommasWithTokens(line: string, tokens: Token[]): string {
         let result = line;
-        // Process comma tokens from right to left.
-        // Their `position.offset` refers to the original line.
-        // When modifying `result` from right to left, the absolute positions
-        // of commas to the left are not affected by changes to their right.
         const commaTokens = tokens
             .filter((token) => token.type === TokenType.comma)
-            .sort((a, b) => b.position.offset - a.position.offset); // Explicit sort R-L
+            .sort((a, b) => b.position.offset - a.position.offset); // Process R-L
 
         for (const commaToken of commaTokens) {
-            const commaPos = commaToken.position.offset; // Use original offset directly
+            const commaPos = commaToken.position.offset;
 
-            // Boundary checks for safety, though with correct R-L, commaPos should be valid in current result
-            if (commaPos < 0 || commaPos >= result.length) {
+            // Safety check: ensure commaPos is valid and points to a comma in the current result string.
+            if (commaPos < 0 || commaPos >= result.length || result[commaPos] !== ",") {
                 continue;
             }
 
-            const afterCommaPos = commaPos + 1;
+            // If comma is in a string, comment, or bracket notation, skip formatting it.
+            if (this.isCommaInStringOrComment(result, commaPos)) {
+                continue;
+            }
 
-            if (afterCommaPos < result.length) {
-                // Comma is not the last char
-                const restOfLineAfterComma = result.substring(afterCommaPos);
-                const whitespaceMatch = restOfLineAfterComma.match(/^(\\s*)/);
-                const existingWhitespace = whitespaceMatch ? whitespaceMatch[1] : "";
+            // Part 1: Everything up to and including the comma
+            const prefix = result.substring(0, commaPos + 1);
 
-                let desiredSpacing = " ";
-                // Pass current `result` to shouldSkipSpacing
-                if (this.shouldSkipSpacing(result, commaPos, tokens)) {
-                    desiredSpacing = "";
-                }
+            // Part 2: Identify the start of actual content after the comma, skipping any existing spaces
+            let contentStartPos = commaPos + 1;
+            while (contentStartPos < result.length && result[contentStartPos] === " ") {
+                contentStartPos++;
+            }
+            const suffix = result.substring(contentStartPos);
 
-                if (existingWhitespace !== desiredSpacing) {
-                    const beforeCommaPart = result.substring(0, commaPos + 1); // Includes the comma
-                    const afterExistingWhitespacePart = result.substring(
-                        afterCommaPos + existingWhitespace.length
-                    );
-                    result = beforeCommaPart + desiredSpacing + afterExistingWhitespacePart;
+            // Part 3: Decide whether a space should be inserted after the comma
+            let shouldInsertSpace = true; // Default to true
+
+            if (contentStartPos >= result.length) {
+                shouldInsertSpace = false;
+            } else {
+                const nextActualCharInResult = result[contentStartPos];
+
+                // Condition 2: Comma is followed by a closing bracket, brace, or parenthesis
+                if (
+                    nextActualCharInResult === "}" ||
+                    nextActualCharInResult === "]" ||
+                    nextActualCharInResult === ")"
+                ) {
+                    shouldInsertSpace = false;
+                } else if (nextActualCharInResult === ",") {
+                    // Condition 3: Comma is followed by another comma (e.g., the first comma in ````,````)
+                    shouldInsertSpace = false;
+                } else if (nextActualCharInResult === "\\n" || nextActualCharInResult === "\\r") {
+                    // Condition 4: Comma is followed by a newline character
+                    shouldInsertSpace = false;
                 }
             }
-            // Else: Comma is the last character on the line.
-            // Current logic doesn't explicitly add a space if missing and desired here,
-            // but shouldSkipSpacing would likely return true for EOL cases anyway.
+
+            // Part 4: Reconstruct the string
+            if (shouldInsertSpace) {
+                result = prefix + " " + suffix;
+            } else {
+                result = prefix + suffix;
+            }
         }
+
         return result;
     }
 
@@ -76,12 +93,11 @@ export class CommaSpacingRule implements FormattingRule {
     private shouldSkipSpacing(currentLine: string, commaPos: number, tokens: Token[]): boolean {
         // Check if comma is at end of line
         if (commaPos >= currentLine.length - 1) {
-            // Use currentLine
             return true;
         }
 
         // Check if followed by closing bracket/brace/paren
-        const nextChar = currentLine[commaPos + 1]; // Use currentLine
+        const nextChar = currentLine[commaPos + 1];
         if (nextChar === "}" || nextChar === "]" || nextChar === ")") {
             return true;
         }
@@ -152,22 +168,32 @@ export class CommaSpacingRule implements FormattingRule {
         const beforeComma = text.substring(0, commaIndex);
 
         // Check for comment context
-        const lastCommentStart = beforeComma.lastIndexOf("/*");
-        const lastCommentEnd = beforeComma.lastIndexOf(";");
-
-        if (
-            lastCommentStart !== -1 &&
-            (lastCommentEnd === -1 || lastCommentStart > lastCommentEnd)
-        ) {
-            return true; // Inside comment
+        // For block comments /* ... */
+        const lastBlockCommentStart = beforeComma.lastIndexOf("/*");
+        if (lastBlockCommentStart !== -1) {
+            const lastBlockCommentEnd = beforeComma.lastIndexOf("*/");
+            if (lastBlockCommentEnd === -1 || lastBlockCommentStart > lastBlockCommentEnd) {
+                // We are inside a /* ... block comment that hasn't ended before the comma
+                return true;
+            }
         }
+        // For EOL comments ;
+        // The previous EOL comment detection based on ';' was too aggressive
+        // and conflicted with ';' as a potential statement separator.
+        // If SSL has specific EOL comment syntax (e.g., REM, //, or specific use of ;),
+        // it should be handled by the tokenizer or a more context-aware rule.
+        // For now, removing the generic ';' EOL check to allow formatting
+        // in cases like "statement1; statement2_with_commas".
 
-        // Special case for bracket notation [e*f]
-        if (beforeComma.lastIndexOf("[") > beforeComma.lastIndexOf("]")) {
-            return true;
-        }
+        // NOTE: The check for general bracket notation `[e*f]` like:
+        // if (beforeComma.lastIndexOf("[") > beforeComma.lastIndexOf("]")) { return true; }
+        // was removed. It was too broad and incorrectly prevented formatting of commas
+        // in array access like `myArray[1,2,3]`. If there's a special SSL bracket
+        // notation (distinct from array access) where commas must be preserved,
+        // it needs to be handled by the tokenizer (e.g., by not producing
+        // TokenType.comma for those internal commas) or by a more context-aware rule.
 
-        // More accurate string detection
+        // More accurate string detection for the comma's position
         let inSingleQuote = false;
         let inDoubleQuote = false;
         let i = 0;

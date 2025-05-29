@@ -28,6 +28,7 @@ export interface FormattingRule {
 
 export interface FormattingContext {
     indentLevel: number;
+    currentLineBaseIndentLevel: number; // Added: Base indent level for the current line
     blockType: string | null; // Type of the keyword on the current line (e.g., "IF", "ELSE") or null
     previousLine: string | null;
     nextLine: string | null;
@@ -58,7 +59,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
                 new CommaSpacingRule(),
                 new BlockAlignmentRule(),
                 new ColonSpacingRule(),
-                new IndentationRule(),
+                new IndentationRule(this), // Pass provider instance
             ];
         }
     }
@@ -122,33 +123,50 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
         token: vscode.CancellationToken
     ): Promise<string> {
         const startTime = Date.now();
-        const MAX_PROCESSING_TIME = 5000; // 5 second timeout
-
+        const MAX_PROCESSING_TIME = 5000; // 5 seconds
         let allTokens: Token[];
         let ast: ASTNode;
+        let tokenizer: SSLTokenizer; // Declare tokenizer        // Instantiate tokenizer for the entire document text before the try-catch block
+        tokenizer = new SSLTokenizer(text);
+
+        // Find the IndentationRule instance
+        const indentationRule = this.rules.find((rule) => rule.name === "IndentationRule") as
+            | IndentationRule
+            | undefined;
+        if (!indentationRule) {
+            console.warn(
+                "IndentationRule not found in SSLFormattingProvider. Indentation keyword logic might be affected."
+            );
+            // Potentially throw an error or use a default/dummy implementation if critical
+        }
+
+        // Process line by line with context from AST
+        const lines = text.split(/\r?\n/);
 
         try {
-            // Check cancellation before expensive operations
-            if (token && token.isCancellationRequested) {
-                return text;
-            }
-
-            // Tokenize the input
-            const tokenizer = new SSLTokenizer(text);
+            // Tokenize the entire document first using the already instantiated tokenizer
             allTokens = tokenizer.tokenize();
 
-            // Check cancellation and timeout
-            if (token && token.isCancellationRequested) {
-                return text;
-            }
-            if (Date.now() - startTime > MAX_PROCESSING_TIME) {
-                console.warn("SSL Formatting timeout during tokenization");
-                return text;
-            }
-
-            // Parse into AST for structural understanding
+            // Then parse the tokens into an AST
             const parser = new SSLParser(allTokens); // Use allTokens for parsing
             ast = parser.parse();
+
+            // Initialize context properties that depend on the AST
+            if (ast && ast.children) {
+                for (const child of ast.children) {
+                    if (child.line !== undefined) {
+                        // Ensure line is defined
+                        const lineIndex = child.line - 1; // Convert to 0-based index
+                        if (lineIndex >= 0 && lineIndex < lines.length) {
+                            const line = lines[lineIndex];
+                            // Re-tokenize the line with the correct tokenizer instance
+                            const lineTokens = new SSLTokenizer(line).tokenize();
+                            // Note: ASTNode doesn't have a tokens property, so we skip this assignment
+                            // child.tokens = lineTokens;
+                        }
+                    }
+                }
+            }
 
             if (Date.now() - startTime > MAX_PROCESSING_TIME) {
                 console.warn("SSL Formatting timeout during parsing");
@@ -160,68 +178,70 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
             ast = { type: ASTNodeType.program, children: [] };
             allTokens = []; // Avoid using potentially incomplete tokens
         }
-
-        // Process line by line with context from AST
-        const lines = text.split(/\r?\n/);
         const formattedLines: string[] = [];
-        let currentBlockDepth = 0;
+        let currentBlockDepth = 0; // This is the keyword-driven depth for the *next* line
 
-        const MAX_LINES = 10000;
+        const MAX_LINES = 10000; // Safety break for very large files
         const actualLines = Math.min(lines.length, MAX_LINES);
 
         if (lines.length > MAX_LINES) {
             console.warn(
-                `SSL Formatting limiting processing to ${MAX_LINES} lines (original: ${lines.length})`
+                `[SSLFormattingProvider] Document has ${lines.length} lines. Processing only the first ${MAX_LINES} lines.`
             );
         }
 
         for (let i = 0; i < actualLines; i++) {
+            if (token.isCancellationRequested) {
+                console.log("[SSLFormattingProvider] Formatting cancelled.");
+                return text; // Return original text if cancelled
+            }
             if (Date.now() - startTime > MAX_PROCESSING_TIME) {
-                console.warn(`SSL Formatting timeout at line ${i + 1}/${lines.length}`);
-                return formattedLines.length > 0 ? formattedLines.join("\n") : text;
+                console.warn(
+                    `[SSLFormattingProvider] Formatting aborted after ${MAX_PROCESSING_TIME}ms due to excessive processing time.`
+                );
+                return text; // Return original text if timeout
             }
 
-            if (token && token.isCancellationRequested) {
-                return formattedLines.length > 0 ? formattedLines.join("\n") : text;
-            }
+            const line = lines[i];
+            // Tokenize current line using a new tokenizer instance for that specific line
+            const lineTokens = new SSLTokenizer(line).tokenize();
 
-            const originalLine = lines[i];
-            const lineTokens = allTokens.filter((t) => t.position.line === i + 1);
-
-            // Determine indentation and block context BEFORE applying rules
-            const lineAnalysisResult = this.analyzeLineContext(
-                originalLine,
+            // Analyze context for the current line (this determines base indent for IndentationRule)
+            const lineContextAnalysis = this.analyzeLineContext(
+                line,
                 ast,
-                i + 1,
+                i + 1, // lineNumber is 1-based for AST
                 currentBlockDepth,
-                lineTokens
+                lineTokens,
+                indentationRule // Pass the rule instance
             );
 
-            const indentLevelForCurrentLine = lineAnalysisResult.indentLevel;
+            const indentLevelForCurrentLine = lineContextAnalysis.indentLevel;
 
-            let currentLineText = originalLine;
+            let currentLineText = line;
             const context: FormattingContext = {
                 indentLevel: indentLevelForCurrentLine,
-                blockType: lineAnalysisResult.blockType,
+                currentLineBaseIndentLevel: indentLevelForCurrentLine, // Added
+                blockType: lineContextAnalysis.blockType,
                 previousLine: i > 0 ? lines[i - 1] : null,
                 nextLine: i < lines.length - 1 ? lines[i + 1] : null,
                 lineNumber: i + 1,
                 options,
                 ast,
                 lineTokens,
-                blockDepth: lineAnalysisResult.blockDepth,
+                blockDepth: lineContextAnalysis.blockDepth,
                 constructType: this.getConstructType(
-                    originalLine,
+                    line,
                     lineTokens,
-                    lineAnalysisResult.blockType,
+                    lineContextAnalysis.blockType,
                     ast, // Added ast
                     i + 1 // Added lineNumber (1-based)
                 ),
                 inMultiLineConstruct: false,
-                enclosingASTBlockType: lineAnalysisResult.enclosingASTBlockType, // Added
+                enclosingASTBlockType: lineContextAnalysis.enclosingASTBlockType, // Added
             };
             context.inMultiLineConstruct = this.isMultiLineConstruct(
-                originalLine,
+                line,
                 lineTokens,
                 i, // 0-based index for lines array
                 lines,
@@ -256,7 +276,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
             formattedLines.push(currentLineText);
 
-            currentBlockDepth = lineAnalysisResult.blockDepth;
+            currentBlockDepth = lineContextAnalysis.blockDepth;
         }
         const result = formattedLines.join("\n");
 
@@ -272,108 +292,78 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
         line: string,
         ast: ASTNode,
         lineNumber: number,
-        currentBlockDepth: number, // This is the keyword-driven depth
-        lineTokens: Token[]
+        currentBlockDepth: number, // Keyword-driven depth from *previous* lines
+        lineTokens: Token[],
+        indentationRule: IndentationRule | undefined // Pass the rule instance
     ): {
-        indentLevel: number;
+        indentLevel: number; // This will become context.currentLineBaseIndentLevel
         blockType: string | null;
         blockDepth: number; // Keyword-driven depth for *next* line
         enclosingASTBlockType: ASTNodeType | null;
     } {
-        let keywordDrivenBlockDepth = currentBlockDepth;
-        let indentLevelForThisLine = currentBlockDepth;
         let newBlockType: string | null = null;
-
         let enclosingAstBlock: ASTNode | null = null;
-        let astBasedIndentLevel = currentBlockDepth;
 
+        // 1. Determine enclosing AST block for context
         if (ast && ast.children.length > 0) {
             enclosingAstBlock = this.findEnclosingASTBlockNode(ast, lineNumber);
-            if (enclosingAstBlock) {
-                astBasedIndentLevel = this.getASTNodeDepth(ast, enclosingAstBlock);
-            }
+            // AST-based adjustments to the current line's indent are handled by IndentationRule.
         }
 
+        // 2. Determine indentLevel for the current line (to be context.currentLineBaseIndentLevel)
+        // This is the base indent level of the current scope, derived from previous lines' keywords.
+        // IndentationRule will apply further AST-based and current-line keyword-based adjustments.
+        let indentLevelForThisLine = currentBlockDepth;
         if (lineTokens.length > 0 && lineTokens[0].type === TokenType.colon) {
-            const keywordToken = lineTokens.length > 1 ? lineTokens[1] : null;
+            indentLevelForThisLine = 0; // Labels are always 0 indent
+        }
+        // No adjustments here for current line's block start/end/middle keywords;
+        // IndentationRule handles that.
 
-            if (keywordToken) {
-                const keywordTokenType = keywordToken.type;
-                newBlockType = this.getBlockTypeFromToken(keywordTokenType);
+        // 3. Determine keywordDrivenBlockDepth for the *next* line
+        let keywordDrivenBlockDepth = currentBlockDepth;
+        const firstSignificantToken = lineTokens.find(
+            (t) =>
+                t.type !== TokenType.whitespace &&
+                t.type !== TokenType.singleLineComment &&
+                t.type !== TokenType.blockComment &&
+                t.type !== TokenType.regionComment &&
+                t.type !== TokenType.endregionComment
+        );
 
-                const startTokens = [
-                    TokenType.if,
-                    TokenType.while,
-                    TokenType.for,
-                    TokenType.procedure,
-                    TokenType.begincase,
-                    TokenType.try,
-                    TokenType.class,
-                    TokenType.region,
-                    TokenType.error,
-                    TokenType.begininlinecode,
-                ];
-                const endTokens = [
-                    TokenType.endif,
-                    TokenType.endwhile,
-                    TokenType.next,
-                    TokenType.endproc,
-                    TokenType.endcase,
-                    TokenType.endtry,
-                    TokenType.endregion,
-                    TokenType.endinlinecode,
-                    TokenType.endclass,
-                ];
-                const intermediateTokens = [
-                    TokenType.else,
-                    TokenType.case,
-                    TokenType.otherwise,
-                    TokenType.catch,
-                    TokenType.finally,
-                ];
+        if (firstSignificantToken) {
+            const tokenValueUpper = firstSignificantToken.value.toUpperCase();
+            newBlockType = tokenValueUpper; // Store the primary keyword for context
 
-                if (endTokens.includes(keywordTokenType)) {
-                    keywordDrivenBlockDepth = Math.max(0, currentBlockDepth - 1);
-                    indentLevelForThisLine = keywordDrivenBlockDepth;
-                } else if (intermediateTokens.includes(keywordTokenType)) {
-                    indentLevelForThisLine = Math.max(0, currentBlockDepth - 1);
-                    keywordDrivenBlockDepth = currentBlockDepth;
-                } else if (startTokens.includes(keywordTokenType)) {
-                    indentLevelForThisLine = currentBlockDepth;
-                    keywordDrivenBlockDepth = currentBlockDepth + 1;
-                } else {
-                    // Colon-prefixed line, but not a block control keyword (e.g., :DEFINE, :INCLUDE)
-                    // Indent based on AST if possible, otherwise maintain current keyword-driven depth.
-                    indentLevelForThisLine = enclosingAstBlock
-                        ? astBasedIndentLevel
-                        : currentBlockDepth;
-                    // keywordDrivenBlockDepth remains currentBlockDepth as these keywords don't define new block levels.
-                }
-            } else {
-                // Line starts with a colon but no subsequent keyword token (e.g., just ":") - unlikely but handle defensively.
-                indentLevelForThisLine = enclosingAstBlock
-                    ? astBasedIndentLevel
-                    : currentBlockDepth;
-                // keywordDrivenBlockDepth remains currentBlockDepth.
+            // Adjust keywordDrivenBlockDepth for the *next* line based on current line's tokens
+            // Start with the current depth
+            let nextLineDepth = currentBlockDepth;
+            if (
+                indentationRule &&
+                (indentationRule.isBlockEndToken(firstSignificantToken, lineTokens) ||
+                    indentationRule.isMiddleBlockToken(firstSignificantToken, lineTokens))
+            ) {
+                nextLineDepth = Math.max(0, nextLineDepth - 1);
             }
-        } else {
-            // Not a colon-prefixed line (e.g., assignment, expression, or empty line)
-            // For non-keyword lines (including empty ones), AST-based indentation is preferred if available.
-            // Otherwise, fall back to the current keyword-driven depth from the previous line.
-            indentLevelForThisLine = enclosingAstBlock ? astBasedIndentLevel : currentBlockDepth;
-            // keywordDrivenBlockDepth remains currentBlockDepth as this line doesn't change keyword-based block structure.
-            // newBlockType remains null.
+            if (
+                indentationRule &&
+                indentationRule.isBlockStartToken(firstSignificantToken, lineTokens)
+            ) {
+                nextLineDepth = nextLineDepth + 1;
+            }
+            keywordDrivenBlockDepth = nextLineDepth;
         }
 
         return {
-            indentLevel: indentLevelForThisLine,
+            indentLevel: indentLevelForThisLine, // Base indent for IndentationRule
             blockType: newBlockType,
-            blockDepth: keywordDrivenBlockDepth,
+            blockDepth: keywordDrivenBlockDepth, // For the next line's base indent
             enclosingASTBlockType: enclosingAstBlock ? enclosingAstBlock.type : null,
         };
     }
 
-    private getASTNodeDepth(programNode: ASTNode, targetNode: ASTNode): number {
+    // Make these methods public so IndentationRule can access them
+    public getASTNodeDepth(programNode: ASTNode, targetNode: ASTNode): number {
         let depth = 0;
         let found = false;
 
@@ -404,7 +394,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
         return Math.max(0, depth);
     }
 
-    private isASTBlockType(type: ASTNodeType): boolean {
+    public isASTBlockType(type: ASTNodeType): boolean {
         return [
             ASTNodeType.program, // The root is a block
             ASTNodeType.procedure,
@@ -420,7 +410,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
         ].includes(type);
     }
 
-    private findEnclosingASTBlockNode(
+    public findEnclosingASTBlockNode(
         currentNode: ASTNode,
         targetLineNumber: number
     ): ASTNode | null {
