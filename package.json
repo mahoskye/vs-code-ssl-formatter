@@ -177,7 +177,7 @@
         "compile": "tsc -p ./",
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
-        "lint": "eslint src --ext ts",
+        "lint": "eslint src",
         "test": "jest --bail",
         "test:all": "jest --bail",
         "test:first-fail": "jest --runInBand --bail",
@@ -186,18 +186,15 @@
         "test:file": "jest --bail --testPathPattern=${1}"
     },
     "devDependencies": {
-        "@types/glob": "^8.1.0",
         "@types/jest": "^29.5.14",
-        "@types/node": "^22.7.5",
-        "@types/vscode": "^1.94.0",
-        "@typescript-eslint/eslint-plugin": "^5.59.1",
-        "@typescript-eslint/parser": "^5.59.1",
-        "eslint": "^8.39.0",
-        "glob": "^11.0.0",
+        "@types/node": "^22.15.29",
+        "@types/vscode": "^1.100.0",
+        "@typescript-eslint/eslint-plugin": "^8.33.1",
+        "@typescript-eslint/parser": "^8.33.1",
+        "eslint": "^9.28.0",
         "jest": "^29.7.0",
-        "ts-jest": "^29.1.1",
-        "typescript": "~5.1.6",
-        "vscode-test": "^1.6.1"
+        "ts-jest": "^29.3.4",
+        "typescript": "~5.8.3"
     },
     "prettier": {
         "printWidth": 100,
