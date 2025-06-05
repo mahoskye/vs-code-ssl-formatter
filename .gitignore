@@ -20,6 +20,7 @@ node_modules/
 
 # Extension packaged files
 *.vsix
+*.zip
 
 # Logs
 *.log

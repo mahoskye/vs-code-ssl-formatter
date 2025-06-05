@@ -27,12 +27,14 @@ The following patterns are frequently seen in SSL code and represent idiomatic u
 
     ```ssl
     :PROCEDURE DoSomething;
-    :PARAMETERS param1, param2;
-    /* Procedure body */
-    :RETURN result;
+        :PARAMETERS param1, param2;
+
+        /* Procedure body;
+
+        :RETURN result;
     :ENDPROC;
 
-    /* Calling the procedure */
+    /* Calling the procedure;
     result := DoProc("DoSomething", {value1, value2});
     ```
 
@@ -40,24 +42,31 @@ The following patterns are frequently seen in SSL code and represent idiomatic u
 
     ```ssl
     :IF condition;
-        /* True branch */
+
+        /* True branch;
+
     :ELSE;
-        /* False branch */
+
+        /* False branch;
+
     :ENDIF;
     ```
 
 4. **Array Processing**:
 
     ```ssl
-    :DECLARE arItems, nCount;
-    arItems := {1, 2, 3, 4, 5};
-    nCount := Len(arItems);
+    :DECLARE aItems, nCount;
+    aItems := {1, 2, 3, 4, 5};
+    nCount := Len(aItems);
 
-    /* Process array elements */
+    /* Process array elements;
     :DECLARE i;
     i := 0;
+
     :WHILE (i += 1) <= nCount;
-        /* Process arItems[i] */
+
+        /* Process aItems[i];
+
     :ENDWHILE;
     ```
 
@@ -65,15 +74,22 @@ The following patterns are frequently seen in SSL code and represent idiomatic u
 
     ```ssl
     :TRY;
-        /* Code that might cause an error */
+
+        /* Code that might cause an error;
+
     :CATCH;
-        /* Error handling code */
+
+        /* Error handling code;
+
     :ENDTRY;
     ```
 
 6. **SQL Database Access**:
+
     ```ssl
-    arResults := SqlExecute("SELECT field1, field2 FROM tablename WHERE condition = ?param?", {paramValue});
+    aResults := SqlExecute("SELECT field1, field2 FROM tablename WHERE condition = ?param?");
+
+    aResultsAlt := LSearch("SELECT field1, field2 FROM tablename WHERE condition = ?",,,{param});
     ```
 
 ## Notation
@@ -320,7 +336,7 @@ Symbol ::= (* Any printable character, specific exclusions depend on context lik
 
 7. **Block Structure**: Control structures like conditionals and loops follow a block-based structure with explicit end markers (`:ENDIF`, `:ENDWHILE`, etc.).
 
-8. **Comments**: Comments in SSL start with `/*` and end with a semicolon, rather than using traditional comment delimiters like `*/`.
+8. **Comments**: Comments in SSL start with `/*` and end with a semicolon `;`, rather than using traditional comment delimiters like `*/`.
 
 9. **Regions and Comments**: The language supports two types of regions:
 

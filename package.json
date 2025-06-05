@@ -2,7 +2,7 @@
     "name": "vs-code-ssl-formatter",
     "displayName": "STARLIMS Scripting Language Formatter",
     "description": "Syntax highlighting, folding, and auto-completion for STARLIMS Scripting Language (SSL)",
-    "version": "0.3.0",
+    "version": "0.2.0",
     "engines": {
         "vscode": "^1.94.0"
     },
@@ -83,7 +83,14 @@
                             "Internal Functions": [],
                             "Error Handling": [],
                             "Web Specific Functions": [],
-                            "Operators": [],
+                            "Operators": [
+                                {
+                                    "label": ":=",
+                                    "kind": "operator",
+                                    "detail": "Assignment Operator",
+                                    "documentation": "Assigns a value to a variable."
+                                }
+                            ],
                             "Literals": [],
                             "Snippets": [
                                 {
@@ -159,29 +166,8 @@
                             ]
                         },
                         "description": "Custom completions for SSL"
-                    },
-                    "sslFormatter.debug.showTableView": {
-                        "type": "boolean",
-                        "default": true,
-                        "description": "Show table view in debug output"
-                    },
-                    "sslFormatter.debug.showDetailedView": {
-                        "type": "boolean",
-                        "default": true,
-                        "description": "Show detailed view in debug output"
-                    },
-                    "sslFormatter.debug.showInsights": {
-                        "type": "boolean",
-                        "default": true,
-                        "description": "Show formatter insights in debug output"
                     }
                 }
-            }
-        ],
-        "commands": [
-            {
-                "command": "sslFormatter.reloadCompletions",
-                "title": "Reload SSL Completions"
             }
         ]
     },
@@ -195,24 +181,6 @@
         "test": "jest --bail",
         "test:all": "jest --bail",
         "test:first-fail": "jest --runInBand --bail",
-        "test:core": "jest --testPathPattern=test/core",
-        "test:tokenizer": "jest --testPathPattern=tokenizer.test",
-        "test:parser": "jest --testPathPattern=parser.test",
-        "test:providers": "jest --testPathPattern=test/(bracketMatchingProvider|completionProvider|foldingProvider|hoverProvider)",
-        "test:bracketMatching": "jest --testPathPattern=bracketMatchingProvider",
-        "test:completion": "jest --testPathPattern=completionProvider",
-        "test:folding": "jest --testPathPattern=foldingProvider",
-        "test:hover": "jest --testPathPattern=hoverProvider",
-        "test:formatting": "jest --testPathPattern=test/formattingProvider",
-        "test:blockAlignment": "jest --testPathPattern=blockAlignmentRules.test",
-        "test:formattingProvider": "jest --testPathPattern=formattingProvider.test",
-        "test:colonSpacing": "jest --testPathPattern=colonSpacingRules.test",
-        "test:commaSpacing": "jest --testPathPattern=commaSpacingRules.test",
-        "test:commentFormatting": "jest --testPathPattern=commentFormattingRules.test",
-        "test:formattingOptions": "jest --testPathPattern=formattingOptions.test",
-        "test:indentation": "jest --testPathPattern=indentationRules.test",
-        "test:integration": "jest --testPathPattern=integrationTests.test",
-        "test:operatorSpacing": "jest --testPathPattern=operatorSpacingRules.test",
         "test:individual": "jest --bail --testPathPattern=${1}",
         "test:suite": "jest --bail --testPathPattern=${1}",
         "test:file": "jest --bail --testPathPattern=${1}"
