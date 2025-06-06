@@ -129,11 +129,9 @@ export class Lexer {
         const operatorResult = this.readOperator(startPos);
         if (operatorResult) {
             return operatorResult;
-        }
-
-        // Handle SQL parameters (must come before punctuation to avoid ? being matched as punctuation)
+        } // Handle question marks
         if (char === "?") {
-            return this.readSqlParameter(startPos);
+            return this.readQuestionMark(startPos);
         }
 
         // Handle punctuation
@@ -319,35 +317,12 @@ export class Lexer {
 
         return null;
     }
-
     /**
-     * Reads an SQL parameter token (?paramName? or ?)
+     * Reads a question mark token (?)
      */
-    private readSqlParameter(startPos: Position): Token {
-        let text = "?";
-        this.advance(); // Skip first ?
-
-        // Check if it's a named parameter (?paramName?)
-        if (isIdentifierStart(this.currentChar())) {
-            while (!this.isAtEnd() && isIdentifierPart(this.currentChar())) {
-                text += this.currentChar();
-                this.advance();
-            }
-
-            if (this.currentChar() === "?") {
-                text += "?";
-                this.advance();
-                return createToken(
-                    TokenType.SQL_PARAM_NAMED,
-                    text,
-                    startPos,
-                    this.getCurrentPosition()
-                );
-            }
-        }
-
-        // It's just a ? (unnamed parameter)
-        return createToken(TokenType.SQL_PARAM_UNNAMED, "?", startPos, this.getCurrentPosition());
+    private readQuestionMark(startPos: Position): Token {
+        this.advance(); // Skip the ?
+        return createToken(TokenType.QUESTION, "?", startPos, this.getCurrentPosition());
     }
 
     /**

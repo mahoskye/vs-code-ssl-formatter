@@ -18,22 +18,27 @@ describe("SSL EBNF Grammar Compliance", () => {
     });
 
     describe("SQL Parameter Tokens", () => {
-        it("should recognize named SQL parameters", () => {
+        it("should recognize question marks for SQL parameters", () => {
             const input = "?paramName?";
             const tokens = tokenize(input);
 
-            const namedParam = tokens.find((t) => t.type === TokenType.SQL_PARAM_NAMED);
-            expect(namedParam).toBeDefined();
-            expect(namedParam?.value).toBe("?paramName?");
+            // Should tokenize as QUESTION, IDENTIFIER, QUESTION
+            const questionTokens = tokens.filter((t) => t.type === TokenType.QUESTION);
+            expect(questionTokens).toHaveLength(2);
+
+            const identifierToken = tokens.find(
+                (t) => t.type === TokenType.IDENTIFIER && t.value === "paramName"
+            );
+            expect(identifierToken).toBeDefined();
         });
 
-        it("should recognize unnamed SQL parameters", () => {
+        it("should recognize standalone question marks", () => {
             const input = "WHERE id = ?";
             const tokens = tokenize(input);
 
-            const unnamedParam = tokens.find((t) => t.type === TokenType.SQL_PARAM_UNNAMED);
-            expect(unnamedParam).toBeDefined();
-            expect(unnamedParam?.value).toBe("?");
+            const questionToken = tokens.find((t) => t.type === TokenType.QUESTION);
+            expect(questionToken).toBeDefined();
+            expect(questionToken?.value).toBe("?");
         });
     });
 

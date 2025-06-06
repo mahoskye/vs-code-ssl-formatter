@@ -60,30 +60,33 @@ describe("Tokenizer", () => {
             expect(tokens[2].value).toBe("TestProc");
             expect(tokens[5].type).toBe(TokenType.ENDPROC);
         });
-        it("should tokenize SQL parameters", () => {
-            // NOTE: This test currently documents a limitation in our tokenizer.
-            // According to the SSL EBNF grammar, SQL parameters like ?userId? within SQL strings
-            // should be tokenized as separate SQL_PARAM_NAMED tokens. However, implementing this
-            // requires complex context-aware string parsing which is deferred for now.
+        it("should tokenize question marks for SQL parameters", () => {
+            // NOTE: SQL parameters like ?userId? are now tokenized as separate tokens:
+            // QUESTION, IDENTIFIER, QUESTION. The parser will be responsible for
+            // interpreting these sequences as SQL parameters in the appropriate context.
             // See: SqlParameter ::= "?" Identifier "?" | "?" in ssl-ebnf-grammar-complete.md
 
-            // Test case 1: SQL parameters outside of strings (currently supported)
+            // Test case 1: SQL parameters outside of strings
             const standaloneParam = "?userId?";
             const standaloneTokens = tokenize(standaloneParam);
-            const namedParamToken = standaloneTokens.find(
-                (t) => t.type === TokenType.SQL_PARAM_NAMED
-            );
-            expect(namedParamToken?.value).toBe("?userId?");
 
-            // Test case 2: SQL parameters within SqlExecute strings (current limitation)
-            // TODO: Implement context-aware SQL parameter extraction within string literals
+            // Should be tokenized as QUESTION, IDENTIFIER, QUESTION
+            const questionTokens = standaloneTokens.filter((t) => t.type === TokenType.QUESTION);
+            expect(questionTokens).toHaveLength(2);
+
+            const identifierToken = standaloneTokens.find(
+                (t) => t.type === TokenType.IDENTIFIER && t.value === "userId"
+            );
+            expect(identifierToken).toBeDefined();
+
+            // Test case 2: SQL parameters within SqlExecute strings (parser responsibility)
             const input = 'aResults := SqlExecute("SELECT * FROM users WHERE id = ?userId?");';
             const tokens = tokenize(input);
 
-            // The SQL string is now correctly tokenized as a SQL_STRING token due to SqlExecute context
+            // The string is already being tokenized as SQL_STRING (probably due to context-aware logic)
+            // The parser will handle the question marks within SQL strings
             const sqlStringToken = tokens.find((t) => t.type === TokenType.SQL_STRING);
-            expect(sqlStringToken?.value).toBe('"SELECT * FROM users WHERE id = ?userId?"'); // Future enhancement: Extract ?userId? as a separate SQL_PARAM_NAMED token
-            // This would require implementing a specialized SQL string parser
+            expect(sqlStringToken?.value).toBe('"SELECT * FROM users WHERE id = ?userId?"');
         });
 
         it("should tokenize SQL strings differently from regular strings", () => {

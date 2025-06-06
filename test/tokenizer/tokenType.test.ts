@@ -68,14 +68,12 @@ describe("TokenType", () => {
             expect(TokenType.LBRACKET).toBeDefined();
             expect(TokenType.RBRACKET).toBeDefined();
         });
-
         it("should have SSL-specific tokens", () => {
             expect(TokenType.PROCEDURE).toBeDefined();
             expect(TokenType.ENDPROC).toBeDefined();
             expect(TokenType.CLASS).toBeDefined();
             expect(TokenType.INHERIT).toBeDefined();
-            expect(TokenType.SQL_PARAM_NAMED).toBeDefined();
-            expect(TokenType.SQL_PARAM_UNNAMED).toBeDefined();
+            expect(TokenType.SQL_STRING).toBeDefined();
         });
 
         it("should have comment types", () => {

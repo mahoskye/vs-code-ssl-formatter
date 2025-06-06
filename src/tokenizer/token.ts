@@ -180,8 +180,6 @@ export function isPunctuationType(type: TokenType): boolean {
         TokenType.RBRACKET,
         TokenType.PIPE,
         TokenType.QUESTION,
-        TokenType.ARRAY_START,
-        TokenType.ARRAY_END,
         TokenType.CODE_BLOCK_START,
         TokenType.CODE_BLOCK_END,
     ].includes(type);

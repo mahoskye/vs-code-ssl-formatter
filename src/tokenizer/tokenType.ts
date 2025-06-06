@@ -6,7 +6,7 @@ export enum TokenType {
     // Literals
     NUMBER = "NUMBER",
     STRING = "STRING",
-    SQL_STRING = "SQL_STRING", // String literals that contain SQL queries
+    SQL_STRING = "SQL_STRING", // Added back for future SQL processing
     BOOLEAN = "BOOLEAN",
     NIL = "NIL",
     DATE = "DATE",
@@ -123,13 +123,7 @@ export enum TokenType {
     EOF = "EOF",
     UNKNOWN = "UNKNOWN",
 
-    // SQL Parameter tokens
-    SQL_PARAM_NAMED = "SQL_PARAM_NAMED", // ?paramName?
-    SQL_PARAM_UNNAMED = "SQL_PARAM_UNNAMED", // ?
-
-    // Array and code block specific tokens
-    ARRAY_START = "ARRAY_START", // {
-    ARRAY_END = "ARRAY_END", // }
+    // Code block specific tokens
     CODE_BLOCK_START = "CODE_BLOCK_START", // {|
     CODE_BLOCK_END = "CODE_BLOCK_END", // |}
 }

@@ -16,7 +16,7 @@ export const LITERAL_PATTERNS = {
     BOOLEAN: /^\.([TF])\.$/i,
 
     // Date: {year, month, day[, hour, minute, second]}
-    DATE: /^\{[\d\s,]+\}$/,
+    DATE: /^\{\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(?:,\s*\d+\s*,\s*\d+\s*,\s*\d+\s*)?\}$/,
 };
 
 /**
@@ -203,42 +203,6 @@ export function matchDate(input: string, position: number): [string, number[]] |
 }
 
 /**
- * Attempts to match an array literal starting at the given position
- * @param input The input string
- * @param position The starting position
- * @returns A tuple of [matched_text, token_type] if successful, null otherwise
- */
-export function matchArrayLiteral(input: string, position: number): [string, TokenType] | null {
-    if (input[position] !== "{") {
-        return null;
-    }
-
-    // Check if it's a code block (starts with {|)
-    if (input.substring(position, position + 2) === "{|") {
-        return null; // This will be handled by matchCodeBlockLiteral
-    }
-
-    // For now, just return the opening brace as ARRAY_START
-    // The parser will handle the full array structure
-    return ["{", TokenType.ARRAY_START];
-}
-
-/**
- * Attempts to match a code block literal starting at the given position
- * @param input The input string
- * @param position The starting position
- * @returns A tuple of [matched_text, token_type] if successful, null otherwise
- */
-export function matchCodeBlockLiteral(input: string, position: number): [string, TokenType] | null {
-    if (input.substring(position, position + 2) !== "{|") {
-        return null;
-    }
-
-    // Return the opening code block delimiter
-    return ["{|", TokenType.CODE_BLOCK_START];
-}
-
-/**
  * Enhanced literal matching that includes all SSL literal types
  */
 export function matchLiteral(input: string, position: number): [string, TokenType, any] | null {
@@ -270,12 +234,9 @@ export function matchLiteral(input: string, position: number): [string, TokenTyp
     // rather than as single tokens, so we don't match them here.
     // The { and } will be handled as punctuation tokens.
 
-    // Try code block literal
+    // Try code block start {|
     if (input.substring(position, position + 2) === "{|") {
-        const codeBlockMatch = matchCodeBlockLiteral(input, position);
-        if (codeBlockMatch) {
-            return [codeBlockMatch[0], TokenType.CODE_BLOCK_START, null];
-        }
+        return ["{|", TokenType.CODE_BLOCK_START, null];
     }
 
     return null;
