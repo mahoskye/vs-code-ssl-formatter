@@ -227,8 +227,8 @@ ArgumentList ::= Expression {"," Expression}
 
 (* Comment statements *)
 CommentStatement ::= BlockComment | SingleLineComment | RegionComment | EndRegionComment
-BlockComment ::= "/*" {Character} ";" (* SSL block comments span multiple lines *)
-SingleLineComment ::= "/*" {Character} ";" (* SSL single line comments appear on a single line *)
+BlockComment ::= "/*" {Character} ";" (* SSL comments that span multiple lines *)
+SingleLineComment ::= "/*" {Character} ";" (* SSL comments that appear on a single line *)
 RegionComment ::= "/*" "region" {Character} ";" (* Comments used for region markers *)
 EndRegionComment ::= "/*" "endregion" {Character} ";" (* Comments used for endregion markers *)
 
@@ -336,7 +336,12 @@ Symbol ::= (* Any printable character, specific exclusions depend on context lik
 
 7. **Block Structure**: Control structures like conditionals and loops follow a block-based structure with explicit end markers (`:ENDIF`, `:ENDWHILE`, etc.).
 
-8. **Comments**: Comments in SSL start with `/*` and end with a semicolon `;`, rather than using traditional comment delimiters like `*/`.
+8. **Comments**: Comments in SSL start with `/*` and end with a semicolon `;`, rather than using traditional comment delimiters like `*/`. Comments are classified as:
+
+    - **Single-line comments**: Comments that appear entirely on one line (e.g., `/* This is a comment ;`)
+    - **Block comments**: Comments that span multiple lines (e.g., `/* This is a \n multi-line comment ;`)
+    - **Region comments**: Comments that start with "region" for code organization
+    - **End region comments**: Comments that start with "endregion" to close regions
 
 9. **Regions and Comments**: The language supports two types of regions:
 
