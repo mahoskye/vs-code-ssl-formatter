@@ -11,5 +11,5 @@
         "typeRoots": ["./node_modules/@types"],
         "types": ["jest", "node"]
     },
-    "exclude": ["node_modules", ".vscode-test", "src/old"]
+    "exclude": ["node_modules", ".vscode-test", "src/old", "package"]
 }

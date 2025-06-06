@@ -1,4 +1,39 @@
+# Exclude zip files
+*.zip
+zip/
+zip/**
+
+# Exclude build artifacts
+dist/
+dist/**
+build/
+build/**
+package/
+package/**
+
+# Exclude documentation files
+docs/
+docs/**
+
+# Exclude configuration files
+config/
+config/**
+
+# Common exclusions for VS Code extensions
 .vscode/**
 .vscode-test/**
+src/**
 .gitignore
+.yarnrc
 vsc-extension-quickstart.md
+**/tsconfig.json
+**/.eslintrc.json
+**/eslint.config.js
+**/jest.config.js
+**/*.map
+**/*.ts
+node_modules/**
+out/test/**
+out/**/*.map
+.nyc_output
+coverage

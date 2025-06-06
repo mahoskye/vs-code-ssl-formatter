@@ -11,6 +11,11 @@ STARLIMS® is a registered trademark of Abbott Informatics Corporation. This ext
 ## Features
 
 -   Syntax highlighting for SSL files
+-   Bracketing, Closing pairs, and Comments handling
+-   Basic code folding for SSL-specific constructs
+
+## Planned Features
+
 -   Code folding for SSL-specific constructs
 -   Special highlighting for folds in the minimap
 -   Auto-completion support for SSL files
@@ -45,10 +50,6 @@ You can add custom completion items by modifying the `sslFormatter.completions` 
     }
 ]
 ```
-
-### Reloading Completions
-
-To reload completion items after modifying the settings, you can use the "Reload SSL Completions" command from the Command Palette (Ctrl+Shift+P or Cmd+Shift+P).
 
 ## Contributing
 
