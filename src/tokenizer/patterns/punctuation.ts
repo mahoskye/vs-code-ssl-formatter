@@ -21,10 +21,7 @@ export const SSL_PUNCTUATION: Map<string, TokenType> = new Map([
 /**
  * Multi-character punctuation patterns (ordered by length, longest first)
  */
-export const SSL_MULTI_PUNCTUATION: [string, TokenType][] = [
-    ["{|", TokenType.CODE_BLOCK_START],
-    ["|}", TokenType.CODE_BLOCK_END],
-];
+export const SSL_MULTI_PUNCTUATION: [string, TokenType][] = [["{|", TokenType.CODE_BLOCK_START]];
 
 /**
  * Attempts to match punctuation at the given position

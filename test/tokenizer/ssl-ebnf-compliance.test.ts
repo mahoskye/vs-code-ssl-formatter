@@ -3,17 +3,17 @@ import { tokenize, TokenType } from "../../src/tokenizer";
 describe("SSL EBNF Grammar Compliance", () => {
     describe("Code Block Constructs", () => {
         it("should tokenize code block delimiters", () => {
-            const input = "{| expression |}";
+            const input = "{|x| x*x}"; // Using the example from the EBNF grammar: {|x| x*x}
             const tokens = tokenize(input);
 
             // Find specific tokens
             const codeBlockStart = tokens.find((t) => t.type === TokenType.CODE_BLOCK_START);
-            const codeBlockEnd = tokens.find((t) => t.type === TokenType.CODE_BLOCK_END);
+            const rbrace = tokens.find((t) => t.type === TokenType.RBRACE);
 
             expect(codeBlockStart).toBeDefined();
             expect(codeBlockStart?.value).toBe("{|");
-            expect(codeBlockEnd).toBeDefined();
-            expect(codeBlockEnd?.value).toBe("|}");
+            expect(rbrace).toBeDefined();
+            expect(rbrace?.value).toBe("}");
         });
     });
 
@@ -162,18 +162,18 @@ describe("SSL EBNF Grammar Compliance", () => {
 
     describe("Complex SSL Expression", () => {
         it("should handle procedure with code blocks correctly", () => {
-            const input = ":procedure test; {| x | x + 1 |} :endproc;";
+            const input = ":procedure test; {| x | x + 1 } :endproc;";
             const tokens = tokenize(input);
 
             // Check key token types are present
             const procedureToken = tokens.find((t) => t.type === TokenType.PROCEDURE);
             const codeBlockStart = tokens.find((t) => t.type === TokenType.CODE_BLOCK_START);
-            const codeBlockEnd = tokens.find((t) => t.type === TokenType.CODE_BLOCK_END);
+            const rbrace = tokens.find((t) => t.type === TokenType.RBRACE);
             const endprocToken = tokens.find((t) => t.type === TokenType.ENDPROC);
 
             expect(procedureToken).toBeDefined();
             expect(codeBlockStart).toBeDefined();
-            expect(codeBlockEnd).toBeDefined();
+            expect(rbrace).toBeDefined();
             expect(endprocToken).toBeDefined();
         });
     });

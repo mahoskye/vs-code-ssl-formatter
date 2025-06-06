@@ -121,9 +121,7 @@ export enum TokenType {
     NEWLINE = "NEWLINE",
     WHITESPACE = "WHITESPACE",
     EOF = "EOF",
-    UNKNOWN = "UNKNOWN",
-
-    // Code block specific tokens
+    UNKNOWN = "UNKNOWN", // Code block specific tokens
     CODE_BLOCK_START = "CODE_BLOCK_START", // {|
-    CODE_BLOCK_END = "CODE_BLOCK_END", // |}
+    CODE_BLOCK_END = "CODE_BLOCK_END", // } (when ending a code block)
 }
