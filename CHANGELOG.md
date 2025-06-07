@@ -2,6 +2,22 @@
 
 All notable changes to the "STARLIMS Scripting Language Formatter" extension will be documented in this file.
 
+# Changelog
+
+## [0.4.0] - In Development
+
+### Added
+
+-   SSL parser implementation (in progress)
+
+## [0.3.0] - 2025-06-07
+
+### Added
+
+-   Complete SSL tokenizer implementation
+-   Token type definitions and lexical analysis
+-   Comprehensive tokenizer test suite
+
 ## [0.2.0] - 2025-06-04
 
 ### Added
