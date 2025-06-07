@@ -14,17 +14,23 @@ STARLIMS® is a registered trademark of Abbott Informatics Corporation. This ext
 -   Bracketing, Closing pairs, and Comments handling
 -   Basic code folding for SSL-specific constructs
 
-## Planned Features
+# v0.4.0 Milestone: SSL Parser Implementation
 
--   Code folding for SSL-specific constructs
--   Special highlighting for folds in the minimap
--   Auto-completion support for SSL files
--   Custom completion items configurable through VS Code settings
--   Error detection based on SSL EBNF grammar
--   Semantic highlighting for better code visualization
--   Proper comment handling (/\* ... ; format)
--   Support for SSL-specific language constructs
--   Validation against formal SSL grammar
+## Goals
+
+-   [ ] Design AST (Abstract Syntax Tree) structure
+-   [ ] Implement recursive descent parser
+-   [ ] Handle SSL syntax rules and precedence
+-   [ ] Add parser error handling and recovery
+-   [ ] Create parser unit tests
+-   [ ] Update documentation
+
+## Parser Components to Implement
+
+-   [ ] Expression parsing
+-   [ ] Statement parsing
+-   [ ] Block structure parsing
+-   [ ] Error reporting with line/column info
 
 ## Installation
 
