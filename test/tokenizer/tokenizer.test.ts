@@ -138,6 +138,177 @@ describe("Tokenizer", () => {
 
             expect(tokens[0].type).toBe(TokenType.REGION_COMMENT);
         });
+
+        it("should handle endregion comments", () => {
+            const input = "/* endregion: TestRegion ;";
+            const tokens = tokenize(input);
+
+            expect(tokens[0].type).toBe(TokenType.ENDREGION_COMMENT);
+            expect(tokens[0].value).toBe("/* endregion: TestRegion ;");
+        });
+    });
+
+    describe("Operators", () => {
+        it("should tokenize all assignment operators", () => {
+            const input = ":= += -= *= /= ^=";
+            const tokens = tokenize(input);
+            const expected = [
+                TokenType.ASSIGN,
+                TokenType.PLUS_ASSIGN,
+                TokenType.MINUS_ASSIGN,
+                TokenType.MULT_ASSIGN,
+                TokenType.DIV_ASSIGN,
+                TokenType.POWER_ASSIGN,
+            ];
+            const found = tokens.filter(t => t.type !== TokenType.EOF).map((t) => t.type);
+            expect(found).toEqual(expect.arrayContaining(expected));
+        });
+
+        it("should tokenize all comparison operators (maximal munch)", () => {
+            const input = "== != < > <= >= =";
+            const tokens = tokenize(input);
+            const expected = [
+                TokenType.STRICT_EQUAL,
+                TokenType.NOT_EQUAL,
+                TokenType.LESS_THAN,
+                TokenType.GREATER_THAN,
+                TokenType.LESS_EQUAL,
+                TokenType.GREATER_EQUAL,
+                TokenType.EQUAL,
+            ];
+            const found = tokens.filter(t => t.type !== TokenType.EOF).map((t) => t.type);
+            expect(found).toEqual(expect.arrayContaining(expected));
+        });
+
+        it("should tokenize all arithmetic and power operators", () => {
+            const input = "+ - * / % ^";
+            const tokens = tokenize(input);
+            const expected = [
+                TokenType.PLUS,
+                TokenType.MINUS,
+                TokenType.MULTIPLY,
+                TokenType.DIVIDE,
+                TokenType.MODULO,
+                TokenType.POWER,
+            ];
+            const found = tokens.filter(t => t.type !== TokenType.EOF).map((t) => t.type);
+            expect(found).toEqual(expect.arrayContaining(expected));
+        });
+
+        it("should tokenize increment/decrement operators", () => {
+            const input = "++ --";
+            const tokens = tokenize(input);
+            const expected = [TokenType.INCREMENT, TokenType.DECREMENT];
+            const found = tokens.filter(t => t.type !== TokenType.EOF).map((t) => t.type);
+            expect(found).toEqual(expect.arrayContaining(expected));
+        });
+    });
+
+    describe("Punctuation", () => {
+        it("should tokenize all punctuation marks", () => {
+            const input = "; , : ( ) [ ] { } | . ?";
+            const tokens = tokenize(input);
+            const expected = [
+                TokenType.SEMICOLON,
+                TokenType.COMMA,
+                TokenType.COLON,
+                TokenType.LPAREN,
+                TokenType.RPAREN,
+                TokenType.LBRACKET,
+                TokenType.RBRACKET,
+                TokenType.LBRACE,
+                TokenType.RBRACE,
+                TokenType.PIPE,
+                TokenType.DOT,
+                TokenType.QUESTION,
+            ];
+            const found = tokens.filter(t => t.type !== TokenType.EOF).map((t) => t.type);
+            expect(found).toEqual(expect.arrayContaining(expected));
+        });
+    });
+
+    describe("Object and Property Access", () => {
+        it("should tokenize property access with a colon", () => {
+            const input = "myObject:myProperty";
+            const tokens = tokenize(input);
+            expect(tokens.map(t=>t.type)).toEqual([
+                TokenType.IDENTIFIER,
+                TokenType.COLON,
+                TokenType.IDENTIFIER,
+                TokenType.EOF,
+            ]);
+            expect(tokens[0].value).toBe("myObject");
+            expect(tokens[2].value).toBe("myProperty");
+        });
+    });
+
+    describe("Literals", () => {
+        it("should tokenize NIL literal", () => {
+            const tokens = tokenize("NIL");
+            expect(tokens[0].type).toBe(TokenType.NIL);
+            expect(tokens[0].value).toBe("NIL");
+        });
+
+        it("should tokenize single-quoted strings", () => {
+            const tokens = tokenize("'hello world'");
+            expect(tokens[0].type).toBe(TokenType.STRING);
+            expect(tokens[0].value).toBe("'hello world'");
+        });
+
+        it("should tokenize a simple array literal", () => {
+            const tokens = tokenize("{1, 'two', .T.}");
+            const types = tokens.map((t) => t.type);
+            expect(types).toEqual([
+                TokenType.LBRACE,
+                TokenType.NUMBER,
+                TokenType.COMMA,
+                TokenType.STRING,
+                TokenType.COMMA,
+                TokenType.BOOLEAN,
+                TokenType.RBRACE,
+                TokenType.EOF,
+            ]);
+        });
+
+        it("should tokenize a nested array literal", () => {
+            const tokens = tokenize("{{1}, {2}}");
+            const types = tokens.map((t) => t.type);
+            expect(types).toEqual([
+                TokenType.LBRACE,
+                TokenType.LBRACE,
+                TokenType.NUMBER,
+                TokenType.RBRACE,
+                TokenType.COMMA,
+                TokenType.LBRACE,
+                TokenType.NUMBER,
+                TokenType.RBRACE,
+                TokenType.RBRACE,
+                TokenType.EOF,
+            ]);
+        });
+    });
+
+    describe("Code Block Constructs", () => {
+        it("should tokenize code block with delimiters and pipe", () => {
+            const input = "{|x| x*x}";
+            const tokens = tokenize(input);
+            const types = tokens.map((t) => t.type);
+
+            expect(types).toEqual([
+                TokenType.CODE_BLOCK_START,
+                TokenType.IDENTIFIER,
+                TokenType.PIPE,
+                TokenType.IDENTIFIER,
+                TokenType.MULTIPLY,
+                TokenType.IDENTIFIER,
+                TokenType.RBRACE,
+                TokenType.EOF,
+            ]);
+
+            expect(tokens[0].value).toBe("{|");
+            expect(tokens[2].value).toBe("|");
+            expect(tokens[6].value).toBe("}");
+        });
     });
 
     describe("Error handling", () => {
@@ -155,6 +326,16 @@ describe("Tokenizer", () => {
 
             expect(result.hasErrors).toBe(true);
             expect(result.tokens.length).toBeGreaterThan(0);
+        });
+
+        it("should handle unterminated comments", () => {
+            const tokenizer = new Tokenizer({ skipErrors: true });
+            const result = tokenizer.tokenize("/* this is not closed");
+            expect(result.hasErrors).toBe(true);
+            expect(result.errors).toHaveLength(1);
+            // The tokenizer will consume the rest of the input and the only token left will be EOF.
+            expect(result.tokens[0].type).toBe(TokenType.EOF);
+            expect(result.tokens).toHaveLength(1);
         });
     });
 });
