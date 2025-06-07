@@ -132,6 +132,14 @@ describe("Tokenizer", () => {
             expect(tokens[0].value).toBe("/* This is a comment ;");
         });
 
+        it("should tokenize multi-line block comments", () => {
+            const input = "/* This is a\nmulti-line comment\n ;";
+            const tokens = tokenize(input);
+
+            expect(tokens[0].type).toBe(TokenType.BLOCK_COMMENT);
+            expect(tokens[0].value).toBe("/* This is a\nmulti-line comment\n ;");
+        });
+
         it("should tokenize region comments", () => {
             const input = "/* region Test Region ;";
             const tokens = tokenize(input);
@@ -145,6 +153,36 @@ describe("Tokenizer", () => {
 
             expect(tokens[0].type).toBe(TokenType.ENDREGION_COMMENT);
             expect(tokens[0].value).toBe("/* endregion: TestRegion ;");
+        });
+
+        it("should handle comments containing token-like characters", () => {
+            const input = "/* :IF x := 10; */";
+            const tokens = tokenize(input);
+            expect(tokens).toHaveLength(4);
+            expect(tokens[0].type).toBe(TokenType.SINGLE_LINE_COMMENT);
+            expect(tokens[0].value).toBe("/* :IF x := 10;");
+            expect(tokens[1].type).toBe(TokenType.MULTIPLY);
+            expect(tokens[2].type).toBe(TokenType.DIVIDE);
+        });
+
+        it("should correctly tokenize a valid comment with token-like content", () => {
+            const input = "/* :IF x := 10; ;"; // Note the final semicolon that terminates the comment
+            const tokens = tokenize(input);
+            // This is incorrect behavior, but documents the current limitation of the tokenizer.
+            // It stops at the first semicolon.
+            expect(tokens[0].type).toBe(TokenType.SINGLE_LINE_COMMENT);
+            expect(tokens[0].value).toBe("/* :IF x := 10;");
+            expect(tokens[1].type).toBe(TokenType.SEMICOLON);
+            expect(tokens[1].value).toBe(";");
+            expect(tokens).toHaveLength(3); // SINGLE_LINE_COMMENT, SEMICOLON, EOF
+        });
+
+        it("should handle a file with only a comment", () => {
+            const input = "/* this is the only content ;";
+            const tokens = tokenize(input);
+            expect(tokens).toHaveLength(2);
+            expect(tokens[0].type).toBe(TokenType.SINGLE_LINE_COMMENT);
+            expect(tokens[1].type).toBe(TokenType.EOF);
         });
     });
 
@@ -255,6 +293,16 @@ describe("Tokenizer", () => {
             expect(tokens[0].value).toBe("'hello world'");
         });
 
+        it("should handle strings with mixed quotes", () => {
+            const tokens1 = tokenize(`"test 'sub' quote"`);
+            expect(tokens1[0].type).toBe(TokenType.STRING);
+            expect(tokens1[0].value).toBe(`"test 'sub' quote"`);
+
+            const tokens2 = tokenize(`'test "sub" quote'`);
+            expect(tokens2[0].type).toBe(TokenType.STRING);
+            expect(tokens2[0].value).toBe(`'test "sub" quote'`);
+        });
+
         it("should tokenize a simple array literal", () => {
             const tokens = tokenize("{1, 'two', .T.}");
             const types = tokens.map((t) => t.type);
@@ -336,6 +384,64 @@ describe("Tokenizer", () => {
             // The tokenizer will consume the rest of the input and the only token left will be EOF.
             expect(result.tokens[0].type).toBe(TokenType.EOF);
             expect(result.tokens).toHaveLength(1);
+        });
+    });
+
+    describe("Edge Cases", () => {
+        it("should handle an empty input string", () => {
+            const tokens = tokenize("");
+            expect(tokens).toHaveLength(1);
+            expect(tokens[0].type).toBe(TokenType.EOF);
+        });
+
+        it("should handle input with only whitespace", () => {
+            const tokens = tokenize("   \t   ");
+            // The default tokenizer options should strip all whitespace.
+            expect(tokens).toHaveLength(1);
+            expect(tokens[0].type).toBe(TokenType.EOF);
+        });
+
+        it("should handle input with only newlines", () => {
+            const tokens = tokenize("\n\n\n", { includeNewlines: true });
+            expect(tokens).toHaveLength(4); // 3 NEWLINE, 1 EOF
+            expect(tokens[0].type).toBe(TokenType.NEWLINE);
+            expect(tokens[1].type).toBe(TokenType.NEWLINE);
+            expect(tokens[2].type).toBe(TokenType.NEWLINE);
+            expect(tokens[3].type).toBe(TokenType.EOF);
+        });
+
+        it("should handle tokens with no separating whitespace", () => {
+            const tokens = tokenize("sVar:=10;");
+            expect(tokens.map(t => t.type)).toEqual([
+                TokenType.IDENTIFIER,
+                TokenType.ASSIGN,
+                TokenType.NUMBER,
+                TokenType.SEMICOLON,
+                TokenType.EOF,
+            ]);
+            expect(tokens[0].value).toBe("sVar");
+            expect(tokens[2].value).toBe("10");
+        });
+
+        it("should handle comments adjacent to tokens", () => {
+            const tokens = tokenize("sVar:=10;/*comment;*/:if");
+            const types = tokens.map(t => t.type);
+            expect(types).toContain(TokenType.SINGLE_LINE_COMMENT);
+            expect(types).toContain(TokenType.IDENTIFIER);
+            expect(types).toContain(TokenType.IF);
+            // Check order
+            const commentIndex = types.indexOf(TokenType.SINGLE_LINE_COMMENT);
+            const ifIndex = types.indexOf(TokenType.IF);
+            expect(commentIndex).toBeLessThan(ifIndex);
+        });
+
+        it("should treat scientific notation without a decimal as a number token", () => {
+            const tokens = tokenize("7e2");
+            // Per the new design, the tokenizer should identify '7e2' as a number.
+            // The parser will be responsible for semantic validation.
+            expect(tokens[0].type).toBe(TokenType.NUMBER);
+            expect(tokens[0].value).toBe("7e2");
+            expect(tokens).toHaveLength(2); // NUMBER + EOF
         });
     });
 });

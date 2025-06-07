@@ -54,9 +54,8 @@ export function matchNumber(input: string, position: number): [string, number] |
                 current++;
             }
         }
-    } // Match exponent part (only allowed if we have a decimal part per EBNF spec)
+    } // Match exponent part
     if (
-        hasDecimal &&
         current < input.length &&
         (input[current] === "e" || input[current] === "E")
     ) {

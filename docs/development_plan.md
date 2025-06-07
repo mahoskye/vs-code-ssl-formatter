@@ -338,7 +338,7 @@ Test thoroughly with various edge cases:
 -   All supported number literal formats from EBNF note 14, including valid and invalid ones (testing error reporting)
 -   Strings with internal delimiters (e.g., `"a 'b' c"` or `'a "b" c'`)
 -   Comments immediately adjacent to other tokens, or nested (if SSL allowed nested comments, which it typically doesn't in the `/* ... ;` style)
--   Comments containing characters that look like other tokens (e.g., `/* :IF x := 10; */`)
+-   Comments containing characters that look like other tokens (e.g., `/* :IF x := 10;`)
 
 #### Section 1.6.3: Leveraging AI for Test Case Generation
 
