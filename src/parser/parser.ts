@@ -57,6 +57,13 @@ import {
 import { parseClassDefinition, ClassParser, ClassParserContext } from "./parsers/classes";
 
 import {
+    parseDefaultStatement,
+    parseErrorBlockStanza,
+    parseInlineCodeStart,
+    parseInlineCodeEnd,
+} from "./parsers/statements";
+
+import {
     ParseError,
     ParserUtilities,
     UtilityParserContext,
@@ -282,6 +289,18 @@ export class Parser
             case TokenType.EXITCASE:
                 this.advance(); // consume 'EXITCASE'
                 return parseExitCaseStatement(this);
+            case TokenType.DEFAULT:
+                this.advance(); // consume 'DEFAULT'
+                return parseDefaultStatement(this);
+            case TokenType.ERROR:
+                this.advance(); // consume 'ERROR'
+                return parseErrorBlockStanza(this);
+            case TokenType.BEGININLINECODE:
+                this.advance(); // consume 'BEGININLINECODE'
+                return parseInlineCodeStart(this);
+            case TokenType.ENDINLINECODE:
+                this.advance(); // consume 'ENDINLINECODE'
+                return parseInlineCodeEnd(this);
 
             // Keywords that do not start a new statement but are handled elsewhere
             case TokenType.ELSE:

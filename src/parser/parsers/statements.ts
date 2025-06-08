@@ -249,3 +249,110 @@ export function parseExitCaseStatement(parser: StatementParser): StatementNode {
         endToken: parser.previous(),
     };
 }
+
+/**
+ * Parse default statement
+ * :DEFAULT Identifier "," Expression
+ */
+export function parseDefaultStatement(parser: StatementParser): StatementNode {
+    const startToken = parser.previous(); // DEFAULT token
+
+    // Parse identifier
+    const identifier = parser.consume(
+        TokenType.IDENTIFIER,
+        "Expected parameter name after :DEFAULT"
+    );
+    parser.consume(TokenType.COMMA, "Expected ',' after parameter name in :DEFAULT");
+
+    // Parse default value expression
+    const defaultValue = parser.parseExpression();
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after :DEFAULT statement");
+
+    const endToken = parser.previous();
+
+    return {
+        kind: ASTNodeType.DefaultStatement,
+        startToken,
+        endToken,
+        defaults: {
+            kind: ASTNodeType.DefaultParameterList,
+            startToken: identifier,
+            endToken,
+            pairs: [{ identifier, defaultValue }],
+        },
+    } as any;
+}
+
+/**
+ * Parse error block stanza
+ * :ERROR {Statement}
+ */
+export function parseErrorBlockStanza(parser: StatementParser): StatementNode {
+    const startToken = parser.previous(); // ERROR token
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after :ERROR");
+
+    const statements: StatementNode[] = [];
+
+    // Parse statements until we hit another keyword or end of input
+    // Note: This is a simplified implementation - in practice, error blocks
+    // continue until the next major construct or end of procedure
+
+    const endToken = parser.previous();
+
+    return {
+        kind: ASTNodeType.ErrorBlockStanza,
+        startToken,
+        endToken,
+        statements,
+    } as any;
+}
+
+/**
+ * Parse inline code block start
+ * :BEGININLINECODE [StringLiteral | Identifier]
+ */
+export function parseInlineCodeStart(parser: StatementParser): StatementNode {
+    const startToken = parser.previous(); // BEGININLINECODE token
+
+    let language: any = undefined;
+
+    // Optional language specification
+    if (parser.check(TokenType.STRING) || parser.check(TokenType.IDENTIFIER)) {
+        const langToken = parser.advance();
+        language =
+            langToken.type === TokenType.STRING
+                ? {
+                      kind: ASTNodeType.StringLiteral,
+                      startToken: langToken,
+                      endToken: langToken,
+                      value: langToken.parsedValue || langToken.value,
+                      token: langToken,
+                  }
+                : langToken;
+    }
+
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after :BEGININLINECODE");
+    const endToken = parser.previous();
+
+    return {
+        kind: ASTNodeType.InlineCodeStart,
+        startToken,
+        endToken,
+        language,
+    } as any;
+}
+
+/**
+ * Parse inline code block end
+ * :ENDINLINECODE
+ */
+export function parseInlineCodeEnd(parser: StatementParser): StatementNode {
+    const startToken = parser.previous(); // ENDINLINECODE token
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after :ENDINLINECODE");
+
+    return {
+        kind: ASTNodeType.InlineCodeEnd,
+        startToken,
+        endToken: parser.previous(),
+    } as any;
+}

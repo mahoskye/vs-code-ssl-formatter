@@ -253,21 +253,25 @@ function parsePrimary(context: ExpressionParserContext): ExpressionNode {
         } as LiteralExpressionNode;
     }
 
-    // Array literals
+    // Array literals and special constructs starting with {
     if (context.match(TokenType.LBRACE)) {
-        return parseArrayLiteral(context);
-    }
-
-    // Date literals - special array-like syntax {year, month, day, [hour, minute, second]}
-    if (context.check(TokenType.LBRACE)) {
-        // This could be either array literal or date literal - need to look ahead
-        return parseArrayLiteral(context);
+        return parseArrayOrSpecialLiteral(context);
     }
 
     // Code block literals - {|params| expressions}
-    if (context.check(TokenType.LBRACE)) {
-        // Would need to look ahead for pipe character to distinguish from array
-        return parseArrayLiteral(context);
+    if (context.match(TokenType.CODE_BLOCK_START)) {
+        return parseCodeBlockLiteral(context);
+    }
+
+    // Date literals - handled by parseArrayOrSpecialLiteral when it detects date pattern
+    if (context.match(TokenType.DATE)) {
+        const token = context.previous();
+        return {
+            kind: ASTNodeType.DateLiteral,
+            startToken: token,
+            endToken: token,
+            components: token.parsedValue || [],
+        } as any;
     }
 
     // Parenthesized expressions
@@ -508,27 +512,114 @@ function parsePrimary(context: ExpressionParserContext): ExpressionNode {
 }
 
 /**
- * Parse array literal
+ * Parse array literal or special constructs starting with {
+ * Handles arrays, date literals, and distinguishes from code blocks
  */
-function parseArrayLiteral(context: ExpressionParserContext): ExpressionNode {
+function parseArrayOrSpecialLiteral(context: ExpressionParserContext): ExpressionNode {
     const startToken = context.previous(); // '{'
     const elements: ExpressionNode[] = [];
 
+    // Check if this might be a date literal by looking ahead
+    // Date literals have the pattern: {number, number, number[, number, number, number]}
+    let isDateLiteral = true;
+    let elementCount = 0;
+
     if (!context.check(TokenType.RBRACE)) {
         do {
-            elements.push(parseExpression(context));
+            const expr = parseExpression(context);
+            elements.push(expr);
+            elementCount++;
+
+            // Check if this element is a number literal for date detection
+            if (
+                expr.kind !== ASTNodeType.LiteralExpression ||
+                (expr as any).token?.type !== TokenType.NUMBER
+            ) {
+                isDateLiteral = false;
+            }
         } while (context.match(TokenType.COMMA));
     }
 
     context.consume(TokenType.RBRACE, "Expected '}' after array elements");
     const endToken = context.previous();
 
+    // Determine if this is a date literal based on EBNF grammar
+    // DateLiteral ::= "{" NumberLiteral "," NumberLiteral "," NumberLiteral
+    //                 ["," NumberLiteral "," NumberLiteral "," NumberLiteral] "}"
+    if (isDateLiteral && (elementCount === 3 || elementCount === 6)) {
+        return {
+            kind: ASTNodeType.DateLiteral,
+            startToken,
+            endToken,
+            components: elements,
+        } as any;
+    }
+
+    // Regular array literal
     return {
         kind: ASTNodeType.ArrayLiteral,
         startToken,
         endToken,
         elements,
     } as any;
+}
+
+/**
+ * Parse code block literal: {|params| expressions}
+ * CodeBlockLiteral ::= "{|" [IdentifierList] "|" ExpressionList "}"
+ */
+function parseCodeBlockLiteral(context: ExpressionParserContext): ExpressionNode {
+    const startToken = context.previous(); // '{|'
+    let parameters: any = undefined;
+    const body: ExpressionNode[] = [];
+
+    // Parse optional parameter list - only if we don't immediately see a pipe
+    // The issue was that we need to check for PIPE first, not try to parse identifiers
+    if (!context.check(TokenType.PIPE)) {
+        // Only try to parse parameters if the next token is an identifier
+        if (context.check(TokenType.IDENTIFIER)) {
+            const paramTokens: any[] = [];
+            do {
+                paramTokens.push(context.consume(TokenType.IDENTIFIER, "Expected parameter name"));
+            } while (context.match(TokenType.COMMA));
+
+            if (paramTokens.length > 0) {
+                parameters = {
+                    kind: ASTNodeType.IdentifierList,
+                    startToken: paramTokens[0],
+                    endToken: paramTokens[paramTokens.length - 1],
+                    identifiers: paramTokens,
+                };
+            }
+        }
+    }
+
+    context.consume(TokenType.PIPE, "Expected '|' after code block parameters");
+
+    // Parse expression list - handle both single expressions and comma-separated lists
+    if (!context.check(TokenType.RBRACE)) {
+        do {
+            body.push(parseExpression(context));
+        } while (context.match(TokenType.COMMA));
+    }
+
+    context.consume(TokenType.RBRACE, "Expected '}' after code block body");
+    const endToken = context.previous();
+
+    return {
+        kind: ASTNodeType.CodeBlockLiteral,
+        startToken,
+        endToken,
+        parameters,
+        body,
+    } as any;
+}
+
+/**
+ * Parse array literal (legacy function for backward compatibility)
+ */
+function parseArrayLiteral(context: ExpressionParserContext): ExpressionNode {
+    return parseArrayOrSpecialLiteral(context);
 }
 
 /**

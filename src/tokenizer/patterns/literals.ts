@@ -233,10 +233,13 @@ export function matchLiteral(input: string, position: number): [string, TokenTyp
         }
     }
 
-    // Note: Date literals like {2024, 12, 25} and array literals like {1, 2, 3}
-    // are tokenized as individual components (LBRACE, NUMBER, COMMA, etc.)
-    // rather than as single tokens, so we don't match them here.
-    // The { and } will be handled as punctuation tokens.
+    // Try date literal - special case for {year, month, day, [hour, minute, second]}
+    if (char === "{") {
+        const dateMatch = matchDate(input, position);
+        if (dateMatch) {
+            return [dateMatch[0], TokenType.DATE, dateMatch[1]];
+        }
+    }
 
     // Try code block start {|
     if (input.substring(position, position + 2) === "{|") {
