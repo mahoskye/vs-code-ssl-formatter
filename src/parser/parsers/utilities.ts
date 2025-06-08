@@ -177,7 +177,35 @@ export function parseArgumentList(context: UtilityParserContext): ArgumentListNo
 
     if (!check(context, TokenType.RPAREN)) {
         do {
-            args.push(context.parseExpression());
+            // Handle empty arguments (consecutive commas)
+            if (check(context, TokenType.COMMA) || check(context, TokenType.RPAREN)) {
+                // Create a NIL literal for empty argument
+                const nilToken = peek(context);
+                args.push({
+                    kind: ASTNodeType.LiteralExpression,
+                    startToken: nilToken,
+                    endToken: nilToken,
+                    value: null,
+                    token: {
+                        ...nilToken,
+                        type: TokenType.NIL,
+                        value: "NIL",
+                        parsedValue: null,
+                    },
+                } as any);
+            } else if (check(context, TokenType.SQL_STRING)) {
+                // Handle SQL_STRING tokens specially
+                const token = advance(context);
+                args.push({
+                    kind: ASTNodeType.StringLiteral,
+                    startToken: token,
+                    endToken: token,
+                    value: token.parsedValue || token.value,
+                    token,
+                } as any);
+            } else {
+                args.push(context.parseExpression());
+            }
         } while (match(context, TokenType.COMMA));
     }
 

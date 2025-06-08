@@ -36,11 +36,14 @@ import {
     parseExitForStatement,
     parseLoopContinueStatement,
     parseExitCaseStatement,
+    parseSqlExecute,
+    parseLSearch,
     ProcedureParser,
     ControlFlowParser,
     CaseParser,
     TryStatementParser,
     StatementParser,
+    SqlStatementParser,
 } from "./parsers";
 
 // Import new modular parsers
@@ -96,6 +99,7 @@ export class Parser
         CaseParser,
         TryStatementParser,
         StatementParser,
+        SqlStatementParser,
         ExpressionParser,
         ClassParser,
         ParserUtilities,
@@ -334,10 +338,14 @@ export class Parser
 
         // Check if this is a comparison expression using = at statement level
         // This should be rejected as = is only for comparisons, not assignments
-        if (expr.kind === ASTNodeType.BinaryExpression) {
+        if (
+            expr.kind === ASTNodeType.BinaryExpression ||
+            expr.kind === ASTNodeType.ComparisonExpression
+        ) {
             const binaryExpr = expr as BinaryExpressionNode;
             if (binaryExpr.operator.type === TokenType.EQUAL) {
                 this.error("Invalid assignment operator. Use ':=' for assignment, not '='");
+                return expr; // Return the expression as-is but with error recorded
             }
         }
 

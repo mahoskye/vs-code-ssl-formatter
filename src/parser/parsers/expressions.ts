@@ -9,6 +9,11 @@ import {
     ExpressionNode,
     ASTNodeType,
     BinaryExpressionNode,
+    LogicalExpressionNode,
+    ComparisonExpressionNode,
+    ArithmeticExpressionNode,
+    TermNode,
+    FactorNode,
     UnaryExpressionNode,
     LiteralExpressionNode,
     VariableAccessNode,
@@ -42,7 +47,8 @@ export interface ExpressionParser {
 }
 
 /**
- * Parse expressions with proper precedence
+ * Parse expressions with proper precedence according to SSL EBNF grammar
+ * Expression ::= LogicalExpression
  */
 export function parseExpression(context: ExpressionParserContext): ExpressionNode {
     return parseLogicalExpression(context);
@@ -50,20 +56,23 @@ export function parseExpression(context: ExpressionParserContext): ExpressionNod
 
 /**
  * Parse logical expressions (.AND., .OR.)
+ * LogicalExpression ::= ComparisonExpression {LogicalOperator ComparisonExpression}
+ * LogicalOperator ::= ".AND." | ".OR."
  */
 function parseLogicalExpression(context: ExpressionParserContext): ExpressionNode {
     let expr = parseComparisonExpression(context);
+
     while (context.match(TokenType.AND, TokenType.OR)) {
         const operator = context.previous();
         const right = parseComparisonExpression(context);
         expr = {
-            kind: ASTNodeType.BinaryExpression,
+            kind: ASTNodeType.LogicalExpression,
             startToken: expr.startToken,
             endToken: right.endToken,
             left: expr,
             operator,
             right,
-        } as BinaryExpressionNode;
+        } as LogicalExpressionNode;
     }
 
     return expr;
@@ -71,9 +80,12 @@ function parseLogicalExpression(context: ExpressionParserContext): ExpressionNod
 
 /**
  * Parse comparison expressions (==, !=, <, >, <=, >=, =)
+ * ComparisonExpression ::= ArithmeticExpression {ComparisonOperator ArithmeticExpression}
+ * ComparisonOperator ::= "==" | "!=" | "<" | ">" | "<=" | ">=" | "="
  */
 function parseComparisonExpression(context: ExpressionParserContext): ExpressionNode {
     let expr = parseArithmeticExpression(context);
+
     while (
         context.match(
             TokenType.STRICT_EQUAL,
@@ -88,13 +100,13 @@ function parseComparisonExpression(context: ExpressionParserContext): Expression
         const operator = context.previous();
         const right = parseArithmeticExpression(context);
         expr = {
-            kind: ASTNodeType.BinaryExpression,
+            kind: ASTNodeType.ComparisonExpression,
             startToken: expr.startToken,
             endToken: right.endToken,
             left: expr,
             operator,
             right,
-        } as BinaryExpressionNode;
+        } as ComparisonExpressionNode;
     }
 
     return expr;
@@ -102,20 +114,23 @@ function parseComparisonExpression(context: ExpressionParserContext): Expression
 
 /**
  * Parse arithmetic expressions (+, -)
+ * ArithmeticExpression ::= Term {AdditiveOperator Term}
+ * AdditiveOperator ::= "+" | "-"
  */
 export function parseArithmeticExpression(context: ExpressionParserContext): ExpressionNode {
     let expr = parseTerm(context);
+
     while (context.match(TokenType.PLUS, TokenType.MINUS)) {
         const operator = context.previous();
         const right = parseTerm(context);
         expr = {
-            kind: ASTNodeType.BinaryExpression,
+            kind: ASTNodeType.ArithmeticExpression,
             startToken: expr.startToken,
             endToken: right.endToken,
             left: expr,
             operator,
             right,
-        } as BinaryExpressionNode;
+        } as ArithmeticExpressionNode;
     }
 
     return expr;
@@ -123,20 +138,23 @@ export function parseArithmeticExpression(context: ExpressionParserContext): Exp
 
 /**
  * Parse terms (*, /, %)
+ * Term ::= Factor {MultiplicativeOperator Factor}
+ * MultiplicativeOperator ::= "*" | "/" | "%"
  */
 function parseTerm(context: ExpressionParserContext): ExpressionNode {
     let expr = parseFactor(context);
+
     while (context.match(TokenType.MULTIPLY, TokenType.DIVIDE, TokenType.MODULO)) {
         const operator = context.previous();
         const right = parseFactor(context);
         expr = {
-            kind: ASTNodeType.BinaryExpression,
+            kind: ASTNodeType.Term,
             startToken: expr.startToken,
             endToken: right.endToken,
             left: expr,
             operator,
             right,
-        } as BinaryExpressionNode;
+        } as TermNode;
     }
 
     return expr;
@@ -144,23 +162,33 @@ function parseTerm(context: ExpressionParserContext): ExpressionNode {
 
 /**
  * Parse factors (^)
+ * Factor ::= PowerOperand {"^" PowerOperand}
  */
 function parseFactor(context: ExpressionParserContext): ExpressionNode {
-    let expr = parseUnary(context);
+    let expr = parsePowerOperand(context);
+
     while (context.match(TokenType.POWER)) {
         const operator = context.previous();
-        const right = parseUnary(context);
+        const right = parsePowerOperand(context);
         expr = {
-            kind: ASTNodeType.BinaryExpression,
+            kind: ASTNodeType.Factor,
             startToken: expr.startToken,
             endToken: right.endToken,
             left: expr,
             operator,
             right,
-        } as BinaryExpressionNode;
+        } as FactorNode;
     }
 
     return expr;
+}
+
+/**
+ * Parse power operands
+ * PowerOperand ::= [UnaryOperator] Primary
+ */
+function parsePowerOperand(context: ExpressionParserContext): ExpressionNode {
+    return parseUnary(context);
 }
 
 /**
@@ -184,10 +212,37 @@ function parseUnary(context: ExpressionParserContext): ExpressionNode {
 
 /**
  * Parse primary expressions (literals, identifiers, function calls, etc.)
+ * Primary ::= Literal | VariableAccess | PropertyAccess | ArrayAccess | FunctionCall |
+ *            BitwiseOperation | "(" Expression ")" | IncrementExpression | MethodCall
  */
 function parsePrimary(context: ExpressionParserContext): ExpressionNode {
+    // Check for prefix increment/decrement
+    if (context.match(TokenType.INCREMENT, TokenType.DECREMENT)) {
+        const operator = context.previous();
+        const operand = context.consume(
+            TokenType.IDENTIFIER,
+            "Expected identifier after prefix increment/decrement"
+        );
+        return {
+            kind: ASTNodeType.IncrementExpression,
+            startToken: operator,
+            endToken: operand,
+            operator,
+            operand,
+            prefix: true,
+        } as any;
+    }
+
     // Literals
-    if (context.match(TokenType.NUMBER, TokenType.STRING, TokenType.BOOLEAN, TokenType.NIL)) {
+    if (
+        context.match(
+            TokenType.NUMBER,
+            TokenType.STRING,
+            TokenType.SQL_STRING,
+            TokenType.BOOLEAN,
+            TokenType.NIL
+        )
+    ) {
         const token = context.previous();
         return {
             kind: ASTNodeType.LiteralExpression,
@@ -203,6 +258,18 @@ function parsePrimary(context: ExpressionParserContext): ExpressionNode {
         return parseArrayLiteral(context);
     }
 
+    // Date literals - special array-like syntax {year, month, day, [hour, minute, second]}
+    if (context.check(TokenType.LBRACE)) {
+        // This could be either array literal or date literal - need to look ahead
+        return parseArrayLiteral(context);
+    }
+
+    // Code block literals - {|params| expressions}
+    if (context.check(TokenType.LBRACE)) {
+        // Would need to look ahead for pipe character to distinguish from array
+        return parseArrayLiteral(context);
+    }
+
     // Parenthesized expressions
     if (context.match(TokenType.LPAREN)) {
         const expr = parseExpression(context);
@@ -214,8 +281,138 @@ function parsePrimary(context: ExpressionParserContext): ExpressionNode {
     if (context.match(TokenType.IDENTIFIER)) {
         const name = context.previous();
 
+        // Check for postfix increment/decrement
+        if (context.match(TokenType.INCREMENT, TokenType.DECREMENT)) {
+            const operator = context.previous();
+            return {
+                kind: ASTNodeType.IncrementExpression,
+                startToken: name,
+                endToken: operator,
+                operator,
+                operand: name,
+                prefix: false,
+            } as any;
+        }
+
         // Function call
         if (context.match(TokenType.LPAREN)) {
+            // Check for special SSL functions
+            if (name.value === "SqlExecute") {
+                // Handle SqlExecute specially - need to parse as SQL statement
+                const args = context.parseArgumentList();
+                context.consume(TokenType.RPAREN, "Expected ')' after arguments");
+
+                if (args.arguments.length === 0) {
+                    context.error("SqlExecute requires at least one argument (SQL query string)");
+                    return context.createErrorNode();
+                }
+
+                return {
+                    kind: ASTNodeType.SqlExecute,
+                    startToken: name,
+                    endToken: context.previous(),
+                    query: args.arguments[0] as any, // First argument should be string literal
+                    parameters: args.arguments.length > 1 ? (args.arguments[1] as any) : undefined, // Second argument should be array literal
+                } as any;
+            }
+
+            if (name.value === "LSearch") {
+                // Handle LSearch specially
+                const args = context.parseArgumentList();
+                context.consume(TokenType.RPAREN, "Expected ')' after arguments");
+                return {
+                    kind: ASTNodeType.LSearch,
+                    startToken: name,
+                    endToken: context.previous(),
+                    query: args.arguments[0] as any,
+                    parameter1: args.arguments[1],
+                    parameter2: args.arguments[2],
+                    parameters: args.arguments[3] as any,
+                } as any;
+            }
+
+            if (name.value === "DoProc") {
+                // Handle DoProc specially
+                const args = context.parseArgumentList();
+                context.consume(TokenType.RPAREN, "Expected ')' after arguments");
+                return {
+                    kind: ASTNodeType.DoProcCall,
+                    startToken: name,
+                    endToken: context.previous(),
+                    procedureName: args.arguments[0] as any,
+                    arguments: args.arguments[1] as any,
+                } as any;
+            }
+
+            if (name.value === "ExecFunction") {
+                // Handle ExecFunction specially
+                const args = context.parseArgumentList();
+                context.consume(TokenType.RPAREN, "Expected ')' after arguments");
+                return {
+                    kind: ASTNodeType.ExecFunctionCall,
+                    startToken: name,
+                    endToken: context.previous(),
+                    functionName: args.arguments[0] as any,
+                    arguments: args.arguments[1] as any,
+                } as any;
+            }
+
+            if (name.value === "CreateUDObject") {
+                // Handle object creation
+                const args = context.parseArgumentList();
+                context.consume(TokenType.RPAREN, "Expected ')' after arguments");
+                return {
+                    kind: ASTNodeType.ObjectCreation,
+                    startToken: name,
+                    endToken: context.previous(),
+                    className: args.arguments[0] as any,
+                } as any;
+            }
+
+            if (name.value === "Branch") {
+                // Handle branch statement
+                const args = context.parseArgumentList();
+                context.consume(TokenType.RPAREN, "Expected ')' after arguments");
+                return {
+                    kind: ASTNodeType.BranchStatement,
+                    startToken: name,
+                    endToken: context.previous(),
+                    target: args.arguments[0] as any,
+                } as any;
+            }
+
+            if (name.value === "ExecUDF") {
+                // Handle dynamic code execution
+                const args = context.parseArgumentList();
+                context.consume(TokenType.RPAREN, "Expected ')' after arguments");
+                return {
+                    kind: ASTNodeType.DynamicCodeExecution,
+                    startToken: name,
+                    endToken: context.previous(),
+                    code: args.arguments[0] as any,
+                    parameters: args.arguments[1] as any,
+                } as any;
+            }
+
+            // Check for bitwise operations
+            if (
+                name.value === "_AND" ||
+                name.value === "_OR" ||
+                name.value === "_XOR" ||
+                name.value === "_NOT"
+            ) {
+                const args = context.parseArgumentList();
+                context.consume(TokenType.RPAREN, "Expected ')' after arguments");
+                return {
+                    kind: ASTNodeType.BitwiseOperation,
+                    startToken: name,
+                    endToken: context.previous(),
+                    operation: name.value as any,
+                    operands: args.arguments,
+                } as any;
+            }
+
+            // Regular function call
             const args = context.parseArgumentList();
             context.consume(TokenType.RPAREN, "Expected ')' after arguments");
             return {
@@ -227,12 +424,28 @@ function parsePrimary(context: ExpressionParserContext): ExpressionNode {
             } as DirectFunctionCallNode;
         }
 
-        // Property access (Object:Property)
+        // Property access (Object:Property) or Method call (Object:Method())
         if (context.match(TokenType.COLON)) {
             const property = context.consume(
                 TokenType.IDENTIFIER,
                 "Expected property name after ':'"
             );
+
+            // Check if this is a method call
+            if (context.match(TokenType.LPAREN)) {
+                const args = context.parseArgumentList();
+                context.consume(TokenType.RPAREN, "Expected ')' after method arguments");
+                return {
+                    kind: ASTNodeType.MethodCall,
+                    startToken: name,
+                    endToken: context.previous(),
+                    object: name,
+                    method: property,
+                    arguments: args,
+                } as any;
+            }
+
+            // Property access
             return {
                 kind: ASTNodeType.PropertyAccess,
                 startToken: name,
@@ -242,8 +455,16 @@ function parsePrimary(context: ExpressionParserContext): ExpressionNode {
             } as PropertyAccessNode;
         }
 
-        // Array access
-        if (context.match(TokenType.LBRACKET)) {
+        // Array access - supports both arr[1,2] and arr[1][2] syntax
+        let expr: ExpressionNode = {
+            kind: ASTNodeType.VariableAccess,
+            startToken: name,
+            endToken: name,
+            name,
+        } as VariableAccessNode;
+
+        // Handle chained array access: arr[1][2][3]
+        while (context.match(TokenType.LBRACKET)) {
             const indices: ExpressionNode[] = [];
             do {
                 indices.push(parseExpression(context));
@@ -251,17 +472,22 @@ function parsePrimary(context: ExpressionParserContext): ExpressionNode {
 
             context.consume(TokenType.RBRACKET, "Expected ']' after array index");
 
-            return {
+            expr = {
                 kind: ASTNodeType.ArrayAccess,
-                startToken: name,
+                startToken: expr.startToken,
                 endToken: context.previous(),
-                array: name,
+                array: expr,
                 indices,
             } as ArrayAccessNode;
         }
 
+        // If we processed any array access, return the result
+        if (expr.kind === ASTNodeType.ArrayAccess) {
+            return expr;
+        }
+
         // Simple variable access
-        // Check for invalid identifiers that violate EBNF grammar
+        // Validate against grammar rules
         if (name.value === "TRUE" || name.value === "FALSE") {
             context.error(
                 `Invalid boolean literal '${name.value}'. Use '.T.' or '.F.' instead according to SSL grammar.`

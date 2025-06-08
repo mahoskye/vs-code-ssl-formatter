@@ -30,14 +30,19 @@ export enum ASTNodeType {
 
     // Procedure declarations
     ProcedureStatement = "ProcedureStatement",
+    ProcedureStart = "ProcedureStart",
+    ProcedureEnd = "ProcedureEnd",
     ParameterDeclaration = "ParameterDeclaration",
     DefaultParameterDeclaration = "DefaultParameterDeclaration",
     DefaultParameterList = "DefaultParameterList",
+    ParameterList = "ParameterList",
 
     // Control flow statements
+    ConditionalStatement = "ConditionalStatement",
     IfStatement = "IfStatement",
     ElseStatement = "ElseStatement",
     EndIfStatement = "EndIfStatement",
+    LoopStatement = "LoopStatement",
     WhileLoop = "WhileLoop",
     WhileStatement = "WhileStatement",
     EndWhileStatement = "EndWhileStatement",
@@ -59,6 +64,7 @@ export enum ASTNodeType {
     ExitCaseStatement = "ExitCaseStatement",
 
     // Error handling
+    ErrorHandlingStatement = "ErrorHandlingStatement",
     TryBlock = "TryBlock",
     TryStatement = "TryStatement",
     CatchBlock = "CatchBlock",
@@ -70,6 +76,7 @@ export enum ASTNodeType {
     ErrorMarker = "ErrorMarker",
 
     // Declaration statements
+    DeclarationStatement = "DeclarationStatement",
     ParametersStatement = "ParametersStatement",
     DeclareStatement = "DeclareStatement",
     DefaultStatement = "DefaultStatement",
@@ -77,6 +84,7 @@ export enum ASTNodeType {
     IncludeStatement = "IncludeStatement",
 
     // Logic statements
+    LogicStatement = "LogicStatement",
     Assignment = "Assignment",
     ReturnStatement = "ReturnStatement",
 
@@ -87,6 +95,7 @@ export enum ASTNodeType {
     ExecFunctionCall = "ExecFunctionCall",
 
     // Comments
+    CommentStatement = "CommentStatement",
     BlockComment = "BlockComment",
     SingleLineComment = "SingleLineComment",
     RegionComment = "RegionComment",
@@ -95,7 +104,11 @@ export enum ASTNodeType {
     // Special structures
     LabelStatement = "LabelStatement",
     RegionBlock = "RegionBlock",
+    RegionStart = "RegionStart",
+    RegionEnd = "RegionEnd",
     InlineCodeBlock = "InlineCodeBlock",
+    InlineCodeStart = "InlineCodeStart",
+    InlineCodeEnd = "InlineCodeEnd",
     DynamicCodeExecution = "DynamicCodeExecution",
     BranchStatement = "BranchStatement",
 
@@ -143,6 +156,23 @@ export enum ASTNodeType {
 
     // Bitwise operations (as functions)
     BitwiseOperation = "BitwiseOperation",
+
+    // Additional missing types from grammar
+    AssignmentOperator = "AssignmentOperator",
+    LogicalOperator = "LogicalOperator",
+    ComparisonOperator = "ComparisonOperator",
+    AdditiveOperator = "AdditiveOperator",
+    MultiplicativeOperator = "MultiplicativeOperator",
+    UnaryOperator = "UnaryOperator",
+    ArraySubscript = "ArraySubscript",
+    Literal = "Literal",
+    IntegerPart = "IntegerPart",
+    DecimalPart = "DecimalPart",
+    Exponent = "Exponent",
+    Character = "Character",
+    Symbol = "Symbol",
+    Letter = "Letter",
+    Digit = "Digit",
 }
 
 // Base types for commonly used node categories
@@ -441,6 +471,52 @@ export interface BinaryExpressionNode extends ASTNode {
     right: ExpressionNode;
 }
 
+export interface LogicalExpressionNode extends ASTNode {
+    kind: ASTNodeType.LogicalExpression;
+    left: ExpressionNode;
+    operator: Token;
+    right: ExpressionNode;
+}
+
+export interface ComparisonExpressionNode extends ASTNode {
+    kind: ASTNodeType.ComparisonExpression;
+    left: ExpressionNode;
+    operator: Token;
+    right: ExpressionNode;
+}
+
+export interface ArithmeticExpressionNode extends ASTNode {
+    kind: ASTNodeType.ArithmeticExpression;
+    left: ExpressionNode;
+    operator: Token;
+    right: ExpressionNode;
+}
+
+export interface TermNode extends ASTNode {
+    kind: ASTNodeType.Term;
+    left: ExpressionNode;
+    operator: Token;
+    right: ExpressionNode;
+}
+
+export interface FactorNode extends ASTNode {
+    kind: ASTNodeType.Factor;
+    left: ExpressionNode;
+    operator: Token;
+    right: ExpressionNode;
+}
+
+export interface PowerOperandNode extends ASTNode {
+    kind: ASTNodeType.PowerOperand;
+    operator?: Token;
+    operand: ExpressionNode;
+}
+
+export interface PrimaryNode extends ASTNode {
+    kind: ASTNodeType.Primary;
+    expression: ExpressionNode;
+}
+
 export interface UnaryExpressionNode extends ASTNode {
     kind: ASTNodeType.UnaryExpression;
     operator: Token;
@@ -461,7 +537,7 @@ export interface VariableAccessNode extends ASTNode {
 
 export interface ArrayAccessNode extends ASTNode {
     kind: ASTNodeType.ArrayAccess;
-    array: Token;
+    array: Token | ExpressionNode;
     indices: ExpressionNode[];
 }
 
@@ -541,8 +617,215 @@ export interface DefaultParameterListNode extends ASTNode {
  */
 export interface BitwiseOperationNode extends ASTNode {
     kind: ASTNodeType.BitwiseOperation;
-    operation: "_AND" | "_OR" | "_NOT";
+    operation: "_AND" | "_OR" | "_XOR" | "_NOT";
     operands: ExpressionNode[];
+}
+
+/**
+ * SQL statement nodes
+ */
+export interface SqlStatementNode extends ASTNode {
+    kind: ASTNodeType.SqlStatement;
+}
+
+export interface SqlParameterNode extends ASTNode {
+    kind: ASTNodeType.SqlParameter;
+    name?: Token;
+}
+
+/**
+ * Dynamic code execution node
+ */
+export interface DynamicCodeExecutionNode extends ASTNode {
+    kind: ASTNodeType.DynamicCodeExecution;
+    code: StringLiteralNode;
+    parameters?: ArrayLiteralNode;
+}
+
+/**
+ * Inline code block nodes
+ */
+export interface InlineCodeStartNode extends ASTNode {
+    kind: ASTNodeType.InlineCodeStart;
+    language?: StringLiteralNode | Token;
+}
+
+export interface InlineCodeEndNode extends ASTNode {
+    kind: ASTNodeType.InlineCodeEnd;
+}
+
+/**
+ * Region nodes
+ */
+export interface RegionStartNode extends ASTNode {
+    kind: ASTNodeType.RegionStart;
+    name: Token;
+}
+
+export interface RegionEndNode extends ASTNode {
+    kind: ASTNodeType.RegionEnd;
+}
+
+/**
+ * Comment statement nodes
+ */
+export interface CommentStatementNode extends ASTNode {
+    kind: ASTNodeType.CommentStatement;
+    content: string;
+}
+
+export interface SingleLineCommentNode extends ASTNode {
+    kind: ASTNodeType.SingleLineComment;
+    content: string;
+}
+
+/**
+ * Declaration statement wrapper
+ */
+export interface DeclarationStatementNode extends ASTNode {
+    kind: ASTNodeType.DeclarationStatement;
+    statement:
+        | ParametersStatementNode
+        | DeclareStatementNode
+        | PublicStatementNode
+        | IncludeStatementNode;
+}
+
+/**
+ * Default statement node
+ */
+export interface DefaultStatementNode extends ASTNode {
+    kind: ASTNodeType.DefaultStatement;
+    defaults: DefaultParameterListNode;
+}
+
+/**
+ * Logic statement wrapper
+ */
+export interface LogicStatementNode extends ASTNode {
+    kind: ASTNodeType.LogicStatement;
+    statement: AssignmentNode | DirectFunctionCallNode | ExpressionNode | ReturnStatementNode;
+}
+
+/**
+ * Conditional statement wrapper
+ */
+export interface ConditionalStatementNode extends ASTNode {
+    kind: ASTNodeType.ConditionalStatement;
+    statement: IfStatementNode | ElseStatementNode | EndIfStatementNode;
+}
+
+/**
+ * Loop statement wrapper
+ */
+export interface LoopStatementNode extends ASTNode {
+    kind: ASTNodeType.LoopStatement;
+    statement:
+        | WhileLoopNode
+        | ForLoopNode
+        | ExitWhileStatementNode
+        | ExitForStatementNode
+        | LoopContinueNode;
+}
+
+/**
+ * Error handling statement wrapper
+ */
+export interface ErrorHandlingStatementNode extends ASTNode {
+    kind: ASTNodeType.ErrorHandlingStatement;
+    statement: TryBlockNode;
+}
+
+/**
+ * Parameter list node
+ */
+export interface ParameterListNode extends ASTNode {
+    kind: ASTNodeType.ParameterList;
+    parameters: Token[];
+}
+
+/**
+ * Procedure start/end nodes
+ */
+export interface ProcedureStartNode extends ASTNode {
+    kind: ASTNodeType.ProcedureStart;
+    name: Token;
+}
+
+export interface ProcedureEndNode extends ASTNode {
+    kind: ASTNodeType.ProcedureEnd;
+}
+
+/**
+ * Statement end nodes
+ */
+export interface ElseStatementNode extends ASTNode {
+    kind: ASTNodeType.ElseStatement;
+}
+
+export interface EndIfStatementNode extends ASTNode {
+    kind: ASTNodeType.EndIfStatement;
+}
+
+export interface WhileStatementNode extends ASTNode {
+    kind: ASTNodeType.WhileStatement;
+    condition: ExpressionNode;
+}
+
+export interface EndWhileStatementNode extends ASTNode {
+    kind: ASTNodeType.EndWhileStatement;
+}
+
+export interface ForStatementNode extends ASTNode {
+    kind: ASTNodeType.ForStatement;
+    variable: Token;
+    from: ExpressionNode;
+    to: ExpressionNode;
+}
+
+export interface NextStatementNode extends ASTNode {
+    kind: ASTNodeType.NextStatement;
+}
+
+export interface BeginCaseStatementNode extends ASTNode {
+    kind: ASTNodeType.BeginCaseStatement;
+}
+
+export interface CaseStatementNode extends ASTNode {
+    kind: ASTNodeType.CaseStatement;
+    values: ExpressionNode[];
+}
+
+export interface OtherwiseStatementNode extends ASTNode {
+    kind: ASTNodeType.OtherwiseStatement;
+}
+
+export interface EndCaseStatementNode extends ASTNode {
+    kind: ASTNodeType.EndCaseStatement;
+}
+
+export interface TryStatementNode extends ASTNode {
+    kind: ASTNodeType.TryStatement;
+}
+
+export interface CatchStatementNode extends ASTNode {
+    kind: ASTNodeType.CatchStatement;
+}
+
+export interface FinallyStatementNode extends ASTNode {
+    kind: ASTNodeType.FinallyStatement;
+}
+
+export interface EndTryStatementNode extends ASTNode {
+    kind: ASTNodeType.EndTryStatement;
+}
+
+/**
+ * Array subscript node
+ */
+export interface ArraySubscriptNode extends ASTNode {
+    kind: ASTNodeType.ArraySubscript;
+    indices: ExpressionNode[];
 }
 
 /**

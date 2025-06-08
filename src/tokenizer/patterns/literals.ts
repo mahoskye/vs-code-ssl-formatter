@@ -54,10 +54,15 @@ export function matchNumber(input: string, position: number): [string, number] |
                 current++;
             }
         }
-    } // Match exponent part
+    }
+
+    // Match exponent part
+    // Per EBNF note 14: Scientific notation requires a decimal point before 'e'
+    // Formats like '7e2' are not supported, only '7.0e2' is valid
     if (
         current < input.length &&
-        (input[current] === "e" || input[current] === "E")
+        (input[current] === "e" || input[current] === "E") &&
+        hasDecimal // Only allow exponent if we have a decimal part
     ) {
         const nextChar = current + 1 < input.length ? input[current + 1] : "";
         const secondChar = current + 2 < input.length ? input[current + 2] : "";

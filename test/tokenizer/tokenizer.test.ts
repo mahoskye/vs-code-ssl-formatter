@@ -198,7 +198,7 @@ describe("Tokenizer", () => {
                 TokenType.DIV_ASSIGN,
                 TokenType.POWER_ASSIGN,
             ];
-            const found = tokens.filter(t => t.type !== TokenType.EOF).map((t) => t.type);
+            const found = tokens.filter((t) => t.type !== TokenType.EOF).map((t) => t.type);
             expect(found).toEqual(expect.arrayContaining(expected));
         });
 
@@ -214,7 +214,7 @@ describe("Tokenizer", () => {
                 TokenType.GREATER_EQUAL,
                 TokenType.EQUAL,
             ];
-            const found = tokens.filter(t => t.type !== TokenType.EOF).map((t) => t.type);
+            const found = tokens.filter((t) => t.type !== TokenType.EOF).map((t) => t.type);
             expect(found).toEqual(expect.arrayContaining(expected));
         });
 
@@ -229,7 +229,7 @@ describe("Tokenizer", () => {
                 TokenType.MODULO,
                 TokenType.POWER,
             ];
-            const found = tokens.filter(t => t.type !== TokenType.EOF).map((t) => t.type);
+            const found = tokens.filter((t) => t.type !== TokenType.EOF).map((t) => t.type);
             expect(found).toEqual(expect.arrayContaining(expected));
         });
 
@@ -237,7 +237,7 @@ describe("Tokenizer", () => {
             const input = "++ --";
             const tokens = tokenize(input);
             const expected = [TokenType.INCREMENT, TokenType.DECREMENT];
-            const found = tokens.filter(t => t.type !== TokenType.EOF).map((t) => t.type);
+            const found = tokens.filter((t) => t.type !== TokenType.EOF).map((t) => t.type);
             expect(found).toEqual(expect.arrayContaining(expected));
         });
     });
@@ -260,7 +260,7 @@ describe("Tokenizer", () => {
                 TokenType.DOT,
                 TokenType.QUESTION,
             ];
-            const found = tokens.filter(t => t.type !== TokenType.EOF).map((t) => t.type);
+            const found = tokens.filter((t) => t.type !== TokenType.EOF).map((t) => t.type);
             expect(found).toEqual(expect.arrayContaining(expected));
         });
     });
@@ -269,7 +269,7 @@ describe("Tokenizer", () => {
         it("should tokenize property access with a colon", () => {
             const input = "myObject:myProperty";
             const tokens = tokenize(input);
-            expect(tokens.map(t=>t.type)).toEqual([
+            expect(tokens.map((t) => t.type)).toEqual([
                 TokenType.IDENTIFIER,
                 TokenType.COLON,
                 TokenType.IDENTIFIER,
@@ -412,7 +412,7 @@ describe("Tokenizer", () => {
 
         it("should handle tokens with no separating whitespace", () => {
             const tokens = tokenize("sVar:=10;");
-            expect(tokens.map(t => t.type)).toEqual([
+            expect(tokens.map((t) => t.type)).toEqual([
                 TokenType.IDENTIFIER,
                 TokenType.ASSIGN,
                 TokenType.NUMBER,
@@ -425,7 +425,7 @@ describe("Tokenizer", () => {
 
         it("should handle comments adjacent to tokens", () => {
             const tokens = tokenize("sVar:=10;/*comment;*/:if");
-            const types = tokens.map(t => t.type);
+            const types = tokens.map((t) => t.type);
             expect(types).toContain(TokenType.SINGLE_LINE_COMMENT);
             expect(types).toContain(TokenType.IDENTIFIER);
             expect(types).toContain(TokenType.IF);
@@ -435,13 +435,16 @@ describe("Tokenizer", () => {
             expect(commentIndex).toBeLessThan(ifIndex);
         });
 
-        it("should treat scientific notation without a decimal as a number token", () => {
+        it("should reject scientific notation without a decimal point", () => {
             const tokens = tokenize("7e2");
-            // Per the new design, the tokenizer should identify '7e2' as a number.
-            // The parser will be responsible for semantic validation.
+            // Per SSL EBNF grammar note 14, scientific notation requires a decimal point
+            // Formats like '7e2' are not supported, only '7.0e2' is valid
+            // So '7e2' should be tokenized as separate tokens: NUMBER(7), IDENTIFIER(e2)
             expect(tokens[0].type).toBe(TokenType.NUMBER);
-            expect(tokens[0].value).toBe("7e2");
-            expect(tokens).toHaveLength(2); // NUMBER + EOF
+            expect(tokens[0].value).toBe("7");
+            expect(tokens[1].type).toBe(TokenType.IDENTIFIER);
+            expect(tokens[1].value).toBe("e2");
+            expect(tokens).toHaveLength(3); // NUMBER, IDENTIFIER, EOF
         });
     });
 });

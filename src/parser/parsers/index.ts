@@ -11,3 +11,4 @@ export * from "./statements";
 export * from "./expressions";
 export * from "./classes";
 export * from "./utilities";
+export * from "./sqlStatements";

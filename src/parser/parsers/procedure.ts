@@ -136,22 +136,19 @@ export function parseProcedureStatementBody(parser: ProcedureParser): ProcedureS
 }
 
 /**
- * Parses a list of default parameters
- * e.g., p1, "default1", p2, "default2"
+ * Parses a default parameter list
+ * According to SSL grammar: DefaultParameterList ::= Identifier "," Expression
+ * e.g., p1, "default1"
  */
 function parseDefaultParameterList(parser: ProcedureParser): DefaultParameterListNode {
     const startToken = parser.peek();
-    const pairs: { identifier: Token; defaultValue: ExpressionNode }[] = [];
 
-    do {
-        const identifier = parser.consume(
-            TokenType.IDENTIFIER,
-            "Expected identifier in default parameter list"
-        );
-        parser.consume(TokenType.COMMA, "Expected ',' after identifier in default parameter list");
-        const defaultValue = parser.parseExpression();
-        pairs.push({ identifier, defaultValue });
-    } while (parser.match(TokenType.COMMA));
+    const identifier = parser.consume(
+        TokenType.IDENTIFIER,
+        "Expected identifier in default parameter list"
+    );
+    parser.consume(TokenType.COMMA, "Expected ',' after identifier in default parameter list");
+    const defaultValue = parser.parseExpression();
 
     const endToken = parser.previous();
 
@@ -159,6 +156,6 @@ function parseDefaultParameterList(parser: ProcedureParser): DefaultParameterLis
         kind: ASTNodeType.DefaultParameterList,
         startToken,
         endToken,
-        pairs,
+        pairs: [{ identifier, defaultValue }],
     };
 }
