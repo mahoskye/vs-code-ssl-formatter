@@ -4,11 +4,25 @@ All notable changes to the "STARLIMS Scripting Language Formatter" extension wil
 
 # Changelog
 
-## [0.4.0] - In Development
+## [0.5.0-formatter] - In Development
 
 ### Added
 
--   SSL parser implementation (in progress)
+-   Formatter implementation (next phase)
+
+## [0.4.0] - 2025-06-08
+
+### Added
+
+-   Complete SSL parser implementation
+-   AST (Abstract Syntax Tree) node definitions
+-   Comprehensive parser for all SSL language constructs including:
+    -   Expressions and statements
+    -   Control flow structures (if/else, while, for loops)
+    -   Class definitions and procedures  
+    -   Try/catch statements and case statements
+    -   SQL statements and utilities
+-   Extensive parser test suite with EBNF compliance validation
 
 ## [0.3.0] - 2025-06-07
 
