@@ -37,12 +37,12 @@ import {
 
 // Import specialized parsers
 import {
-    parseProcedureStatement as parseSpecializedProcedure,
-    parseIfStatement as parseSpecializedIf,
-    parseWhileStatement as parseSpecializedWhile,
-    parseForStatement as parseSpecializedFor,
-    parseSwitchStatement as parseSpecializedSwitch,
-    parseTryStatement as parseSpecializedTry,
+    parseProcedureStatement,
+    parseIfStatement,
+    parseWhileStatement,
+    parseForStatement,
+    parseSwitchStatement,
+    parseTryStatement,
     parseDeclareStatement,
     parseParametersStatement,
     parsePublicStatement,
@@ -53,6 +53,7 @@ import {
     parseExitWhileStatement,
     parseExitForStatement,
     parseLoopContinueStatement,
+    parseExitCaseStatement,
     ProcedureParser,
     ControlFlowParser,
     CaseParser,
@@ -163,6 +164,7 @@ export class Parser
 
         this.consume(TokenType.COLON, "Expected ':' before class declaration");
         this.consume(TokenType.CLASS, "Expected 'CLASS' keyword");
+        this.consume(TokenType.SEMICOLON, "Expected ';' after class declaration.");
         const className = this.consume(TokenType.IDENTIFIER, "Expected class name");
         const declaration = {
             kind: ASTNodeType.ClassDeclaration,
@@ -178,6 +180,7 @@ export class Parser
         if (this.check(TokenType.COLON) && this.checkNext(TokenType.INHERIT)) {
             this.advance(); // consume ':'
             this.advance(); // consume 'INHERIT'
+            this.consume(TokenType.SEMICOLON, "Expected ';' after :INHERIT clause.");
             const inheritClassName = this.consume(
                 TokenType.IDENTIFIER,
                 "Expected inherited class name"
@@ -207,7 +210,7 @@ export class Parser
                 // Method declaration
                 this.advance(); // consume ':'
                 this.advance(); // consume 'PROCEDURE'
-                const procedure = parseSpecializedProcedure(this);
+                const procedure = parseProcedureStatement(this);
                 members.push({
                     kind: ASTNodeType.MethodDeclaration,
                     startToken: procedure.startToken,
@@ -231,7 +234,8 @@ export class Parser
     }
     /**
      * Parse a statement
-     */ public parseStatement(): StatementNode | null {
+     */
+    public parseStatement(): StatementNode | null {
         try {
             // Skip whitespace tokens (including NEWLINE)
             this.skipWhitespace();
@@ -282,22 +286,23 @@ export class Parser
         switch (keywordToken.type) {
             case TokenType.PROCEDURE:
                 this.advance(); // consume 'PROCEDURE'
-                return parseSpecializedProcedure(this);
+                return parseProcedureStatement(this);
             case TokenType.IF:
                 this.advance(); // consume 'IF'
-                return parseSpecializedIf(this);
+                return parseIfStatement(this);
             case TokenType.WHILE:
                 this.advance(); // consume 'WHILE'
-                return parseSpecializedWhile(this);
+                return parseWhileStatement(this);
             case TokenType.FOR:
                 this.advance(); // consume 'FOR'
-                return parseSpecializedFor(this);
+                return parseForStatement(this);
             case TokenType.BEGINCASE:
                 this.advance(); // consume 'BEGINCASE'
-                return parseSpecializedSwitch(this);
+                this.consume(TokenType.SEMICOLON, "Expected ';' after :BEGINCASE.");
+                return parseSwitchStatement(this);
             case TokenType.TRY:
                 this.advance(); // consume 'TRY'
-                return parseSpecializedTry(this);
+                return parseTryStatement(this);
             case TokenType.DECLARE:
                 this.advance(); // consume 'DECLARE'
                 return parseDeclareStatement(this);
@@ -328,6 +333,9 @@ export class Parser
             case TokenType.LOOP:
                 this.advance(); // consume 'LOOP'
                 return parseLoopContinueStatement(this);
+            case TokenType.EXITCASE:
+                this.advance(); // consume 'EXITCASE'
+                return parseExitCaseStatement(this);
 
             // Keywords that do not start a new statement but are handled elsewhere
             case TokenType.ELSE:
@@ -353,7 +361,8 @@ export class Parser
 
     /**
      * Parse assignment or function call
-     */ private parseAssignmentOrFunctionCall(): StatementNode {
+     */
+    private parseAssignmentOrFunctionCall(): StatementNode {
         const startToken = this.peek();
         const expr = this.parseExpression();
 

@@ -31,9 +31,10 @@ export interface StatementParser {
     previous(): Token;
     peek(): Token;
     check(type: TokenType): boolean;
+    checkNext(type: TokenType): boolean;
     consume(type: TokenType, message: string): Token;
-    parseExpression(): ExpressionNode;
     parseIdentifierList(): IdentifierListNode;
+    parseExpression(): ExpressionNode;
     error(message: string): void;
     isAtEnd(): boolean;
 }
@@ -194,12 +195,12 @@ export function parseRegionStatement(parser: StatementParser): RegionBlockNode {
  * :EXITWHILE
  */
 export function parseExitWhileStatement(parser: StatementParser): ExitWhileStatementNode {
-    const token = parser.previous(); // EXITWHILE token
-
+    const startToken = parser.previous();
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after :EXITWHILE");
     return {
         kind: ASTNodeType.ExitWhileStatement,
-        startToken: token,
-        endToken: token,
+        startToken: startToken,
+        endToken: parser.previous(),
     } as ExitWhileStatementNode;
 }
 
@@ -208,12 +209,12 @@ export function parseExitWhileStatement(parser: StatementParser): ExitWhileState
  * :EXITFOR
  */
 export function parseExitForStatement(parser: StatementParser): ExitForStatementNode {
-    const token = parser.previous(); // EXITFOR token
-
+    const startToken = parser.previous();
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after :EXITFOR");
     return {
         kind: ASTNodeType.ExitForStatement,
-        startToken: token,
-        endToken: token,
+        startToken: startToken,
+        endToken: parser.previous(),
     } as ExitForStatementNode;
 }
 
@@ -222,11 +223,21 @@ export function parseExitForStatement(parser: StatementParser): ExitForStatement
  * :LOOP
  */
 export function parseLoopContinueStatement(parser: StatementParser): LoopContinueNode {
-    const token = parser.previous(); // LOOP token
-
+    const startToken = parser.previous();
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after :LOOP");
     return {
         kind: ASTNodeType.LoopContinue,
-        startToken: token,
-        endToken: token,
+        startToken: startToken,
+        endToken: parser.previous(),
     } as LoopContinueNode;
+}
+
+export function parseExitCaseStatement(parser: StatementParser): StatementNode {
+    const startToken = parser.previous();
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after :EXITCASE");
+    return {
+        kind: ASTNodeType.ExitCaseStatement,
+        startToken: startToken,
+        endToken: parser.previous(),
+    };
 }

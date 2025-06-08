@@ -11,6 +11,7 @@ import {
     FinallyBlockNode,
     ASTNodeType,
     IdentifierListNode,
+    ExpressionNode,
 } from "../ast";
 
 /**
@@ -25,6 +26,7 @@ export interface TryStatementParser {
     checkNext(type: TokenType): boolean;
     consume(type: TokenType, message: string): Token;
     parseStatement(): StatementNode | null;
+    parseExpression(): ExpressionNode;
     parseIdentifierList(): IdentifierListNode;
     skipWhitespace(): void;
     error(message: string): void;
