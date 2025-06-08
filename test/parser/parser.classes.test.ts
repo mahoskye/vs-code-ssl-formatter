@@ -62,8 +62,7 @@ x := 1;
 
     describe("Class definitions", () => {
         it("should parse simple class", () => {
-            const input = `:CLASS;
-MyClass;`;
+            const input = `:CLASS clsCar;`;
             const tokens = tokenize(input);
             const result = parse(tokens);
 
@@ -72,36 +71,28 @@ MyClass;`;
             expect(result.ast.body).toHaveLength(1);
             expect(result.ast.body[0].kind).toBe(ASTNodeType.ClassDefinition);
         });
-
         it("should parse class with inheritance", () => {
-            const input = `:CLASS;
-MyClass;
-:INHERIT;
-BaseClass;`;
+            const input = `:CLASS clsCar;
+:INHERIT Research.clsVehicle;`;
             const tokens = tokenize(input);
             const result = parse(tokens);
 
             expect(result.success).toBe(true);
             expect(result.errors).toHaveLength(0);
         });
-
         it("should parse class with fields", () => {
-            const input = `:CLASS;
-MyClass;
-:DECLARE field1, field2, field3;`;
+            const input = `:CLASS clsCar;
+:DECLARE MSRPPrice, field2, field3;`;
             const tokens = tokenize(input);
             const result = parse(tokens);
 
             expect(result.success).toBe(true);
             expect(result.errors).toHaveLength(0);
         });
-
         it("should parse class with methods", () => {
-            const input = `:CLASS;
-MyClass;
-:PROCEDURE MyMethod;
-:PARAMETERS param1;
-result := param1 * 2;
+            const input = `:CLASS clsCar;
+:PROCEDURE Constructor;
+Me:Wheels := 4;
 :ENDPROC;`;
             const tokens = tokenize(input);
             const result = parse(tokens);
@@ -109,16 +100,15 @@ result := param1 * 2;
             expect(result.success).toBe(true);
             expect(result.errors).toHaveLength(0);
         });
-
         it("should parse complete class definition", () => {
-            const input = `:CLASS;
-MyClass;
-:INHERIT;
-BaseClass;
-:DECLARE field1, field2;
-:PROCEDURE MyMethod;
-:PARAMETERS param1;
-result := param1 + field1;
+            const input = `:CLASS clsCar;
+:INHERIT Research.clsVehicle;
+:DECLARE MSRPPrice, Wheels;
+:PROCEDURE Constructor;
+Me:Wheels := 4;
+:ENDPROC;
+:PROCEDURE GetPrice;
+:RETURN Me:MSRPPrice + 500; /* Car owner fee ;
 :ENDPROC;`;
             const tokens = tokenize(input);
             const result = parse(tokens);

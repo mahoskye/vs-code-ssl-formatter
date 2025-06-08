@@ -104,7 +104,7 @@ x := 42;
 
     describe("Error handling", () => {
         it("should report syntax errors", () => {
-            const input = "x := ; // Missing expression";
+            const input = "x := ; /* Missing expression ;";
             const tokens = tokenize(input);
             const result = parse(tokens);
 

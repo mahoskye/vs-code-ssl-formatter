@@ -422,24 +422,25 @@ describe("Tokenizer", () => {
             expect(tokens[0].value).toBe("sVar");
             expect(tokens[2].value).toBe("10");
         });
-
         it("should handle comments adjacent to tokens", () => {
             const tokens = tokenize("sVar:=10;/*comment;*/:if");
             const types = tokens.map((t) => t.type);
             expect(types).toContain(TokenType.SINGLE_LINE_COMMENT);
             expect(types).toContain(TokenType.IDENTIFIER);
             expect(types).toContain(TokenType.IF);
+            expect(types).toContain(TokenType.MULTIPLY);
+            expect(types).toContain(TokenType.DIVIDE);
             // Check order
             const commentIndex = types.indexOf(TokenType.SINGLE_LINE_COMMENT);
             const ifIndex = types.indexOf(TokenType.IF);
             expect(commentIndex).toBeLessThan(ifIndex);
         });
-
-        it("should reject scientific notation without a decimal point", () => {
+        it("should tokenize scientific notation without decimal point as separate tokens", () => {
             const tokens = tokenize("7e2");
             // Per SSL EBNF grammar note 14, scientific notation requires a decimal point
             // Formats like '7e2' are not supported, only '7.0e2' is valid
             // So '7e2' should be tokenized as separate tokens: NUMBER(7), IDENTIFIER(e2)
+            // The parser should handle validation of whether this is valid in context
             expect(tokens[0].type).toBe(TokenType.NUMBER);
             expect(tokens[0].value).toBe("7");
             expect(tokens[1].type).toBe(TokenType.IDENTIFIER);

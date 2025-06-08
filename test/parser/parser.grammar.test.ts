@@ -18,10 +18,8 @@ describe("Parser - Grammar Compliance", () => {
             expect(result.ast.kind).toBe(ASTNodeType.Program);
             expect(result.ast.body).toHaveLength(0);
         });
-
         it("should parse program with class definition", () => {
-            const input = `:CLASS;
-MyClass;`;
+            const input = `:CLASS MyClass;`;
             const tokens = tokenize(input);
             const result = parse(tokens);
 

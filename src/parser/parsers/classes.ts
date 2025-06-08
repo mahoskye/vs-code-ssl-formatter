@@ -30,6 +30,29 @@ export interface ClassParserContext {
 }
 
 /**
+ * Parse a dotted identifier (e.g., Research.clsVehicle)
+ * Returns the concatenated identifier string
+ */
+function parseDottedIdentifier(context: ClassParserContext): string {
+    let result = context.consume(TokenType.IDENTIFIER, "Expected identifier").value;
+
+    // Check for dotted notation (namespace.classname)
+    while (context.check(TokenType.DOT) && !context.isAtEnd()) {
+        const dotToken = context.advance(); // consume dot
+        if (context.check(TokenType.IDENTIFIER)) {
+            const nextIdentifier = context.advance(); // consume next identifier
+            result += dotToken.value + nextIdentifier.value;
+        } else {
+            // Put the dot back if it's not followed by an identifier
+            // Note: This is a simplified approach - in a real parser we'd need proper backtracking
+            break;
+        }
+    }
+
+    return result;
+}
+
+/**
  * Class parser interface
  */
 export interface ClassParser {
@@ -45,8 +68,6 @@ export function parseClassDefinition(context: ClassParserContext): ClassDefiniti
 
     context.consume(TokenType.COLON, "Expected ':' before class declaration");
     context.consume(TokenType.CLASS, "Expected 'CLASS' keyword");
-    context.consume(TokenType.SEMICOLON, "Expected ';' after class declaration.");
-    context.skipWhitespace(); // Skip any whitespace/newlines before class name
     const className = context.consume(TokenType.IDENTIFIER, "Expected class name");
     context.consume(TokenType.SEMICOLON, "Expected ';' after class name");
 
@@ -58,27 +79,32 @@ export function parseClassDefinition(context: ClassParserContext): ClassDefiniti
     } as ClassDeclarationNode;
 
     let inherit = undefined;
-    const members: any[] = [];
-
-    // Skip whitespace before checking for inheritance
-    context.skipWhitespace();
-
-    // Optional inherit statement
+    const members: any[] = []; // Skip whitespace before checking for inheritance
+    context.skipWhitespace(); // Optional inherit statement
     if (context.check(TokenType.COLON) && context.checkNext(TokenType.INHERIT)) {
-        context.advance(); // consume ':'
+        const inheritStartToken = context.advance(); // consume ':'
         context.advance(); // consume 'INHERIT'
-        context.consume(TokenType.SEMICOLON, "Expected ';' after :INHERIT clause.");
-        context.skipWhitespace(); // Skip any whitespace/newlines before inherited class name
-        const inheritClassName = context.consume(
-            TokenType.IDENTIFIER,
-            "Expected inherited class name"
+        const inheritClassName = parseDottedIdentifier(context);
+        const semicolonToken = context.consume(
+            TokenType.SEMICOLON,
+            "Expected ';' after inherited class name"
         );
-        context.consume(TokenType.SEMICOLON, "Expected ';' after inherited class name");
+
+        // Create a token-like object for the inherited class name
+        const inheritClassToken = {
+            type: TokenType.IDENTIFIER,
+            value: inheritClassName,
+            range: {
+                start: inheritStartToken.range.start,
+                end: semicolonToken.range.start,
+            },
+        } as Token;
+
         inherit = {
             kind: ASTNodeType.InheritStatement,
-            startToken: context.previous(),
-            endToken: inheritClassName,
-            className: inheritClassName,
+            startToken: inheritStartToken,
+            endToken: inheritClassToken,
+            className: inheritClassToken,
         } as InheritStatementNode;
     }
 
