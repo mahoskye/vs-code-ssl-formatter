@@ -32,6 +32,7 @@ export enum ASTNodeType {
     ProcedureStatement = "ProcedureStatement",
     ParameterDeclaration = "ParameterDeclaration",
     DefaultParameterDeclaration = "DefaultParameterDeclaration",
+    DefaultParameterList = "DefaultParameterList",
 
     // Control flow statements
     IfStatement = "IfStatement",
@@ -531,7 +532,7 @@ export interface ArgumentListNode extends ASTNode {
 }
 
 export interface DefaultParameterListNode extends ASTNode {
-    kind: ASTNodeType.IdentifierList; // Reuse IdentifierList for now
+    kind: ASTNodeType.DefaultParameterList;
     pairs: { identifier: Token; defaultValue: ExpressionNode }[];
 }
 

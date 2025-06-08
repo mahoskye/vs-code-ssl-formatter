@@ -272,47 +272,83 @@ export class Parser
         }
     }
     /**
-     * Parse colon-prefixed statements
+     * Parse a statement that begins with a colon
+     * This function is a dispatcher that calls the appropriate specialized parser
      */
-    private parseColonStatement(): StatementNode {
-        this.consume(TokenType.COLON, "Expected ':'");
+    private parseColonStatement(): StatementNode | null {
+        this.advance(); // consume ':'
+        const keywordToken = this.peek();
 
-        if (this.match(TokenType.PROCEDURE)) {
-            return parseSpecializedProcedure(this);
-        } else if (this.match(TokenType.IF)) {
-            return parseSpecializedIf(this);
-        } else if (this.match(TokenType.WHILE)) {
-            return parseSpecializedWhile(this);
-        } else if (this.match(TokenType.FOR)) {
-            return parseSpecializedFor(this);
-        } else if (this.match(TokenType.BEGINCASE)) {
-            return parseSpecializedSwitch(this);
-        } else if (this.match(TokenType.TRY)) {
-            return parseSpecializedTry(this);
-        } else if (this.match(TokenType.DECLARE)) {
-            return parseDeclareStatement(this);
-        } else if (this.match(TokenType.PARAMETERS)) {
-            return parseParametersStatement(this);
-        } else if (this.match(TokenType.PUBLIC)) {
-            return parsePublicStatement(this);
-        } else if (this.match(TokenType.INCLUDE)) {
-            return parseIncludeStatement(this);
-        } else if (this.match(TokenType.RETURN)) {
-            return parseReturnStatement(this);
-        } else if (this.match(TokenType.LABEL)) {
-            return parseLabelStatement(this);
-        } else if (this.match(TokenType.REGION)) {
-            return parseRegionStatement(this);
-        } else if (this.match(TokenType.EXITWHILE)) {
-            return parseExitWhileStatement(this);
-        } else if (this.match(TokenType.EXITFOR)) {
-            return parseExitForStatement(this);
-        } else if (this.match(TokenType.LOOP)) {
-            return parseLoopContinueStatement(this);
+        switch (keywordToken.type) {
+            case TokenType.PROCEDURE:
+                this.advance(); // consume 'PROCEDURE'
+                return parseSpecializedProcedure(this);
+            case TokenType.IF:
+                this.advance(); // consume 'IF'
+                return parseSpecializedIf(this);
+            case TokenType.WHILE:
+                this.advance(); // consume 'WHILE'
+                return parseSpecializedWhile(this);
+            case TokenType.FOR:
+                this.advance(); // consume 'FOR'
+                return parseSpecializedFor(this);
+            case TokenType.BEGINCASE:
+                this.advance(); // consume 'BEGINCASE'
+                return parseSpecializedSwitch(this);
+            case TokenType.TRY:
+                this.advance(); // consume 'TRY'
+                return parseSpecializedTry(this);
+            case TokenType.DECLARE:
+                this.advance(); // consume 'DECLARE'
+                return parseDeclareStatement(this);
+            case TokenType.PARAMETERS:
+                this.advance(); // consume 'PARAMETERS'
+                return parseParametersStatement(this);
+            case TokenType.PUBLIC:
+                this.advance(); // consume 'PUBLIC'
+                return parsePublicStatement(this);
+            case TokenType.INCLUDE:
+                this.advance(); // consume 'INCLUDE'
+                return parseIncludeStatement(this);
+            case TokenType.RETURN:
+                this.advance(); // consume 'RETURN'
+                return parseReturnStatement(this);
+            case TokenType.LABEL:
+                this.advance(); // consume 'LABEL'
+                return parseLabelStatement(this);
+            case TokenType.REGION:
+                 this.advance(); // consume 'REGION'
+                return parseRegionStatement(this);
+            case TokenType.EXITWHILE:
+                this.advance(); // consume 'EXITWHILE'
+                return parseExitWhileStatement(this);
+            case TokenType.EXITFOR:
+                this.advance(); // consume 'EXITFOR'
+                return parseExitForStatement(this);
+            case TokenType.LOOP:
+                this.advance(); // consume 'LOOP'
+                return parseLoopContinueStatement(this);
+
+            // Keywords that do not start a new statement but are handled elsewhere
+            case TokenType.ELSE:
+            case TokenType.ENDIF:
+            case TokenType.ENDWHILE:
+            case TokenType.NEXT:
+            case TokenType.CASE:
+            case TokenType.OTHERWISE:
+            case TokenType.ENDCASE:
+            case TokenType.CATCH:
+            case TokenType.FINALLY:
+            case TokenType.ENDTRY:
+            case TokenType.ENDPROC:
+            case TokenType.ENDREGION:
+                this.error(`Unexpected keyword '${keywordToken.value}' found.`);
+                return null;
+
+            default:
+                this.error(`Unknown statement starting with ':${keywordToken.value}'`);
+                return null;
         }
-
-        this.error("Unexpected statement after ':'");
-        return this.createErrorNode();
     }
 
     /**

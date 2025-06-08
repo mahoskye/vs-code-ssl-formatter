@@ -10,6 +10,9 @@ import {
     ParameterDeclarationNode,
     ASTNodeType,
     IdentifierListNode,
+    DefaultParameterDeclarationNode,
+    DefaultParameterListNode,
+    ExpressionNode,
 } from "../ast";
 
 /**
@@ -25,6 +28,7 @@ export interface ProcedureParser {
     consume(type: TokenType, message: string): Token;
     parseStatement(): StatementNode | null;
     parseIdentifierList(): IdentifierListNode;
+    parseExpression(): ExpressionNode;
     skipWhitespace(): void;
     error(message: string): void;
     isAtEnd(): boolean;
@@ -80,11 +84,16 @@ export function parseProcedureStatementBody(parser: ProcedureParser): ProcedureS
 
     // Optional default parameter declaration
     if (parser.check(TokenType.COLON) && parser.checkNext(TokenType.DEFAULT)) {
-        parser.advance();
-        parser.advance();
-        // For now, just consume the default parameters
-        // TODO: Implement proper default parameter parsing
-        parser.parseIdentifierList();
+        const defaultStartToken = parser.advance(); // consume ':'
+        parser.advance(); // consume 'DEFAULT'
+
+        const defaultParamList = parseDefaultParameterList(parser);
+        defaultParameters = {
+            kind: ASTNodeType.DefaultParameterDeclaration,
+            startToken: defaultStartToken,
+            endToken: parser.previous(),
+            defaults: defaultParamList,
+        } as DefaultParameterDeclarationNode;
     }
 
     // Parse procedure body
@@ -119,5 +128,33 @@ export function parseProcedureStatementBody(parser: ProcedureParser): ProcedureS
         parameters,
         defaultParameters,
         body,
+    };
+}
+
+/**
+ * Parses a list of default parameters
+ * e.g., p1, "default1", p2, "default2"
+ */
+function parseDefaultParameterList(parser: ProcedureParser): DefaultParameterListNode {
+    const startToken = parser.peek();
+    const pairs: { identifier: Token; defaultValue: ExpressionNode }[] = [];
+
+    do {
+        const identifier = parser.consume(
+            TokenType.IDENTIFIER,
+            "Expected identifier in default parameter list"
+        );
+        parser.consume(TokenType.COMMA, "Expected ',' after identifier in default parameter list");
+        const defaultValue = parser.parseExpression();
+        pairs.push({ identifier, defaultValue });
+    } while (parser.match(TokenType.COMMA));
+
+    const endToken = parser.previous();
+
+    return {
+        kind: ASTNodeType.DefaultParameterList,
+        startToken,
+        endToken,
+        pairs,
     };
 }

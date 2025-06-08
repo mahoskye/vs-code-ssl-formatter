@@ -43,6 +43,31 @@ x := param1 + param2;
             expect(result.errors).toHaveLength(0);
         });
 
+        it("should parse procedure with default parameters", () => {
+            const input = `:PROCEDURE TestProc
+:PARAMETERS param1, param2
+:DEFAULT param2, "default value"
+x := param1 + param2;
+:ENDPROC`;
+            const tokens = tokenize(input);
+            const result = parse(tokens);
+
+            if (!result.success) {
+                console.log("Parser errors:", result.errors);
+            }
+
+            expect(result.success).toBe(true);
+            expect(result.errors).toHaveLength(0);
+            
+            const proc = result.ast.body[0] as any;
+            expect(proc.kind).toBe("ProcedureStatement");
+            expect(proc.defaultParameters).toBeDefined();
+            expect(proc.defaultParameters.kind).toBe("DefaultParameterDeclaration");
+            expect(proc.defaultParameters.defaults.pairs).toHaveLength(1);
+            expect(proc.defaultParameters.defaults.pairs[0].identifier.value).toBe("param2");
+            expect(proc.defaultParameters.defaults.pairs[0].defaultValue.kind).toBe("LiteralExpression");
+        });
+
         it("should parse logical expressions with .AND. and .OR.", () => {
             const input = "result := a .AND. b .OR. c;";
             const tokens = tokenize(input);
