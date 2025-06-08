@@ -35,6 +35,31 @@ import {
     createBaseNode,
 } from "./ast";
 
+// Import specialized parsers
+import {
+    parseProcedureStatement as parseSpecializedProcedure,
+    parseIfStatement as parseSpecializedIf,
+    parseWhileStatement as parseSpecializedWhile,
+    parseForStatement as parseSpecializedFor,
+    parseSwitchStatement as parseSpecializedSwitch,
+    parseTryStatement as parseSpecializedTry,
+    parseDeclareStatement,
+    parseParametersStatement,
+    parsePublicStatement,
+    parseIncludeStatement,
+    parseReturnStatement,
+    parseLabelStatement,
+    parseRegionStatement,
+    parseExitWhileStatement,
+    parseExitForStatement,
+    parseLoopContinueStatement,
+    ProcedureParser,
+    ControlFlowParser,
+    CaseParser,
+    TryStatementParser,
+    StatementParser,
+} from "./parsers";
+
 /**
  * Represents a syntax error found during parsing
  */
@@ -58,12 +83,14 @@ export interface ParseResult {
 /**
  * SSL Recursive Descent Parser
  */
-export class Parser {
+export class Parser
+    implements ProcedureParser, ControlFlowParser, CaseParser, TryStatementParser, StatementParser
+{
     private tokens: Token[];
     private current: number = 0;
     private errors: ParseError[] = [];
     private panicMode: boolean = false;
-    private isInsideProcedure: boolean = false;
+    public isInsideProcedure: boolean = false;
 
     constructor(tokens: Token[]) {
         this.tokens = tokens;
@@ -178,7 +205,9 @@ export class Parser {
                 });
             } else if (this.checkNext(TokenType.PROCEDURE)) {
                 // Method declaration
-                const procedure = this.parseProcedureStatement();
+                this.advance(); // consume ':'
+                this.advance(); // consume 'PROCEDURE'
+                const procedure = parseSpecializedProcedure(this);
                 members.push({
                     kind: ASTNodeType.MethodDeclaration,
                     startToken: procedure.startToken,
@@ -202,7 +231,7 @@ export class Parser {
     }
     /**
      * Parse a statement
-     */ private parseStatement(): StatementNode | null {
+     */ public parseStatement(): StatementNode | null {
         try {
             // Skip whitespace tokens (including NEWLINE)
             this.skipWhitespace();
@@ -249,265 +278,41 @@ export class Parser {
         this.consume(TokenType.COLON, "Expected ':'");
 
         if (this.match(TokenType.PROCEDURE)) {
-            return this.parseProcedureStatement();
+            return parseSpecializedProcedure(this);
         } else if (this.match(TokenType.IF)) {
-            return this.parseIfStatement();
+            return parseSpecializedIf(this);
         } else if (this.match(TokenType.WHILE)) {
-            return this.parseWhileStatement();
+            return parseSpecializedWhile(this);
         } else if (this.match(TokenType.FOR)) {
-            return this.parseForStatement();
+            return parseSpecializedFor(this);
         } else if (this.match(TokenType.BEGINCASE)) {
-            return this.parseSwitchStatement();
+            return parseSpecializedSwitch(this);
         } else if (this.match(TokenType.TRY)) {
-            return this.parseTryStatement();
+            return parseSpecializedTry(this);
         } else if (this.match(TokenType.DECLARE)) {
-            return this.parseDeclareStatement();
+            return parseDeclareStatement(this);
         } else if (this.match(TokenType.PARAMETERS)) {
-            return this.parseParametersStatement();
+            return parseParametersStatement(this);
         } else if (this.match(TokenType.PUBLIC)) {
-            return this.parsePublicStatement();
+            return parsePublicStatement(this);
         } else if (this.match(TokenType.INCLUDE)) {
-            return this.parseIncludeStatement();
+            return parseIncludeStatement(this);
         } else if (this.match(TokenType.RETURN)) {
-            return this.parseReturnStatement();
+            return parseReturnStatement(this);
         } else if (this.match(TokenType.LABEL)) {
-            return this.parseLabelStatement();
+            return parseLabelStatement(this);
         } else if (this.match(TokenType.REGION)) {
-            return this.parseRegionStatement();
+            return parseRegionStatement(this);
         } else if (this.match(TokenType.EXITWHILE)) {
-            return this.parseExitWhileStatement();
+            return parseExitWhileStatement(this);
         } else if (this.match(TokenType.EXITFOR)) {
-            return this.parseExitForStatement();
+            return parseExitForStatement(this);
         } else if (this.match(TokenType.LOOP)) {
-            return this.parseLoopContinueStatement();
+            return parseLoopContinueStatement(this);
         }
 
         this.error("Unexpected statement after ':'");
         return this.createErrorNode();
-    }
-
-    /**
-     * Parse procedure statement body (after : and PROCEDURE are consumed)
-     */ private parseProcedureStatementBody(): ProcedureStatementNode {
-        const startToken = this.previous();
-        const name = this.consume(TokenType.IDENTIFIER, "Expected procedure name");
-        let parameters = undefined;
-        let defaultParameters = undefined;
-        const body: StatementNode[] = [];
-
-        // Set flag to track that we're inside a procedure
-        const wasInsideProcedure = this.isInsideProcedure;
-        this.isInsideProcedure = true;
-
-        // Skip whitespace before checking for parameters
-        this.skipWhitespace();
-
-        // Optional parameter declaration
-        if (this.check(TokenType.COLON) && this.checkNext(TokenType.PARAMETERS)) {
-            this.advance(); // consume ':'
-            this.advance(); // consume 'PARAMETERS'
-            const paramList = this.parseIdentifierList();
-            parameters = {
-                kind: ASTNodeType.ParameterDeclaration,
-                startToken: this.previous(),
-                endToken: this.previous(),
-                parameters: paramList,
-            } as ParameterDeclarationNode;
-        }
-
-        // Skip whitespace before checking for default parameters
-        this.skipWhitespace();
-
-        // Optional default parameter declaration
-        if (this.check(TokenType.COLON) && this.checkNext(TokenType.DEFAULT)) {
-            this.advance(); // consume ':'
-            this.advance(); // consume 'DEFAULT'
-            // For now, just consume the default parameters
-            // TODO: Implement proper default parameter parsing
-            this.parseIdentifierList();
-        } // Parse procedure body
-        while (!this.isAtEnd()) {
-            // Skip whitespace tokens before checking for end condition
-            this.skipWhitespace();
-
-            // Check for :ENDPROC
-            if (this.check(TokenType.COLON) && this.checkNext(TokenType.ENDPROC)) {
-                break;
-            }
-
-            const stmt = this.parseStatement();
-            if (stmt) {
-                body.push(stmt);
-            }
-        }
-
-        // Consume :ENDPROC
-        this.consume(TokenType.COLON, "Expected ':' before ENDPROC");
-        this.consume(TokenType.ENDPROC, "Expected 'ENDPROC'");
-        const endToken = this.previous();
-
-        // Restore the previous procedure context
-        this.isInsideProcedure = wasInsideProcedure;
-
-        return {
-            kind: ASTNodeType.ProcedureStatement,
-            startToken,
-            endToken,
-            name,
-            parameters,
-            defaultParameters,
-            body,
-        };
-    }
-    /**
-     * Parse procedure statement (starting from :PROCEDURE)
-     */
-    private parseProcedureStatement(): ProcedureStatementNode {
-        // Check for nested procedures
-        if (this.isInsideProcedure) {
-            this.error("Nested procedures are not allowed in SSL");
-            throw new Error("Nested procedures are not allowed in SSL");
-        }
-
-        // Note: COLON and PROCEDURE tokens are already consumed by parseColonStatement
-        return this.parseProcedureStatementBody();
-    }
-
-    /**
-     * Parse if statement
-     */
-    private parseIfStatement(): IfStatementNode {
-        const startToken = this.previous();
-        const condition = this.parseExpression();
-
-        const thenBranch: StatementNode[] = [];
-        let elseBranch: StatementNode[] | undefined = undefined; // Parse statements until ELSE or ENDIF
-        while (!this.isAtEnd()) {
-            // Skip whitespace tokens before checking for end condition
-            this.skipWhitespace();
-
-            // Check for :ELSE or :ENDIF
-            if (
-                this.check(TokenType.COLON) &&
-                (this.checkNext(TokenType.ELSE) || this.checkNext(TokenType.ENDIF))
-            ) {
-                break;
-            }
-
-            const stmt = this.parseStatement();
-            if (stmt) {
-                thenBranch.push(stmt);
-            }
-        } // Optional ELSE branch
-        if (this.check(TokenType.COLON) && this.checkNext(TokenType.ELSE)) {
-            this.advance(); // consume ':'
-            this.advance(); // consume 'ELSE'
-
-            elseBranch = [];
-            while (!this.isAtEnd()) {
-                // Skip whitespace tokens before checking for end condition
-                this.skipWhitespace();
-
-                // Check for :ENDIF
-                if (this.check(TokenType.COLON) && this.checkNext(TokenType.ENDIF)) {
-                    break;
-                }
-
-                const stmt = this.parseStatement();
-                if (stmt) {
-                    elseBranch.push(stmt);
-                }
-            }
-        }
-
-        // Consume :ENDIF
-        this.consume(TokenType.COLON, "Expected ':' before ENDIF");
-        this.consume(TokenType.ENDIF, "Expected 'ENDIF'");
-        const endToken = this.previous();
-
-        return {
-            kind: ASTNodeType.IfStatement,
-            startToken,
-            endToken,
-            condition,
-            thenBranch,
-            elseBranch,
-        };
-    }
-    /**
-     * Parse while statement
-     */
-    private parseWhileStatement(): WhileLoopNode {
-        const startToken = this.previous();
-        const condition = this.parseExpression();
-
-        const body: StatementNode[] = [];
-        while (
-            !this.isAtEnd() &&
-            !(this.check(TokenType.COLON) && this.checkNext(TokenType.ENDWHILE))
-        ) {
-            this.skipWhitespace();
-            if (this.check(TokenType.COLON) && this.checkNext(TokenType.ENDWHILE)) {
-                break;
-            }
-            const stmt = this.parseStatement();
-            if (stmt) {
-                body.push(stmt);
-            }
-        }
-
-        this.consume(TokenType.COLON, "Expected ':' before ENDWHILE");
-        this.consume(TokenType.ENDWHILE, "Expected 'ENDWHILE'");
-        const endToken = this.previous();
-
-        return {
-            kind: ASTNodeType.WhileLoop,
-            startToken,
-            endToken,
-            condition,
-            body,
-        };
-    }
-
-    /**
-     * Parse for statement
-     */
-    private parseForStatement(): ForLoopNode {
-        const startToken = this.previous();
-        const variable = this.consume(TokenType.IDENTIFIER, "Expected loop variable");
-        this.consume(TokenType.ASSIGN, "Expected ':=' in for loop");
-        const from = this.parseExpression();
-        this.consume(TokenType.COLON, "Expected ':' before TO");
-        this.consume(TokenType.TO, "Expected 'TO' in for loop");
-        const to = this.parseExpression();
-        const body: StatementNode[] = [];
-        while (
-            !this.isAtEnd() &&
-            !(this.check(TokenType.COLON) && this.checkNext(TokenType.NEXT))
-        ) {
-            this.skipWhitespace();
-            if (this.check(TokenType.COLON) && this.checkNext(TokenType.NEXT)) {
-                break;
-            }
-            const stmt = this.parseStatement();
-            if (stmt) {
-                body.push(stmt);
-            }
-        }
-
-        this.consume(TokenType.COLON, "Expected ':' before NEXT");
-        this.consume(TokenType.NEXT, "Expected 'NEXT'");
-        const endToken = this.previous();
-
-        return {
-            kind: ASTNodeType.ForLoop,
-            startToken,
-            endToken,
-            variable,
-            from,
-            to,
-            body,
-        };
     }
 
     /**
@@ -553,11 +358,10 @@ export class Parser {
         this.consume(TokenType.SEMICOLON, "Expected ';' after expression");
         return expr;
     }
-
     /**
      * Parse expressions with proper precedence
      */
-    private parseExpression(): ExpressionNode {
+    public parseExpression(): ExpressionNode {
         return this.parseLogicalExpression();
     }
 
@@ -794,7 +598,7 @@ export class Parser {
     /**
      * Helper method to create error recovery node
      */
-    private createErrorNode(): ExpressionNode {
+    public createErrorNode(): ExpressionNode {
         const token = this.peek();
         return {
             kind: ASTNodeType.LiteralExpression,
@@ -849,11 +653,10 @@ export class Parser {
             arguments: args,
         } as ArgumentListNode;
     }
-
     /**
      * Parse identifier list
      */
-    private parseIdentifierList(): IdentifierListNode {
+    public parseIdentifierList(): IdentifierListNode {
         const startToken = this.peek();
         const identifiers: Token[] = [];
 
@@ -872,80 +675,14 @@ export class Parser {
         };
     }
 
-    // Stub implementations for other statement types
-    private parseSwitchStatement(): StatementNode {
-        // TODO: Implement switch statement parsing
-        return this.createErrorNode();
-    }
-
-    private parseTryStatement(): StatementNode {
-        // TODO: Implement try statement parsing
-        return this.createErrorNode();
-    }
-
-    private parseDeclareStatement(): StatementNode {
-        // TODO: Implement declare statement parsing
-        return this.createErrorNode();
-    }
-    private parseParametersStatement(): ParametersStatementNode {
-        // Parse according to EBNF: ParametersStatement ::= ":" "PARAMETERS" IdentifierList
-        const startToken = this.previous(); // Should be "PARAMETERS" token
-        const identifiers = this.parseIdentifierList();
-
-        return {
-            kind: ASTNodeType.ParametersStatement,
-            startToken,
-            endToken: this.previous(),
-            identifiers,
-        };
-    }
-
-    private parsePublicStatement(): StatementNode {
-        // TODO: Implement public statement parsing
-        return this.createErrorNode();
-    }
-
-    private parseIncludeStatement(): StatementNode {
-        // TODO: Implement include statement parsing
-        return this.createErrorNode();
-    }
-
-    private parseReturnStatement(): StatementNode {
-        // TODO: Implement return statement parsing
-        return this.createErrorNode();
-    }
-
-    private parseLabelStatement(): StatementNode {
-        // TODO: Implement label statement parsing
-        return this.createErrorNode();
-    }
-
-    private parseRegionStatement(): StatementNode {
-        // TODO: Implement region statement parsing
-        return this.createErrorNode();
-    }
-
-    private parseExitWhileStatement(): StatementNode {
-        // TODO: Implement exit while statement parsing
-        return this.createErrorNode();
-    }
-
-    private parseExitForStatement(): StatementNode {
-        // TODO: Implement exit for statement parsing
-        return this.createErrorNode();
-    }
-
-    private parseLoopContinueStatement(): StatementNode {
-        // TODO: Implement loop continue statement parsing
-        return this.createErrorNode();
-    } // Utility methods
-    private skipWhitespace(): void {
+    // Utility methods
+    public skipWhitespace(): void {
         while (!this.isAtEnd() && this.check(TokenType.NEWLINE)) {
             this.advance();
         }
     }
 
-    private match(...types: TokenType[]): boolean {
+    public match(...types: TokenType[]): boolean {
         for (const type of types) {
             if (this.check(type)) {
                 this.advance();
@@ -965,39 +702,39 @@ export class Parser {
             TokenType.POWER_ASSIGN
         );
     }
-    private check(type: TokenType): boolean {
+    public check(type: TokenType): boolean {
         if (this.isAtEnd()) {
             return false;
         }
         return this.peek().type === type;
     }
 
-    private checkNext(type: TokenType): boolean {
+    public checkNext(type: TokenType): boolean {
         if (this.current + 1 >= this.tokens.length) {
             return false;
         }
         return this.tokens[this.current + 1].type === type;
     }
 
-    private advance(): Token {
+    public advance(): Token {
         if (!this.isAtEnd()) {
             this.current++;
         }
         return this.previous();
     }
 
-    private isAtEnd(): boolean {
+    public isAtEnd(): boolean {
         return this.peek().type === TokenType.EOF;
     }
 
-    private peek(): Token {
+    public peek(): Token {
         return this.tokens[this.current];
     }
 
-    private previous(): Token {
+    public previous(): Token {
         return this.tokens[this.current - 1];
     }
-    private consume(type: TokenType, message: string): Token {
+    public consume(type: TokenType, message: string): Token {
         if (this.check(type)) {
             return this.advance();
         }
@@ -1006,7 +743,7 @@ export class Parser {
         throw new Error(message);
     }
 
-    private error(message: string): void {
+    public error(message: string): void {
         const token = this.peek();
         this.errors.push({
             message,
