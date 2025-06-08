@@ -58,6 +58,7 @@ export function parseSwitchStatement(parser: CaseParser): SwitchStatementNode {
             while (parser.match(TokenType.COMMA)) {
                 values.push(parser.parseExpression());
             }
+            parser.consume(TokenType.SEMICOLON, "Expected ';' after CASE values");
 
             // Parse case body
             const body: StatementNode[] = [];
@@ -93,6 +94,7 @@ export function parseSwitchStatement(parser: CaseParser): SwitchStatementNode {
         else if (parser.check(TokenType.COLON) && parser.checkNext(TokenType.OTHERWISE)) {
             parser.advance(); // consume :
             parser.advance(); // consume OTHERWISE
+            parser.consume(TokenType.SEMICOLON, "Expected ';' after OTHERWISE");
 
             const otherwiseStartToken = parser.previous();
             const body: StatementNode[] = [];
@@ -132,6 +134,7 @@ export function parseSwitchStatement(parser: CaseParser): SwitchStatementNode {
     // Consume :ENDCASE
     parser.consume(TokenType.COLON, "Expected ':' before ENDCASE");
     parser.consume(TokenType.ENDCASE, "Expected 'ENDCASE'");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after ENDCASE");
     const endToken = parser.previous();
     return {
         kind: ASTNodeType.SwitchStatement,

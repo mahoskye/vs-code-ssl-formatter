@@ -46,6 +46,7 @@ export interface StatementParser {
 export function parseDeclareStatement(parser: StatementParser): DeclareStatementNode {
     const startToken = parser.previous(); // DECLARE token
     const identifiers = parser.parseIdentifierList();
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after DECLARE statement");
     const endToken = parser.previous();
 
     return {
@@ -63,6 +64,7 @@ export function parseDeclareStatement(parser: StatementParser): DeclareStatement
 export function parseParametersStatement(parser: StatementParser): ParametersStatementNode {
     const startToken = parser.previous(); // PARAMETERS token
     const identifiers = parser.parseIdentifierList();
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after PARAMETERS statement");
     const endToken = parser.previous();
 
     return {
@@ -80,6 +82,7 @@ export function parseParametersStatement(parser: StatementParser): ParametersSta
 export function parsePublicStatement(parser: StatementParser): PublicStatementNode {
     const startToken = parser.previous(); // PUBLIC token
     const identifiers = parser.parseIdentifierList();
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after PUBLIC statement");
     const endToken = parser.previous();
 
     return {
@@ -97,6 +100,7 @@ export function parsePublicStatement(parser: StatementParser): PublicStatementNo
 export function parseIncludeStatement(parser: StatementParser): IncludeStatementNode {
     const startToken = parser.previous(); // INCLUDE token
     const pathToken = parser.consume(TokenType.STRING, "Expected string literal after INCLUDE");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after INCLUDE statement");
     const path: StringLiteralNode = {
         kind: ASTNodeType.StringLiteral,
         startToken: pathToken,
@@ -108,7 +112,7 @@ export function parseIncludeStatement(parser: StatementParser): IncludeStatement
     return {
         kind: ASTNodeType.IncludeStatement,
         startToken,
-        endToken: pathToken,
+        endToken: parser.previous(),
         path,
     } as IncludeStatementNode;
 }
@@ -129,6 +133,9 @@ export function parseReturnStatement(parser: StatementParser): ReturnStatementNo
         endToken = parser.previous();
     }
 
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after RETURN statement");
+    endToken = parser.previous();
+
     return {
         kind: ASTNodeType.ReturnStatement,
         startToken,
@@ -144,11 +151,12 @@ export function parseReturnStatement(parser: StatementParser): ReturnStatementNo
 export function parseLabelStatement(parser: StatementParser): LabelStatementNode {
     const startToken = parser.previous(); // LABEL token
     const name = parser.consume(TokenType.IDENTIFIER, "Expected label name");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after LABEL statement");
 
     return {
         kind: ASTNodeType.LabelStatement,
         startToken,
-        endToken: name,
+        endToken: parser.previous(),
         name,
     } as LabelStatementNode;
 }

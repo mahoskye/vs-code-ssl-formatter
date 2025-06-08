@@ -38,6 +38,7 @@ export interface TryStatementParser {
  */
 export function parseTryStatement(parser: TryStatementParser): TryBlockNode {
     const startToken = parser.previous(); // TRY token
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after TRY");
     const tryBody: StatementNode[] = [];
     let catchBlock: CatchBlockNode | undefined = undefined;
     let finallyBlock: FinallyBlockNode | undefined = undefined;
@@ -67,6 +68,7 @@ export function parseTryStatement(parser: TryStatementParser): TryBlockNode {
     if (parser.check(TokenType.COLON) && parser.checkNext(TokenType.CATCH)) {
         parser.advance(); // consume :
         parser.advance(); // consume CATCH
+        parser.consume(TokenType.SEMICOLON, "Expected ';' after CATCH");
 
         const catchStartToken = parser.previous();
 
@@ -108,6 +110,7 @@ export function parseTryStatement(parser: TryStatementParser): TryBlockNode {
     if (parser.check(TokenType.COLON) && parser.checkNext(TokenType.FINALLY)) {
         parser.advance(); // consume :
         parser.advance(); // consume FINALLY
+        parser.consume(TokenType.SEMICOLON, "Expected ';' after FINALLY");
 
         const finallyStartToken = parser.previous();
         const finallyBody: StatementNode[] = [];
@@ -139,6 +142,7 @@ export function parseTryStatement(parser: TryStatementParser): TryBlockNode {
     // Consume :ENDTRY
     parser.consume(TokenType.COLON, "Expected ':' before ENDTRY");
     parser.consume(TokenType.ENDTRY, "Expected 'ENDTRY'");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after ENDTRY");
     const endToken = parser.previous();
     return {
         kind: ASTNodeType.TryBlock,

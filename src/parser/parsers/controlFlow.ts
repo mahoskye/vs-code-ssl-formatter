@@ -26,9 +26,40 @@ export interface ControlFlowParser {
     consume(type: TokenType, message: string): Token;
     parseStatement(): StatementNode | null;
     parseExpression(): ExpressionNode;
+    parseArithmeticExpression(): ExpressionNode;
     skipWhitespace(): void;
     error(message: string): void;
     isAtEnd(): boolean;
+}
+
+/**
+ * Parse a simple expression for FOR loop bounds (no property access)
+ */
+function parseSimpleExpression(parser: ControlFlowParser): ExpressionNode {
+    // For now, just parse identifiers and literals
+    if (parser.check(TokenType.IDENTIFIER)) {
+        const token = parser.advance();
+        return {
+            kind: ASTNodeType.VariableAccess,
+            startToken: token,
+            endToken: token,
+            name: token,
+        } as any;
+    }
+
+    if (parser.check(TokenType.NUMBER)) {
+        const token = parser.advance();
+        return {
+            kind: ASTNodeType.LiteralExpression,
+            startToken: token,
+            endToken: token,
+            value: token.parsedValue || token.value,
+            token,
+        } as any;
+    }
+
+    // Fallback to arithmetic expression but this might still have issues
+    return parser.parseArithmeticExpression();
 }
 
 /**
@@ -37,6 +68,7 @@ export interface ControlFlowParser {
 export function parseIfStatement(parser: ControlFlowParser): IfStatementNode {
     const startToken = parser.previous();
     const condition = parser.parseExpression();
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after IF condition");
 
     const thenBranch: StatementNode[] = [];
     let elseBranch: StatementNode[] | undefined = undefined;
@@ -64,6 +96,7 @@ export function parseIfStatement(parser: ControlFlowParser): IfStatementNode {
     if (parser.check(TokenType.COLON) && parser.checkNext(TokenType.ELSE)) {
         parser.advance();
         parser.advance();
+        parser.consume(TokenType.SEMICOLON, "Expected ';' after ELSE");
         elseBranch = [];
         while (!parser.isAtEnd()) {
             // Skip whitespace tokens before checking for end condition
@@ -84,6 +117,7 @@ export function parseIfStatement(parser: ControlFlowParser): IfStatementNode {
     // Consume :ENDIF
     parser.consume(TokenType.COLON, "Expected ':' before ENDIF");
     parser.consume(TokenType.ENDIF, "Expected 'ENDIF'");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after ENDIF");
     const endToken = parser.previous();
 
     return {
@@ -102,6 +136,7 @@ export function parseIfStatement(parser: ControlFlowParser): IfStatementNode {
 export function parseWhileStatement(parser: ControlFlowParser): WhileLoopNode {
     const startToken = parser.previous();
     const condition = parser.parseExpression();
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after WHILE condition");
 
     const body: StatementNode[] = [];
     while (
@@ -120,6 +155,7 @@ export function parseWhileStatement(parser: ControlFlowParser): WhileLoopNode {
 
     parser.consume(TokenType.COLON, "Expected ':' before ENDWHILE");
     parser.consume(TokenType.ENDWHILE, "Expected 'ENDWHILE'");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after ENDWHILE");
     const endToken = parser.previous();
 
     return {
@@ -138,10 +174,11 @@ export function parseForStatement(parser: ControlFlowParser): ForLoopNode {
     const startToken = parser.previous();
     const variable = parser.consume(TokenType.IDENTIFIER, "Expected loop variable");
     parser.consume(TokenType.ASSIGN, "Expected ':=' in for loop");
-    const from = parser.parseExpression();
+    const from = parseSimpleExpression(parser); // Use simple expression to avoid property access
     parser.consume(TokenType.COLON, "Expected ':' before TO");
     parser.consume(TokenType.TO, "Expected 'TO' in for loop");
-    const to = parser.parseExpression();
+    const to = parseSimpleExpression(parser); // Use simple expression to avoid property access
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after FOR statement");
 
     const body: StatementNode[] = [];
     while (
@@ -160,6 +197,7 @@ export function parseForStatement(parser: ControlFlowParser): ForLoopNode {
 
     parser.consume(TokenType.COLON, "Expected ':' before NEXT");
     parser.consume(TokenType.NEXT, "Expected 'NEXT'");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after NEXT");
     const endToken = parser.previous();
 
     return {

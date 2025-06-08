@@ -55,6 +55,7 @@ export function parseProcedureStatement(parser: ProcedureParser): ProcedureState
 export function parseProcedureStatementBody(parser: ProcedureParser): ProcedureStatementNode {
     const startToken = parser.previous();
     const name = parser.consume(TokenType.IDENTIFIER, "Expected procedure name");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after procedure name");
     let parameters = undefined;
     let defaultParameters = undefined;
     const body: StatementNode[] = [];
@@ -68,9 +69,10 @@ export function parseProcedureStatementBody(parser: ProcedureParser): ProcedureS
 
     // Optional parameter declaration
     if (parser.check(TokenType.COLON) && parser.checkNext(TokenType.PARAMETERS)) {
-        parser.advance();
-        parser.advance();
+        parser.advance(); // consume ':'
+        parser.advance(); // consume 'PARAMETERS'
         const paramList = parser.parseIdentifierList();
+        parser.consume(TokenType.SEMICOLON, "Expected ';' after PARAMETERS");
         parameters = {
             kind: ASTNodeType.ParameterDeclaration,
             startToken: parser.previous(),
@@ -88,6 +90,7 @@ export function parseProcedureStatementBody(parser: ProcedureParser): ProcedureS
         parser.advance(); // consume 'DEFAULT'
 
         const defaultParamList = parseDefaultParameterList(parser);
+        parser.consume(TokenType.SEMICOLON, "Expected ';' after DEFAULT");
         defaultParameters = {
             kind: ASTNodeType.DefaultParameterDeclaration,
             startToken: defaultStartToken,
@@ -115,6 +118,7 @@ export function parseProcedureStatementBody(parser: ProcedureParser): ProcedureS
     // Consume :ENDPROC
     parser.consume(TokenType.COLON, "Expected ':' before ENDPROC");
     parser.consume(TokenType.ENDPROC, "Expected 'ENDPROC'");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after ENDPROC");
     const endToken = parser.previous();
 
     // Restore the previous procedure context
