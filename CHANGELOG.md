@@ -19,7 +19,7 @@ All notable changes to the "STARLIMS Scripting Language Formatter" extension wil
 -   Comprehensive parser for all SSL language constructs including:
     -   Expressions and statements
     -   Control flow structures (if/else, while, for loops)
-    -   Class definitions and procedures  
+    -   Class definitions and procedures
     -   Try/catch statements and case statements
     -   SQL statements and utilities
 -   Extensive parser test suite with EBNF compliance validation
