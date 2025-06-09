@@ -77,7 +77,12 @@ export function parseProcedureStatementBody(parser: ProcedureParser): ProcedureS
             kind: ASTNodeType.ParameterDeclaration,
             startToken: parser.previous(),
             endToken: parser.previous(),
-            parameters: paramList,
+            parameters: {
+                kind: ASTNodeType.ParameterList,
+                startToken: paramList.startToken,
+                endToken: paramList.endToken,
+                identifiers: paramList.identifiers,
+            } as any,
         } as ParameterDeclarationNode;
     }
 
@@ -95,7 +100,7 @@ export function parseProcedureStatementBody(parser: ProcedureParser): ProcedureS
             kind: ASTNodeType.DefaultParameterDeclaration,
             startToken: defaultStartToken,
             endToken: parser.previous(),
-            defaults: defaultParamList,
+            parameters: defaultParamList,
         } as DefaultParameterDeclarationNode;
     }
 

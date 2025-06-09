@@ -10,6 +10,12 @@ import {
     IfStatementNode,
     WhileLoopNode,
     ForLoopNode,
+    ElseStatementNode,
+    EndIfStatementNode,
+    WhileStatementNode,
+    EndWhileStatementNode,
+    ForStatementNode,
+    NextStatementNode,
     ASTNodeType,
 } from "../ast";
 
@@ -90,11 +96,10 @@ export function parseIfStatement(parser: ControlFlowParser): IfStatementNode {
         if (stmt) {
             thenBranch.push(stmt);
         }
-    }
-
-    // Optional ELSE branch
+    } // Optional ELSE branch
+    let elseNode: ElseStatementNode | undefined = undefined;
     if (parser.check(TokenType.COLON) && parser.checkNext(TokenType.ELSE)) {
-        parser.advance();
+        const elseStartToken = parser.advance();
         parser.advance();
         parser.consume(TokenType.SEMICOLON, "Expected ';' after ELSE");
         elseBranch = [];
@@ -112,6 +117,13 @@ export function parseIfStatement(parser: ControlFlowParser): IfStatementNode {
                 elseBranch.push(stmt);
             }
         }
+
+        elseNode = {
+            kind: ASTNodeType.ElseStatement,
+            startToken: elseStartToken,
+            endToken: parser.previous(),
+            body: elseBranch,
+        } as ElseStatementNode;
     }
 
     // Consume :ENDIF
@@ -126,7 +138,12 @@ export function parseIfStatement(parser: ControlFlowParser): IfStatementNode {
         endToken,
         condition,
         thenBranch,
-        elseBranch,
+        elseBranch: elseNode,
+        endIf: {
+            kind: ASTNodeType.EndIfStatement,
+            startToken: endToken,
+            endToken: endToken,
+        } as EndIfStatementNode,
     };
 }
 
@@ -157,13 +174,22 @@ export function parseWhileStatement(parser: ControlFlowParser): WhileLoopNode {
     parser.consume(TokenType.ENDWHILE, "Expected 'ENDWHILE'");
     parser.consume(TokenType.SEMICOLON, "Expected ';' after ENDWHILE");
     const endToken = parser.previous();
-
     return {
         kind: ASTNodeType.WhileLoop,
         startToken,
         endToken,
-        condition,
+        condition: {
+            kind: ASTNodeType.WhileStatement,
+            startToken,
+            endToken: parser.previous(),
+            condition: condition,
+        } as WhileStatementNode,
         body,
+        end: {
+            kind: ASTNodeType.EndWhileStatement,
+            startToken: endToken,
+            endToken: endToken,
+        } as EndWhileStatementNode,
     };
 }
 
@@ -199,14 +225,23 @@ export function parseForStatement(parser: ControlFlowParser): ForLoopNode {
     parser.consume(TokenType.NEXT, "Expected 'NEXT'");
     parser.consume(TokenType.SEMICOLON, "Expected ';' after NEXT");
     const endToken = parser.previous();
-
     return {
         kind: ASTNodeType.ForLoop,
         startToken,
         endToken,
-        variable,
-        from,
-        to,
+        declaration: {
+            kind: ASTNodeType.ForStatement,
+            startToken,
+            endToken: parser.previous(),
+            variable: variable,
+            startValue: from,
+            endValue: to,
+        } as ForStatementNode,
         body,
+        next: {
+            kind: ASTNodeType.NextStatement,
+            startToken: endToken,
+            endToken: endToken,
+        } as NextStatementNode,
     };
 }
