@@ -15,6 +15,7 @@ import {
     OutputBuilder,
     VisitorResult,
 } from "../../src/formatter/visitor";
+import { mergeFormatterOptions } from "../../src/formatter/options";
 import {
     ASTNode,
     ASTNodeType,
@@ -40,24 +41,59 @@ describe("FormatterVisitorBase", () => {
     beforeEach(() => {
         mockToken = createToken(TokenType.IDENTIFIER, "test", createPosition(1, 1, 0));
     });
-
     describe("FormatterOptions", () => {
         it("should have correct default options", () => {
             expect(defaultFormatterOptions).toEqual({
+                // Basic Formatting
                 indentSize: 4,
                 useTabs: false,
-                maxLineLength: 120,
+                maxLineLength: 90,
                 insertFinalNewline: true,
                 trimTrailingWhitespace: true,
+
+                // Spacing Options
                 insertSpacesAroundOperators: true,
                 insertSpacesAfterCommas: true,
+                insertSpacesAroundAssignmentOperators: true,
+                insertSpacesAroundComparisonOperators: true,
+                insertSpacesAroundLogicalOperators: true,
+                insertSpacesAroundPropertyAccess: false,
+
+                // Line Breaking
                 preserveBlankLines: true,
                 maxPreserveBlankLines: 2,
+                breakLongParameterLists: true,
+                breakLongArrayLiterals: true,
+                breakLongSqlStatements: true,
+                parameterListBreakThreshold: 4,
+
+                // SSL-Specific Options
+                formatEmbeddedSql: true,
+                alignSqlClauses: true,
+                uppercaseKeywords: true,
+                enforceHungarianNotation: false,
+                alignEndOfLineComments: true,
+                commentAlignmentColumn: 60,
+
+                // Control Flow Formatting
+                blankLinesBeforeControlFlow: false,
+                blankLinesAfterControlFlow: false,
+                indentCaseStatements: true,
+                alignProcedureParameters: true,
+
+                // Comment Formatting
+                preserveRegionMarkers: true,
+                formatMultiLineComments: true,
+                wrapLongComments: true,
+
+                // Array and Object Formatting
+                alignArrayElements: true,
+                insertTrailingCommas: false,
+                breakObjectCreationCalls: true,
             });
         });
-
         it("should allow custom options", () => {
-            const customOptions: FormatterOptions = {
+            const customOptions = mergeFormatterOptions({
                 indentSize: 2,
                 useTabs: true,
                 maxLineLength: 80,
@@ -67,7 +103,7 @@ describe("FormatterVisitorBase", () => {
                 insertSpacesAfterCommas: false,
                 preserveBlankLines: false,
                 maxPreserveBlankLines: 1,
-            };
+            });
 
             expect(customOptions.indentSize).toBe(2);
             expect(customOptions.useTabs).toBe(true);

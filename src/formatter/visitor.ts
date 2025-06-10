@@ -117,45 +117,11 @@ import {
     IdentifierListNode,
     ExpressionListNode,
 } from "../parser/ast";
+import { FormatterOptions, defaultFormatterOptions } from "./options";
 
-/**
- * Formatting options interface
- */
-export interface FormatterOptions {
-    /** Number of spaces for indentation (ignored if useTabs is true) */
-    indentSize: number;
-    /** Use tabs instead of spaces for indentation */
-    useTabs: boolean;
-    /** Maximum line length before wrapping */
-    maxLineLength: number;
-    /** Insert final newline at end of file */
-    insertFinalNewline: boolean;
-    /** Trim trailing whitespace */
-    trimTrailingWhitespace: boolean;
-    /** Insert spaces around operators */
-    insertSpacesAroundOperators: boolean;
-    /** Insert spaces after commas */
-    insertSpacesAfterCommas: boolean;
-    /** Preserve blank lines */
-    preserveBlankLines: boolean;
-    /** Maximum number of consecutive blank lines to preserve */
-    maxPreserveBlankLines: number;
-}
-
-/**
- * Default formatting options
- */
-export const defaultFormatterOptions: FormatterOptions = {
-    indentSize: 4,
-    useTabs: false,
-    maxLineLength: 120,
-    insertFinalNewline: true,
-    trimTrailingWhitespace: true,
-    insertSpacesAroundOperators: true,
-    insertSpacesAfterCommas: true,
-    preserveBlankLines: true,
-    maxPreserveBlankLines: 2,
-};
+// Re-export for backward compatibility
+export type { FormatterOptions } from "./options";
+export { defaultFormatterOptions } from "./options";
 
 /**
  * Simple output builder for managing formatted output
