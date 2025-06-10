@@ -385,47 +385,58 @@ describe("OutputBuilder", () => {
             expect(snapshot.currentLine).toBe("");
         });
     });
-
     describe("Complex Formatting Scenarios", () => {
         it("should format SSL procedure declaration", () => {
-            builder.writeKeywordLine(":PROCEDURE TestProc");
+            builder.writeKeyword(":PROCEDURE");
+            builder.ensureSpace();
+            builder.write("TestProc");
+            builder.writeSemicolon();
+            builder.endLine();
             builder.indent();
-            builder.writeKeywordLine(":PARAMETERS sParam1, nParam2");
+            builder.writeKeyword(":PARAMETERS");
+            builder.ensureSpace();
+            builder.write("sParam1, nParam2");
+            builder.writeSemicolon();
+            builder.endLine();
             builder.writeBlankLine();
             builder.writeLineIndented("sResult := sParam1;");
             builder.dedent();
-            builder.writeKeywordLine(":ENDPROC");
+            builder.writeKeyword(":ENDPROC");
+            builder.writeSemicolon();
             const expected = [
-                ":PROCEDURE TESTPROC",
-                "    :PARAMETERS SPARAM1, NPARAM2",
+                ":PROCEDURE TestProc;",
+                "    :PARAMETERS sParam1, nParam2;",
                 "",
                 "    sResult := sParam1;",
-                ":ENDPROC",
+                ":ENDPROC;",
                 "",
             ].join("\n");
 
             expect(builder.getOutput()).toBe(expected);
         });
-
         it("should format SSL conditional statement", () => {
             builder.writeKeyword(":IF");
             builder.ensureSpace();
             builder.write("nValue > 0");
+            builder.writeSemicolon();
             builder.endLine();
             builder.indent();
             builder.writeLineIndented("DoSomething();");
             builder.dedent();
-            builder.writeKeywordLine(":ELSE");
+            builder.writeKeyword(":ELSE");
+            builder.writeSemicolon();
+            builder.endLine();
             builder.indent();
             builder.writeLineIndented("DoSomethingElse();");
             builder.dedent();
-            builder.writeKeywordLine(":ENDIF");
+            builder.writeKeyword(":ENDIF");
+            builder.writeSemicolon();
             const expected = [
-                ":IF nValue > 0",
+                ":IF nValue > 0;",
                 "    DoSomething();",
-                ":ELSE",
+                ":ELSE;",
                 "    DoSomethingElse();",
-                ":ENDIF",
+                ":ENDIF;",
                 "",
             ].join("\n");
 
@@ -433,7 +444,7 @@ describe("OutputBuilder", () => {
         });
         it("should format SSL array literal with proper spacing", () => {
             builder.write("aValues");
-            builder.writeOperator(":=");
+            builder.writeOperator(":=", true, true);
             builder.writeOpenBrace();
             builder.write("1");
             builder.writeComma();
@@ -447,28 +458,31 @@ describe("OutputBuilder", () => {
         });
 
         it("should handle skipped parameters in SSL style", () => {
-            builder.write("DoProc(");
-            builder.write("param1");
+            // Per SSL grammar: DoProc("function", {param1, , param3})
+            // The preferred formatting for skipped parameters is no space after first comma
+            builder.write('DoProc("TestFunction", ');
+            builder.writeOpenBrace();
+            builder.write("sParam1");
             builder.write(",");
             builder.write(","); // Skipped parameter - no space after first comma per SSL style
-            builder.write("param3");
+            builder.write("sParam3");
+            builder.writeCloseBrace();
             builder.write(")");
             builder.writeSemicolon();
 
-            expect(builder.getOutput()).toBe("DoProc(param1,,param3);\n");
+            expect(builder.getOutput()).toBe('DoProc("TestFunction", {sParam1,,sParam3});\n');
         });
     });
-
     describe("Edge Cases", () => {
         it("should handle multiple consecutive operations", () => {
-            builder.writeKeyword("if");
+            builder.writeKeyword(":IF");
             builder.writeSpaceIf(true);
             builder.writeOpenParen();
-            builder.write("condition");
+            builder.write("bCondition");
             builder.writeCloseParen();
             builder.endLine();
 
-            expect(builder.getOutput()).toBe("IF (condition)\n");
+            expect(builder.getOutput()).toBe(":IF (bCondition)\n");
         });
 
         it("should handle empty lines and whitespace correctly", () => {
@@ -486,6 +500,200 @@ describe("OutputBuilder", () => {
             builder.write(longText);
             expect(builder.isCurrentLineTooLong()).toBe(true);
             expect(builder.wouldExceedMaxLength("more")).toBe(true);
+        });
+    });
+
+    describe("SSL EBNF Grammar Compliance Tests", () => {
+        it("should format SSL boolean literals correctly", () => {
+            builder.write("bIsValid");
+            builder.writeOperator(":=", true, true);
+            builder.write(".T.");
+            builder.writeSemicolon();
+            builder.endLine();
+            builder.write("bIsFalse");
+            builder.writeOperator(":=", true, true);
+            builder.write(".F.");
+            builder.writeSemicolon();
+
+            expect(builder.getOutput()).toBe("bIsValid := .T.;\nbIsFalse := .F.;\n");
+        });
+        it("should format SSL property access with colon notation", () => {
+            builder.write("oObject");
+            builder.writeOperator(":", false, false);
+            builder.write("sProperty");
+            builder.writeOperator(":=", true, true);
+            builder.write('"value"');
+            builder.writeSemicolon();
+
+            expect(builder.getOutput()).toBe('oObject:sProperty := "value";\n');
+        });
+
+        it("should format SSL SQL statements correctly", () => {
+            builder.write('SqlExecute("SELECT * FROM table WHERE id = ?nId?")');
+            builder.writeSemicolon();
+
+            expect(builder.getOutput()).toBe(
+                'SqlExecute("SELECT * FROM table WHERE id = ?nId?");\n'
+            );
+        });
+
+        it("should format SSL assignment operators correctly", () => {
+            builder.write("nCounter += 1;");
+            builder.endLine();
+            builder.write("sText *= 'suffix';");
+            builder.endLine();
+            builder.write("nValue /= 2;");
+            builder.endLine();
+            builder.write("nPower ^= 2;");
+
+            const expected = [
+                "nCounter += 1;",
+                "sText *= 'suffix';",
+                "nValue /= 2;",
+                "nPower ^= 2;",
+                "",
+            ].join("\n");
+
+            expect(builder.getOutput()).toBe(expected);
+        });
+        it("should format SSL array access correctly", () => {
+            // Test both comma notation and chained bracket notation
+            builder.write("aMatrix[1, 2]");
+            builder.writeOperator(":=", true, true);
+            builder.write("aArray[1][2];");
+            builder.endLine();
+            builder.write("nValue");
+            builder.writeOperator(":=", true, true);
+            builder.write("aItems[nIndex];");
+
+            const expected = [
+                "aMatrix[1, 2] := aArray[1][2];",
+                "nValue := aItems[nIndex];",
+                "",
+            ].join("\n");
+
+            expect(builder.getOutput()).toBe(expected);
+        });
+        it("should format SSL comments correctly", () => {
+            builder.write("/* This is an SSL comment");
+            builder.writeSemicolon();
+            builder.endLine();
+            builder.write("/* region Main Logic");
+            builder.writeSemicolon();
+            builder.endLine();
+            builder.write("DoSomething();");
+            builder.endLine();
+            builder.write("/* endregion");
+            builder.writeSemicolon();
+
+            const expected = [
+                "/* This is an SSL comment;",
+                "/* region Main Logic;",
+                "DoSomething();",
+                "/* endregion;",
+                "",
+            ].join("\n");
+
+            expect(builder.getOutput()).toBe(expected);
+        });
+
+        it("should format SSL ExecFunction and DoProc calls", () => {
+            builder.write('ExecFunction("MyFunction", {sParam1, nParam2})');
+            builder.writeSemicolon();
+            builder.endLine();
+            builder.write('DoProc("MyProc", {bFlag, , sValue})'); // Note skipped middle parameter
+            builder.writeSemicolon();
+
+            const expected = [
+                'ExecFunction("MyFunction", {sParam1, nParam2});',
+                'DoProc("MyProc", {bFlag, , sValue});',
+                "",
+            ].join("\n");
+
+            expect(builder.getOutput()).toBe(expected);
+        });
+        it("should format SSL date literals correctly", () => {
+            builder.write("dToday");
+            builder.writeOperator(":=", true, true);
+            builder.write("{2025, 6, 9}");
+            builder.writeSemicolon();
+            builder.endLine();
+            builder.write("dtNow");
+            builder.writeOperator(":=", true, true);
+            builder.write("{2025, 6, 9, 14, 30, 0}");
+            builder.writeSemicolon();
+
+            const expected = [
+                "dToday := {2025, 6, 9};",
+                "dtNow := {2025, 6, 9, 14, 30, 0};",
+                "",
+            ].join("\n");
+
+            expect(builder.getOutput()).toBe(expected);
+        });
+        it("should format SSL object creation correctly", () => {
+            builder.write("oObject");
+            builder.writeOperator(":=", true, true);
+            builder.write('CreateUDObject("MyClass")');
+            builder.writeSemicolon();
+            builder.endLine();
+            builder.write("oExpando");
+            builder.writeOperator(":=", true, true);
+            builder.write("CreateUDObject()");
+            builder.writeSemicolon();
+
+            const expected = [
+                'oObject := CreateUDObject("MyClass");',
+                "oExpando := CreateUDObject();",
+                "",
+            ].join("\n");
+
+            expect(builder.getOutput()).toBe(expected);
+        });
+        it("should format SSL logical operators correctly", () => {
+            builder.writeKeyword(":IF");
+            builder.ensureSpace();
+            builder.write("bCondition1 .AND. bCondition2 .OR. .NOT. bCondition3");
+            builder.writeSemicolon();
+            builder.endLine();
+            builder.indent();
+            builder.writeLineIndented("DoAction();");
+            builder.dedent();
+            builder.writeKeyword(":ENDIF");
+            builder.writeSemicolon();
+            const expected = [
+                ":IF bCondition1 .AND. bCondition2 .OR. .NOT. bCondition3;",
+                "    DoAction();",
+                ":ENDIF;",
+                "",
+            ].join("\n");
+
+            expect(builder.getOutput()).toBe(expected);
+        });
+        it("should format SSL bitwise functions correctly", () => {
+            builder.write("nResult");
+            builder.writeOperator(":=", true, true);
+            builder.write("_AND(nValue1, nValue2)");
+            builder.writeSemicolon();
+            builder.endLine();
+            builder.write("nOr");
+            builder.writeOperator(":=", true, true);
+            builder.write("_OR(nBits1, nBits2)");
+            builder.writeSemicolon();
+            builder.endLine();
+            builder.write("nNot");
+            builder.writeOperator(":=", true, true);
+            builder.write("_NOT(nInput)");
+            builder.writeSemicolon();
+
+            const expected = [
+                "nResult := _AND(nValue1, nValue2);",
+                "nOr := _OR(nBits1, nBits2);",
+                "nNot := _NOT(nInput);",
+                "",
+            ].join("\n");
+
+            expect(builder.getOutput()).toBe(expected);
         });
     });
 });
