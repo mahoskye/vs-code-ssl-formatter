@@ -7,4 +7,294 @@
  * - Format exit statements (:EXITWHILE, :EXITFOR)
  */
 
-// TODO: Implement control flow formatters
+import {
+    FormatterVisitorBase,
+    VisitorResult,
+    FormatterOptions,
+    defaultFormatterOptions,
+} from "./visitor";
+import {
+    ConditionalStatementNode,
+    IfStatementNode,
+    ElseStatementNode,
+    EndIfStatementNode,
+    LoopStatementNode,
+    WhileLoopNode,
+    WhileStatementNode,
+    EndWhileStatementNode,
+    ForLoopNode,
+    ForStatementNode,
+    NextStatementNode,
+    ExitWhileStatementNode,
+    ExitForStatementNode,
+    LoopContinueNode,
+} from "../parser/ast/controlFlow";
+import { ExpressionNode, StatementNode } from "../parser/ast/base";
+import { Token } from "../tokenizer/token";
+
+/**
+ * SSL Control Flow Formatter Visitor
+ *
+ * Formats SSL control flow constructs including:
+ * - IF/ELSE/ENDIF blocks with proper indentation
+ * - WHILE/ENDWHILE loops with proper nesting
+ * - FOR/NEXT loops with proper variable and range formatting
+ * - Exit statements (EXITWHILE, EXITFOR, LOOP)
+ */
+export class SSLControlFlowFormatterVisitor extends FormatterVisitorBase {
+    constructor(options: FormatterOptions = defaultFormatterOptions) {
+        super(options);
+    }
+
+    /**
+     * Format conditional statement wrapper
+     * This acts as a dispatcher for different conditional types
+     */
+    protected override visitConditionalStatement(node: ConditionalStatementNode): VisitorResult {
+        // Conditional statements are wrappers - continue to visit children
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format IF statement block
+     * Follows EBNF: IfStatement ::= ":" "IF" Expression
+     */
+    protected override visitIfStatement(node: IfStatementNode): VisitorResult {
+        // Format :IF condition;
+        this.output.writeIndented(":IF ");
+        this.formatExpression(node.condition);
+        this.output.write(";");
+        this.output.writeLine();
+
+        // Indent for body
+        this.output.indent();
+
+        // Format then branch (body statements)
+        this.formatStatementList(node.thenBranch);
+
+        // Format else branch if present
+        if (node.elseBranch) {
+            this.output.dedent();
+            this.visit(node.elseBranch);
+            this.output.indent();
+        }
+
+        // Format endif
+        this.output.dedent();
+        this.visit(node.endIf);
+
+        return { shouldContinue: false }; // We've handled all children manually
+    }
+
+    /**
+     * Format ELSE statement
+     * Follows EBNF: ElseStatement ::= ":" "ELSE"
+     */
+    protected override visitElseStatement(node: ElseStatementNode): VisitorResult {
+        this.output.writeIndented(":ELSE;");
+        this.output.writeLine();
+
+        // Indent for else body
+        this.output.indent();
+        this.formatStatementList(node.body);
+        this.output.dedent();
+
+        return { shouldContinue: false }; // We've handled children manually
+    }
+
+    /**
+     * Format ENDIF statement
+     * Follows EBNF: EndIfStatement ::= ":" "ENDIF"
+     */
+    protected override visitEndIfStatement(node: EndIfStatementNode): VisitorResult {
+        this.output.writeIndented(":ENDIF;");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format loop statement wrapper
+     * This acts as a dispatcher for different loop types
+     */
+    protected override visitLoopStatement(node: LoopStatementNode): VisitorResult {
+        // Loop statements are wrappers - continue to visit children
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format WHILE loop block
+     * Follows EBNF: WhileLoop ::= WhileStatement {Statement} EndWhileStatement
+     */
+    protected override visitWhileLoop(node: WhileLoopNode): VisitorResult {
+        // Format the WHILE condition
+        this.visit(node.condition);
+
+        // Indent for body
+        this.output.indent();
+
+        // Format body statements
+        this.formatStatementList(node.body);
+
+        // Dedent and format end
+        this.output.dedent();
+        this.visit(node.end);
+
+        return { shouldContinue: false }; // We've handled all children manually
+    }
+
+    /**
+     * Format WHILE statement (condition part)
+     * Follows EBNF: WhileStatement ::= ":" "WHILE" Expression
+     */
+    protected override visitWhileStatement(node: WhileStatementNode): VisitorResult {
+        this.output.writeIndented(":WHILE ");
+        this.formatExpression(node.condition);
+        this.output.write(";");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format ENDWHILE statement
+     * Follows EBNF: EndWhileStatement ::= ":" "ENDWHILE"
+     */
+    protected override visitEndWhileStatement(node: EndWhileStatementNode): VisitorResult {
+        this.output.writeIndented(":ENDWHILE;");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format FOR loop block
+     * Follows EBNF: ForLoop ::= ForStatement {Statement} NextStatement
+     */
+    protected override visitForLoop(node: ForLoopNode): VisitorResult {
+        // Format the FOR declaration
+        this.visit(node.declaration);
+
+        // Indent for body
+        this.output.indent();
+
+        // Format body statements
+        this.formatStatementList(node.body);
+
+        // Dedent and format NEXT
+        this.output.dedent();
+        this.visit(node.next);
+
+        return { shouldContinue: false }; // We've handled all children manually
+    }
+
+    /**
+     * Format FOR statement (declaration part)
+     * Follows EBNF: ForStatement ::= ":" "FOR" Identifier ":=" Expression ":" "TO" Expression
+     */
+    protected override visitForStatement(node: ForStatementNode): VisitorResult {
+        this.output.writeIndented(":FOR ");
+
+        // Format variable name
+        this.output.write(node.variable.value);
+
+        // Add spacing around assignment operator if configured
+        if (this.options.insertSpacesAroundAssignmentOperators) {
+            this.output.write(" := ");
+        } else {
+            this.output.write(":=");
+        }
+
+        // Format start value
+        this.formatExpression(node.startValue);
+
+        this.output.write(" :TO ");
+
+        // Format end value
+        this.formatExpression(node.endValue);
+
+        this.output.write(";");
+        this.output.writeLine();
+
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format NEXT statement
+     * Follows EBNF: NextStatement ::= ":" "NEXT"
+     */
+    protected override visitNextStatement(node: NextStatementNode): VisitorResult {
+        this.output.writeIndented(":NEXT;");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format EXITWHILE statement
+     * Follows EBNF: ExitWhileStatement ::= ":" "EXITWHILE"
+     */
+    protected override visitExitWhileStatement(node: ExitWhileStatementNode): VisitorResult {
+        this.output.writeIndented(":EXITWHILE;");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format EXITFOR statement
+     * Follows EBNF: ExitForStatement ::= ":" "EXITFOR"
+     */
+    protected override visitExitForStatement(node: ExitForStatementNode): VisitorResult {
+        this.output.writeIndented(":EXITFOR;");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format LOOP continue statement
+     * Follows EBNF: LoopContinue ::= ":" "LOOP"
+     */
+    protected override visitLoopContinue(node: LoopContinueNode): VisitorResult {
+        this.output.writeIndented(":LOOP;");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Helper method to format expressions
+     * This delegates to the expression formatter or handles simple cases
+     */
+    private formatExpression(expression: ExpressionNode): void {
+        // For now, we'll use a simple approach - in a full implementation,
+        // this would delegate to an expression formatter
+        this.visit(expression);
+    }
+
+    /**
+     * Helper method to format a list of statements
+     * Handles proper spacing and indentation between statements
+     */
+    private formatStatementList(statements: StatementNode[]): void {
+        if (!statements || statements.length === 0) {
+            return;
+        }
+
+        for (let i = 0; i < statements.length; i++) {
+            this.visit(statements[i]);
+
+            // Add blank line between logical sections if configured
+            if (this.options.preserveBlankLines && i < statements.length - 1) {
+                // Simple heuristic: add blank line before control flow statements
+                const nextStatement = statements[i + 1];
+                if (this.isControlFlowStatement(nextStatement)) {
+                    this.output.writeBlankLine();
+                }
+            }
+        }
+    }
+
+    /**
+     * Helper method to determine if a statement is a control flow statement
+     */
+    private isControlFlowStatement(statement: StatementNode): boolean {
+        return ["IfStatement", "WhileLoop", "ForLoop", "SwitchStatement", "TryBlock"].includes(
+            statement.kind
+        );
+    }
+}
