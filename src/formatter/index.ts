@@ -18,6 +18,7 @@ import { SSLErrorHandlingFormatterVisitor } from "./errorHandling";
 import { SSLCommentFormatterVisitor } from "./comments";
 import { SSLExpressionFormatterVisitor } from "./expressions";
 import { SSLDeclarationFormatterVisitor } from "./declarationVisitor";
+import { SSLSqlFormatterVisitor } from "./sql";
 
 /**
  * Main SSL Formatter class that orchestrates all formatting functionality
@@ -34,6 +35,7 @@ export class SSLFormatter {
     private readonly commentVisitor: SSLCommentFormatterVisitor;
     private readonly expressionVisitor: SSLExpressionFormatterVisitor;
     private readonly declarationVisitor: SSLDeclarationFormatterVisitor;
+    private readonly sqlVisitor: SSLSqlFormatterVisitor;
 
     constructor(options: FormatterOptions = defaultFormatterOptions) {
         this.options = options;
@@ -45,6 +47,7 @@ export class SSLFormatter {
         this.commentVisitor = new SSLCommentFormatterVisitor(options);
         this.expressionVisitor = new SSLExpressionFormatterVisitor(options);
         this.declarationVisitor = new SSLDeclarationFormatterVisitor(options);
+        this.sqlVisitor = new SSLSqlFormatterVisitor(options);
     }
     /**
      * Format an SSL AST and return the formatted code string
@@ -64,7 +67,6 @@ export class SSLFormatter {
 
         return freshOutput.getOutput();
     }
-
     /**
      * Visit an AST node and route to the appropriate specialized visitor
      *
@@ -97,11 +99,18 @@ export class SSLFormatter {
             return;
         }
 
+        if (this.isSqlNode(node)) {
+            this.sqlVisitor.visit(node);
+            return;
+        }
+
         // Handle special cases that need main formatter logic
         if (node.kind === "Program") {
             this.visitProgram(node as ProgramNode);
             return;
-        } // For unhandled node types, fall back to a default approach
+        }
+
+        // For unhandled node types, fall back to a default approach
         this.visitDefault(node);
     }
 
@@ -240,6 +249,15 @@ export class SSLFormatter {
         return declarationTypes.includes(node.kind);
     }
     /**
+     * Helper method to determine if a node is a SQL node
+     */
+    private isSqlNode(node: ASTNode): boolean {
+        const sqlTypes = ["SqlStatement", "SqlExecute", "LSearch", "SqlParameter"];
+
+        return sqlTypes.includes(node.kind);
+    }
+
+    /**
      * Format Program node (root of AST)
      */
     private visitProgram(node: ProgramNode): void {
@@ -318,4 +336,5 @@ export function formatSSL(ast: ASTNode, options?: FormatterOptions): string {
 
 // Re-export for convenience
 export { FormatterOptions, defaultFormatterOptions } from "./options";
+export { SSLSqlFormatterVisitor } from "./sql";
 export { SSLFormatter as default };
