@@ -537,6 +537,29 @@ export class FormatterVisitorBase {
             case ASTNodeType.ExpressionList:
                 return this.visitExpressionList(node as ExpressionListNode);
 
+            // Special SSL constructs (from EBNF grammar)
+            case ASTNodeType.BranchStatement:
+                return this.visitBranchStatement(node as BranchStatementNode);
+            case ASTNodeType.DynamicCodeExecution:
+                return this.visitDynamicCodeExecution(node as DynamicCodeExecutionNode);
+            case ASTNodeType.RegionBlock:
+                return this.visitRegionBlock(node as RegionBlockNode);
+            case ASTNodeType.RegionStart:
+                return this.visitRegionStart(node as RegionStartNode);
+            case ASTNodeType.RegionEnd:
+                return this.visitRegionEnd(node as RegionEndNode);
+            case ASTNodeType.InlineCodeBlock:
+                return this.visitInlineCodeBlock(node as InlineCodeBlockNode);
+            case ASTNodeType.InlineCodeStart:
+                return this.visitInlineCodeStart(node as InlineCodeStartNode);
+            case ASTNodeType.InlineCodeEnd:
+                return this.visitInlineCodeEnd(node as InlineCodeEndNode);
+            case ASTNodeType.BitwiseOperation:
+                return this.visitBitwiseOperation(node as BitwiseOperationNode);
+            case ASTNodeType.ObjectCreation:
+                return this.visitObjectCreation(node as ObjectCreationNode);
+
+            // Unknown node type
             default:
                 return this.visitUnknown(node);
         }
@@ -923,9 +946,7 @@ export class FormatterVisitorBase {
     }
     protected visitExpressionList(node: ExpressionListNode): VisitorResult {
         return { shouldContinue: true };
-    }
-
-    // Unknown node type
+    } // Unknown node type
     protected visitUnknown(node: ASTNode): VisitorResult {
         return {
             shouldContinue: false,
