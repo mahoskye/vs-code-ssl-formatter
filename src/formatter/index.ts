@@ -11,6 +11,19 @@
 import { ASTNode, ProgramNode } from "../parser/ast";
 import { FormatterOptions, defaultFormatterOptions } from "./options";
 import { OutputBuilder } from "./visitor";
+import {
+    CommentAssociator,
+    CommentAssociation,
+    CommentPosition,
+    defaultCommentAssociationOptions,
+} from "./commentAssociation";
+import {
+    CommentStatementNode,
+    BlockCommentNode,
+    SingleLineCommentNode,
+    RegionCommentNode,
+    EndRegionCommentNode,
+} from "../parser/ast/comments";
 
 // Import all the individual formatter visitors
 import { SSLControlFlowFormatterVisitor } from "./controlFlow";
@@ -30,6 +43,7 @@ import { SSLSqlFormatterVisitor } from "./sql";
 export class SSLFormatter {
     private readonly output: OutputBuilder;
     private readonly options: FormatterOptions;
+    private readonly commentAssociator: CommentAssociator;
     private readonly controlFlowVisitor: SSLControlFlowFormatterVisitor;
     private readonly errorHandlingVisitor: SSLErrorHandlingFormatterVisitor;
     private readonly commentVisitor: SSLCommentFormatterVisitor;
@@ -40,6 +54,7 @@ export class SSLFormatter {
     constructor(options: FormatterOptions = defaultFormatterOptions) {
         this.options = options;
         this.output = new OutputBuilder(options);
+        this.commentAssociator = new CommentAssociator(defaultCommentAssociationOptions);
 
         // Initialize all specialized visitors with the same options
         this.controlFlowVisitor = new SSLControlFlowFormatterVisitor(options);
@@ -62,11 +77,146 @@ export class SSLFormatter {
         // Temporarily replace the output builder for the visitors
         this.replaceOutputBuilder(freshOutput);
 
-        // Visit the AST starting from the root
-        this.visit(ast);
+        // Extract comments and non-comment nodes for association
+        const { commentNodes, nonCommentNodes } = this.extractNodes(ast);
+
+        // Associate comments with AST nodes
+        const commentAssociations = this.commentAssociator.associateComments(
+            commentNodes,
+            nonCommentNodes
+        );
+
+        // Visit the AST starting from the root with comment awareness
+        this.visitWithComments(ast, commentAssociations);
 
         return freshOutput.getOutput();
     }
+
+    /**
+     * Extract comment nodes and non-comment nodes from the AST
+     */
+    private extractNodes(ast: ASTNode): {
+        commentNodes: (
+            | CommentStatementNode
+            | BlockCommentNode
+            | SingleLineCommentNode
+            | RegionCommentNode
+            | EndRegionCommentNode
+        )[];
+        nonCommentNodes: ASTNode[];
+    } {
+        const commentNodes: (
+            | CommentStatementNode
+            | BlockCommentNode
+            | SingleLineCommentNode
+            | RegionCommentNode
+            | EndRegionCommentNode
+        )[] = [];
+        const nonCommentNodes: ASTNode[] = [];
+
+        // Traverse the AST to collect all nodes
+        this.collectNodes(ast, commentNodes, nonCommentNodes);
+
+        return { commentNodes, nonCommentNodes };
+    }
+
+    /**
+     * Recursively collect comment and non-comment nodes from the AST
+     */
+    private collectNodes(
+        node: ASTNode,
+        commentNodes: (
+            | CommentStatementNode
+            | BlockCommentNode
+            | SingleLineCommentNode
+            | RegionCommentNode
+            | EndRegionCommentNode
+        )[],
+        nonCommentNodes: ASTNode[]
+    ): void {
+        if (this.isCommentNode(node)) {
+            commentNodes.push(node as any);
+        } else {
+            nonCommentNodes.push(node);
+        }
+
+        // Recursively traverse child nodes
+        // Note: This is a simplified traversal - in a real implementation,
+        // you would traverse based on the specific structure of each node type
+        if ((node as any).body && Array.isArray((node as any).body)) {
+            for (const child of (node as any).body) {
+                this.collectNodes(child, commentNodes, nonCommentNodes);
+            }
+        }
+
+        // Handle other common child node patterns
+        if ((node as any).members && Array.isArray((node as any).members)) {
+            for (const child of (node as any).members) {
+                this.collectNodes(child, commentNodes, nonCommentNodes);
+            }
+        }
+    }
+
+    /**
+     * Visit an AST node with comment awareness
+     */
+    private visitWithComments(node: ASTNode, commentAssociations: CommentAssociation[]): void {
+        // Process leading comments for this node
+        this.processLeadingComments(node, commentAssociations);
+
+        // Visit the node itself
+        this.visit(node);
+
+        // Process trailing comments for this node
+        this.processTrailingComments(node, commentAssociations);
+    }
+
+    /**
+     * Process leading comments for a node
+     */
+    private processLeadingComments(node: ASTNode, commentAssociations: CommentAssociation[]): void {
+        const leadingComments = commentAssociations
+            .filter(
+                (assoc) =>
+                    assoc.associatedNode === node &&
+                    assoc.position === CommentPosition.Leading &&
+                    assoc.preserve
+            )
+            .sort((a, b) => a.lineNumber - b.lineNumber);
+
+        for (const association of leadingComments) {
+            this.commentVisitor.visit(association.comment);
+            this.output.writeLine(); // Add line break after leading comment
+        }
+    }
+
+    /**
+     * Process trailing comments for a node
+     */
+    private processTrailingComments(
+        node: ASTNode,
+        commentAssociations: CommentAssociation[]
+    ): void {
+        const trailingComments = commentAssociations
+            .filter(
+                (assoc) =>
+                    assoc.associatedNode === node &&
+                    (assoc.position === CommentPosition.Trailing ||
+                        assoc.position === CommentPosition.Following) &&
+                    assoc.preserve
+            )
+            .sort((a, b) => a.lineNumber - b.lineNumber);
+
+        for (const association of trailingComments) {
+            if (association.position === CommentPosition.Trailing) {
+                this.output.write(" "); // Add space before trailing comment on same line
+            } else {
+                this.output.writeLine(); // New line for following comments
+            }
+            this.commentVisitor.visit(association.comment);
+        }
+    }
+
     /**
      * Visit an AST node and route to the appropriate specialized visitor
      *
@@ -256,17 +406,33 @@ export class SSLFormatter {
 
         return sqlTypes.includes(node.kind);
     }
-
     /**
-     * Format Program node (root of AST)
+     * Format Program node (root of AST) with comment awareness
      */
     private visitProgram(node: ProgramNode): void {
+        // Extract comments and non-comment nodes
+        const { commentNodes, nonCommentNodes } = this.extractNodes(node);
+
+        // Associate comments with AST nodes
+        const commentAssociations = this.commentAssociator.associateComments(
+            commentNodes,
+            nonCommentNodes
+        );
+
+        // Process standalone comments first (those not associated with any node)
+        this.processStandaloneComments(commentAssociations);
+
         if (node.body && node.body.length > 0) {
             for (let i = 0; i < node.body.length; i++) {
                 const statement = node.body[i];
 
-                // Visit each statement
-                this.visit(statement);
+                // Skip comment nodes - they're handled through associations
+                if (this.isCommentNode(statement)) {
+                    continue;
+                }
+
+                // Visit each statement with comment awareness
+                this.visitWithComments(statement, commentAssociations);
 
                 // Add appropriate spacing between statements
                 if (i < node.body.length - 1) {
@@ -281,6 +447,25 @@ export class SSLFormatter {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Process standalone comments (not associated with any specific node)
+     */
+    private processStandaloneComments(commentAssociations: CommentAssociation[]): void {
+        const standaloneComments = commentAssociations
+            .filter((assoc) => assoc.position === CommentPosition.Standalone && assoc.preserve)
+            .sort((a, b) => a.lineNumber - b.lineNumber);
+
+        for (const association of standaloneComments) {
+            this.commentVisitor.visit(association.comment);
+            this.output.writeLine();
+        }
+
+        // Add blank line after standalone comments if there are any
+        if (standaloneComments.length > 0) {
+            this.output.writeBlankLine();
         }
     }
 
@@ -337,4 +522,11 @@ export function formatSSL(ast: ASTNode, options?: FormatterOptions): string {
 // Re-export for convenience
 export { FormatterOptions, defaultFormatterOptions } from "./options";
 export { SSLSqlFormatterVisitor } from "./sql";
+export {
+    CommentAssociator,
+    CommentAssociation,
+    CommentPosition,
+    CommentAssociationOptions,
+    defaultCommentAssociationOptions,
+} from "./commentAssociation";
 export { SSLFormatter as default };
