@@ -167,6 +167,7 @@ export function mergeFormatterOptions(
 export function validateFormatterOptions(options: FormatterOptions): string[] {
     const warnings: string[] = [];
 
+    // === Basic validation ===
     if (options.indentSize < 1 || options.indentSize > 8) {
         warnings.push("indentSize should be between 1 and 8");
     }
@@ -187,14 +188,169 @@ export function validateFormatterOptions(options: FormatterOptions): string[] {
         warnings.push("commentAlignmentColumn should be between 20 and 120");
     }
 
-    // SSL-specific validations
+    // === SSL-specific validations ===
     if (options.insertSpacesAroundPropertyAccess) {
         warnings.push(
-            "insertSpacesAroundPropertyAccess=true is not recommended for SSL (object:property syntax)"
+            "insertSpacesAroundPropertyAccess=true is not recommended for SSL (object:property syntax should not have spaces)"
+        );
+    }
+
+    if (!options.uppercaseKeywords) {
+        warnings.push(
+            "uppercaseKeywords=false deviates from SSL convention. Consider using true for better readability."
+        );
+    }
+
+    if (options.indentSize === 2 && !options.useTabs) {
+        warnings.push(
+            "SSL code traditionally uses 4-space indentation. Consider using indentSize=4 for better team consistency."
+        );
+    }
+
+    if (options.maxLineLength > 120) {
+        warnings.push(
+            "SSL procedures often have deep nesting. Consider maxLineLength≤120 to prevent excessive line wrapping."
+        );
+    }
+
+    if (!options.alignEndOfLineComments && options.commentAlignmentColumn > 0) {
+        warnings.push(
+            "commentAlignmentColumn is set but alignEndOfLineComments=false. Enable comment alignment or set column to 0."
+        );
+    }
+
+    if (!options.preserveRegionMarkers) {
+        warnings.push(
+            "preserveRegionMarkers=false may remove important code organization. SSL procedures benefit from region markers."
+        );
+    }
+
+    if (options.insertTrailingCommas) {
+        warnings.push(
+            "insertTrailingCommas=true is not supported in SSL syntax. Trailing commas will cause parse errors."
+        );
+    }
+
+    if (!options.formatEmbeddedSql && options.alignSqlClauses) {
+        warnings.push(
+            "alignSqlClauses=true has no effect when formatEmbeddedSql=false. Enable SQL formatting or disable alignment."
+        );
+    }
+
+    if (options.enforceHungarianNotation) {
+        warnings.push(
+            "enforceHungarianNotation=true is experimental. Modern SSL practices favor descriptive names over notation."
+        );
+    }
+
+    // === Logical consistency checks ===
+    if (options.useTabs && options.indentSize > 1) {
+        warnings.push(
+            "When useTabs=true, indentSize represents tab width. Consider setting to 1 for consistency."
+        );
+    }
+
+    if (options.breakLongParameterLists && options.parameterListBreakThreshold > 10) {
+        warnings.push(
+            "parameterListBreakThreshold>10 may prevent line breaking. SSL procedures often have many parameters."
+        );
+    }
+
+    if (!options.insertSpacesAfterCommas && options.breakLongParameterLists) {
+        warnings.push(
+            "Disabling spaces after commas may reduce readability in broken parameter lists."
+        );
+    }
+
+    if (options.blankLinesBeforeControlFlow && options.blankLinesAfterControlFlow) {
+        warnings.push(
+            "Both blankLinesBeforeControlFlow and blankLinesAfterControlFlow=true may create excessive white space."
+        );
+    }
+
+    if (!options.trimTrailingWhitespace && options.alignEndOfLineComments) {
+        warnings.push(
+            "Comment alignment works best with trimTrailingWhitespace=true to prevent uneven spacing."
+        );
+    }
+
+    // === Performance warnings ===
+    if (options.formatEmbeddedSql && options.maxLineLength < 60) {
+        warnings.push(
+            "Very short line lengths with SQL formatting may cause excessive line breaks in complex queries."
+        );
+    }
+
+    if (options.wrapLongComments && options.maxLineLength < 50) {
+        warnings.push(
+            "Comment wrapping with very short lines may fragment important documentation."
         );
     }
 
     return warnings;
+}
+
+/**
+ * Validates options and optionally logs warnings
+ * @param options Formatter options to validate
+ * @param logWarnings Whether to log warnings to console (default: false)
+ * @returns Validated options (unchanged) and validation results
+ */
+export function validateAndReportOptions(
+    options: FormatterOptions,
+    logWarnings: boolean = false
+): { options: FormatterOptions; warnings: string[]; isValid: boolean } {
+    const warnings = validateFormatterOptions(options);
+    const isValid = warnings.length === 0;
+
+    if (logWarnings && warnings.length > 0) {
+        console.warn("SSL Formatter Configuration Warnings:");
+        warnings.forEach((warning, index) => {
+            console.warn(`  ${index + 1}. ${warning}`);
+        });
+
+        if (warnings.some((w) => w.includes("not supported") || w.includes("will cause"))) {
+            console.warn(
+                "\n⚠️  Some settings may cause formatting errors. Please review your configuration."
+            );
+        }
+
+        if (warnings.some((w) => w.includes("not recommended") || w.includes("Consider"))) {
+            console.warn(
+                "\n💡 Consider reviewing highlighted settings for better SSL code formatting."
+            );
+        }
+    }
+
+    return { options, warnings, isValid };
+}
+
+/**
+ * Creates a summary of the current formatter configuration
+ * @param options Formatter options to summarize
+ * @returns Human-readable configuration summary
+ */
+export function getFormatterConfigSummary(options: FormatterOptions): string {
+    const lines = [
+        "SSL Formatter Configuration:",
+        `  Indentation: ${
+            options.useTabs ? `${options.indentSize} tab(s)` : `${options.indentSize} spaces`
+        }`,
+        `  Max Line Length: ${options.maxLineLength}`,
+        `  Keywords: ${options.uppercaseKeywords ? "Uppercase" : "Preserve case"}`,
+        `  SQL Formatting: ${options.formatEmbeddedSql ? "Enabled" : "Disabled"}`,
+        `  Comment Alignment: ${
+            options.alignEndOfLineComments ? `Column ${options.commentAlignmentColumn}` : "Disabled"
+        }`,
+        `  Region Markers: ${options.preserveRegionMarkers ? "Preserved" : "Not preserved"}`,
+    ];
+
+    const warnings = validateFormatterOptions(options);
+    if (warnings.length > 0) {
+        lines.push(`  Warnings: ${warnings.length} configuration issue(s)`);
+    }
+
+    return lines.join("\n");
 }
 
 /**

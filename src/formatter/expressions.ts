@@ -1,10 +1,104 @@
 /**
  * Expression Formatters
  *
+ * Formats SSL expressions with proper spacing and operator precedence:
  * - Format binary expressions with proper spacing
  * - Format unary expressions
  * - Format property access (: operator)
  * - Format array access and subscripts
+ *
+ * # Before/After Formatting Examples
+ *
+ * ## Binary Expressions
+ * **Before:**
+ * ```ssl
+ * result=a+b*c-d/e
+ * condition=value1>=value2and flag<>true
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * result = a + b * c - d / e
+ * condition = value1 >= value2 And flag <> True
+ * ```
+ *
+ * ## Complex Logical Expressions
+ * **Before:**
+ * ```ssl
+ * if(status="active"or status="pending")and(priority>5)and not isProcessed then
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * If (status = "active" Or status = "pending") And (priority > 5) And Not isProcessed Then
+ * ```
+ *
+ * ## Property Access
+ * **Before:**
+ * ```ssl
+ * customer:name=newValue
+ * result=object:method(param1,param2)
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * customer:name = newValue
+ * result = object:method(param1, param2)
+ * ```
+ *
+ * ## Array Access
+ * **Before:**
+ * ```ssl
+ * value=myArray[index+1]
+ * matrix[row,col]=newValue
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * value = myArray[index + 1]
+ * matrix[row, col] = newValue
+ * ```
+ *
+ * ## Function Calls
+ * **Before:**
+ * ```ssl
+ * result=calculateTotal(amount,taxRate,discount)
+ * DoProcessData(input1,input2,output)
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * result = CalculateTotal(amount, taxRate, discount)
+ * DoProcessData(input1, input2, output)
+ * ```
+ *
+ * ## Unary and Increment Expressions
+ * **Before:**
+ * ```ssl
+ * result=-value
+ * flag=not condition
+ * counter++
+ * --index
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * result = -value
+ * flag = Not condition
+ * counter++
+ * --index
+ * ```
+ *
+ * ## Object Creation
+ * **Before:**
+ * ```ssl
+ * obj=new MyClass(param1,param2)
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * obj = New MyClass(param1, param2)
+ * ```
  */
 
 import {

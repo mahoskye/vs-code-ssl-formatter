@@ -1,10 +1,130 @@
 /**
  * Control Flow Formatters
  *
+ * Formats SSL control flow constructs including:
  * - Format :IF/:ELSE/:ENDIF blocks
  * - Format :WHILE/:ENDWHILE loops
  * - Format :FOR/:NEXT loops
  * - Format exit statements (:EXITWHILE, :EXITFOR)
+ *
+ * # Before/After Formatting Examples
+ *
+ * ## IF/ELSE/ENDIF Blocks
+ * **Before:**
+ * ```ssl
+ * if condition1 and condition2 then
+ * processData()
+ * else
+ * handleError()
+ * endif
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * If condition1 And condition2 Then
+ *     ProcessData()
+ * Else
+ *     HandleError()
+ * EndIf
+ * ```
+ *
+ * ## Nested IF Statements
+ * **Before:**
+ * ```ssl
+ * if outerCondition then
+ * if innerCondition then
+ * result = processInner()
+ * else
+ * result = processAlternative()
+ * endif
+ * else
+ * result = processOuter()
+ * endif
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * If outerCondition Then
+ *     If innerCondition Then
+ *         result = ProcessInner()
+ *     Else
+ *         result = ProcessAlternative()
+ *     EndIf
+ * Else
+ *     result = ProcessOuter()
+ * EndIf
+ * ```
+ *
+ * ## WHILE Loops
+ * **Before:**
+ * ```ssl
+ * while counter<10 and active
+ * doWork(counter)
+ * counter=counter+1
+ * endwhile
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * While counter < 10 And active
+ *     DoWork(counter)
+ *     counter = counter + 1
+ * EndWhile
+ * ```
+ *
+ * ## FOR Loops
+ * **Before:**
+ * ```ssl
+ * for i=1 to maxCount
+ * processItem(i)
+ * if shouldBreak then
+ * exitfor
+ * endif
+ * next
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * For i = 1 To maxCount
+ *     ProcessItem(i)
+ *     If shouldBreak Then
+ *         ExitFor
+ *     EndIf
+ * Next
+ * ```
+ *
+ * ## Complex Nested Control Flow
+ * **Before:**
+ * ```ssl
+ * for outer=1 to 5
+ * while condition(outer)
+ * if isValid(outer) then
+ * for inner=1 to 3
+ * processData(outer,inner)
+ * next
+ * else
+ * logError(outer)
+ * exitwhile
+ * endif
+ * endwhile
+ * next
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * For outer = 1 To 5
+ *     While condition(outer)
+ *         If IsValid(outer) Then
+ *             For inner = 1 To 3
+ *                 ProcessData(outer, inner)
+ *             Next
+ *         Else
+ *             LogError(outer)
+ *             ExitWhile
+ *         EndIf
+ *     EndWhile
+ * Next
+ * ```
  */
 
 import {

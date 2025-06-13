@@ -171,15 +171,13 @@ describe("FormatterOptions", () => {
             const warnings2 = validateFormatterOptions(options2);
             expect(warnings2).toContain("commentAlignmentColumn should be between 20 and 120");
         });
-
         it("should warn about SSL-specific issues", () => {
             const options = { ...defaultFormatterOptions, insertSpacesAroundPropertyAccess: true };
             const warnings = validateFormatterOptions(options);
             expect(warnings).toContain(
-                "insertSpacesAroundPropertyAccess=true is not recommended for SSL (object:property syntax)"
+                "insertSpacesAroundPropertyAccess=true is not recommended for SSL (object:property syntax should not have spaces)"
             );
         });
-
         it("should return multiple warnings for multiple issues", () => {
             const options: FormatterOptions = {
                 ...defaultFormatterOptions,
@@ -188,11 +186,14 @@ describe("FormatterOptions", () => {
                 insertSpacesAroundPropertyAccess: true,
             };
             const warnings = validateFormatterOptions(options);
-            expect(warnings.length).toBe(3);
+            expect(warnings.length).toBe(4);
             expect(warnings).toContain("indentSize should be between 1 and 8");
             expect(warnings).toContain("maxLineLength should be between 40 and 200");
             expect(warnings).toContain(
-                "insertSpacesAroundPropertyAccess=true is not recommended for SSL (object:property syntax)"
+                "insertSpacesAroundPropertyAccess=true is not recommended for SSL (object:property syntax should not have spaces)"
+            );
+            expect(warnings).toContain(
+                "SSL procedures often have deep nesting. Consider maxLineLength≤120 to prevent excessive line wrapping."
             );
         });
     });
@@ -328,7 +329,6 @@ describe("FormatterOptions", () => {
             expect(result.uppercaseKeywords).toBe(defaultFormatterOptions.uppercaseKeywords);
             expect(result.maxLineLength).toBe(defaultFormatterOptions.maxLineLength);
         });
-
         it("should handle extreme but valid values", () => {
             const extremeOptions: FormatterOptions = {
                 ...defaultFormatterOptions,
@@ -339,9 +339,15 @@ describe("FormatterOptions", () => {
                 commentAlignmentColumn: 20,
             };
             const warnings = validateFormatterOptions(extremeOptions);
-            expect(warnings).toEqual([]);
+            // Extreme values (while valid) trigger SSL-specific best practice warnings
+            expect(warnings.length).toBe(2);
+            expect(warnings).toContain(
+                "Very short line lengths with SQL formatting may cause excessive line breaks in complex queries."
+            );
+            expect(warnings).toContain(
+                "Comment wrapping with very short lines may fragment important documentation."
+            );
         });
-
         it("should handle maximum valid values", () => {
             const maxOptions: FormatterOptions = {
                 ...defaultFormatterOptions,
@@ -352,7 +358,14 @@ describe("FormatterOptions", () => {
                 commentAlignmentColumn: 120,
             };
             const warnings = validateFormatterOptions(maxOptions);
-            expect(warnings).toEqual([]);
+            // Maximum values (while valid) trigger SSL-specific best practice warnings
+            expect(warnings.length).toBe(2);
+            expect(warnings).toContain(
+                "SSL procedures often have deep nesting. Consider maxLineLength≤120 to prevent excessive line wrapping."
+            );
+            expect(warnings).toContain(
+                "parameterListBreakThreshold>10 may prevent line breaking. SSL procedures often have many parameters."
+            );
         });
     });
 });

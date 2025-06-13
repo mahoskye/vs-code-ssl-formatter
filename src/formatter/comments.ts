@@ -1,10 +1,104 @@
 /**
  * Comment Formatter
  *
+ * Handles all SSL comment types with proper formatting and preservation:
  * - Handle block comments (/* comment ;)
  * - Handle single-line comments
  * - Handle region comments (/* region, /* endregion)
  * - Comment association and placement logic
+ *
+ * # Before/After Formatting Examples
+ *
+ * ## Single-Line Comments
+ * **Before:**
+ * ```ssl
+ * /*this is a comment;
+ * result=calculate()/*inline comment;
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * /* This is a comment ;
+ * result = calculate() /* Inline comment ;
+ * ```
+ *
+ * ## Block Comments
+ * **Before:**
+ * ```ssl
+ * /*this is a
+ * multi-line comment
+ * with various content;
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * /* This is a
+ *    multi-line comment
+ *    with various content ;
+ * ```
+ *
+ * ## Region Comments
+ * **Before:**
+ * ```ssl
+ * /*region data processing;
+ * procedure processData()
+ *     /*do work here;
+ * endprocedure
+ * /*endregion;
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * /* Region: Data Processing ;
+ * Procedure ProcessData()
+ *     /* Do work here ;
+ * EndProcedure
+ * /* EndRegion ;
+ * ```
+ *
+ * ## Comment Association
+ * **Before:**
+ * ```ssl
+ * /*procedure header comment;
+ * procedure myProc()
+ * value=10/*variable assignment;
+ * endprocedure/*end of procedure;
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * /* Procedure header comment ;
+ * Procedure MyProc()
+ *     value = 10 /* Variable assignment ;
+ * EndProcedure /* End of procedure ;
+ * ```
+ *
+ * ## Complex Comment Scenarios
+ * **Before:**
+ * ```ssl
+ * /*region validation;
+ * if input<>nil then/*check if input exists;
+ * /*validate the input;
+ * result=validateInput(input)
+ * else
+ * /*handle nil case;
+ * result=false
+ * endif/*end validation;
+ * /*endregion;
+ * ```
+ *
+ * **After:**
+ * ```ssl
+ * /* Region: Validation ;
+ * If input <> Nil Then /* Check if input exists ;
+ *     /* Validate the input ;
+ *     result = ValidateInput(input)
+ * Else
+ *     /* Handle nil case ;
+ *     result = False
+ * EndIf /* End validation ;
+ * /* EndRegion ;
+ * ```
  */
 
 import {
