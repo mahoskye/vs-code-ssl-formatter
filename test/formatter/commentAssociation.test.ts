@@ -256,15 +256,14 @@ describe("CommentAssociator", () => {
                 endToken: comment2Token,
             };
 
-            // Create a procedure statement on line 4
-            const procToken = createToken(TokenType.COLON, ":", createPosition(4, 1, 30));
+            // Create a procedure statement on line 3 (within maxLeadingDistance of 2)
+            const procToken = createToken(TokenType.COLON, ":", createPosition(3, 1, 30));
 
             const procedure: ProcedureStatementNode = {
                 kind: ASTNodeType.ProcedureStatement,
                 startToken: procToken,
                 endToken: procToken,
             } as any;
-
             const associations = associator.associateComments([comment1, comment2], [procedure]);
 
             expect(associations).toHaveLength(2);
@@ -442,7 +441,7 @@ describe("CommentAssociator", () => {
                 endToken: blockCommentToken,
             };
 
-            const nodeToken = createToken(TokenType.COLON, ":", createPosition(4, 1, 30));
+            const nodeToken = createToken(TokenType.COLON, ":", createPosition(3, 1, 30));
 
             const node: ProcedureStatementNode = {
                 kind: ASTNodeType.ProcedureStatement,

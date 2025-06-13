@@ -255,12 +255,14 @@ export class CommentAssociator {
         let bestNode: ASTNode | null = null;
         let bestPosition = CommentPosition.Standalone;
         let bestDistance = Infinity;
-
         for (const node of nodes) {
-            const nodeLine = this.getLineNumber(node);
-            const distance = Math.abs(commentLine - nodeLine);
+            // Skip nodes without valid tokens
+            if (!node.startToken || !node.startToken.range) {
+                continue;
+            }
 
-            // Check for leading comment (comment before node)
+            const nodeLine = this.getLineNumber(node);
+            const distance = Math.abs(commentLine - nodeLine); // Check for leading comment (comment before node)
             if (
                 commentLine < nodeLine &&
                 nodeLine - commentLine <= this.options.maxLeadingDistance &&

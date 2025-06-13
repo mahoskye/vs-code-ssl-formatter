@@ -52,7 +52,6 @@ export class DeclarationFormatter {
         this.output.write(";");
         this.output.writeLine();
     }
-
     /**
      * Format a DECLARE statement
      * Example: :DECLARE var1, var2, var3;
@@ -145,8 +144,7 @@ export class DeclarationFormatter {
     /**
      * Format an identifier list with proper spacing
      * Example: param1, param2, param3
-     */
-    private formatIdentifierList(node: IdentifierListNode): void {
+     */ private formatIdentifierList(node: IdentifierListNode): void {
         if (!node.identifiers || node.identifiers.length === 0) {
             return;
         }

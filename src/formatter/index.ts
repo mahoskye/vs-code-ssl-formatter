@@ -24,6 +24,7 @@ import {
     RegionCommentNode,
     EndRegionCommentNode,
 } from "../parser/ast/comments";
+import { ProcedureStatementNode } from "../parser/ast/procedures";
 
 // Import all the individual formatter visitors
 import { SSLControlFlowFormatterVisitor } from "./controlFlow";
@@ -41,7 +42,7 @@ import { SSLSqlFormatterVisitor } from "./sql";
  * different visitors handle different aspects of the language.
  */
 export class SSLFormatter {
-    private readonly output: OutputBuilder;
+    private output: OutputBuilder;
     private readonly options: FormatterOptions;
     private readonly commentAssociator: CommentAssociator;
     private readonly controlFlowVisitor: SSLControlFlowFormatterVisitor;
@@ -84,9 +85,7 @@ export class SSLFormatter {
         const commentAssociations = this.commentAssociator.associateComments(
             commentNodes,
             nonCommentNodes
-        );
-
-        // Visit the AST starting from the root with comment awareness
+        ); // Visit the AST starting from the root with comment awareness
         this.visitWithComments(ast, commentAssociations);
 
         return freshOutput.getOutput();
@@ -221,8 +220,7 @@ export class SSLFormatter {
      * Visit an AST node and route to the appropriate specialized visitor
      *
      * @param node The AST node to format
-     */
-    private visit(node: ASTNode): void {
+     */ private visit(node: ASTNode): void {
         // Route to appropriate specialized visitor based on node type
         if (this.isControlFlowNode(node)) {
             this.controlFlowVisitor.visit(node);
@@ -248,9 +246,13 @@ export class SSLFormatter {
             this.declarationVisitor.visit(node);
             return;
         }
-
         if (this.isSqlNode(node)) {
             this.sqlVisitor.visit(node);
+            return;
+        }
+
+        if (this.isProcedureNode(node)) {
+            this.visitProcedure(node);
             return;
         }
 
@@ -403,35 +405,95 @@ export class SSLFormatter {
      */
     private isSqlNode(node: ASTNode): boolean {
         const sqlTypes = ["SqlStatement", "SqlExecute", "LSearch", "SqlParameter"];
-
         return sqlTypes.includes(node.kind);
+    }
+
+    /**
+     * Helper method to determine if a node is a procedure node
+     */
+    private isProcedureNode(node: ASTNode): boolean {
+        const procedureTypes = [
+            "ProcedureStatement",
+            "ProcedureStart",
+            "ProcedureEnd",
+            "ParameterDeclaration",
+            "DefaultParameterDeclaration",
+            "ParameterList",
+            "DefaultParameterList",
+        ];
+
+        return procedureTypes.includes(node.kind);
+    }
+
+    /**
+     * Format procedure nodes
+     */
+    private visitProcedure(node: ASTNode): void {
+        // For now, let's handle the main ProcedureStatement case
+        if (node.kind === "ProcedureStatement") {
+            this.visitProcedureStatement(node as any);
+        } else {
+            // For other procedure-related nodes, fall back to default
+            this.visitDefault(node);
+        }
+    }
+    /**
+     * Format a procedure statement with proper formatting
+     */
+    private visitProcedureStatement(node: any): void {
+        // Write the procedure start token ":"
+        this.output.writeIndented(":");
+
+        // Write the procedure name if available
+        if (node.name && node.name.value) {
+            this.output.write(node.name.value);
+        }
+
+        // Write the semicolon
+        this.output.write(";");
+        this.output.writeLine();
+
+        // Process the procedure body if it exists
+        if (node.body && Array.isArray(node.body)) {
+            this.output.indent();
+            for (const statement of node.body) {
+                this.visit(statement);
+            }
+            this.output.dedent();
+        }
     }
     /**
      * Format Program node (root of AST) with comment awareness
      */
     private visitProgram(node: ProgramNode): void {
         // Extract comments and non-comment nodes
-        const { commentNodes, nonCommentNodes } = this.extractNodes(node);
-
-        // Associate comments with AST nodes
+        const { commentNodes, nonCommentNodes } = this.extractNodes(node); // Associate comments with AST nodes
         const commentAssociations = this.commentAssociator.associateComments(
             commentNodes,
             nonCommentNodes
         );
 
-        // Process standalone comments first (those not associated with any node)
-        this.processStandaloneComments(commentAssociations);
-
         if (node.body && node.body.length > 0) {
             for (let i = 0; i < node.body.length; i++) {
                 const statement = node.body[i];
 
-                // Skip comment nodes - they're handled through associations
+                // If this is a comment node, check if it should be treated as standalone
                 if (this.isCommentNode(statement)) {
+                    const association = commentAssociations.find(
+                        (assoc) => assoc.comment === statement
+                    );
+                    if (
+                        association &&
+                        association.position === CommentPosition.Standalone &&
+                        association.preserve
+                    ) {
+                        this.commentVisitor.visit(association.comment);
+                        this.output.writeLine();
+                    }
                     continue;
                 }
 
-                // Visit each statement with comment awareness
+                // Visit each non-comment statement with comment awareness
                 this.visitWithComments(statement, commentAssociations);
 
                 // Add appropriate spacing between statements
@@ -496,14 +558,15 @@ export class SSLFormatter {
      * Replace the output builder for all visitors
      *
      * @param newOutput The new output builder to use
-     */
-    private replaceOutputBuilder(newOutput: OutputBuilder): void {
-        // Replace the output builder in all visitors
+     */ private replaceOutputBuilder(newOutput: OutputBuilder): void {
+        // Replace the output builder in the main formatter
+        this.output = newOutput; // Replace the output builder in all visitors
         (this.controlFlowVisitor as any).output = newOutput;
         (this.errorHandlingVisitor as any).output = newOutput;
         (this.commentVisitor as any).output = newOutput;
         (this.expressionVisitor as any).output = newOutput;
         (this.declarationVisitor as any).output = newOutput;
+        (this.sqlVisitor as any).output = newOutput;
     }
 }
 

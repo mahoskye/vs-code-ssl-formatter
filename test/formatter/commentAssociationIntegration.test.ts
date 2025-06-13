@@ -64,7 +64,6 @@ describe("Comment Association Integration Tests", () => {
                 endToken: procToken,
                 body: [comment, procedure],
             };
-
             const result = formatter.format(program);
 
             // The result should contain both the comment and the procedure

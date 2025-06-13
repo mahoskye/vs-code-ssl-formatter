@@ -250,7 +250,7 @@ export interface VisitorResult {
  * Base class for AST visitors implementing the visitor pattern
  */
 export class FormatterVisitorBase {
-    protected readonly output: OutputBuilder;
+    protected output: OutputBuilder;
     protected readonly options: FormatterOptions;
     private visitedNodes = new Set<ASTNode>();
 
