@@ -17,7 +17,7 @@ import {
 } from "../parser/ast/classes";
 import { IdentifierListNode } from "../parser/ast/lists";
 import { ProcedureStatementNode } from "../parser/ast/procedures";
-import { OutputBuilder } from "./outputBuilder";
+import { OutputBuilder } from "./visitor";
 import { FormatterOptions } from "./options";
 
 /**

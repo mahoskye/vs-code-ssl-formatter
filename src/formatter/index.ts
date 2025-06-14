@@ -33,6 +33,7 @@ import { SSLCommentFormatterVisitor } from "./comments";
 import { SSLExpressionFormatterVisitor } from "./expressions";
 import { SSLDeclarationFormatterVisitor } from "./declarationVisitor";
 import { SSLSqlFormatterVisitor } from "./sql";
+import { SSLClassFormatterVisitor } from "./classVisitor";
 
 /**
  * Main SSL Formatter class that orchestrates all formatting functionality
@@ -51,7 +52,7 @@ export class SSLFormatter {
     private readonly expressionVisitor: SSLExpressionFormatterVisitor;
     private readonly declarationVisitor: SSLDeclarationFormatterVisitor;
     private readonly sqlVisitor: SSLSqlFormatterVisitor;
-
+    private readonly classVisitor: SSLClassFormatterVisitor;
     constructor(options: FormatterOptions = defaultFormatterOptions) {
         this.options = options;
         this.output = new OutputBuilder(options);
@@ -64,6 +65,7 @@ export class SSLFormatter {
         this.expressionVisitor = new SSLExpressionFormatterVisitor(options);
         this.declarationVisitor = new SSLDeclarationFormatterVisitor(options);
         this.sqlVisitor = new SSLSqlFormatterVisitor(options);
+        this.classVisitor = new SSLClassFormatterVisitor(options);
     }
     /**
      * Format an SSL AST and return the formatted code string
@@ -215,7 +217,6 @@ export class SSLFormatter {
             this.commentVisitor.visit(association.comment);
         }
     }
-
     /**
      * Visit an AST node and route to the appropriate specialized visitor
      *
@@ -246,8 +247,14 @@ export class SSLFormatter {
             this.declarationVisitor.visit(node);
             return;
         }
+
         if (this.isSqlNode(node)) {
             this.sqlVisitor.visit(node);
+            return;
+        }
+
+        if (this.isClassNode(node)) {
+            this.classVisitor.visit(node);
             return;
         }
 
@@ -384,7 +391,6 @@ export class SSLFormatter {
 
         return expressionTypes.includes(node.kind);
     }
-
     /**
      * Helper method to determine if a node is a declaration node
      */
@@ -399,6 +405,21 @@ export class SSLFormatter {
         ];
 
         return declarationTypes.includes(node.kind);
+    }
+
+    /**
+     * Helper method to determine if a node is a class node
+     */
+    private isClassNode(node: ASTNode): boolean {
+        const classTypes = [
+            "ClassDefinition",
+            "ClassDeclaration",
+            "InheritStatement",
+            "ClassFieldDeclaration",
+            "MethodDeclaration",
+        ];
+
+        return classTypes.includes(node.kind);
     }
     /**
      * Helper method to determine if a node is a SQL node
@@ -553,7 +574,6 @@ export class SSLFormatter {
     public getFormattedOutput(): string {
         return this.output.getOutput();
     }
-
     /**
      * Replace the output builder for all visitors
      *
@@ -567,6 +587,7 @@ export class SSLFormatter {
         (this.expressionVisitor as any).output = newOutput;
         (this.declarationVisitor as any).output = newOutput;
         (this.sqlVisitor as any).output = newOutput;
+        (this.classVisitor as any).updateOutputBuilder(newOutput);
     }
 }
 

@@ -11,7 +11,7 @@
  */
 
 import { ClassFormatter } from "../../src/formatter/classes";
-import { OutputBuilder } from "../../src/formatter/outputBuilder";
+import { OutputBuilder } from "../../src/formatter/visitor";
 import { defaultFormatterOptions, FormatterOptions } from "../../src/formatter/options";
 import {
     ClassDefinitionNode,
