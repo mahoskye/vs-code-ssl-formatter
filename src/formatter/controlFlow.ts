@@ -149,6 +149,16 @@ import {
     ExitForStatementNode,
     LoopContinueNode,
 } from "../parser/ast/controlFlow";
+import {
+    SwitchStatementNode,
+    BeginCaseStatementNode,
+    CaseBlockNode,
+    CaseStatementNode,
+    OtherwiseBlockNode,
+    OtherwiseStatementNode,
+    EndCaseStatementNode,
+    ExitCaseStatementNode,
+} from "../parser/ast/switchCase";
 import { ExpressionNode, StatementNode } from "../parser/ast/base";
 import { Token } from "../tokenizer/token";
 
@@ -365,13 +375,138 @@ export class SSLControlFlowFormatterVisitor extends FormatterVisitorBase {
         this.output.writeLine();
         return { shouldContinue: true };
     }
-
     /**
      * Format LOOP continue statement
      * Follows EBNF: LoopContinue ::= ":" "LOOP"
      */
     protected override visitLoopContinue(node: LoopContinueNode): VisitorResult {
         this.output.writeIndented(":LOOP;");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    // ===== SWITCH CASE FORMATTING METHODS =====
+
+    /**
+     * Format switch statement block
+     * Follows EBNF: SwitchStatement ::= BeginCaseStatement {CaseBlock} [OtherwiseBlock] EndCaseStatement
+     */
+    protected override visitSwitchStatement(node: SwitchStatementNode): VisitorResult {
+        // Format :BEGINCASE
+        this.output.writeIndented(":BEGINCASE;");
+        this.output.writeLine();
+
+        // Indent for case blocks
+        this.output.indent();
+
+        // Format all case blocks
+        node.cases?.forEach((caseBlock: CaseBlockNode) => {
+            this.visit(caseBlock);
+        });
+
+        // Format otherwise block if present
+        if (node.otherwiseBlock) {
+            this.visit(node.otherwiseBlock);
+        }
+
+        // Dedent and format :ENDCASE
+        this.output.dedent();
+        this.output.writeIndented(":ENDCASE;");
+        this.output.writeLine();
+
+        return { shouldContinue: false }; // We've handled all children manually
+    }
+
+    /**
+     * Format BEGINCASE statement
+     * Follows EBNF: BeginCaseStatement ::= ":" "BEGINCASE"
+     */
+    protected override visitBeginCaseStatement(node: BeginCaseStatementNode): VisitorResult {
+        this.output.writeIndented(":BEGINCASE;");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format case block (case condition + body + optional exit)
+     * Follows EBNF: CaseBlock ::= CaseStatement {Statement} [ExitCaseStatement]
+     */
+    protected override visitCaseBlock(node: CaseBlockNode): VisitorResult {
+        // Format :CASE expression;
+        this.output.writeIndented(":CASE ");
+        this.formatExpression(node.condition);
+        this.output.write(";");
+        this.output.writeLine();
+
+        // Indent for case body
+        this.output.indent();
+
+        // Format body statements
+        this.formatStatementList(node.statements);
+
+        // Dedent after case block
+        this.output.dedent();
+        return { shouldContinue: false }; // We've handled all children manually
+    }
+
+    /**
+     * Format CASE statement (condition part)
+     * Follows EBNF: CaseStatement ::= ":" "CASE" Expression
+     */
+    protected override visitCaseStatement(node: CaseStatementNode): VisitorResult {
+        this.output.writeIndented(":CASE ");
+        this.formatExpression(node.expression);
+        this.output.write(";");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format OTHERWISE block
+     * Follows EBNF: OtherwiseBlock ::= OtherwiseStatement {Statement}
+     */
+    protected override visitOtherwiseBlock(node: OtherwiseBlockNode): VisitorResult {
+        // Format :OTHERWISE;
+        this.output.writeIndented(":OTHERWISE;");
+        this.output.writeLine();
+
+        // Indent for otherwise body
+        this.output.indent();
+
+        // Format body statements
+        this.formatStatementList(node.statements);
+
+        // Dedent after otherwise block
+        this.output.dedent();
+
+        return { shouldContinue: false }; // We've handled all children manually
+    }
+
+    /**
+     * Format OTHERWISE statement
+     * Follows EBNF: OtherwiseStatement ::= ":" "OTHERWISE"
+     */
+    protected override visitOtherwiseStatement(node: OtherwiseStatementNode): VisitorResult {
+        this.output.writeIndented(":OTHERWISE;");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+
+    /**
+     * Format ENDCASE statement
+     * Follows EBNF: EndCaseStatement ::= ":" "ENDCASE"
+     */
+    protected override visitEndCaseStatement(node: EndCaseStatementNode): VisitorResult {
+        this.output.writeIndented(":ENDCASE;");
+        this.output.writeLine();
+        return { shouldContinue: true };
+    }
+    /**
+     * Format EXITCASE statement
+     * Follows EBNF: ExitCaseStatement ::= ":" "EXITCASE"
+     */
+    protected override visitExitCaseStatement(node: ExitCaseStatementNode): VisitorResult {
+        this.output.writeIndented(":EXITCASE;");
         this.output.writeLine();
         return { shouldContinue: true };
     }

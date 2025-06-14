@@ -196,16 +196,32 @@ export class SSLSwitchCaseFormatterVisitor extends FormatterVisitorBase {
         }
         return { shouldContinue: false };
     }
-
     /**
      * Format assignment statements
      * Override to provide assignment formatting within switch case context
      */
     protected override visitAssignment(node: AssignmentNode): VisitorResult {
-        const variable = (node as any).variable || "";
-        const value = (node as any).value || "";
+        // Format: left := right;
+        // Note: Using any to access runtime AST properties that aren't in TypeScript definitions
+        const anyNode = node as any;
 
-        this.output.writeIndented(`${variable} := ${value};`);
+        this.output.writeIndented("");
+
+        // Format left-hand side (variable)
+        if (anyNode.left) {
+            this.visit(anyNode.left);
+        }
+
+        // Format assignment operator
+        this.output.write(" := ");
+
+        // Format right-hand side (expression)
+        if (anyNode.right) {
+            this.visit(anyNode.right);
+        }
+
+        // Add semicolon and newline
+        this.output.write(";");
         this.output.writeLine();
         return { shouldContinue: false };
     }

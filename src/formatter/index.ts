@@ -28,6 +28,7 @@ import { ProcedureStatementNode } from "../parser/ast/procedures";
 
 // Import all the individual formatter visitors
 import { SSLControlFlowFormatterVisitor } from "./controlFlow";
+import { SSLSwitchCaseFormatterVisitor } from "./switchCase";
 import { SSLErrorHandlingFormatterVisitor } from "./errorHandling";
 import { SSLCommentFormatterVisitor } from "./comments";
 import { SSLExpressionFormatterVisitor } from "./expressions";
@@ -47,6 +48,7 @@ export class SSLFormatter {
     private readonly options: FormatterOptions;
     private readonly commentAssociator: CommentAssociator;
     private readonly controlFlowVisitor: SSLControlFlowFormatterVisitor;
+    private readonly switchCaseVisitor: SSLSwitchCaseFormatterVisitor;
     private readonly errorHandlingVisitor: SSLErrorHandlingFormatterVisitor;
     private readonly commentVisitor: SSLCommentFormatterVisitor;
     private readonly expressionVisitor: SSLExpressionFormatterVisitor;
@@ -56,10 +58,9 @@ export class SSLFormatter {
     constructor(options: FormatterOptions = defaultFormatterOptions) {
         this.options = options;
         this.output = new OutputBuilder(options);
-        this.commentAssociator = new CommentAssociator(defaultCommentAssociationOptions);
-
-        // Initialize all specialized visitors with the same options
+        this.commentAssociator = new CommentAssociator(defaultCommentAssociationOptions); // Initialize all specialized visitors with the same options
         this.controlFlowVisitor = new SSLControlFlowFormatterVisitor(options);
+        this.switchCaseVisitor = new SSLSwitchCaseFormatterVisitor(options);
         this.errorHandlingVisitor = new SSLErrorHandlingFormatterVisitor(options);
         this.commentVisitor = new SSLCommentFormatterVisitor(options);
         this.expressionVisitor = new SSLExpressionFormatterVisitor(options);
@@ -223,6 +224,11 @@ export class SSLFormatter {
      * @param node The AST node to format
      */ private visit(node: ASTNode): void {
         // Route to appropriate specialized visitor based on node type
+        if (this.isSwitchCaseNode(node)) {
+            this.switchCaseVisitor.visit(node);
+            return;
+        }
+
         if (this.isControlFlowNode(node)) {
             this.controlFlowVisitor.visit(node);
             return;
@@ -261,11 +267,14 @@ export class SSLFormatter {
         if (this.isProcedureNode(node)) {
             this.visitProcedure(node);
             return;
-        }
-
-        // Handle special cases that need main formatter logic
+        } // Handle special cases that need main formatter logic
         if (node.kind === "Program") {
             this.visitProgram(node as ProgramNode);
+            return;
+        }
+
+        if (node.kind === "Assignment") {
+            this.visitAssignment(node as any);
             return;
         }
 
@@ -282,6 +291,23 @@ export class SSLFormatter {
         if (token && token.value) {
             this.output.writeIndented(token.value);
         }
+    }
+    /**
+     * Helper method to determine if a node is a switch/case node
+     */
+    private isSwitchCaseNode(node: ASTNode): boolean {
+        const switchCaseTypes = [
+            "SwitchStatement",
+            "BeginCaseStatement",
+            "CaseBlock",
+            "CaseStatement",
+            "OtherwiseBlock",
+            "OtherwiseStatement",
+            "EndCaseStatement",
+            "ExitCaseStatement",
+        ];
+
+        return switchCaseTypes.includes(node.kind);
     }
 
     /**
@@ -303,14 +329,6 @@ export class SSLFormatter {
             "ExitWhileStatement",
             "ExitForStatement",
             "LoopContinue",
-            "SwitchStatement",
-            "BeginCaseStatement",
-            "CaseBlock",
-            "CaseStatement",
-            "OtherwiseBlock",
-            "OtherwiseStatement",
-            "EndCaseStatement",
-            "ExitCaseStatement",
         ];
 
         return controlFlowTypes.includes(node.kind);
@@ -484,6 +502,29 @@ export class SSLFormatter {
         }
     }
     /**
+     * Format Assignment statement
+     */
+    private visitAssignment(node: any): void {
+        // Format: left := right;
+
+        // Format left-hand side (variable)
+        if (node.left) {
+            this.visit(node.left);
+        }
+
+        // Format assignment operator
+        this.output.write(" := ");
+
+        // Format right-hand side (expression)
+        if (node.right) {
+            this.visit(node.right);
+        }
+
+        // Add semicolon and newline
+        this.output.write(";");
+        this.output.writeLine();
+    }
+    /**
      * Format Program node (root of AST) with comment awareness
      */
     private visitProgram(node: ProgramNode): void {
@@ -582,6 +623,7 @@ export class SSLFormatter {
         // Replace the output builder in the main formatter
         this.output = newOutput; // Replace the output builder in all visitors
         (this.controlFlowVisitor as any).output = newOutput;
+        (this.switchCaseVisitor as any).output = newOutput;
         (this.errorHandlingVisitor as any).output = newOutput;
         (this.commentVisitor as any).output = newOutput;
         (this.expressionVisitor as any).output = newOutput;

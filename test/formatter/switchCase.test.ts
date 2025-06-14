@@ -421,7 +421,6 @@ describe("SSLSwitchCaseFormatterVisitor", () => {
             token: createToken(TokenType.IDENTIFIER, value, createPosition(1, 1, 0)),
         } as LiteralExpressionNode;
     }
-
     function createMockAssignment(
         variable: string = "result",
         value: string = '"case1"'
@@ -430,8 +429,19 @@ describe("SSLSwitchCaseFormatterVisitor", () => {
             kind: ASTNodeType.Assignment,
             startToken: mockToken,
             endToken: mockToken,
-            variable,
-            value,
+            left: {
+                kind: ASTNodeType.VariableAccess,
+                startToken: mockToken,
+                endToken: mockToken,
+                name: { value: variable },
+            },
+            right: {
+                kind: ASTNodeType.LiteralExpression,
+                startToken: mockToken,
+                endToken: mockToken,
+                value: value.replace(/"/g, ""), // Remove quotes for the value
+                token: { value: value },
+            },
         } as StatementNode;
     }
 
