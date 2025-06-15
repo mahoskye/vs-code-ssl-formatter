@@ -99,3 +99,22 @@ export const workspace = {
 export const window = {
     // Mock window for testing
 };
+
+export enum DiagnosticSeverity {
+    Error = 0,
+    Warning = 1,
+    Information = 2,
+    Hint = 3,
+}
+
+export class Diagnostic {
+    public range: Range;
+    public message: string;
+    public severity: DiagnosticSeverity;
+
+    constructor(range: Range, message: string, severity?: DiagnosticSeverity) {
+        this.range = range;
+        this.message = message;
+        this.severity = severity || DiagnosticSeverity.Error;
+    }
+}

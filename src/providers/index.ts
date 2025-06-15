@@ -5,3 +5,4 @@
  */
 
 export { SSLFoldingRangeProvider } from "./foldingRangeProvider";
+export { SSLBracketMatchingProvider } from "./bracketMatchingProvider";

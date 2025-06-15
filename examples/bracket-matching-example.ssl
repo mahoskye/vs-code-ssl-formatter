@@ -1,0 +1,126 @@
+/* SSL Bracket Matching Example
+   This file demonstrates various SSL keyword pairs that the bracket matching provider handles.
+   Use the "SSL Formatter: Show Bracket Info" command to see all bracket pairs.
+   Use the "SSL Formatter: Find Matching Bracket" command to jump between matching keywords.
+*/
+
+/* region SSL Procedure Example */
+:PROCEDURE ExampleProcedure;
+    :PARAMETERS sInput, nValue;
+    :DEFAULT sInput, "DefaultValue";
+    
+    :DECLARE sResult, nCounter;
+    
+    /* Conditional block example */
+    :IF nValue > 0;
+        sResult := "Positive";
+        
+        /* Nested loop example */
+        :FOR nCounter := 1 :TO nValue;
+            /* Loop body */
+            :IF nCounter = 5;
+                :EXITFOR;
+            :ENDIF;
+        :NEXT;
+        
+    :ELSE;
+        sResult := "Non-positive";
+    :ENDIF;
+    
+    /* While loop example */
+    :DECLARE bCondition;
+    bCondition := .T.;
+    
+    :WHILE bCondition;
+        /* Loop body */
+        :IF SomeCondition();
+            bCondition := .F.;
+        :ENDIF;
+    :ENDWHILE;
+    
+    /* Switch case example */
+    :BEGINCASE;
+        :CASE sResult = "Positive";
+            /* Handle positive case */
+            
+        :CASE sResult = "Non-positive";
+            /* Handle non-positive case */
+            
+        :OTHERWISE;
+            /* Default case */
+    :ENDCASE;
+    
+    /* Error handling example */
+    :TRY;
+        /* Code that might fail */
+        DoSomethingRisky();
+        
+    :CATCH;
+        /* Handle error */
+        LogError("Error occurred");
+        
+    :FINALLY;
+        /* Cleanup code */
+        CleanupResources();
+    :ENDTRY;
+    
+    :RETURN sResult;
+:ENDPROC;
+/* endregion */
+
+/* region Class Example */
+:CLASS ExampleClass;
+    :DECLARE sName, nAge;
+    
+    :PROCEDURE Initialize;
+        :PARAMETERS sName, nAge;
+        THIS:sName := sName;
+        THIS:nAge := nAge;
+    :ENDPROC;
+    
+    :PROCEDURE GetInfo;
+        :RETURN "Name: " + THIS:sName + ", Age: " + Str(THIS:nAge);
+    :ENDPROC;
+/* endregion */
+
+/* region Inline Code Example */
+:BEGININLINECODE "HelperFunction";
+    :PROCEDURE HelperFunction;
+        :PARAMETERS sParam;
+        :RETURN "Processed: " + sParam;
+    :ENDPROC;
+:ENDINLINECODE;
+/* endregion */
+
+/* region Array and Expression Examples */
+:DECLARE aValues, aMatrix;
+
+/* Array literal with curly braces */
+aValues := {1, 2, 3, 4, 5};
+
+/* Multi-dimensional array */
+aMatrix := {
+    {1, 2, 3},
+    {4, 5, 6},
+    {7, 8, 9}
+};
+
+/* Function calls with parentheses */
+nResult := Max(aValues);
+sFormatted := Format(nResult, "###.##");
+
+/* Array access with square brackets */
+nFirstValue := aValues[1];
+nMatrixValue := aMatrix[2][3];
+
+/* Code block literal */
+bCodeBlock := {|x| x * x};
+/* endregion */
+
+/* region Error Handling Block */
+:ERROR;
+    /* Error handling code */
+    LogError("An error occurred in the main script");
+/* endregion */
+
+/* End of SSL Bracket Matching Example */
