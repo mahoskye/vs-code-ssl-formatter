@@ -48,6 +48,23 @@
                 "path": "./syntaxes/ssl.tmLanguage.json"
             }
         ],
+        "commands": [
+            {
+                "command": "ssl-formatter.showBracketInfo",
+                "title": "Show SSL Bracket Pairs",
+                "category": "SSL"
+            },
+            {
+                "command": "ssl-formatter.showBracketInfoAtCursor",
+                "title": "Show SSL Bracket Info at Cursor",
+                "category": "SSL"
+            },
+            {
+                "command": "ssl-formatter.findMatchingBracket",
+                "title": "Find Matching SSL Bracket",
+                "category": "SSL"
+            }
+        ],
         "configuration": [
             {
                 "title": "SSL Formatter",

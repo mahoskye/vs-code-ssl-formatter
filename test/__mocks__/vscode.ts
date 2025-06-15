@@ -90,6 +90,12 @@ export interface FoldingRangeProvider {
 
 export const languages = {
     registerFoldingRangeProvider: jest.fn(),
+    createDiagnosticCollection: jest.fn(() => ({
+        dispose: jest.fn(),
+        set: jest.fn(),
+        clear: jest.fn(),
+        delete: jest.fn(),
+    })),
 };
 
 export const workspace = {
