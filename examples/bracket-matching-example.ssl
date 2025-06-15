@@ -1,23 +1,22 @@
 /* SSL Bracket Matching Example
    This file demonstrates various SSL keyword pairs that the bracket matching provider handles.
    Use the "SSL Formatter: Show Bracket Info" command to see all bracket pairs.
-   Use the "SSL Formatter: Find Matching Bracket" command to jump between matching keywords.
-*/
+   Use the "SSL Formatter: Find Matching Bracket" command to jump between matching keywords. ;
 
-/* region SSL Procedure Example */
+/* region SSL Procedure Example ;
 :PROCEDURE ExampleProcedure;
     :PARAMETERS sInput, nValue;
     :DEFAULT sInput, "DefaultValue";
     
     :DECLARE sResult, nCounter;
     
-    /* Conditional block example */
+    /* Conditional block example ;
     :IF nValue > 0;
         sResult := "Positive";
         
-        /* Nested loop example */
+        /* Nested loop example ;
         :FOR nCounter := 1 :TO nValue;
-            /* Loop body */
+            /* Loop body ;
             :IF nCounter = 5;
                 :EXITFOR;
             :ENDIF;
@@ -27,48 +26,48 @@
         sResult := "Non-positive";
     :ENDIF;
     
-    /* While loop example */
+    /* While loop example ;
     :DECLARE bCondition;
     bCondition := .T.;
     
     :WHILE bCondition;
-        /* Loop body */
+        /* Loop body ;
         :IF SomeCondition();
             bCondition := .F.;
         :ENDIF;
     :ENDWHILE;
     
-    /* Switch case example */
+    /* Switch case example ;
     :BEGINCASE;
         :CASE sResult = "Positive";
-            /* Handle positive case */
+            /* Handle positive case ;
             
         :CASE sResult = "Non-positive";
-            /* Handle non-positive case */
+            /* Handle non-positive case ;
             
         :OTHERWISE;
-            /* Default case */
+            /* Default case ;
     :ENDCASE;
     
-    /* Error handling example */
+    /* Error handling example ;
     :TRY;
-        /* Code that might fail */
+        /* Code that might fail ;
         DoSomethingRisky();
         
     :CATCH;
-        /* Handle error */
+        /* Handle error ;
         LogError("Error occurred");
         
     :FINALLY;
-        /* Cleanup code */
+        /* Cleanup code ;
         CleanupResources();
     :ENDTRY;
     
     :RETURN sResult;
 :ENDPROC;
-/* endregion */
+/* endregion ;
 
-/* region Class Example */
+/* region Class Example ;
 :CLASS ExampleClass;
     :DECLARE sName, nAge;
     
@@ -81,46 +80,46 @@
     :PROCEDURE GetInfo;
         :RETURN "Name: " + THIS:sName + ", Age: " + Str(THIS:nAge);
     :ENDPROC;
-/* endregion */
+/* endregion ;
 
-/* region Inline Code Example */
+/* region Inline Code Example ;
 :BEGININLINECODE "HelperFunction";
     :PROCEDURE HelperFunction;
         :PARAMETERS sParam;
         :RETURN "Processed: " + sParam;
     :ENDPROC;
 :ENDINLINECODE;
-/* endregion */
+/* endregion ;
 
-/* region Array and Expression Examples */
+/* region Array and Expression Examples ;
 :DECLARE aValues, aMatrix;
 
-/* Array literal with curly braces */
+/* Array literal with curly braces ;
 aValues := {1, 2, 3, 4, 5};
 
-/* Multi-dimensional array */
+/* Multi-dimensional array ;
 aMatrix := {
     {1, 2, 3},
     {4, 5, 6},
     {7, 8, 9}
 };
 
-/* Function calls with parentheses */
+/* Function calls with parentheses ;
 nResult := Max(aValues);
 sFormatted := Format(nResult, "###.##");
 
-/* Array access with square brackets */
+/* Array access with square brackets ;
 nFirstValue := aValues[1];
 nMatrixValue := aMatrix[2][3];
 
-/* Code block literal */
+/* Code block literal ;
 bCodeBlock := {|x| x * x};
-/* endregion */
+/* endregion ;
 
-/* region Error Handling Block */
+/* region Error Handling Block ;
 :ERROR;
-    /* Error handling code */
+    /* Error handling code ;
     LogError("An error occurred in the main script");
-/* endregion */
+/* endregion ;
 
-/* End of SSL Bracket Matching Example */
+/* End of SSL Bracket Matching Example ;
