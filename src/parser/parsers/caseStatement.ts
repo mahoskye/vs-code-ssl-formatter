@@ -38,6 +38,10 @@ export interface CaseParser {
 export function parseSwitchStatement(parser: CaseParser): SwitchStatementNode {
     const startToken = parser.previous(); // BEGINCASE token
 
+    // According to SSL EBNF grammar: BeginCaseStatement ::= ":" "BEGINCASE"
+    // No expression needed after BEGINCASE, just the semicolon
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after BEGINCASE");
+
     const cases: CaseBlockNode[] = [];
     let otherwiseBlock: OtherwiseBlockNode | undefined = undefined;
 

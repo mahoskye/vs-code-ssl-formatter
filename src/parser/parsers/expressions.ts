@@ -36,6 +36,7 @@ export interface ExpressionParserContext {
     error(message: string): void;
     createErrorNode(): ExpressionNode;
     parseArgumentList(): ArgumentListNode;
+    skipWhitespace(): void;
 }
 
 /**
@@ -593,15 +594,24 @@ function parseCodeBlockLiteral(context: ExpressionParserContext): ExpressionNode
             }
         }
     }
-
     context.consume(TokenType.PIPE, "Expected '|' after code block parameters");
+
+    // Skip whitespace before parsing expressions
+    context.skipWhitespace();
 
     // Parse expression list - handle both single expressions and comma-separated lists
     if (!context.check(TokenType.RBRACE)) {
         do {
+            // Skip whitespace before each expression
+            context.skipWhitespace();
             body.push(parseExpression(context));
+            // Skip whitespace after expression
+            context.skipWhitespace();
         } while (context.match(TokenType.COMMA));
     }
+
+    // Skip whitespace before closing brace
+    context.skipWhitespace();
 
     context.consume(TokenType.RBRACE, "Expected '}' after code block body");
     const endToken = context.previous();

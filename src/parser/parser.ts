@@ -32,6 +32,7 @@ import {
     parseReturnStatement,
     parseLabelStatement,
     parseRegionStatement,
+    parseInlineCodeBlock,
     parseExitWhileStatement,
     parseExitForStatement,
     parseLoopContinueStatement,
@@ -251,7 +252,6 @@ export class Parser
                 return parseForStatement(this);
             case TokenType.BEGINCASE:
                 this.advance(); // consume 'BEGINCASE'
-                this.consume(TokenType.SEMICOLON, "Expected ';' after :BEGINCASE.");
                 return parseSwitchStatement(this);
             case TokenType.TRY:
                 this.advance(); // consume 'TRY'

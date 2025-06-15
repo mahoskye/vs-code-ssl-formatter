@@ -1,5 +1,5 @@
 import { Token } from "../../tokenizer/token";
-import { ASTNode, ASTNodeType } from "./base";
+import { ASTNode, ASTNodeType, StatementNode } from "./base";
 // import { StringLiteralNode, ArrayLiteralNode } from './literals';
 // import { StatementNode } from './base'; // For InlineCodeBlock body
 
@@ -11,9 +11,8 @@ export interface LabelStatementNode extends ASTNode {
 export interface RegionBlockNode extends ASTNode {
     // Keyword-based :REGION / :ENDREGION
     kind: ASTNodeType.RegionBlock;
-    // start: RegionStartNode;
-    // body: any[]; // Can contain various elements, not just statements
-    // end: RegionEndNode;
+    name: Token;
+    statements: StatementNode[];
 }
 
 export interface RegionStartNode extends ASTNode {
@@ -27,9 +26,8 @@ export interface RegionEndNode extends ASTNode {
 
 export interface InlineCodeBlockNode extends ASTNode {
     kind: ASTNodeType.InlineCodeBlock;
-    // start: InlineCodeStartNode;
-    // body: StatementNode[];
-    // end: InlineCodeEndNode;
+    language?: Token | any; // Language specifier (identifier or string)
+    statements: StatementNode[];
 }
 
 export interface InlineCodeStartNode extends ASTNode {

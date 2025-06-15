@@ -6,10 +6,6 @@ import * as path from "path";
 
 async function main() {
     try {
-        console.log("Jest test runner initialized");
-        console.log("Extension development path:", path.resolve(__dirname, "../../"));
-        console.log("Test files will be discovered by Jest configuration");
-
         // Jest will handle the actual test execution
         // This file exists for compatibility with existing scripts
     } catch (err) {

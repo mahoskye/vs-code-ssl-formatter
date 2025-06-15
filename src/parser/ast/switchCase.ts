@@ -3,6 +3,7 @@ import { ASTNode, ASTNodeType, StatementNode, ExpressionNode } from "./base";
 
 export interface SwitchStatementNode extends ASTNode {
     kind: ASTNodeType.SwitchStatement;
+    expression?: ExpressionNode; // Optional for SSL BEGINCASE which doesn't have a switch expression
     cases: CaseBlockNode[];
     otherwiseBlock?: OtherwiseBlockNode;
 }

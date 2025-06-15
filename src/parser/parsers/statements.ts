@@ -15,6 +15,7 @@ import {
     ReturnStatementNode,
     LabelStatementNode,
     RegionBlockNode,
+    InlineCodeBlockNode,
     ExitWhileStatementNode,
     ExitForStatementNode,
     LoopContinueNode,
@@ -33,8 +34,10 @@ export interface StatementParser {
     check(type: TokenType): boolean;
     checkNext(type: TokenType): boolean;
     consume(type: TokenType, message: string): Token;
+    parseStatement(): StatementNode | null;
     parseIdentifierList(): IdentifierListNode;
     parseExpression(): ExpressionNode;
+    skipWhitespace(): void;
     error(message: string): void;
     isAtEnd(): boolean;
 }
@@ -168,24 +171,29 @@ export function parseLabelStatement(parser: StatementParser): LabelStatementNode
 export function parseRegionStatement(parser: StatementParser): RegionBlockNode {
     const startToken = parser.previous(); // REGION token
     const name = parser.consume(TokenType.IDENTIFIER, "Expected region name");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after region name");
 
     const body: StatementNode[] = [];
 
     // Parse statements until :ENDREGION
-    while (
-        !parser.isAtEnd() &&
-        !(parser.check(TokenType.COLON) && parser.peek().type === TokenType.ENDREGION)
-    ) {
-        // Note: This would need to be implemented by the main parser
-        // For now, we'll just skip to the end
-        break;
+    while (!parser.isAtEnd()) {
+        parser.skipWhitespace();
+
+        // Check for :ENDREGION before trying to parse the next statement
+        if (parser.check(TokenType.COLON) && parser.checkNext(TokenType.ENDREGION)) {
+            break;
+        }
+
+        const stmt = parser.parseStatement();
+        if (stmt) {
+            body.push(stmt);
+        }
     }
 
     // Consume :ENDREGION
-    if (parser.check(TokenType.COLON)) {
-        parser.advance(); // consume ':'
-        parser.consume(TokenType.ENDREGION, "Expected 'ENDREGION'");
-    }
+    parser.consume(TokenType.COLON, "Expected ':' before ENDREGION");
+    parser.consume(TokenType.ENDREGION, "Expected 'ENDREGION'");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after ENDREGION");
 
     const endToken = parser.previous();
 
@@ -194,8 +202,67 @@ export function parseRegionStatement(parser: StatementParser): RegionBlockNode {
         startToken,
         endToken,
         name,
-        body,
+        statements: body,
     } as RegionBlockNode;
+}
+
+/**
+ * Parse inline code block statement
+ * :BEGININLINECODE [language] ; {Statement} :ENDINLINECODE ;
+ */
+export function parseInlineCodeBlock(parser: StatementParser): InlineCodeBlockNode {
+    const startToken = parser.previous(); // BEGININLINECODE token
+
+    let language: any = undefined;
+
+    // Optional language specification
+    if (parser.check(TokenType.STRING) || parser.check(TokenType.IDENTIFIER)) {
+        const langToken = parser.advance();
+        language =
+            langToken.type === TokenType.STRING
+                ? {
+                      kind: ASTNodeType.StringLiteral,
+                      startToken: langToken,
+                      endToken: langToken,
+                      value: langToken.parsedValue || langToken.value,
+                      token: langToken,
+                  }
+                : langToken;
+    }
+
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after BEGININLINECODE");
+
+    const body: StatementNode[] = [];
+
+    // Parse statements until :ENDINLINECODE
+    while (!parser.isAtEnd()) {
+        parser.skipWhitespace();
+
+        // Check for :ENDINLINECODE before trying to parse the next statement
+        if (parser.check(TokenType.COLON) && parser.checkNext(TokenType.ENDINLINECODE)) {
+            break;
+        }
+
+        const stmt = parser.parseStatement();
+        if (stmt) {
+            body.push(stmt);
+        }
+    }
+
+    // Consume :ENDINLINECODE
+    parser.consume(TokenType.COLON, "Expected ':' before ENDINLINECODE");
+    parser.consume(TokenType.ENDINLINECODE, "Expected 'ENDINLINECODE'");
+    parser.consume(TokenType.SEMICOLON, "Expected ';' after ENDINLINECODE");
+
+    const endToken = parser.previous();
+
+    return {
+        kind: ASTNodeType.InlineCodeBlock,
+        startToken,
+        endToken,
+        language,
+        statements: body,
+    } as InlineCodeBlockNode;
 }
 
 /**

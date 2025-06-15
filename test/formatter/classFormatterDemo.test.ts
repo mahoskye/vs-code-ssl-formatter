@@ -38,57 +38,34 @@ describe("SSL Class Formatter Integration Demo", () => {
             endToken: completeClass.endToken,
             body: [completeClass],
         };
-
         const formattedCode = formatter.format(program);
-        console.log("=".repeat(80));
-        console.log("SSL CLASS FORMATTER INTEGRATION - COMPLETE DEMO");
-        console.log("=".repeat(80));
-        console.log("FORMATTED SSL CLASS CODE:");
-        console.log("-".repeat(80));
-        console.log(formattedCode);
-        console.log("-".repeat(80));
 
         // Verify the formatted output matches EBNF grammar expectations
         const lines = formattedCode.split("\n").filter((line) => line.trim() !== "");
 
         // 1. ClassDeclaration ::= ":" "CLASS" Identifier
         expect(lines[0]).toMatch(/^:CLASS clsAdvancedExample;$/);
-        console.log(
-            '✓ Class declaration follows EBNF: ClassDeclaration ::= ":" "CLASS" Identifier'
-        );
 
         // 2. InheritStatement ::= ":" "INHERIT" Identifier (supports qualified names)
         expect(lines[1]).toMatch(/^:INHERIT Research\.clsBaseVehicle;$/);
-        console.log('✓ Inheritance follows EBNF: InheritStatement ::= ":" "INHERIT" Identifier');
 
         // 3. ClassFieldDeclaration ::= ":" "DECLARE" IdentifierList
         expect(lines[2]).toMatch(
             /^:DECLARE sManufacturer, nEngineSize, bIsElectric, dManufactureDate;$/
         );
-        console.log(
-            '✓ Field declaration follows EBNF: ClassFieldDeclaration ::= ":" "DECLARE" IdentifierList'
-        );
 
         // 4. MethodDeclaration ::= ProcedureStatement (procedures within class context)
         expect(lines[3]).toMatch(/^:PROCEDURE CalculateValue;$/);
         expect(lines[4]).toMatch(/^:ENDPROC;$/);
-        console.log("✓ Method declaration follows EBNF: MethodDeclaration ::= ProcedureStatement");
 
         // 5. Verify proper indentation and spacing
         expect(formattedCode).toContain("\n\n"); // Blank lines between major sections
-        console.log("✓ Proper indentation and spacing maintained");
 
         // 6. Verify Hungarian notation support (SSL convention)
         expect(formattedCode).toContain("sManufacturer"); // String
         expect(formattedCode).toContain("nEngineSize"); // Number
         expect(formattedCode).toContain("bIsElectric"); // Boolean
         expect(formattedCode).toContain("dManufactureDate"); // Date
-        console.log("✓ Hungarian notation preserved (SSL coding convention)");
-
-        console.log("=".repeat(80));
-        console.log("🎉 SSL CLASS FORMATTER INTEGRATION COMPLETE!");
-        console.log("All EBNF grammar rules correctly implemented and tested.");
-        console.log("=".repeat(80));
     });
 
     function createComprehensiveClassExample(): ClassDefinitionNode {

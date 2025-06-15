@@ -684,17 +684,11 @@ describe("SSLControlFlowFormatterVisitor", () => {
             tabVisitor.visit(ifNode);
             const output = tabVisitor.getFormattedOutput();
 
-            // Debug: log the output to see what's being generated
-            console.log("Debug output:", JSON.stringify(output));
-
             // With useTabs: true, indented lines should contain tab characters
             const lines = output.split("\n");
             const indentedLines = lines.filter(
                 (line) => line.startsWith("\t") || line.startsWith(" ")
             );
-
-            console.log("Debug lines:", lines);
-            console.log("Debug indented lines:", indentedLines);
 
             if (tabOptions.useTabs) {
                 // At least one line should start with a tab

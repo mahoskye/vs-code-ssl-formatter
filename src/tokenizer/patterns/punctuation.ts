@@ -21,7 +21,10 @@ export const SSL_PUNCTUATION: Map<string, TokenType> = new Map([
 /**
  * Multi-character punctuation patterns (ordered by length, longest first)
  */
-export const SSL_MULTI_PUNCTUATION: [string, TokenType][] = [["{|", TokenType.CODE_BLOCK_START]];
+export const SSL_MULTI_PUNCTUATION: [string, TokenType][] = [
+    ["{|", TokenType.CODE_BLOCK_START],
+    ["|}", TokenType.CODE_BLOCK_END],
+];
 
 /**
  * Attempts to match punctuation at the given position
@@ -48,7 +51,7 @@ export function matchPunctuation(input: string, position: number): [string, Toke
             return null;
         }
         if (char === "}" && position > 0 && input[position - 1] === "|") {
-            // This will be handled by multi-character check above
+            // This should be handled by multi-character check above for |}
             return null;
         } // For braces, use the mapped token types (LBRACE/RBRACE)
         // instead of hardcoding ARRAY_START/ARRAY_END
