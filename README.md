@@ -18,6 +18,17 @@ This Visual Studio Code extension provides syntax highlighting and folding for S
 
 Once installed, the extension will automatically activate for files with `.ssl` or `.ssl.txt` extensions.
 
+## Building from Source
+
+To build the extension from source:
+
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Compile TypeScript: `npm run compile`
+4. Package the extension: `npm run package`
+
+The packaged `.vsix` file can then be installed in VS Code manually.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.

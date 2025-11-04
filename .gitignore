@@ -2,6 +2,9 @@
 out/
 dist/
 
+# Configuration files
+config/config.private.json
+
 # Dependencies
 node_modules/
 
