@@ -1,0 +1,15 @@
+{
+  "name": "tree-sitter-ssl",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tree-sitter grammar for STARLIMS Scripting Language (SSL)",
+  "main": "grammar.js",
+  "keywords": ["tree-sitter", "grammar", "ssl", "starlims"],
+  "scripts": {
+    "gen": "tree-sitter generate",
+    "test": "tree-sitter test"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.22.5"
+  }
+}
