@@ -140,6 +140,8 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		this.keywordDocs.set("ENDREGION", "Marks the end of a code region");
 		this.keywordDocs.set("CLASS", "Defines a class");
 		this.keywordDocs.set("INHERIT", "Specifies base class for inheritance");
+		this.keywordDocs.set("BEGININLINECODE", "Marks the beginning of an inline code block");
+		this.keywordDocs.set("ENDINLINECODE", "Marks the end of an inline code block");
 		this.keywordDocs.set("EXITFOR", "Exits a FOR loop immediately");
 		this.keywordDocs.set("EXITWHILE", "Exits a WHILE loop immediately");
 		this.keywordDocs.set("EXITCASE", "Exits a CASE statement immediately");

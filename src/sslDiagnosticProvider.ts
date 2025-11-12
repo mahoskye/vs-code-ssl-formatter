@@ -38,6 +38,10 @@ export class SSLDiagnosticProvider {
 		const preventSqlInjection = config.get<boolean>("security.preventSqlInjection", true);
 		const requireParameterized = config.get<boolean>("security.requireParameterizedQueries", true);
 
+		// Style guide settings
+		const enforceKeywordCase = config.get<boolean>("styleGuide.enforceKeywordCase", true);
+		const enforceCommentSyntax = config.get<boolean>("styleGuide.enforceCommentSyntax", true);
+
 		for (let i = 0; i < lines.length && diagnostics.length < maxProblems; i++) {
 			const line = lines[i];
 			const trimmed = line.trim();
@@ -191,6 +195,37 @@ export class SSLDiagnosticProvider {
 						vscode.DiagnosticSeverity.Information
 					);
 					diagnostic.code = "ssl-missing-otherwise";
+					diagnostics.push(diagnostic);
+				}
+			}
+
+			// Check keyword case (should be UPPERCASE)
+			if (enforceKeywordCase) {
+				const keywordMatch = trimmed.match(/^:([A-Za-z]+)\b/);
+				if (keywordMatch) {
+					const keyword = keywordMatch[1];
+					if (keyword !== keyword.toUpperCase()) {
+						const diagnostic = new vscode.Diagnostic(
+							new vscode.Range(i, line.indexOf(`:${keyword}`), i, line.indexOf(`:${keyword}`) + keyword.length + 1),
+							`Keyword should be UPPERCASE: :${keyword.toUpperCase()} (style guide requires UPPERCASE keywords)`,
+							vscode.DiagnosticSeverity.Warning
+						);
+						diagnostic.code = "ssl-keyword-case";
+						diagnostics.push(diagnostic);
+					}
+				}
+			}
+
+			// Check comment syntax (should be /* ... ; not /* ... */)
+			if (enforceCommentSyntax) {
+				const invalidCommentMatch = line.match(/\/\*.*\*\//);
+				if (invalidCommentMatch && !line.includes(';')) {
+					const diagnostic = new vscode.Diagnostic(
+						new vscode.Range(i, 0, i, line.length),
+						"Invalid SSL comment syntax: Comments should use /* ... ; (semicolon terminator, not */)",
+						vscode.DiagnosticSeverity.Warning
+					);
+					diagnostic.code = "ssl-comment-syntax";
 					diagnostics.push(diagnostic);
 				}
 			}

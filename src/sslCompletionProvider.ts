@@ -98,6 +98,8 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			{ name: "ENDREGION", description: "End code region" },
 			{ name: "CLASS", description: "Define a class" },
 			{ name: "INHERIT", description: "Inherit from base class" },
+			{ name: "BEGININLINECODE", description: "Begin inline code block" },
+			{ name: "ENDINLINECODE", description: "End inline code block" },
 			{ name: "ERROR", description: "Error marker" },
 			{ name: "LABEL", description: "Label for GOTO" },
 			{ name: "EXITFOR", description: "Exit for loop" },
