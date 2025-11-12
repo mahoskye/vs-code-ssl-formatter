@@ -11,6 +11,10 @@ import { SSLRenameProvider } from "./sslRenameProvider";
 import { SSLSignatureHelpProvider } from "./sslSignatureHelpProvider";
 import { SSLCodeLensProvider } from "./sslCodeLensProvider";
 import { SSLCodeActionProvider } from "./sslCodeActionProvider";
+import { SSLWorkspaceSymbolProvider } from "./sslWorkspaceSymbolProvider";
+import { SSLDocumentHighlightProvider } from "./sslDocumentHighlightProvider";
+import { SSLCallHierarchyProvider } from "./sslCallHierarchyProvider";
+import { SSLInlayHintsProvider } from "./sslInlayHintsProvider";
 
 /**
  * Activates the SSL extension.
@@ -157,7 +161,27 @@ export function activate(context: vscode.ExtensionContext) {
         )
     );
 
-    console.log("SSL extension fully activated with all language features");
+    // Register workspace symbol provider for global search (Ctrl+T)
+    context.subscriptions.push(
+        vscode.languages.registerWorkspaceSymbolProvider(new SSLWorkspaceSymbolProvider())
+    );
+
+    // Register document highlight provider for symbol occurrence highlighting
+    context.subscriptions.push(
+        vscode.languages.registerDocumentHighlightProvider(documentSelector, new SSLDocumentHighlightProvider())
+    );
+
+    // Register call hierarchy provider for procedure call trees
+    context.subscriptions.push(
+        vscode.languages.registerCallHierarchyProvider(documentSelector, new SSLCallHierarchyProvider())
+    );
+
+    // Register inlay hints provider for parameter names
+    context.subscriptions.push(
+        vscode.languages.registerInlayHintsProvider(documentSelector, new SSLInlayHintsProvider())
+    );
+
+    console.log("SSL extension fully activated with all language features including workspace search, call hierarchy, and inlay hints");
 }
 
 /**

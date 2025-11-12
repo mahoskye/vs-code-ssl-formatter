@@ -2,6 +2,31 @@
 
 All notable changes to the "STARLIMS Scripting Language Formatter" extension will be documented in this file.
 
+## [0.4.0] - 2025-11-12
+
+### Added
+
+-   **Workspace Symbol Search** (`Ctrl+T`): Search for procedures, classes, and regions across the entire workspace
+-   **Document Highlight**: Automatic highlighting of all symbol occurrences in current document
+    -   Distinguishes between read, write, and definition occurrences
+    -   Filters out comments automatically
+-   **Call Hierarchy**: Visual call tree showing incoming and outgoing calls for procedures
+    -   View which procedures call the current one (incoming)
+    -   View which procedures are called by the current one (outgoing)
+    -   Navigate through the call hierarchy tree
+-   **Inlay Hints** (Experimental): Parameter name hints displayed inline in function calls
+    -   Shows parameter names for 30+ built-in SSL functions
+    -   Toggle via `ssl.intellisense.inlayHints.enabled`
+    -   Disabled by default for cleaner code view
+-   **Configuration**:
+    -   `ssl.intellisense.inlayHints.enabled`: Enable inlay hints (default: false)
+    -   `ssl.intellisense.inlayHints.parameterNames`: Show parameter names (default: false)
+
+### Changed
+
+-   Enhanced workspace-wide features for multi-file projects
+-   Improved symbol recognition across different file types (.ssl, .srvscr, .ds)
+
 ## [0.3.0] - 2025-11-12
 
 ### Added

@@ -63,6 +63,19 @@ Powerful navigation features for exploring code:
   - Prevents renaming keywords and built-in functions
 - **CodeLens**: Shows reference counts above procedures
 - **Peek Definition** (`Alt+F12`): Preview definition inline
+- **Workspace Symbol Search** (`Ctrl+T`): Search for symbols across entire workspace
+  - Find procedures, classes, and regions in any file
+  - Fast fuzzy search across all SSL files
+- **Document Highlight**: Automatic highlighting of symbol occurrences
+  - Distinguishes read, write, and definition locations
+  - Works across the entire document
+- **Call Hierarchy**: Visual procedure call tree
+  - View incoming calls (which procedures call this one)
+  - View outgoing calls (which procedures this one calls)
+  - Navigate through complex call relationships
+- **Inlay Hints** (Experimental): Parameter names shown inline
+  - Display parameter names for built-in functions
+  - Optional feature, disabled by default
 
 ### Hover Information
 
@@ -150,6 +163,8 @@ The extension provides extensive configuration options. Access settings via `Ctr
 - `ssl.intellisense.enabled`: Enable IntelliSense features (default: true)
 - `ssl.intellisense.codeLens.enabled`: Show CodeLens reference counts above procedures (default: true)
 - `ssl.intellisense.signatureHelp.enabled`: Show parameter hints while typing function calls (default: true)
+- `ssl.intellisense.inlayHints.enabled`: Enable inlay hints (experimental, default: false)
+- `ssl.intellisense.inlayHints.parameterNames`: Show parameter names inline (default: false)
 
 ### Example Configuration
 
