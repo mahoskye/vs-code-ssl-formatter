@@ -170,12 +170,12 @@
                 },
                 "ssl.intellisense.inlayHints.enabled": {
                     "type": "boolean",
-                    "default": false,
-                    "description": "Enable inlay hints for parameter names (experimental)"
+                    "default": true,
+                    "description": "Enable inlay hints for parameter names"
                 },
                 "ssl.intellisense.inlayHints.parameterNames": {
                     "type": "boolean",
-                    "default": false,
+                    "default": true,
                     "description": "Show parameter names as inlay hints in function calls"
                 },
                 "ssl.trace.server": {

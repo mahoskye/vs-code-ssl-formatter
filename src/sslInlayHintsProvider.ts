@@ -28,7 +28,6 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 		const hints: vscode.InlayHint[] = [];
 		const text = document.getText(range);
-		const startLine = range.start.line;
 
 		// Find function calls in the range
 		const functionCallPattern = /\b([A-Za-z_]\w*)\s*\(([^)]*)\)/g;
@@ -37,6 +36,13 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		while ((match = functionCallPattern.exec(text)) !== null) {
 			const functionName = match[1];
 			const args = match[2];
+
+			// Special handling for DoProc
+			if (functionName.toUpperCase() === "DOPROC") {
+				const doProcHints = this.getDoProcInlayHints(document, range, match);
+				hints.push(...doProcHints);
+				continue;
+			}
 
 			// Get parameter names for this function
 			const paramNames = this.functionSignatures.get(functionName.toUpperCase());
@@ -83,6 +89,124 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		}
 
 		return hints;
+	}
+
+	/**
+	 * Get inlay hints for DoProc calls with actual procedure parameters
+	 */
+	private getDoProcInlayHints(
+		document: vscode.TextDocument,
+		range: vscode.Range,
+		match: RegExpExecArray
+	): vscode.InlayHint[] {
+		const hints: vscode.InlayHint[] = [];
+		const fullMatch = match[0]; // e.g., "DoProc("ValidateSample", {sSampleId, @sErrorMsg})"
+		const functionName = match[1]; // "DoProc"
+		const args = match[2]; // everything inside the parentheses
+
+		// Parse to get procedure name and array contents
+		// Expected format: DoProc("ProcedureName", {param1, param2, param3})
+		const doProcPattern = /["']([^"']+)["']\s*,\s*\{([^}]*)\}/;
+		const doProcMatch = args.match(doProcPattern);
+		
+		if (!doProcMatch) {
+			return hints;
+		}
+
+		const procedureName = doProcMatch[1];
+		const arrayContents = doProcMatch[2];
+
+		// Find the procedure parameters
+		const paramNames = this.getProcedureParameters(document, procedureName);
+		if (paramNames.length === 0) {
+			return hints;
+		}
+
+		// Parse the arguments inside the curly braces
+		const arrayArgs = this.parseArguments(arrayContents);
+
+		// Find the position of the opening brace
+		const openBraceIndex = args.indexOf('{');
+		if (openBraceIndex === -1) {
+			return hints;
+		}
+
+		// Calculate offset to the start of array contents
+		let currentOffset = match.index + functionName.length + 1 + openBraceIndex + 1; // After 'DoProc(' + position + '{'
+		
+		// Create hints for each argument matching procedure parameters
+		for (let i = 0; i < arrayArgs.length && i < paramNames.length; i++) {
+			const arg = arrayArgs[i].trim();
+			if (!arg) {
+				currentOffset += arrayArgs[i].length + 1;
+				continue;
+			}
+
+			const absoluteOffset = document.offsetAt(range.start) + currentOffset;
+			const position = document.positionAt(absoluteOffset);
+
+			// Skip whitespace to find actual argument start
+			const lineText = document.lineAt(position.line).text;
+			let charIndex = position.character;
+			while (charIndex < lineText.length && /\s/.test(lineText[charIndex])) {
+				charIndex++;
+			}
+
+			const hintPosition = new vscode.Position(position.line, charIndex);
+			const hint = new vscode.InlayHint(
+				hintPosition,
+				`${paramNames[i]}:`,
+				vscode.InlayHintKind.Parameter
+			);
+
+			hint.paddingRight = true;
+			hints.push(hint);
+
+			currentOffset += arrayArgs[i].length + 1; // Move past arg and comma
+		}
+
+		return hints;
+	}
+
+	/**
+	 * Get parameter names for a procedure from its definition
+	 */
+	private getProcedureParameters(document: vscode.TextDocument, procedureName: string): string[] {
+		const text = document.getText();
+		const lines = text.split('\n');
+
+		// Find the procedure definition
+		const procedurePattern = new RegExp(`^\\s*:PROCEDURE\\s+${procedureName}\\b`, 'i');
+		let procedureLineIndex = -1;
+
+		for (let i = 0; i < lines.length; i++) {
+			if (procedurePattern.test(lines[i])) {
+				procedureLineIndex = i;
+				break;
+			}
+		}
+
+		if (procedureLineIndex === -1) {
+			return [];
+		}
+
+		// Look for :PARAMETERS line after :PROCEDURE
+		for (let i = procedureLineIndex + 1; i < Math.min(procedureLineIndex + 20, lines.length); i++) {
+			const line = lines[i].trim();
+
+			// Check for :PARAMETERS
+			const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
+			if (paramsMatch) {
+				return paramsMatch[1].split(',').map(p => p.trim());
+			}
+
+			// Stop at next procedure or other block keyword
+			if (/^:(PROCEDURE|ENDPROC|DECLARE)\b/i.test(line)) {
+				break;
+			}
+		}
+
+		return [];
 	}
 
 	private parseArguments(argsString: string): string[] {

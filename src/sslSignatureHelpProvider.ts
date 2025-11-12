@@ -34,6 +34,49 @@ export class SSLSignatureHelpProvider implements vscode.SignatureHelpProvider {
 			return null;
 		}
 
+		// Special handling for DoProc - check if we're inside the array parameter
+		if (functionCall.name.toUpperCase() === "DOPROC") {
+			// Check if we're inside the curly braces (array parameter)
+			const arrayMatch = beforeCursor.match(/DoProc\s*\(\s*["']([^"']+)["']\s*,\s*\{([^}]*)/i);
+			if (arrayMatch) {
+				const procedureName = arrayMatch[1];
+				const insideArray = arrayMatch[2];
+				
+				// Count which parameter we're on inside the array
+				let arrayParamIndex = 0;
+				let depth = 0;
+				for (let i = 0; i < insideArray.length; i++) {
+					if (insideArray[i] === '{') {
+						depth++;
+					} else if (insideArray[i] === '}') {
+						depth--;
+					} else if (insideArray[i] === ',' && depth === 0) {
+						arrayParamIndex++;
+					}
+				}
+				
+				// Get the procedure's signature
+				const procedureSignature = this.getProcedureSignature(document, beforeCursor);
+				if (procedureSignature) {
+					const signatureHelp = new vscode.SignatureHelp();
+					const signatureInfo = new vscode.SignatureInformation(
+						`DoProc("${procedureName}", {${procedureSignature.parameters.join(', ')}})`,
+						procedureSignature.documentation
+					);
+
+					procedureSignature.parameters.forEach(param => {
+						signatureInfo.parameters.push(new vscode.ParameterInformation(param));
+					});
+
+					signatureHelp.signatures = [signatureInfo];
+					signatureHelp.activeSignature = 0;
+					signatureHelp.activeParameter = arrayParamIndex;
+
+					return signatureHelp;
+				}
+			}
+		}
+
 		const signature = this.functionSignatures.get(functionCall.name.toUpperCase());
 		if (!signature) {
 			return null;
@@ -85,21 +128,106 @@ export class SSLSignatureHelpProvider implements vscode.SignatureHelpProvider {
 		const functionName = match[1];
 
 		// Count the parameter index by counting commas
+		// Track both parentheses and curly braces depth to avoid counting commas inside arrays
 		const insideParen = text.substring(functionStart + 1);
 		let parameterIndex = 0;
 		let parenDepth = 0;
+		let braceDepth = 0;
 
 		for (let i = 0; i < insideParen.length; i++) {
 			if (insideParen[i] === "(") {
 				parenDepth++;
 			} else if (insideParen[i] === ")") {
 				parenDepth--;
-			} else if (insideParen[i] === "," && parenDepth === 0) {
+			} else if (insideParen[i] === "{") {
+				braceDepth++;
+			} else if (insideParen[i] === "}") {
+				braceDepth--;
+			} else if (insideParen[i] === "," && parenDepth === 0 && braceDepth === 0) {
 				parameterIndex++;
 			}
 		}
 
 		return { name: functionName, parameterIndex };
+	}
+
+	/**
+	 * Get signature for a procedure called via DoProc
+	 */
+	private getProcedureSignature(document: vscode.TextDocument, textBeforeCursor: string): FunctionSignature | null {
+		// Extract the procedure name from DoProc("ProcedureName", ...)
+		const procNameMatch = textBeforeCursor.match(/DoProc\s*\(\s*["']([^"']+)["']/i);
+		if (!procNameMatch) {
+			return null;
+		}
+
+		const procedureName = procNameMatch[1];
+		const text = document.getText();
+		const lines = text.split('\n');
+
+		// Find the procedure definition
+		const procedurePattern = new RegExp(`^\\s*:PROCEDURE\\s+${procedureName}\\b`, 'i');
+		let procedureLineIndex = -1;
+
+		for (let i = 0; i < lines.length; i++) {
+			if (procedurePattern.test(lines[i])) {
+				procedureLineIndex = i;
+				break;
+			}
+		}
+
+		if (procedureLineIndex === -1) {
+			return null;
+		}
+
+		// Look for :PARAMETERS line after :PROCEDURE
+		const parameters: string[] = [];
+		let documentation = `User-defined procedure: ${procedureName}`;
+
+		for (let i = procedureLineIndex + 1; i < Math.min(procedureLineIndex + 20, lines.length); i++) {
+			const line = lines[i].trim();
+
+			// Check for :PARAMETERS
+			const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
+			if (paramsMatch) {
+				const paramList = paramsMatch[1].split(',').map(p => p.trim());
+				parameters.push(...paramList);
+				break;
+			}
+
+			// Stop at next procedure or other block keyword
+			if (/^:(PROCEDURE|ENDPROC|DECLARE)\b/i.test(line)) {
+				break;
+			}
+
+			// Extract documentation from comments
+			if (line.startsWith('/*') && !line.endsWith(';')) {
+				// Start of multi-line comment
+				let commentText = '';
+				for (let j = i; j < Math.min(i + 10, lines.length); j++) {
+					const commentLine = lines[j].trim();
+					if (commentLine.endsWith(';')) {
+						break;
+					}
+					if (commentLine.startsWith('*') && !commentLine.startsWith('/*')) {
+						commentText += commentLine.substring(1).trim() + ' ';
+					}
+				}
+				if (commentText) {
+					documentation = commentText.trim();
+				}
+			}
+		}
+
+		// Build signature label
+		const paramString = parameters.length > 0 ? parameters.join(', ') : '';
+		const label = `${procedureName}(${paramString})`;
+
+		return {
+			label,
+			parameters,
+			documentation
+		};
 	}
 
 	private initializeFunctionSignatures(): void {

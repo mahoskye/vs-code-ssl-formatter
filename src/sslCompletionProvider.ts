@@ -31,9 +31,17 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			return [];
 		}
 
+		const lineText = document.lineAt(position.line).text;
+		const textBeforeCursor = lineText.substring(0, position.character);
+
+		// Check if we're inside a DoProc call suggesting procedure names
+		const doProcMatch = textBeforeCursor.match(/DoProc\s*\(\s*["']([^"']*)$/i);
+		if (doProcMatch) {
+			return this.getProcedureCompletions(document);
+		}
+
 		// Check if this is an object member completion (after ':')
 		if (context.triggerCharacter === ':') {
-			const lineText = document.lineAt(position.line).text;
 			const textBeforeColon = lineText.substring(0, position.character - 1);
 
 			// Get the object variable name before the colon
@@ -414,6 +422,35 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		}
 
 		return members;
+	}
+
+	/**
+	 * Get procedure completions from the current document and workspace
+	 */
+	private getProcedureCompletions(document: vscode.TextDocument): vscode.CompletionItem[] {
+		const completions: vscode.CompletionItem[] = [];
+		const procedureNames = new Set<string>();
+		const text = document.getText();
+		const lines = text.split('\n');
+
+		// Pattern to match :PROCEDURE ProcedureName
+		const procedurePattern = /^\s*:PROCEDURE\s+(\w+)/i;
+
+		for (const line of lines) {
+			const match = line.match(procedurePattern);
+			if (match) {
+				const procName = match[1];
+				if (!procedureNames.has(procName)) {
+					procedureNames.add(procName);
+					const item = new vscode.CompletionItem(procName, vscode.CompletionItemKind.Function);
+					item.detail = 'User-defined procedure';
+					item.insertText = procName;
+					completions.push(item);
+				}
+			}
+		}
+
+		return completions;
 	}
 
 	/**
