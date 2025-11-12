@@ -303,7 +303,7 @@ export class SSLDiagnosticProvider {
 	private isMultilineConstruct(line: string): boolean {
 		// Check if line is part of a multi-line construct that doesn't need semicolon on every line
 		// Or is a control flow keyword that ends with the keyword itself
-		return /^:(IF|ELSE|ELSEIF|WHILE|FOR|TO|STEP|FOREACH|IN|BEGINCASE|CASE|OTHERWISE|EXITCASE|TRY|CATCH|FINALLY|PROCEDURE|PARAMETERS|DEFAULT|CLASS|INHERIT|REGION|ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDPROCEDURE|ENDREGION|LOOP|EXITWHILE|RETURN)\b/i.test(line);
+		return /^:(IF|ELSE|WHILE|FOR|TO|STEP|FOREACH|IN|BEGINCASE|CASE|OTHERWISE|EXITCASE|TRY|CATCH|FINALLY|PROCEDURE|PARAMETERS|DEFAULT|CLASS|INHERIT|REGION|ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDPROCEDURE|ENDREGION|LOOP|EXITWHILE|RETURN)\b/i.test(line);
 	}
 
 	private hasValidHungarianNotation(name: string): boolean {

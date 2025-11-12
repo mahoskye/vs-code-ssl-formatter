@@ -95,7 +95,7 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 
 	private isKeyword(word: string): boolean {
 		const keywords = [
-			"IF", "ELSE", "ELSEIF", "ENDIF",
+			"IF", "ELSE", "ENDIF",
 			"WHILE", "ENDWHILE", "FOR", "TO", "STEP", "NEXT",
 			"FOREACH", "IN", "BEGINCASE", "CASE", "OTHERWISE", "ENDCASE",
 			"TRY", "CATCH", "FINALLY", "ENDTRY",

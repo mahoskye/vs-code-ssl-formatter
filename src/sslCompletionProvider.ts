@@ -67,8 +67,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 	private initializeKeywords(): void {
 		const keywords = [
 			{ name: "IF", description: "Conditional statement" },
-			{ name: "ELSE", description: "Alternative condition" },
-			{ name: "ELSEIF", description: "Additional condition" },
+			{ name: "ELSE", description: "Alternative condition (use nested :IF for else-if logic)" },
 			{ name: "ENDIF", description: "End conditional block" },
 			{ name: "WHILE", description: "While loop" },
 			{ name: "ENDWHILE", description: "End while loop" },
@@ -110,9 +109,10 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		];
 
 		this.keywords = keywords.map(kw => {
-			const item = new vscode.CompletionItem(`:${kw.name}`, vscode.CompletionItemKind.Keyword);
+			const item = new vscode.CompletionItem(kw.name, vscode.CompletionItemKind.Keyword);
 			item.detail = kw.description;
-			item.insertText = `:${kw.name}`;
+			item.insertText = kw.name;
+			item.filterText = `:${kw.name}`;
 			return item;
 		});
 	}

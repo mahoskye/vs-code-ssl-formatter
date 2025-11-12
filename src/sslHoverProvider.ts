@@ -108,8 +108,7 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 
 	private initializeKeywordDocs(): void {
 		this.keywordDocs.set("IF", "Conditional statement - executes code block if condition is true");
-		this.keywordDocs.set("ELSE", "Alternative code path when IF condition is false");
-		this.keywordDocs.set("ELSEIF", "Additional condition to test if previous conditions are false");
+		this.keywordDocs.set("ELSE", "Alternative code path when IF condition is false (use nested :IF for else-if logic)");
 		this.keywordDocs.set("ENDIF", "Marks the end of an IF conditional block");
 		this.keywordDocs.set("WHILE", "Loop that executes while condition is true");
 		this.keywordDocs.set("ENDWHILE", "Marks the end of a WHILE loop");

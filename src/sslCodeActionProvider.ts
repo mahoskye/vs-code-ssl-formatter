@@ -112,7 +112,7 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 		line: vscode.TextLine
 	): vscode.CodeAction | null {
 		const keywords = [
-			"IF", "ELSE", "ELSEIF", "ENDIF",
+			"IF", "ELSE", "ENDIF",
 			"WHILE", "ENDWHILE", "FOR", "TO", "STEP", "NEXT",
 			"PROCEDURE", "ENDPROC", "RETURN",
 			"DECLARE", "PARAMETERS", "DEFAULT"

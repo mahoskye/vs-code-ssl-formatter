@@ -87,7 +87,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		}
 
 		const keywords = [
-			"IF", "ELSE", "ELSEIF", "ENDIF",
+			"IF", "ELSE", "ENDIF",
 			"WHILE", "ENDWHILE",
 			"FOR", "TO", "STEP", "NEXT", "EXITFOR",
 			"EXITWHILE", "LOOP", "RESUME",
@@ -335,7 +335,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const indentChar = indentStyle === "tab" ? "\t" : " ".repeat(indentWidth);
 
 		const blockStart = /^\s*:(IF|WHILE|FOR|FOREACH|BEGINCASE|TRY|PROCEDURE|CLASS|REGION)\b/i;
-		const blockMiddle = /^\s*:(ELSE|ELSEIF|CATCH|FINALLY|CASE|OTHERWISE)\b/i;
+		const blockMiddle = /^\s*:(ELSE|CATCH|FINALLY|CASE|OTHERWISE)\b/i;
 		const blockEnd = /^\s*:(ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDPROCEDURE|ENDREGION)\b/i;
 
 		const formatted = lines.map(line => {
