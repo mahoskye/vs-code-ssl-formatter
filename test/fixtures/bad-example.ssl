@@ -1,0 +1,110 @@
+/* Sample SSL file with poor formatting - needs cleanup ;
+include "common/utilities.ssl";
+:include "lib/database.ssl";
+
+:region Configuration
+:declare const max_bonus_percent:=15.0;
+   :DECLARE CONST min_performance_score := 3.5;
+  :DECLARE CONST Bonus_Multiplier:=1.2e3;
+:endregion
+
+/* Main procedure to calculate and distribute bonuses;
+:procedure calculateEmployeeBonuses
+:parameters nYear,sDepartment,bIncludeContractors:=.f.;
+:declare nTotalEmployees:=0;
+	:DECLARE nQualifiedCount := 0;
+:DECLARE nTotalBonus:=0.0;
+	:declare aEmployeeList:={};
+:DECLARE sReportPath:="";
+:declare dProcessDate:=Today( );
+:try
+/* Validate input parameters;
+:if nYear<2020.or.nYear>Year(Today())
+:error "Invalid year specified";
+:return .f.;
+:endif
+/* Fetch employee data from database;
+aEmployeeList:=GetEmployeesByDepartment( sDepartment,nYear );
+nTotalEmployees:=Len(aEmployeeList);
+/* Process each employee;
+:for i:=1 :to nTotalEmployees :step 1
+:declare oEmployee:=aEmployeeList[ i ];
+:DECLARE nPerformanceScore:=oEmployee.PerformanceScore;
+:declare nBaseSalary:=oEmployee.BaseSalary;
+	:DECLARE nBonus:=0.0;
+/* Determine eligibility and calculate bonus;
+:if nPerformanceScore>=min_performance_score
+:begincase
+:case nPerformanceScore>=4.5
+nBonus:=nBaseSalary*(max_bonus_percent/100.0);
+:CASE nPerformanceScore>=4.0
+nBonus := nBaseSalary*0.10;
+:case nPerformanceScore >= 3.5
+nBonus:=nBaseSalary * 0.05;
+:otherwise
+nBonus := 0.0;
+:ENDCASE
+/* Apply multiplier for exceptional cases;
+:if oEmployee.IsTopPerformer==.t.
+nBonus:=nBonus*1.25;
+:ENDIF
+nQualifiedCount+=1;
+nTotalBonus+=nBonus;
+/* Update employee record;
+UpdateEmployeeBonus(oEmployee.EmployeeID,nBonus,nYear);
+:endif
+:next
+
+
+/* Generate summary report;
+:declare sMessage:="Processed "+AllTrim(Str(nTotalEmployees))+" employees";
+sMessage+=", "+AllTrim(Str(nQualifiedCount))+" qualified";
+LogMessage( sMessage,"INFO" );
+sReportPath:=GenerateBonusReport(sDepartment,nYear,nTotalBonus);
+:catch oError
+/* Handle any errors during processing;
+LogError("Bonus calculation failed: "+oError.Message);
+:return .F.;
+:finally
+/* Cleanup resources;
+CloseConnections( );
+:ENDTRY
+:return .t.;
+:ENDPROC
+
+/* Helper function to validate employee data;
+:procedure ValidateEmployeeData
+:parameters oEmployee;
+:declare bIsValid:=.t.;
+:IF oEmployee==NIL
+:RETURN .f.;
+:endif
+:if Empty(oEmployee.EmployeeID).or.Empty(oEmployee.BaseSalary)
+bIsValid:=.f.;
+:endif
+:if oEmployee.BaseSalary<=0.OR.oEmployee.PerformanceScore<0
+bIsValid:=.F.;
+:ENDIF
+:return bIsValid;
+:endproc
+
+/* Class for managing bonus calculations;
+:class BonusCalculator
+:declare nDefaultRate;
+:DECLARE bDebugMode;
+/* Initialize calculator with default rate;
+:procedure Initialize
+:PARAMETERS nRate:=10.0;
+nDefaultRate:=nRate;
+bDebugMode:=.f.;
+:ENDPROC
+/* Calculate bonus using configured rate;
+:PROCEDURE Calculate
+:parameters nSalary,nMultiplier:=1.0;
+:declare nResult:=0.0;
+:IF nSalary>0
+nResult:=nSalary*(nDefaultRate/100.0)*nMultiplier;
+:endif
+:return nResult;
+:ENDPROC
+:endclass
