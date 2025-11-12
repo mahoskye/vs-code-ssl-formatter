@@ -184,7 +184,7 @@ sTest := TestProcedure("test", 50);
 		test("CRITICAL: Finds class symbols", async () => {
 			const provider = new SSLSymbolProvider();
 			const document = await vscode.workspace.openTextDocument({
-				content: ":CLASS MyClass;\n:PROCEDURE Init;\n:ENDPROC;\n:ENDCLASS;",
+				content: ":CLASS MyClass;\n:INHERIT BaseClass;\n:PROCEDURE Init;\n:ENDPROC;",
 				language: "ssl"
 			});
 
@@ -196,6 +196,8 @@ sTest := TestProcedure("test", 50);
 			const classSymbol = symbols.find(s => s.name === "MyClass");
 			assert.ok(classSymbol, "Should find MyClass class symbol");
 			assert.strictEqual(classSymbol.kind, vscode.SymbolKind.Class, "Symbol should be of kind Class");
+
+			// Note: In SSL, classes have NO :ENDCLASS keyword - the class structure ends with the script
 		});
 
 		test("CRITICAL: Finds region symbols", async () => {
