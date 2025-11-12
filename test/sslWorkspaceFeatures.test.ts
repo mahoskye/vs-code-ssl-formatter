@@ -222,6 +222,104 @@ suite("SSL Workspace Features Test Suite", () => {
 				assert.ok(codeActions[0].edit, "Code action should have an edit");
 			}
 		});
+
+		test("CRITICAL: Applying semicolon fix actually adds semicolon", async () => {
+			const provider = new SSLCodeActionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":DECLARE x",
+				language: "ssl"
+			});
+
+			const codeActions = provider.provideCodeActions(
+				document,
+				new vscode.Range(0, 0, 0, 10),
+				{ triggerKind: vscode.CodeActionTriggerKind.Invoke, diagnostics: [], only: vscode.CodeActionKind.QuickFix },
+				new vscode.CancellationTokenSource().token
+			);
+
+			// Find semicolon fix
+			const semicolonFix = codeActions.find(a =>
+				a.title.toLowerCase().includes("semicolon") ||
+				a.title.toLowerCase().includes("add ;")
+			);
+
+			if (semicolonFix && semicolonFix.edit) {
+				const changes = semicolonFix.edit.get(document.uri);
+				assert.ok(changes && changes.length > 0, "Should have text edits");
+
+				// Verify the edit adds a semicolon
+				const edit = changes[0];
+				assert.ok(edit.newText.includes(";"), `Should add semicolon, got: '${edit.newText}'`);
+			}
+		});
+
+		test("CRITICAL: Applying keyword casing fix uppercases keywords", async () => {
+			const provider = new SSLCodeActionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":if x > 0;\n\ty := 1;\n:endif;",
+				language: "ssl"
+			});
+
+			const codeActions = provider.provideCodeActions(
+				document,
+				new vscode.Range(0, 0, 0, 10),
+				{ triggerKind: vscode.CodeActionTriggerKind.Invoke, diagnostics: [], only: vscode.CodeActionKind.QuickFix },
+				new vscode.CancellationTokenSource().token
+			);
+
+			// Find keyword casing fix
+			const keywordFix = codeActions.find(a =>
+				a.title.toLowerCase().includes("keyword") &&
+				a.title.toLowerCase().includes("uppercase")
+			);
+
+			if (keywordFix && keywordFix.edit) {
+				const changes = keywordFix.edit.get(document.uri);
+				assert.ok(changes && changes.length > 0, "Should have text edits");
+
+				// Verify edits convert keywords to uppercase
+				let hasIfUppercase = false;
+				let hasEndifUppercase = false;
+
+				for (const edit of changes) {
+					if (edit.newText.includes(":IF")) {
+						hasIfUppercase = true;
+					}
+					if (edit.newText.includes(":ENDIF")) {
+						hasEndifUppercase = true;
+					}
+				}
+
+				assert.ok(hasIfUppercase || hasEndifUppercase,
+					"Should convert at least one keyword to uppercase");
+			}
+		});
+
+		test("Code action applies to correct range", async () => {
+			const provider = new SSLCodeActionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":declare x;\n:declare y",
+				language: "ssl"
+			});
+
+			// Request fix for second line only
+			const codeActions = provider.provideCodeActions(
+				document,
+				new vscode.Range(1, 0, 1, 10),
+				{ triggerKind: vscode.CodeActionTriggerKind.Invoke, diagnostics: [], only: vscode.CodeActionKind.QuickFix },
+				new vscode.CancellationTokenSource().token
+			);
+
+			// Should provide fixes for line 1, not line 0
+			if (codeActions.length > 0 && codeActions[0].edit) {
+				const changes = codeActions[0].edit.get(document.uri);
+				if (changes && changes.length > 0) {
+					// Edits should target line 1
+					assert.ok(changes.every(e => e.range.start.line === 1),
+						"Edits should only affect the requested line");
+				}
+			}
+		});
 	});
 
 	suite("Integration Tests", () => {

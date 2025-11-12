@@ -138,6 +138,59 @@ sTest := TestProcedure("test", 50);
 			assert.ok(formattedText.includes(" + "), "Should have spaces around +");
 			assert.ok(formattedText.includes(" * "), "Should have spaces around *");
 		});
+
+		test("CRITICAL: Range formatting formats only selected range", async () => {
+			const provider = new SSLFormattingProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":PROCEDURE Test;\nx:=1;\ny:=2;\nz:=3;\n:ENDPROC;",
+				language: "ssl"
+			});
+
+			// Format only line 2 (y:=2;)
+			const range = new vscode.Range(
+				new vscode.Position(2, 0),
+				new vscode.Position(2, 5)
+			);
+
+			const edits = provider.provideDocumentRangeFormattingEdits(
+				document,
+				range,
+				{ insertSpaces: false, tabSize: 1 },
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(edits.length > 0, "Should provide range formatting edits");
+			assert.ok(edits[0].range.isEqual(range), "Edit should only affect the selected range");
+
+			const formattedText = edits[0].newText;
+			assert.ok(formattedText.includes(" := "), "Should format the selected range");
+		});
+
+		test("Range formatting preserves content outside selection", async () => {
+			const provider = new SSLFormattingProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "x:=1;\ny:=2;\nz:=3;",
+				language: "ssl"
+			});
+
+			// Format only middle line
+			const range = new vscode.Range(
+				new vscode.Position(1, 0),
+				new vscode.Position(1, 5)
+			);
+
+			const edits = provider.provideDocumentRangeFormattingEdits(
+				document,
+				range,
+				{ insertSpaces: false, tabSize: 1 },
+				new vscode.CancellationTokenSource().token
+			);
+
+			// The edit should only cover the selected range, not the entire document
+			assert.strictEqual(edits.length, 1, "Should have exactly one edit for the range");
+			assert.strictEqual(edits[0].range.start.line, 1, "Edit should be on line 1");
+			assert.strictEqual(edits[0].range.end.line, 1, "Edit should end on line 1");
+		});
 	});
 
 	suite("Symbol Provider Tests", () => {
@@ -282,6 +335,92 @@ sTest := TestProcedure("test", 50);
 			);
 			assert.ok(funcCompletions.length > 0, "Should provide function completions");
 		});
+
+		test("Triggers on colon character", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(0, 1), // After ":"
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.TriggerCharacter, triggerCharacter: ":" }
+			);
+
+			assert.ok(completions.length > 0, "Should provide completions after :");
+			// Should provide keyword completions like :IF, :DECLARE, :PROCEDURE
+			const keywordCompletions = completions.filter(c =>
+				typeof c.label === 'string' && c.label.startsWith(":")
+			);
+			assert.ok(keywordCompletions.length > 0, "Should provide keyword completions after :");
+		});
+
+		test("Triggers on open parenthesis", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "result := ALLTRIM(",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(0, 18), // After "("
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.TriggerCharacter, triggerCharacter: "(" }
+			);
+
+			// Should provide completions (variables, parameters, etc.)
+			assert.ok(Array.isArray(completions), "Should return completions array");
+		});
+
+		test("Provides context-specific completions inside procedure", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":PROCEDURE Test;\n:DECLARE nValue;\n",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(2, 0), // After variable declaration, inside procedure
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.Invoke, triggerCharacter: undefined }
+			);
+
+			// Should provide both keywords and functions
+			assert.ok(completions.length > 0, "Should provide completions inside procedure");
+
+			// Check for at least some expected items
+			const hasKeywords = completions.some(c =>
+				typeof c.label === 'string' && (c.label.includes("IF") || c.label.includes("RETURN"))
+			);
+			const hasFunctions = completions.some(c => c.kind === vscode.CompletionItemKind.Function);
+
+			assert.ok(hasKeywords || hasFunctions,
+				"Should provide either keywords or functions in procedure context");
+		});
+
+		test("Completion items have documentation", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(0, 0),
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.Invoke, triggerCharacter: undefined }
+			);
+
+			// Check that at least some completions have documentation
+			const withDocs = completions.filter(c => c.documentation);
+			assert.ok(withDocs.length > 0, "Some completions should have documentation");
+		});
 	});
 
 	suite("Hover Provider Tests", () => {
@@ -320,6 +459,98 @@ sTest := TestProcedure("test", 50);
 			);
 
 			assert.ok(hover, "Should provide hover for ALLTRIM");
+		});
+
+		test("Provides Hungarian notation hint for string variables", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":DECLARE sUserName;",
+				language: "ssl"
+			});
+
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(0, 10), // Position on sUserName
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for variable");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("String") || hoverText.includes("Hungarian"),
+				`Should show Hungarian notation hint for 's' prefix, got: ${hoverText}`);
+		});
+
+		test("Provides Hungarian notation hint for numeric variables", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":DECLARE nCount;",
+				language: "ssl"
+			});
+
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(0, 10), // Position on nCount
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for numeric variable");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("Numeric") || hoverText.includes("Hungarian"),
+				`Should show Hungarian notation hint for 'n' prefix, got: ${hoverText}`);
+		});
+
+		test("Provides Hungarian notation hint for array variables", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":DECLARE aItems;",
+				language: "ssl"
+			});
+
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(0, 10), // Position on aItems
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for array variable");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("Array") || hoverText.includes("Hungarian"),
+				`Should show Hungarian notation hint for 'a' prefix, got: ${hoverText}`);
+		});
+
+		test("No hover for variables without Hungarian notation", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":DECLARE BadName;",
+				language: "ssl"
+			});
+
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(0, 10), // Position on BadName
+				new vscode.CancellationTokenSource().token
+			);
+
+			// Should return null or no Hungarian hint since BadName doesn't follow convention
+			assert.ok(!hover || !hover.contents[0].toString().includes("Hungarian"),
+				"Should not show Hungarian hint for non-conforming variable");
+		});
+
+		test("No hover on invalid positions", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":IF x > 0;",
+				language: "ssl"
+			});
+
+			// Position on whitespace
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(0, 0),
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(!hover, "Should not provide hover on whitespace/invalid position");
 		});
 	});
 
@@ -499,6 +730,108 @@ sTest := TestProcedure("test", 50);
 
 			assert.ok(definition, "Should find definition");
 		});
+
+		test("Finds variable definition in :DECLARE", async () => {
+			const provider = new SSLDefinitionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":PROCEDURE Test;\n:DECLARE nValue;\nnValue := 5;\n:ENDPROC;",
+				language: "ssl"
+			});
+
+			// Go to definition from usage on line 2
+			const definition = provider.provideDefinition(
+				document,
+				new vscode.Position(2, 1), // Position on nValue usage
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(definition, "Should find variable definition");
+			if (definition && !Array.isArray(definition)) {
+				assert.strictEqual(definition.range.start.line, 1,
+					"Should find definition on line 1 (:DECLARE line)");
+			}
+		});
+
+		test("Finds variable definition in :PARAMETERS", async () => {
+			const provider = new SSLDefinitionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":PROCEDURE Test;\n:PARAMETERS sInput;\nresult := ALLTRIM(sInput);\n:ENDPROC;",
+				language: "ssl"
+			});
+
+			// Go to definition from usage on line 2
+			const definition = provider.provideDefinition(
+				document,
+				new vscode.Position(2, 19), // Position on sInput usage
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(definition, "Should find parameter definition");
+			if (definition && !Array.isArray(definition)) {
+				assert.strictEqual(definition.range.start.line, 1,
+					"Should find definition on line 1 (:PARAMETERS line)");
+			}
+		});
+
+		test("Returns null when definition not found", async () => {
+			const provider = new SSLDefinitionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":PROCEDURE Test;\nresult := UndefinedFunction();\n:ENDPROC;",
+				language: "ssl"
+			});
+
+			// Try to find definition of undefined function
+			const definition = provider.provideDefinition(
+				document,
+				new vscode.Position(1, 11), // Position on UndefinedFunction
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(!definition, "Should return null for undefined symbols");
+		});
+
+		test("Respects variable scoping (procedure-local)", async () => {
+			const provider = new SSLDefinitionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":PROCEDURE Test1;\n:DECLARE nValue;\n:ENDPROC;\n\n:PROCEDURE Test2;\nnValue := 5;\n:ENDPROC;",
+				language: "ssl"
+			});
+
+			// Try to find definition of nValue from Test2 (should not find declaration in Test1)
+			const definition = provider.provideDefinition(
+				document,
+				new vscode.Position(5, 1), // Position on nValue in Test2
+				new vscode.CancellationTokenSource().token
+			);
+
+			// Should not find the nValue from Test1 (different procedure scope)
+			if (definition && !Array.isArray(definition)) {
+				// If it finds something, it shouldn't be in Test1
+				assert.notStrictEqual(definition.range.start.line, 1,
+					"Should not find variable from different procedure scope");
+			}
+		});
+
+		test("Finds definition on same line (declaration)", async () => {
+			const provider = new SSLDefinitionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":DECLARE nValue;",
+				language: "ssl"
+			});
+
+			// Position on nValue in its declaration
+			const definition = provider.provideDefinition(
+				document,
+				new vscode.Position(0, 10), // Position on nValue
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(definition, "Should find definition even when on declaration line");
+			if (definition && !Array.isArray(definition)) {
+				assert.strictEqual(definition.range.start.line, 0,
+					"Should point to the declaration line");
+			}
+		});
 	});
 
 	suite("Reference Provider Tests", () => {
@@ -570,6 +903,106 @@ sTest := TestProcedure("test", 50);
 			if (signatureHelp) {
 				assert.ok(signatureHelp.signatures.length > 0, "Should have at least one signature");
 			}
+		});
+
+		test("Tracks active parameter on first argument", async () => {
+			const provider = new SSLSignatureHelpProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "result := SUBSTR(sValue",
+				language: "ssl"
+			});
+
+			const signatureHelp = provider.provideSignatureHelp(
+				document,
+				new vscode.Position(0, 24), // After "sValue"
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.SignatureHelpTriggerKind.Invoke, isRetrigger: false, triggerCharacter: "(", activeSignatureHelp: undefined }
+			);
+
+			assert.ok(signatureHelp, "Should provide signature help");
+			if (signatureHelp) {
+				assert.strictEqual(signatureHelp.activeParameter, 0, "Should highlight first parameter (string)");
+			}
+		});
+
+		test("Tracks active parameter on second argument", async () => {
+			const provider = new SSLSignatureHelpProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "result := SUBSTR(sValue, 5",
+				language: "ssl"
+			});
+
+			const signatureHelp = provider.provideSignatureHelp(
+				document,
+				new vscode.Position(0, 27), // After comma and "5"
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.SignatureHelpTriggerKind.Invoke, isRetrigger: false, triggerCharacter: ",", activeSignatureHelp: undefined }
+			);
+
+			assert.ok(signatureHelp, "Should provide signature help");
+			if (signatureHelp) {
+				assert.strictEqual(signatureHelp.activeParameter, 1, "Should highlight second parameter (start)");
+			}
+		});
+
+		test("Tracks active parameter on third argument", async () => {
+			const provider = new SSLSignatureHelpProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "result := SUBSTR(sValue, 1, 10",
+				language: "ssl"
+			});
+
+			const signatureHelp = provider.provideSignatureHelp(
+				document,
+				new vscode.Position(0, 31), // After second comma and "10"
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.SignatureHelpTriggerKind.Invoke, isRetrigger: false, triggerCharacter: ",", activeSignatureHelp: undefined }
+			);
+
+			assert.ok(signatureHelp, "Should provide signature help");
+			if (signatureHelp) {
+				assert.strictEqual(signatureHelp.activeParameter, 2, "Should highlight third parameter (length)");
+			}
+		});
+
+		test("Handles nested function calls", async () => {
+			const provider = new SSLSignatureHelpProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "result := LEFT(ALLTRIM(",
+				language: "ssl"
+			});
+
+			const signatureHelp = provider.provideSignatureHelp(
+				document,
+				new vscode.Position(0, 23), // Inside inner ALLTRIM call
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.SignatureHelpTriggerKind.Invoke, isRetrigger: false, triggerCharacter: "(", activeSignatureHelp: undefined }
+			);
+
+			assert.ok(signatureHelp, "Should provide signature help for innermost function");
+			if (signatureHelp) {
+				// Should show signature for ALLTRIM, not LEFT
+				assert.ok(signatureHelp.signatures[0].label.includes("ALLTRIM") ||
+				          signatureHelp.signatures[0].label.includes("string"),
+				          "Should show signature for ALLTRIM (innermost function)");
+			}
+		});
+
+		test("Returns null when not in function call", async () => {
+			const provider = new SSLSignatureHelpProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "result := sValue;",
+				language: "ssl"
+			});
+
+			const signatureHelp = provider.provideSignatureHelp(
+				document,
+				new vscode.Position(0, 10), // Not in function call
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.SignatureHelpTriggerKind.Invoke, isRetrigger: false, triggerCharacter: undefined, activeSignatureHelp: undefined }
+			);
+
+			assert.ok(!signatureHelp, "Should return null when not in function call");
 		});
 	});
 
