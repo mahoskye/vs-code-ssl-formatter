@@ -262,8 +262,8 @@ export class SSLSignatureHelpProvider implements vscode.SignatureHelpProvider {
 		});
 
 		this.functionSignatures.set("USRMES", {
-			label: "UsrMes(message, title, type)",
-			parameters: ["message: string", "title: string", "type: number"],
+			label: "UsrMes(message1, message2)",
+			parameters: ["message1: any", "message2: any"],
 			documentation: "Display a message to the user"
 		});
 

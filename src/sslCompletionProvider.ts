@@ -132,7 +132,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			{ name: "ExecFunction", description: "Execute a function", params: "(funcName, params)" },
 			{ name: "Empty", description: "Check if value is empty", params: "(value)" },
 			{ name: "Len", description: "Get length of string or array", params: "(value)" },
-			{ name: "usrmes", description: "Display message to user", params: "(message)" },
+			{ name: "usrmes", description: "Display message to user", params: "(message1, message2)" },
 			{ name: "Chr", description: "Get character from ASCII code", params: "(code)" },
 			{ name: "aadd", description: "Add element to array", params: "(array, element)" },
 			{ name: "AllTrim", description: "Trim whitespace from string", params: "(string)" },

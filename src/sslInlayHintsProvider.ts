@@ -29,17 +29,28 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		const hints: vscode.InlayHint[] = [];
 		const text = document.getText(range);
 
-		// Find function calls in the range
-		const functionCallPattern = /\b([A-Za-z_]\w*)\s*\(([^)]*)\)/g;
-		let match: RegExpExecArray | null;
-
-		while ((match = functionCallPattern.exec(text)) !== null) {
-			const functionName = match[1];
-			const args = match[2];
+		// Find function calls with balanced parentheses
+		const functionMatches = this.findFunctionCalls(text);
+		
+		for (const match of functionMatches) {
+			const functionName = match.name;
+			const args = match.args;
+			const index = match.index;
 
 			// Special handling for DoProc
 			if (functionName.toUpperCase() === "DOPROC") {
-				const doProcHints = this.getDoProcInlayHints(document, range, match);
+				// Create a pseudo-match object for compatibility with getDoProcInlayHints
+				const regExpMatch = Object.assign([
+					match.fullMatch,
+					functionName,
+					args
+				], {
+					index: index,
+					input: text,
+					groups: undefined
+				}) as RegExpExecArray;
+				
+				const doProcHints = this.getDoProcInlayHints(document, range, regExpMatch);
 				hints.push(...doProcHints);
 				continue;
 			}
@@ -54,7 +65,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 			const argsList = this.parseArguments(args);
 
 			// Create inlay hints for each argument
-			let currentOffset = match.index + match[1].length + 1; // Position after function name and '('
+			let currentOffset = index + functionName.length + 1; // Position after function name and '('
 
 			for (let i = 0; i < argsList.length && i < paramNames.length; i++) {
 				const arg = argsList[i].trim();
@@ -104,17 +115,41 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		const functionName = match[1]; // "DoProc"
 		const args = match[2]; // everything inside the parentheses
 
-		// Parse to get procedure name and array contents
+		// Parse to get procedure name and extract array contents with proper brace matching
 		// Expected format: DoProc("ProcedureName", {param1, param2, param3})
-		const doProcPattern = /["']([^"']+)["']\s*,\s*\{([^}]*)\}/;
-		const doProcMatch = args.match(doProcPattern);
-		
-		if (!doProcMatch) {
+		const procNameMatch = args.match(/["']([^"']+)["']/);
+		if (!procNameMatch) {
 			return hints;
 		}
 
-		const procedureName = doProcMatch[1];
-		const arrayContents = doProcMatch[2];
+		const procedureName = procNameMatch[1];
+
+		// Find the opening brace and extract contents by tracking depth
+		const openBraceIndex = args.indexOf('{');
+		if (openBraceIndex === -1) {
+			return hints;
+		}
+
+		// Extract array contents with proper nested brace handling
+		let arrayContents = '';
+		let depth = 0;
+		let startIndex = openBraceIndex + 1;
+		
+		for (let i = openBraceIndex; i < args.length; i++) {
+			if (args[i] === '{') {
+				depth++;
+			} else if (args[i] === '}') {
+				depth--;
+				if (depth === 0) {
+					arrayContents = args.substring(startIndex, i);
+					break;
+				}
+			}
+		}
+
+		if (!arrayContents && depth !== 0) {
+			return hints; // Unmatched braces
+		}
 
 		// Find the procedure parameters
 		const paramNames = this.getProcedureParameters(document, procedureName);
@@ -124,12 +159,6 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 		// Parse the arguments inside the curly braces
 		const arrayArgs = this.parseArguments(arrayContents);
-
-		// Find the position of the opening brace
-		const openBraceIndex = args.indexOf('{');
-		if (openBraceIndex === -1) {
-			return hints;
-		}
 
 		// Calculate offset to the start of array contents
 		let currentOffset = match.index + functionName.length + 1 + openBraceIndex + 1; // After 'DoProc(' + position + '{'
@@ -243,7 +272,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		this.functionSignatures.set("EXECFUNCTION", ["funcName", "parameters"]);
 		this.functionSignatures.set("EMPTY", ["value"]);
 		this.functionSignatures.set("LEN", ["value"]);
-		this.functionSignatures.set("USRMES", ["message", "title", "type"]);
+		this.functionSignatures.set("USRMES", ["message1", "message2"]);
 		this.functionSignatures.set("CHR", ["code"]);
 		this.functionSignatures.set("AADD", ["array", "element"]);
 		this.functionSignatures.set("ALLTRIM", ["string"]);
@@ -271,5 +300,51 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		this.functionSignatures.set("DATEADD", ["date", "interval", "units"]);
 		this.functionSignatures.set("DATEDIFF", ["startDate", "endDate", "units"]);
 		this.functionSignatures.set("STRTRAN", ["string", "search", "replace"]);
+	}
+
+	/**
+	 * Find all function calls with balanced parentheses in the text
+	 */
+	private findFunctionCalls(text: string): Array<{ name: string; args: string; index: number; fullMatch: string }> {
+		const results: Array<{ name: string; args: string; index: number; fullMatch: string }> = [];
+		const functionPattern = /\b([A-Za-z_]\w*)\s*\(/g;
+		let match: RegExpExecArray | null;
+
+		while ((match = functionPattern.exec(text)) !== null) {
+			const functionName = match[1];
+			const startIndex = match.index;
+			const openParenIndex = match.index + match[0].length - 1; // Position of '('
+
+			// Extract arguments with balanced parentheses
+			let depth = 1;
+			let i = openParenIndex + 1;
+			let args = '';
+
+			while (i < text.length && depth > 0) {
+				if (text[i] === '(') {
+					depth++;
+				} else if (text[i] === ')') {
+					depth--;
+					if (depth === 0) {
+						break; // Found matching closing paren
+					}
+				}
+				args += text[i];
+				i++;
+			}
+
+			if (depth === 0) {
+				// Successfully matched
+				const fullMatch = text.substring(startIndex, i + 1);
+				results.push({
+					name: functionName,
+					args: args,
+					index: startIndex,
+					fullMatch: fullMatch
+				});
+			}
+		}
+
+		return results;
 	}
 }
