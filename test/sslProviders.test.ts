@@ -693,7 +693,7 @@ sTest := TestProcedure("test", 50);
 :PARAMETERS sTo, sSubject, sBody, bCC;
 :DEFAULT sBody, "";
 :DEFAULT bCC, .F.;
-	/* Send email code */;
+	/* Send email code;
 :ENDPROC;
 
 :PROCEDURE Main;
@@ -1429,7 +1429,7 @@ sTest := TestProcedure("test", 50);
 		test("Completion provider handles keywords in comments", async () => {
 			const provider = new SSLCompletionProvider();
 			const document = await vscode.workspace.openTextDocument({
-				content: "/* :IF :WHILE :PROCEDURE */\n",
+				content: "/* :IF :WHILE :PROCEDURE;\n",
 				language: "ssl"
 			});
 

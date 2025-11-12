@@ -94,8 +94,8 @@ Some code here
 :PROCEDURE TestProc;
     :IF x > 0;
         y := 1;
-    /* Missing :ENDIF; */;
-/* Missing :ENDPROC */;
+    /* Missing :ENDIF;
+/* Missing :ENDPROC;
 :REGION Unclosed Region;
     z := 3;
             `,
