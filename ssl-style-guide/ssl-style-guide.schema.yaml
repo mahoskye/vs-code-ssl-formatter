@@ -626,7 +626,8 @@ ssl_style_guide:
     require_otherwise_in_case: true
     hungarian_notation:
       enabled: true
-      strict_mode: true
+      strict_mode: false  # Recommended (warn) rather than required (error)
+      severity: warn  # Produces warnings, not errors
       prefixes:
         s: string
         n: numeric
@@ -690,9 +691,9 @@ ssl_style_guide:
   language_features:
     version: SSL v11
     case_sensitivity:
-      keywords: case_insensitive  # Normalized to UPPER
-      identifiers: case_sensitive
-      functions: case_insensitive
+      keywords: case_sensitive  # Keywords are case-sensitive (must match with colon prefix); formatter normalizes to UPPER
+      identifiers: case_insensitive  # Variable and procedure names are case-insensitive
+      functions: case_insensitive  # Built-in function names are case-insensitive; formatter normalizes to PascalCase
     statement_termination:
       all_statements: require_semicolon
       comments: terminate_with_semicolon
@@ -716,7 +717,9 @@ ssl_style_guide:
       continuation_indent: 1
       smart_indent: true
   formatter_hints:
-    normalize_keyword_case: true
+    normalize_keyword_case: true  # Normalize keywords to UPPER
+    normalize_builtin_function_case: true  # Normalize built-in functions to PascalCase
+    builtin_function_case: PascalCase  # SQLExecute, CreateUdoObject, BuildString, etc.
     align_assignment: 'off'
     wrap_long_lines:
       mode: soft
