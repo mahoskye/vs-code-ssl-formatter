@@ -102,9 +102,25 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		];
 
 		const lines = text.split('\n');
+		let inMultiLineComment = false;
+		
 		const formattedLines = lines.map(line => {
-			// Skip lines that are comments
-			if (line.trim().startsWith('/*')) {
+			const trimmed = line.trim();
+			
+			// Track multi-line comment state (SSL uses /* ... ; syntax)
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+				return line;
+			}
+			if (inMultiLineComment) {
+				if (trimmed.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				return line; // Don't format comment content
+			}
+			
+			// Skip single-line comments
+			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
 				return line;
 			}
 			
@@ -145,9 +161,25 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		];
 
 		const lines = text.split('\n');
+		let inMultiLineComment = false;
+		
 		const formattedLines = lines.map(line => {
-			// Skip comment lines
-			if (line.trim().startsWith('/*')) {
+			const trimmed = line.trim();
+			
+			// Track multi-line comment state (SSL uses /* ... ; syntax)
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+				return line;
+			}
+			if (inMultiLineComment) {
+				if (trimmed.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				return line; // Don't format comment content
+			}
+			
+			// Skip single-line comments
+			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
 				return line;
 			}
 			
@@ -184,9 +216,25 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	 */
 	private normalizeOperatorSpacing(text: string): string {
 		const lines = text.split('\n');
+		let inMultiLineComment = false;
+		
 		const formattedLines = lines.map(line => {
-			// Skip comment lines
-			if (line.trim().startsWith('/*')) {
+			const trimmed = line.trim();
+			
+			// Track multi-line comment state (SSL uses /* ... ; syntax)
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+				return line;
+			}
+			if (inMultiLineComment) {
+				if (trimmed.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				return line; // Don't format comment content
+			}
+			
+			// Skip single-line comments
+			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
 				return line;
 			}
 			
@@ -283,6 +331,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	private normalizeIndentation(text: string, indentStyle: string, indentWidth: number): string {
 		const lines = text.split("\n");
 		let indentLevel = 0;
+		let inMultiLineComment = false;
 		const indentChar = indentStyle === "tab" ? "\t" : " ".repeat(indentWidth);
 
 		const blockStart = /^\s*:(IF|WHILE|FOR|FOREACH|BEGINCASE|TRY|PROCEDURE|CLASS|REGION)\b/i;
@@ -292,8 +341,20 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const formatted = lines.map(line => {
 			const trimmed = line.trim();
 
-			if (!trimmed || trimmed.startsWith("/*")) {
-				return trimmed;
+			// Track multi-line comment state (SSL uses /* ... ; syntax)
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+			}
+			if (inMultiLineComment) {
+				if (trimmed.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				return line; // Don't re-indent comment content
+			}
+
+			// Skip empty lines or return original comment lines
+			if (!trimmed || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
+				return line;
 			}
 
 			// Decrease indent for block end and middle keywords
