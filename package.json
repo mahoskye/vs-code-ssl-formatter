@@ -1,13 +1,15 @@
 {
     "name": "vs-code-ssl-formatter",
-    "displayName": "STARLIMS Scripting Language Formatter",
-    "description": "Syntax highlighting and folding for STARLIMS Scripting Language (SSL)",
-    "version": "0.1.0",
+    "displayName": "STARLIMS Scripting Language",
+    "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
+    "version": "0.2.0",
     "engines": {
         "vscode": "^1.94.0"
     },
     "categories": [
-        "Programming Languages"
+        "Programming Languages",
+        "Formatters",
+        "Linters"
     ],
     "publisher": "mahoskye",
     "repository": {
@@ -28,7 +30,10 @@
                 ],
                 "extensions": [
                     ".ssl",
-                    ".ssl.txt"
+                    ".srvscr",
+                    ".ds",
+                    ".ssl.txt",
+                    ".ds.txt"
                 ],
                 "configuration": "./language-configuration.json"
             }
@@ -39,7 +44,112 @@
                 "scopeName": "source.ssl",
                 "path": "./syntaxes/ssl.tmLanguage.json"
             }
-        ]
+        ],
+        "configuration": {
+            "title": "SSL",
+            "properties": {
+                "ssl.strictStyleGuideMode": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable stricter style guide enforcement (converts warnings to errors)"
+                },
+                "ssl.maxNumberOfProblems": {
+                    "type": "number",
+                    "default": 100,
+                    "minimum": 10,
+                    "maximum": 1000,
+                    "description": "Maximum number of diagnostics to report per file"
+                },
+                "ssl.format.indentStyle": {
+                    "type": "string",
+                    "enum": ["tab", "space"],
+                    "default": "tab",
+                    "description": "Character type for indentation"
+                },
+                "ssl.format.indentWidth": {
+                    "type": "number",
+                    "default": 1,
+                    "minimum": 1,
+                    "maximum": 8,
+                    "description": "Number of tabs or spaces per indent level"
+                },
+                "ssl.format.keywordCase": {
+                    "type": "string",
+                    "enum": ["preserve", "upper", "lower"],
+                    "default": "upper",
+                    "description": "Preferred casing for SSL keywords"
+                },
+                "ssl.format.builtinFunctionCase": {
+                    "type": "string",
+                    "enum": ["preserve", "PascalCase", "lowercase", "UPPERCASE"],
+                    "default": "PascalCase",
+                    "description": "Casing for built-in function names"
+                },
+                "ssl.format.wrapLength": {
+                    "type": "number",
+                    "default": 90,
+                    "minimum": 60,
+                    "maximum": 200,
+                    "description": "Maximum line length before wrapping"
+                },
+                "ssl.format.formatOnSave": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Automatically format document when saving"
+                },
+                "ssl.format.trimTrailingWhitespace": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Remove trailing whitespace from all lines"
+                },
+                "ssl.naming.hungarianNotation.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable Hungarian notation validation"
+                },
+                "ssl.naming.hungarianNotation.severity": {
+                    "type": "string",
+                    "enum": ["warn", "error", "info"],
+                    "default": "warn",
+                    "description": "Severity level for Hungarian notation violations"
+                },
+                "ssl.styleGuide.limitBlockDepth": {
+                    "type": "number",
+                    "default": 4,
+                    "minimum": 0,
+                    "maximum": 10,
+                    "description": "Maximum nesting level for control structures (0 = disabled)"
+                },
+                "ssl.styleGuide.maxParamsPerProcedure": {
+                    "type": "number",
+                    "default": 8,
+                    "minimum": 0,
+                    "maximum": 15,
+                    "description": "Maximum procedure parameter count (0 = disabled)"
+                },
+                "ssl.security.preventSqlInjection": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Warn about non-parameterized SQL queries"
+                },
+                "ssl.security.requireParameterizedQueries": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Require ?PARAM? or ? placeholders in SQL"
+                },
+                "ssl.intellisense.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable IntelliSense features"
+                },
+                "ssl.trace.server": {
+                    "type": "string",
+                    "enum": ["off", "messages", "verbose"],
+                    "default": "off",
+                    "description": "Trace communication with the language server"
+                }
+            }
+        }
     },
     "main": "./out/extension.js",
     "activationEvents": [
