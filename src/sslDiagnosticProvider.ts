@@ -30,6 +30,9 @@ export class SSLDiagnosticProvider {
 		let procedureParams = 0;
 		const maxParams = config.get<number>("styleGuide.maxParamsPerProcedure", 8);
 
+		// Track multi-line comment state
+		let inMultiLineComment = false;
+
 		// Hungarian notation settings
 		const hungarianEnabled = config.get<boolean>("naming.hungarianNotation.enabled", true);
 		const hungarianSeverity = config.get<string>("naming.hungarianNotation.severity", "warn");
@@ -45,6 +48,19 @@ export class SSLDiagnosticProvider {
 		for (let i = 0; i < lines.length && diagnostics.length < maxProblems; i++) {
 			const line = lines[i];
 			const trimmed = line.trim();
+
+			// Track multi-line comment state
+			// Multi-line comments in SSL: /* ... ; (end with semicolon, not */)
+			if (trimmed.startsWith("/*") && !trimmed.endsWith(";")) {
+				inMultiLineComment = true;
+			}
+			if (inMultiLineComment && trimmed.endsWith(";")) {
+				inMultiLineComment = false;
+				continue; // Skip this line as it's the comment terminator
+			}
+			if (inMultiLineComment) {
+				continue; // Skip all lines inside multi-line comments
+			}
 
 			// Check block depth
 			if (this.isBlockStart(trimmed)) {
@@ -127,7 +143,13 @@ export class SSLDiagnosticProvider {
 			}
 
 			// Check for missing semicolons
-			if (trimmed && !trimmed.endsWith(";") && !trimmed.startsWith("/*") && !this.isMultilineConstruct(trimmed)) {
+			// Skip: empty lines, comments, multi-line constructs, lines ending with semicolon
+			// Skip: lines ending with operators (continuation lines)
+			const isSingleLineComment = trimmed.startsWith("/*") && trimmed.endsWith(";");
+			const isCommentLine = trimmed.startsWith("*") || trimmed.startsWith("/*");
+			const isContinuationLine = /[+\-*/,]$/.test(trimmed); // Ends with operator or comma
+			
+			if (trimmed && !trimmed.endsWith(";") && !isCommentLine && !this.isMultilineConstruct(trimmed) && !isContinuationLine) {
 				const diagnostic = new vscode.Diagnostic(
 					new vscode.Range(i, line.length - 1, i, line.length),
 					"Statement should end with semicolon",
@@ -138,7 +160,9 @@ export class SSLDiagnosticProvider {
 			}
 
 			// Check for nested ternaries (if we detect them)
-			if (/\?.*\?.*\?/.test(trimmed)) {
+			// Avoid false positives from SQL placeholders like ?PARAM?
+			const ternaryPattern = /\?[^?]+\?[^?]*:[^?]*\?[^?]+\?/;
+			if (ternaryPattern.test(trimmed) && !trimmed.includes("?PARAM?") && !/\?\w+\?/.test(trimmed)) {
 				const diagnostic = new vscode.Diagnostic(
 					new vscode.Range(i, 0, i, line.length),
 					"Nested ternary expressions are discouraged for readability",
@@ -278,13 +302,19 @@ export class SSLDiagnosticProvider {
 
 	private isMultilineConstruct(line: string): boolean {
 		// Check if line is part of a multi-line construct that doesn't need semicolon on every line
-		return /^:(IF|ELSE|ELSEIF|WHILE|FOR|TO|STEP|FOREACH|IN|BEGINCASE|CASE|OTHERWISE|TRY|CATCH|FINALLY|PROCEDURE|PARAMETERS|DEFAULT|CLASS|INHERIT|REGION)\b/i.test(line);
+		// Or is a control flow keyword that ends with the keyword itself
+		return /^:(IF|ELSE|ELSEIF|WHILE|FOR|TO|STEP|FOREACH|IN|BEGINCASE|CASE|OTHERWISE|EXITCASE|TRY|CATCH|FINALLY|PROCEDURE|PARAMETERS|DEFAULT|CLASS|INHERIT|REGION|ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDPROCEDURE|ENDREGION|LOOP|EXITWHILE|RETURN)\b/i.test(line);
 	}
 
 	private hasValidHungarianNotation(name: string): boolean {
 		// Exceptions for loop counters and constants
 		const exceptions = ["i", "j", "k", "NIL", ".T.", ".F.", "ID", "SQL", "URL", "XML", "HTML", "API", "UID", "GUID"];
 		if (exceptions.includes(name)) {
+			return true;
+		}
+
+		// Allow ALL_CAPS constants (global constants pattern)
+		if (/^[A-Z][A-Z0-9_]+$/.test(name)) {
 			return true;
 		}
 
