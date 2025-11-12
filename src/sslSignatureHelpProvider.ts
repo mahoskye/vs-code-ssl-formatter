@@ -235,16 +235,16 @@ export class SSLSignatureHelpProvider implements vscode.SignatureHelpProvider {
 			documentation: "Get a system setting value"
 		});
 
-		this.functionSignatures.set("GETUSERSETTING", {
-			label: "GetUserSetting(settingName, defaultValue)",
-			parameters: ["settingName: string", "defaultValue: any"],
-			documentation: "Get a user-specific setting value"
+		this.functionSignatures.set("GETUSERDATA", {
+			label: "GetUserData(key)",
+			parameters: ["key: string"],
+			documentation: "Get user-specific data value"
 		});
 
-		this.functionSignatures.set("SETUSERSETTING", {
-			label: "SetUserSetting(settingName, value)",
-			parameters: ["settingName: string", "value: any"],
-			documentation: "Set a user-specific setting value"
+		this.functionSignatures.set("SETUSERDATA", {
+			label: "SetUserData(key, value)",
+			parameters: ["key: string", "value: any"],
+			documentation: "Set user-specific data value"
 		});
 
 		this.functionSignatures.set("RUNSQL", {

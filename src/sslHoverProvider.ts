@@ -296,15 +296,15 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 			returns: "Setting value"
 		});
 
-		this.functionDocs.set("GETUSERSETTING", {
-			description: "Get a user-specific setting value",
-			params: "(settingName)",
-			returns: "Setting value"
+		this.functionDocs.set("GETUSERDATA", {
+			description: "Get user-specific data value",
+			params: "(key)",
+			returns: "User data value"
 		});
 
-		this.functionDocs.set("SETUSERSETTING", {
-			description: "Set a user-specific setting value",
-			params: "(settingName, value)",
+		this.functionDocs.set("SETUSERDATA", {
+			description: "Set user-specific data value",
+			params: "(key, value)",
 			returns: "Boolean success status"
 		});
 	}

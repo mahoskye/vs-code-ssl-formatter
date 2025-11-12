@@ -132,17 +132,15 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		}
 
 		const functions = [
-			"SQLExecute", "DOPROC", "EXECFUNCTION", "EMPTY", "LEN", "USRMES", "CHR",
-			"AADD", "ALLTRIM", "AT", "NOW", "TODAY",
-			"CREATEUDOBJECT", "BUILDSTRING", "ASCAN", "ALEN", "ARRAYCALC", "BUILDARRAY",
-			"DIRECTORY", "CREATEGUID", "BUILDSTRINGFORIN", "ASCANEXACT",
-			"DAY", "ARRAYNEW", "BRANCH", "DATEADD", "DATEDIFF", "ABS",
+			"SQLExecute", "DoProc", "ExecFunction", "Empty", "Len", "usrmes", "Chr",
+			"aadd", "AllTrim", "At", "Now", "Today",
+			"CreateUDObject", "buildstring", "ascan", "alen", "arraycalc", "buildarray",
+			"Directory", "CreateGUID", "BuildStringForIn", "ascanexact",
+			"Day", "arraynew", "Branch", "DateAdd", "DateDiff", "Abs",
 			"Left", "Right", "SubStr", "StrTran", "Upper", "Lower", "Trim",
-			"AEVAL", "RunSQL", "LSearch", "GetDataSet",
-			"GetSystemDate", "GetSystemTime", "CtoD", "FormatDateTime",
-			"DownloadFile", "UploadFile", "FileExists", "DeleteFile",
-			"InfoMes", "ErrorMes", "GetSetting", "GetUserSetting", "SetUserSetting",
-			"GetLastSSLError", "ReturnLastSqlError", "FormatErrorMessage", "RaiseError",
+			"aeval", "RunSQL", "LSearch", "GetDataSet",
+			"CToD", "InfoMes", "ErrorMes", "GetSetting", "GetUserData", "SetUserData",
+			"GetLastSSLError", "ReturnLastSQLError", "FormatErrorMessage", "RaiseError",
 			"Val", "LimsTypeEx"
 		];
 
