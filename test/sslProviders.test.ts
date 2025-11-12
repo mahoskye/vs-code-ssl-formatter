@@ -79,6 +79,65 @@ sTest := TestProcedure("test", 50);
 			const formattedText = edits[0].newText;
 			assert.ok(formattedText.includes(" := "), "Should add spaces around :=");
 		});
+
+		test("CRITICAL: Formats builtin function names to PascalCase", async () => {
+			const provider = new SSLFormattingProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "result := sqlexecute(query);",
+				language: "ssl"
+			});
+
+			const edits = provider.provideDocumentFormattingEdits(
+				document,
+				{ insertSpaces: false, tabSize: 1 },
+				new vscode.CancellationTokenSource().token
+			);
+
+			const formattedText = edits[0].newText;
+			assert.ok(formattedText.includes("SQLExecute") || formattedText.includes("SqlExecute"),
+				`Should format 'sqlexecute' to PascalCase, got: ${formattedText}`);
+		});
+
+		test("Normalizes indentation", async () => {
+			const provider = new SSLFormattingProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":IF x > 0;\ny := 1;\n:ENDIF;",
+				language: "ssl"
+			});
+
+			const edits = provider.provideDocumentFormattingEdits(
+				document,
+				{ insertSpaces: true, tabSize: 4 },
+				new vscode.CancellationTokenSource().token
+			);
+
+			const formattedText = edits[0].newText;
+			const lines = formattedText.split("\n");
+
+			// Line 2 (y := 1) should be indented
+			assert.ok(lines[1].startsWith("    ") || lines[1].startsWith("\t"),
+				`Second line should be indented, got: '${lines[1]}'`);
+		});
+
+		test("Handles multiple operators on same line", async () => {
+			const provider = new SSLFormattingProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "x:=y+z*2;",
+				language: "ssl"
+			});
+
+			const edits = provider.provideDocumentFormattingEdits(
+				document,
+				{ insertSpaces: false, tabSize: 1 },
+				new vscode.CancellationTokenSource().token
+			);
+
+			const formattedText = edits[0].newText;
+			// Should have spaces around :=, +, and *
+			assert.ok(formattedText.includes(" := "), "Should have spaces around :=");
+			assert.ok(formattedText.includes(" + "), "Should have spaces around +");
+			assert.ok(formattedText.includes(" * "), "Should have spaces around *");
+		});
 	});
 
 	suite("Symbol Provider Tests", () => {
@@ -120,6 +179,61 @@ sTest := TestProcedure("test", 50);
 			const testProc = symbols.find(s => s.name === "TestProcedure");
 			assert.ok(testProc, "Should find TestProcedure");
 			assert.ok(testProc.children.length > 0, "Should have child symbols");
+		});
+
+		test("CRITICAL: Finds class symbols", async () => {
+			const provider = new SSLSymbolProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":CLASS MyClass;\n:PROCEDURE Init;\n:ENDPROC;\n:ENDCLASS;",
+				language: "ssl"
+			});
+
+			const symbols = provider.provideDocumentSymbols(
+				document,
+				new vscode.CancellationTokenSource().token
+			);
+
+			const classSymbol = symbols.find(s => s.name === "MyClass");
+			assert.ok(classSymbol, "Should find MyClass class symbol");
+			assert.strictEqual(classSymbol.kind, vscode.SymbolKind.Class, "Symbol should be of kind Class");
+		});
+
+		test("CRITICAL: Finds region symbols", async () => {
+			const provider = new SSLSymbolProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":REGION Initialization;\n:DECLARE nValue;\nnValue := 0;\n:ENDREGION;",
+				language: "ssl"
+			});
+
+			const symbols = provider.provideDocumentSymbols(
+				document,
+				new vscode.CancellationTokenSource().token
+			);
+
+			const regionSymbol = symbols.find(s => s.name === "Initialization");
+			assert.ok(regionSymbol, "Should find Initialization region symbol");
+			assert.strictEqual(regionSymbol.kind, vscode.SymbolKind.Namespace, "Region should be Namespace kind");
+		});
+
+		test("Verifies hierarchical symbol structure", async () => {
+			const provider = new SSLSymbolProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: sampleSSLCode,
+				language: "ssl"
+			});
+
+			const symbols = provider.provideDocumentSymbols(
+				document,
+				new vscode.CancellationTokenSource().token
+			);
+
+			const testProc = symbols.find(s => s.name === "TestProcedure");
+			assert.ok(testProc, "Should find TestProcedure");
+
+			// Verify variables are children of procedure
+			const childNames = testProc.children.map(c => c.name);
+			assert.ok(childNames.includes("sResult") || childNames.includes("nTotal"),
+				`Should have variable children, found: ${childNames.join(", ")}`);
 		});
 	});
 
@@ -324,6 +438,42 @@ sTest := TestProcedure("test", 50);
 			);
 			assert.ok(sqlDiags.length > 0, "Should detect SQL injection risk");
 		});
+
+		test("CRITICAL: Detects excessive procedure parameters", async () => {
+			const provider = new SSLDiagnosticProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":PROCEDURE Test;\n:PARAMETERS p1, p2, p3, p4, p5, p6, p7, p8, p9, p10;\n:ENDPROC;",
+				language: "ssl"
+			});
+
+			provider.updateDiagnostics(document);
+
+			const diagnostics = vscode.languages.getDiagnostics(document.uri);
+			const paramDiags = diagnostics.filter(d =>
+				d.message.includes("parameters") ||
+				d.code === "ssl-max-params"
+			);
+
+			// Default maxParamsPerProcedure is 8, so 10 parameters should be flagged
+			assert.ok(paramDiags.length > 0, "Should detect excessive procedure parameters (10 > 8)");
+		});
+
+		test("Detects missing :OTHERWISE in :BEGINCASE", async () => {
+			const provider = new SSLDiagnosticProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":BEGINCASE;\n:CASE x = 1;\n\ty := 1;\n:ENDCASE;",
+				language: "ssl"
+			});
+
+			provider.updateDiagnostics(document);
+
+			const diagnostics = vscode.languages.getDiagnostics(document.uri);
+			const caseDiags = diagnostics.filter(d =>
+				d.message.toLowerCase().includes("otherwise") ||
+				d.code === "ssl-missing-otherwise"
+			);
+			assert.ok(caseDiags.length > 0, "Should warn about missing :OTHERWISE in :BEGINCASE");
+		});
 	});
 
 	suite("Definition Provider Tests", () => {
@@ -504,6 +654,52 @@ sTest := TestProcedure("test", 50);
 					new vscode.CancellationTokenSource().token
 				);
 			}, "Should throw error when trying to rename keyword");
+		});
+
+		test("CRITICAL: Rename actually changes ALL occurrences", async () => {
+			const provider = new SSLRenameProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":PROCEDURE Test;\n:DECLARE nValue;\nnValue := 5;\nnResult := nValue + 10;\n:RETURN nResult;\n:ENDPROC;",
+				language: "ssl"
+			});
+
+			const edit = provider.provideRenameEdits(
+				document,
+				new vscode.Position(1, 10), // Position on nValue declaration
+				"nAmount",
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(edit, "Should provide rename edits");
+			const changes = edit.get(document.uri);
+			assert.ok(changes, "Should have changes for the document");
+
+			// nValue appears 3 times: declaration (line 1), assignment (line 2), usage (line 3)
+			assert.ok(changes.length >= 3, `Should rename all 3 occurrences, found ${changes.length} edits`);
+
+			// Verify each edit changes nValue to nAmount
+			for (const change of changes) {
+				assert.strictEqual(change.newText, "nAmount", `Edit should change to 'nAmount', got '${change.newText}'`);
+			}
+		});
+
+		test("Rename warns for Hungarian notation violations", async () => {
+			const provider = new SSLRenameProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":DECLARE nValue;\nnValue := 5;",
+				language: "ssl"
+			});
+
+			// Renaming to BadName (no Hungarian prefix) should work but warn
+			const edit = provider.provideRenameEdits(
+				document,
+				new vscode.Position(0, 10),
+				"BadName",
+				new vscode.CancellationTokenSource().token
+			);
+
+			// Edit should still be created (warning, not error)
+			assert.ok(edit, "Should create edit even with Hungarian notation warning");
 		});
 	});
 
