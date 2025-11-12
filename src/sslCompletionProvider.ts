@@ -31,6 +31,22 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			return [];
 		}
 
+		// Check if this is an object member completion (after ':')
+		if (context.triggerCharacter === ':') {
+			const lineText = document.lineAt(position.line).text;
+			const textBeforeColon = lineText.substring(0, position.character - 1);
+
+			// Get the object variable name before the colon
+			const objectMatch = textBeforeColon.match(/(\w+)\s*$/);
+			if (objectMatch) {
+				const objectName = objectMatch[1];
+				const memberCompletions = this.getObjectMemberCompletions(document, objectName);
+				if (memberCompletions.length > 0) {
+					return memberCompletions;
+				}
+			}
+		}
+
 		const completions: vscode.CompletionItem[] = [];
 
 		// Add keywords
@@ -234,5 +250,193 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			regionSnippet,
 			caseSnippet
 		];
+	}
+
+	/**
+	 * Get member completions for an object based on its type
+	 */
+	private getObjectMemberCompletions(
+		document: vscode.TextDocument,
+		objectName: string
+	): vscode.CompletionItem[] {
+		const text = document.getText();
+		const lines = text.split('\n');
+
+		// Find the object's instantiation to determine its type
+		const objectType = this.findObjectType(lines, objectName);
+
+		if (!objectType) {
+			return [];
+		}
+
+		// Built-in classes
+		if (objectType.type === 'builtin') {
+			return this.getBuiltinClassMembers(objectType.className!);
+		}
+
+		// User-defined classes
+		if (objectType.type === 'userclass') {
+			return this.getUserDefinedClassMembers(lines, objectType.className!);
+		}
+
+		// Anonymous objects - scan for property assignments
+		if (objectType.type === 'anonymous') {
+			return this.getAnonymousObjectMembers(lines, objectName);
+		}
+
+		return [];
+	}
+
+	/**
+	 * Determine the type of an object by finding its instantiation
+	 */
+	private findObjectType(
+		lines: string[],
+		objectName: string
+	): { type: 'builtin' | 'userclass' | 'anonymous'; className?: string } | null {
+		for (const line of lines) {
+			// Check for built-in class instantiation: oEmail := Email{}
+			const builtinMatch = line.match(new RegExp(`\\b${objectName}\\s*:=\\s*(\\w+)\\{\\}`, 'i'));
+			if (builtinMatch) {
+				const className = builtinMatch[1].toUpperCase();
+				if (className === 'EMAIL' || className === 'SSLREGEX') {
+					return { type: 'builtin', className };
+				}
+			}
+
+			// Check for user-defined class: oHandler := CreateUDObject("ClassName")
+			const userClassMatch = line.match(new RegExp(`\\b${objectName}\\s*:=\\s*CreateUDObject\\s*\\(\\s*["']([^"']+)["']`, 'i'));
+			if (userClassMatch) {
+				const fullClassName = userClassMatch[1];
+				// Handle namespace: "Namespace.ClassName" -> "ClassName"
+				const classParts = fullClassName.split('.');
+				const className = classParts[classParts.length - 1];
+				return { type: 'userclass', className };
+			}
+
+			// Check for anonymous object: oVar := CreateUDObject()
+			const anonymousMatch = line.match(new RegExp(`\\b${objectName}\\s*:=\\s*CreateUDObject\\s*\\(\\s*\\)`, 'i'));
+			if (anonymousMatch) {
+				return { type: 'anonymous' };
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Get members for built-in classes (Email, SSLRegex)
+	 */
+	private getBuiltinClassMembers(className: string): vscode.CompletionItem[] {
+		const members: vscode.CompletionItem[] = [];
+
+		if (className === 'EMAIL') {
+			// Methods
+			const send = new vscode.CompletionItem('Send', vscode.CompletionItemKind.Method);
+			send.detail = 'Send email';
+			send.insertText = new vscode.SnippetString('Send($0)');
+			members.push(send);
+
+			const addAttachment = new vscode.CompletionItem('AddAttachment', vscode.CompletionItemKind.Method);
+			addAttachment.detail = 'Add attachment to email';
+			addAttachment.insertText = new vscode.SnippetString('AddAttachment($1)');
+			members.push(addAttachment);
+
+			const setRecipient = new vscode.CompletionItem('SetRecipient', vscode.CompletionItemKind.Method);
+			setRecipient.detail = 'Set email recipient';
+			setRecipient.insertText = new vscode.SnippetString('SetRecipient($1)');
+			members.push(setRecipient);
+
+			// Properties
+			['Subject', 'Body', 'From', 'To'].forEach(prop => {
+				const item = new vscode.CompletionItem(prop, vscode.CompletionItemKind.Property);
+				item.detail = `Email ${prop.toLowerCase()}`;
+				members.push(item);
+			});
+		} else if (className === 'SSLREGEX') {
+			// Methods
+			const match = new vscode.CompletionItem('Match', vscode.CompletionItemKind.Method);
+			match.detail = 'Match pattern against text';
+			match.insertText = new vscode.SnippetString('Match($1, $2)');
+			members.push(match);
+
+			const replace = new vscode.CompletionItem('Replace', vscode.CompletionItemKind.Method);
+			replace.detail = 'Replace pattern in text';
+			replace.insertText = new vscode.SnippetString('Replace($1, $2, $3)');
+			members.push(replace);
+
+			const test = new vscode.CompletionItem('Test', vscode.CompletionItemKind.Method);
+			test.detail = 'Test if pattern matches';
+			test.insertText = new vscode.SnippetString('Test($1, $2)');
+			members.push(test);
+
+			// Properties
+			['Pattern', 'IgnoreCase', 'Multiline'].forEach(prop => {
+				const item = new vscode.CompletionItem(prop, vscode.CompletionItemKind.Property);
+				item.detail = `Regex ${prop}`;
+				members.push(item);
+			});
+		}
+
+		return members;
+	}
+
+	/**
+	 * Get members for user-defined classes by scanning the class definition
+	 */
+	private getUserDefinedClassMembers(lines: string[], className: string): vscode.CompletionItem[] {
+		const members: vscode.CompletionItem[] = [];
+		const classPattern = new RegExp(`^\\s*:CLASS\\s+${className}\\b`, 'i');
+
+		let inClass = false;
+		for (const line of lines) {
+			if (classPattern.test(line)) {
+				inClass = true;
+				continue;
+			}
+
+			if (inClass) {
+				// Look for property/method definitions (simplified - just look for :PROCEDURE or variable patterns)
+				const procMatch = line.match(/^\s*:PROCEDURE\s+(\w+)/i);
+				if (procMatch) {
+					const method = new vscode.CompletionItem(procMatch[1], vscode.CompletionItemKind.Method);
+					method.detail = 'User-defined method';
+					members.push(method);
+				}
+
+				// Exit class when we hit another :CLASS or end of likely class content
+				if (/^\s*:(CLASS|PROCEDURE\s+\w+.*\s+:ENDPROC)/i.test(line) && !procMatch) {
+					break;
+				}
+			}
+		}
+
+		return members;
+	}
+
+	/**
+	 * Get members for anonymous objects by scanning for property assignments
+	 */
+	private getAnonymousObjectMembers(lines: string[], objectName: string): vscode.CompletionItem[] {
+		const members: vscode.CompletionItem[] = [];
+		const memberNames = new Set<string>();
+
+		// Pattern: objectName:propertyName := value
+		const memberPattern = new RegExp(`\\b${objectName}:(\\w+)\\s*:=`, 'i');
+
+		for (const line of lines) {
+			const match = line.match(memberPattern);
+			if (match) {
+				const memberName = match[1];
+				if (!memberNames.has(memberName)) {
+					memberNames.add(memberName);
+					const item = new vscode.CompletionItem(memberName, vscode.CompletionItemKind.Property);
+					item.detail = `Property of ${objectName}`;
+					members.push(item);
+				}
+			}
+		}
+
+		return members;
 	}
 }

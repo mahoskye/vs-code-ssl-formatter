@@ -563,6 +563,182 @@ sTest := TestProcedure("test", 50);
 			assert.ok(hasEmail, "Should have Email class");
 			assert.ok(hasRegex, "Should have SSLRegex class");
 		});
+
+		test("OBJECT-MEMBERS: Provides completions for built-in Email class members", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "oEmail := Email{};\noEmail:",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(1, 7), // After "oEmail:"
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.TriggerCharacter, triggerCharacter: ":" }
+			);
+
+			assert.ok(completions.length > 0, "Should provide member completions");
+
+			// Check for some expected members
+			const hasSend = completions.some(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Send";
+			});
+			const hasSubject = completions.some(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Subject";
+			});
+
+			assert.ok(hasSend, "Should have Send method");
+			assert.ok(hasSubject, "Should have Subject property");
+		});
+
+		test("OBJECT-MEMBERS: Provides completions for built-in SSLRegex class members", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "oRegex := SSLRegex{};\noRegex:",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(1, 7), // After "oRegex:"
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.TriggerCharacter, triggerCharacter: ":" }
+			);
+
+			assert.ok(completions.length > 0, "Should provide member completions");
+
+			const hasMatch = completions.some(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Match";
+			});
+			const hasPattern = completions.some(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Pattern";
+			});
+
+			assert.ok(hasMatch, "Should have Match method");
+			assert.ok(hasPattern, "Should have Pattern property");
+		});
+
+		test("OBJECT-MEMBERS: Provides completions for anonymous object members", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `oVar := CreateUDObject();
+oVar:someValue := "Blue";
+oVar:someOther := "Red";
+oVar:`,
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(3, 5), // After "oVar:" on line 4
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.TriggerCharacter, triggerCharacter: ":" }
+			);
+
+			assert.ok(completions.length > 0, "Should provide member completions for anonymous object");
+
+			const hasSomeValue = completions.some(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "someValue";
+			});
+			const hasSomeOther = completions.some(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "someOther";
+			});
+
+			assert.ok(hasSomeValue, "Should have someValue property");
+			assert.ok(hasSomeOther, "Should have someOther property");
+		});
+
+		test("OBJECT-MEMBERS: Provides completions for user-defined class members", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:CLASS EmailHandler;
+:PROCEDURE Send;
+:ENDPROC;
+:PROCEDURE Validate;
+:ENDPROC;
+:ENDCLASS;
+
+oHandler := CreateUDObject("EmailHandler");
+oHandler:`,
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(8, 9), // After "oHandler:"
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.TriggerCharacter, triggerCharacter: ":" }
+			);
+
+			assert.ok(completions.length > 0, "Should provide member completions for user-defined class");
+
+			const hasSend = completions.some(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Send";
+			});
+			const hasValidate = completions.some(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Validate";
+			});
+
+			assert.ok(hasSend, "Should have Send method from class");
+			assert.ok(hasValidate, "Should have Validate method from class");
+		});
+
+		test("OBJECT-MEMBERS: No completions for undefined object", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "oUndefined:",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(0, 11), // After "oUndefined:"
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.TriggerCharacter, triggerCharacter: ":" }
+			);
+
+			// Should fall back to default completions (keywords, functions, etc.)
+			// Object member completions should be empty, so we get the defaults
+			assert.ok(completions.length > 0, "Should provide default completions");
+		});
+
+		test("OBJECT-MEMBERS: Methods have parentheses in completion", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "oEmail := Email{};\noEmail:",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(1, 7),
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.TriggerCharacter, triggerCharacter: ":" }
+			);
+
+			const sendCompletion = completions.find(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Send";
+			});
+
+			assert.ok(sendCompletion, "Should find Send completion");
+			assert.ok(sendCompletion.kind === vscode.CompletionItemKind.Method, "Send should be a method");
+
+			const insertText = sendCompletion.insertText instanceof vscode.SnippetString
+				? sendCompletion.insertText.value
+				: sendCompletion.insertText;
+
+			assert.ok(insertText?.includes("("), "Method should include parentheses");
+		});
 	});
 
 	suite("Hover Provider Tests", () => {
