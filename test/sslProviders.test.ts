@@ -552,6 +552,172 @@ sTest := TestProcedure("test", 50);
 
 			assert.ok(!hover, "Should not provide hover on whitespace/invalid position");
 		});
+
+		test("ENHANCEMENT: Provides hover for user-defined procedures in DoProc", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:PROCEDURE CalculateTotal;
+:PARAMETERS nQuantity, nPrice;
+	:RETURN nQuantity * nPrice;
+:ENDPROC;
+
+:PROCEDURE Main;
+	result := DoProc("CalculateTotal", {10, 5});
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "CalculateTotal" inside DoProc string
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(6, 20), // Position inside "CalculateTotal" string
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for user-defined procedure in DoProc");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("CalculateTotal"), "Should show procedure name");
+			assert.ok(hoverText.includes("nQuantity") && hoverText.includes("nPrice"),
+				"Should show parameters");
+			assert.ok(hoverText.includes("User-defined procedure"), "Should indicate it's user-defined");
+		});
+
+		test("ENHANCEMENT: Provides hover for user-defined procedures in ExecFunction", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:PROCEDURE ValidateInput;
+:PARAMETERS sData;
+	:RETURN .T.;
+:ENDPROC;
+
+:PROCEDURE Process;
+	bValid := ExecFunction("NameSpace.ValidateInput", {data});
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "ValidateInput" inside ExecFunction string (with namespace)
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(6, 35), // Position inside "NameSpace.ValidateInput" string
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for user-defined procedure in ExecFunction");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("ValidateInput"), "Should show procedure name");
+			assert.ok(hoverText.includes("sData"), "Should show parameter");
+			assert.ok(hoverText.includes("ExecFunction"), "Should indicate called via ExecFunction");
+		});
+
+		test("ENHANCEMENT: No hover for non-existent procedures in DoProc", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:PROCEDURE Main;
+	result := DoProc("NonExistentProc", {});
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "NonExistentProc" that doesn't exist
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(1, 20), // Position inside "NonExistentProc" string
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(!hover, "Should not provide hover for non-existent procedure");
+		});
+
+		test("ENHANCEMENT: Handles procedures without parameters", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:PROCEDURE Initialize;
+	x := 0;
+:ENDPROC;
+
+:PROCEDURE Main;
+	DoProc("Initialize", {});
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "Initialize"
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(5, 12), // Position inside "Initialize" string
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for procedure without parameters");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("Initialize"), "Should show procedure name");
+		});
+
+		test("ENHANCEMENT: Shows parameters with default values", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:PROCEDURE ProcessData;
+:PARAMETERS sInput, nTimeout, bVerbose;
+:DEFAULT sInput = "";
+:DEFAULT nTimeout = 30;
+:DEFAULT bVerbose = .F.;
+	:RETURN .T.;
+:ENDPROC;
+
+:PROCEDURE Main;
+	result := DoProc("ProcessData", {"data", 60});
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "ProcessData"
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(9, 25), // Position inside "ProcessData" string
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for procedure with defaults");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("ProcessData"), "Should show procedure name");
+			assert.ok(hoverText.includes('sInput = ""'), "Should show sInput with default");
+			assert.ok(hoverText.includes("nTimeout = 30"), "Should show nTimeout with default");
+			assert.ok(hoverText.includes("bVerbose = .F."), "Should show bVerbose with default");
+		});
+
+		test("ENHANCEMENT: Handles mixed parameters with and without defaults", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:PROCEDURE SendEmail;
+:PARAMETERS sTo, sSubject, sBody, bCC;
+:DEFAULT sBody = "";
+:DEFAULT bCC = .F.;
+	/* Send email code */;
+:ENDPROC;
+
+:PROCEDURE Main;
+	DoProc("SendEmail", {"user@example.com", "Hello"});
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "SendEmail"
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(8, 15), // Position inside "SendEmail" string
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for procedure with mixed parameters");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("sTo") && !hoverText.includes("sTo ="),
+				"Should show sTo without default");
+			assert.ok(hoverText.includes("sSubject") && !hoverText.includes("sSubject ="),
+				"Should show sSubject without default");
+			assert.ok(hoverText.includes('sBody = ""'), "Should show sBody with default");
+			assert.ok(hoverText.includes("bCC = .F."), "Should show bCC with default");
+		});
 	});
 
 	suite("Diagnostic Provider Tests", () => {
