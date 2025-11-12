@@ -8,12 +8,15 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 
 	private functionDocs: Map<string, { description: string; params: string; returns: string }>;
 	private keywordDocs: Map<string, string>;
+	private builtInClassDocs: Map<string, { description: string; instantiation: string; commonMethods: string[]; commonProperties: string[] }>;
 
 	constructor() {
 		this.functionDocs = new Map();
 		this.keywordDocs = new Map();
+		this.builtInClassDocs = new Map();
 		this.initializeFunctionDocs();
 		this.initializeKeywordDocs();
+		this.initializeBuiltInClassDocs();
 	}
 
 	public provideHover(
@@ -61,6 +64,29 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 				markdown.appendMarkdown(`**Returns:** ${funcDoc.returns}\n\n`);
 			}
 			return new vscode.Hover(markdown, range);
+		}
+
+		// Check if it's a built-in class (followed by {})
+		const classDoc = this.builtInClassDocs.get(word.toUpperCase());
+		if (classDoc) {
+			// Check if followed by {}
+			const afterWord = range.end.character;
+			const restOfLine = lineText.substring(afterWord);
+			if (restOfLine.trimStart().startsWith("{}") || restOfLine.trimStart().startsWith("{")) {
+				const markdown = new vscode.MarkdownString();
+				markdown.appendCodeblock(classDoc.instantiation, "ssl");
+				markdown.appendMarkdown(`\n**Description:** ${classDoc.description}\n\n`);
+
+				if (classDoc.commonMethods.length > 0) {
+					markdown.appendMarkdown(`**Common Methods:** ${classDoc.commonMethods.map(m => `\`${m}\``).join(', ')}\n\n`);
+				}
+
+				if (classDoc.commonProperties.length > 0) {
+					markdown.appendMarkdown(`**Common Properties:** ${classDoc.commonProperties.map(p => `\`${p}\``).join(', ')}\n\n`);
+				}
+
+				return new vscode.Hover(markdown, range);
+			}
 		}
 
 		// Check for Hungarian notation hints
@@ -272,6 +298,39 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 			description: "Set a user-specific setting value",
 			params: "(settingName, value)",
 			returns: "Boolean success status"
+		});
+	}
+
+	private initializeBuiltInClassDocs(): void {
+		this.builtInClassDocs.set("EMAIL", {
+			description: "Built-in email class for sending emails. Instantiate with Email{} then use colon notation for methods and properties.",
+			instantiation: "oEmail := Email{}",
+			commonMethods: [
+				"oEmail:Send()",
+				"oEmail:AddAttachment(path)",
+				"oEmail:SetRecipient(address)"
+			],
+			commonProperties: [
+				"oEmail:Subject",
+				"oEmail:Body",
+				"oEmail:From",
+				"oEmail:To"
+			]
+		});
+
+		this.builtInClassDocs.set("SSLREGEX", {
+			description: "Built-in regular expression class for pattern matching. Instantiate with SSLRegex{} then use colon notation for methods and properties.",
+			instantiation: "oRegex := SSLRegex{}",
+			commonMethods: [
+				"oRegex:Match(pattern, text)",
+				"oRegex:Replace(pattern, replacement, text)",
+				"oRegex:Test(pattern, text)"
+			],
+			commonProperties: [
+				"oRegex:Pattern",
+				"oRegex:IgnoreCase",
+				"oRegex:Multiline"
+			]
 		});
 	}
 

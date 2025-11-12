@@ -421,6 +421,148 @@ sTest := TestProcedure("test", 50);
 			const withDocs = completions.filter(c => c.documentation);
 			assert.ok(withDocs.length > 0, "Some completions should have documentation");
 		});
+
+		test("BUILTIN-CLASS: Provides Email class completion", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(0, 0),
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.Invoke, triggerCharacter: undefined }
+			);
+
+			const emailCompletion = completions.find(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Email";
+			});
+
+			assert.ok(emailCompletion, "Should provide Email class completion");
+			assert.strictEqual(emailCompletion.kind, vscode.CompletionItemKind.Class,
+				"Email completion should be a Class kind");
+		});
+
+		test("BUILTIN-CLASS: Provides SSLRegex class completion", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(0, 0),
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.Invoke, triggerCharacter: undefined }
+			);
+
+			const regexCompletion = completions.find(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "SSLRegex";
+			});
+
+			assert.ok(regexCompletion, "Should provide SSLRegex class completion");
+			assert.strictEqual(regexCompletion.kind, vscode.CompletionItemKind.Class,
+				"SSLRegex completion should be a Class kind");
+		});
+
+		test("BUILTIN-CLASS: Email completion inserts {} braces", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(0, 0),
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.Invoke, triggerCharacter: undefined }
+			);
+
+			const emailCompletion = completions.find(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Email";
+			});
+
+			assert.ok(emailCompletion, "Should find Email completion");
+			assert.ok(emailCompletion.insertText, "Should have insertText");
+
+			const insertText = emailCompletion.insertText instanceof vscode.SnippetString
+				? emailCompletion.insertText.value
+				: emailCompletion.insertText;
+
+			assert.ok(insertText?.includes("{}"), "Should insert Email{} with braces");
+		});
+
+		test("BUILTIN-CLASS: Built-in class completions have documentation", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(0, 0),
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.Invoke, triggerCharacter: undefined }
+			);
+
+			const emailCompletion = completions.find(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Email";
+			});
+
+			assert.ok(emailCompletion, "Should find Email completion");
+			assert.ok(emailCompletion.documentation, "Email completion should have documentation");
+
+			const docText = emailCompletion.documentation instanceof vscode.MarkdownString
+				? emailCompletion.documentation.value
+				: emailCompletion.documentation?.toString() || "";
+
+			assert.ok(docText.includes("email") || docText.includes("Email"),
+				"Documentation should mention email");
+		});
+
+		test("BUILTIN-CLASS: All built-in classes are present", async () => {
+			const provider = new SSLCompletionProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "",
+				language: "ssl"
+			});
+
+			const completions = provider.provideCompletionItems(
+				document,
+				new vscode.Position(0, 0),
+				new vscode.CancellationTokenSource().token,
+				{ triggerKind: vscode.CompletionTriggerKind.Invoke, triggerCharacter: undefined }
+			);
+
+			const classCompletions = completions.filter(c =>
+				c.kind === vscode.CompletionItemKind.Class
+			);
+
+			// Should have at least Email and SSLRegex
+			assert.ok(classCompletions.length >= 2,
+				`Should have at least 2 built-in class completions, found ${classCompletions.length}`);
+
+			const hasEmail = classCompletions.some(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "Email";
+			});
+			const hasRegex = classCompletions.some(c => {
+				const label = typeof c.label === 'string' ? c.label : c.label.label;
+				return label === "SSLRegex";
+			});
+
+			assert.ok(hasEmail, "Should have Email class");
+			assert.ok(hasRegex, "Should have SSLRegex class");
+		});
 	});
 
 	suite("Hover Provider Tests", () => {
@@ -717,6 +859,105 @@ sTest := TestProcedure("test", 50);
 				"Should show sSubject without default");
 			assert.ok(hoverText.includes('sBody = ""'), "Should show sBody with default");
 			assert.ok(hoverText.includes("bCC = .F."), "Should show bCC with default");
+		});
+
+		test("BUILTIN-CLASS: Provides hover for Email class instantiation", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "oEmail := Email{};",
+				language: "ssl"
+			});
+
+			// Hover over "Email" in Email{}
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(0, 12), // Position on "Email"
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for Email class");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("Email"), "Should show Email class");
+			assert.ok(hoverText.includes("email"), "Should mention email in description");
+		});
+
+		test("BUILTIN-CLASS: Provides hover for SSLRegex class instantiation", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "oRegex := SSLRegex{};",
+				language: "ssl"
+			});
+
+			// Hover over "SSLRegex" in SSLRegex{}
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(0, 13), // Position on "SSLRegex"
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for SSLRegex class");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("SSLRegex"), "Should show SSLRegex class");
+			assert.ok(hoverText.includes("regular expression") || hoverText.includes("regex") || hoverText.includes("pattern"),
+				"Should mention regex/pattern in description");
+		});
+
+		test("BUILTIN-CLASS: No hover for class name without {}", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "Email",
+				language: "ssl"
+			});
+
+			// Hover over "Email" without {}
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(0, 2), // Position on "Email"
+				new vscode.CancellationTokenSource().token
+			);
+
+			// Should not provide built-in class hover since no {}
+			assert.ok(!hover || !hover.contents[0].toString().includes("Built-in"),
+				"Should not show built-in class hover without {}");
+		});
+
+		test("BUILTIN-CLASS: Hover shows common methods and properties", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "oEmail := Email{};",
+				language: "ssl"
+			});
+
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(0, 12),
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover");
+			const hoverText = hover.contents[0].toString();
+			// Check for either methods or properties section
+			assert.ok(hoverText.includes("Methods") || hoverText.includes("Properties"),
+				"Should show methods or properties");
+		});
+
+		test("BUILTIN-CLASS: Handles whitespace before {}", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: "oEmail := Email  {};",
+				language: "ssl"
+			});
+
+			// Hover over "Email" with whitespace before {}
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(0, 12),
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover even with whitespace before {}");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("Email"), "Should show Email class");
 		});
 	});
 

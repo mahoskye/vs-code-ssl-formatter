@@ -8,11 +8,13 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 
 	private keywords: vscode.CompletionItem[] = [];
 	private builtinFunctions: vscode.CompletionItem[] = [];
+	private builtinClasses: vscode.CompletionItem[] = [];
 	private snippets: vscode.CompletionItem[] = [];
 
 	constructor() {
 		this.initializeKeywords();
 		this.initializeBuiltinFunctions();
+		this.initializeBuiltinClasses();
 		this.initializeSnippets();
 	}
 
@@ -36,6 +38,9 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 
 		// Add built-in functions
 		completions.push(...this.builtinFunctions);
+
+		// Add built-in classes
+		completions.push(...this.builtinClasses);
 
 		// Add snippets
 		completions.push(...this.snippets);
@@ -133,6 +138,37 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			item.detail = func.description;
 			item.insertText = new vscode.SnippetString(`${func.name}($1)`);
 			item.documentation = new vscode.MarkdownString(`**${func.name}**${func.params}\n\n${func.description}`);
+			return item;
+		});
+	}
+
+	private initializeBuiltinClasses(): void {
+		const classes = [
+			{
+				name: "Email",
+				description: "Built-in email class for sending emails",
+				instantiation: "Email{}",
+				usage: "oEmail := Email{}; oEmail:Subject := 'Test'; oEmail:Send();"
+			},
+			{
+				name: "SSLRegex",
+				description: "Built-in regular expression class for pattern matching",
+				instantiation: "SSLRegex{}",
+				usage: "oRegex := SSLRegex{}; result := oRegex:Match(pattern, text);"
+			}
+		];
+
+		this.builtinClasses = classes.map(cls => {
+			const item = new vscode.CompletionItem(cls.name, vscode.CompletionItemKind.Class);
+			item.detail = cls.description;
+			item.insertText = new vscode.SnippetString(`${cls.name}{}`);
+			item.documentation = new vscode.MarkdownString(
+				`**${cls.name}** - Built-in class\n\n` +
+				`${cls.description}\n\n` +
+				`**Instantiation:** \`${cls.instantiation}\`\n\n` +
+				`**Example:** \`${cls.usage}\`\n\n` +
+				`Use colon notation for methods and properties (e.g., \`object:method()\`, \`object:property\`)`
+			);
 			return item;
 		});
 	}
