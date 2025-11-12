@@ -335,8 +335,10 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const indentChar = indentStyle === "tab" ? "\t" : " ".repeat(indentWidth);
 
 		const blockStart = /^\s*:(IF|WHILE|FOR|FOREACH|BEGINCASE|TRY|PROCEDURE|CLASS|REGION)\b/i;
-		const blockMiddle = /^\s*:(ELSE|CATCH|FINALLY|CASE|OTHERWISE)\b/i;
+		const blockMiddle = /^\s*:(ELSE|CATCH|FINALLY)\b/i;
+		const caseKeyword = /^\s*:(CASE|OTHERWISE)\b/i;
 		const blockEnd = /^\s*:(ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDPROCEDURE|ENDREGION)\b/i;
+		const caseExit = /^\s*:EXITCASE\b/i;
 
 		const formatted = lines.map(line => {
 			const trimmed = line.trim();
@@ -362,6 +364,11 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				indentLevel = Math.max(0, indentLevel - 1);
 			}
 
+			// Decrease indent for :CASE and :OTHERWISE (they're at same level as :BEGINCASE)
+			if (caseKeyword.test(trimmed)) {
+				indentLevel = Math.max(0, indentLevel - 1);
+			}
+
 			const indented = indentChar.repeat(indentLevel) + trimmed;
 
 			// Increase indent after block start
@@ -371,6 +378,11 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 			// Restore indent after middle keywords
 			if (blockMiddle.test(trimmed)) {
+				indentLevel++;
+			}
+
+			// Increase indent after :CASE and :OTHERWISE for their body
+			if (caseKeyword.test(trimmed)) {
 				indentLevel++;
 			}
 
