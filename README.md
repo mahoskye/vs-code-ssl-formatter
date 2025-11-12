@@ -43,6 +43,7 @@ Smart code completion for faster development:
 
 - **Keyword Completion**: All SSL keywords with descriptions
 - **Function Completion**: Built-in functions with parameter hints
+- **Signature Help**: Parameter hints while typing function calls (shows parameter names and types)
 - **Code Snippets**: Templates for common patterns:
   - Procedure with documentation header
   - IF/ELSE blocks
@@ -50,6 +51,18 @@ Smart code completion for faster development:
   - TRY/CATCH error handling
   - REGION markers
   - CASE statements
+
+### Navigation & Code Intelligence
+
+Powerful navigation features for exploring code:
+
+- **Go to Definition** (`F12`): Jump to procedure or variable definition
+- **Find All References** (`Shift+F12`): Find all usages of a symbol
+- **Rename Symbol** (`F2`): Rename variables and procedures across the file
+  - Validates Hungarian notation compliance
+  - Prevents renaming keywords and built-in functions
+- **CodeLens**: Shows reference counts above procedures
+- **Peek Definition** (`Alt+F12`): Preview definition inline
 
 ### Hover Information
 
@@ -69,6 +82,15 @@ Real-time code analysis and style enforcement:
 - **SQL Injection Prevention**: Warns about non-parameterized SQL queries
 - **Style Guide Enforcement**: Missing semicolons, nested ternaries, missing OTHERWISE clauses
 - **Configurable Severity**: Choose between error, warning, or info levels
+
+### Quick Fixes & Code Actions
+
+Automatic fixes for common issues:
+
+- **Add Missing Semicolon**: Automatically add semicolons to statements
+- **Fix Keyword Casing**: Correct keyword casing to match style guide (UPPERCASE)
+- **Add OTHERWISE Clause**: Add missing :OTHERWISE to CASE statements
+- **Lightbulb Menu** (`Ctrl+.`): Quick access to all available fixes
 
 ### Editor Features
 
@@ -126,6 +148,8 @@ The extension provides extensive configuration options. Access settings via `Ctr
 ### IntelliSense Settings
 
 - `ssl.intellisense.enabled`: Enable IntelliSense features (default: true)
+- `ssl.intellisense.codeLens.enabled`: Show CodeLens reference counts above procedures (default: true)
+- `ssl.intellisense.signatureHelp.enabled`: Show parameter hints while typing function calls (default: true)
 
 ### Example Configuration
 

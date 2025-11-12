@@ -5,6 +5,12 @@ import { SSLSymbolProvider } from "./sslSymbolProvider";
 import { SSLCompletionProvider } from "./sslCompletionProvider";
 import { SSLHoverProvider } from "./sslHoverProvider";
 import { SSLDiagnosticProvider } from "./sslDiagnosticProvider";
+import { SSLDefinitionProvider } from "./sslDefinitionProvider";
+import { SSLReferenceProvider } from "./sslReferenceProvider";
+import { SSLRenameProvider } from "./sslRenameProvider";
+import { SSLSignatureHelpProvider } from "./sslSignatureHelpProvider";
+import { SSLCodeLensProvider } from "./sslCodeLensProvider";
+import { SSLCodeActionProvider } from "./sslCodeActionProvider";
 
 /**
  * Activates the SSL extension.
@@ -103,7 +109,55 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    console.log("SSL extension features registered: folding, formatting, symbols, completion, hover, diagnostics");
+    // Register definition provider for Go to Definition
+    context.subscriptions.push(
+        vscode.languages.registerDefinitionProvider(documentSelector, new SSLDefinitionProvider())
+    );
+
+    // Register reference provider for Find All References
+    context.subscriptions.push(
+        vscode.languages.registerReferenceProvider(documentSelector, new SSLReferenceProvider())
+    );
+
+    // Register rename provider for symbol renaming
+    context.subscriptions.push(
+        vscode.languages.registerRenameProvider(documentSelector, new SSLRenameProvider())
+    );
+
+    // Register signature help provider for parameter hints
+    context.subscriptions.push(
+        vscode.languages.registerSignatureHelpProvider(
+            documentSelector,
+            new SSLSignatureHelpProvider(),
+            "(", ","
+        )
+    );
+
+    // Register CodeLens provider for reference counts
+    const codeLensProvider = new SSLCodeLensProvider();
+    context.subscriptions.push(
+        vscode.languages.registerCodeLensProvider(documentSelector, codeLensProvider)
+    );
+
+    // Refresh CodeLens when document changes
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeTextDocument(() => {
+            codeLensProvider.refresh();
+        })
+    );
+
+    // Register code action provider for quick fixes
+    context.subscriptions.push(
+        vscode.languages.registerCodeActionsProvider(
+            documentSelector,
+            new SSLCodeActionProvider(),
+            {
+                providedCodeActionKinds: SSLCodeActionProvider.providedCodeActionKinds
+            }
+        )
+    );
+
+    console.log("SSL extension fully activated with all language features");
 }
 
 /**

@@ -2,6 +2,31 @@
 
 All notable changes to the "STARLIMS Scripting Language Formatter" extension will be documented in this file.
 
+## [0.3.0] - 2025-11-12
+
+### Added
+
+-   **Navigation & Code Intelligence**:
+    -   Go to Definition (F12) for procedures and variables
+    -   Find All References (Shift+F12) for symbols
+    -   Rename Symbol (F2) with Hungarian notation validation
+    -   Peek Definition (Alt+F12) for inline preview
+-   **Signature Help**: Parameter hints while typing function calls (triggered by `(` and `,`)
+-   **CodeLens**: Reference counts displayed above procedures (clickable to show references)
+-   **Code Actions & Quick Fixes**:
+    -   Add missing semicolon
+    -   Fix keyword casing to UPPERCASE
+    -   Add missing :OTHERWISE clause to CASE statements
+    -   Lightbulb menu for quick access to fixes
+-   **Configuration**:
+    -   `ssl.intellisense.codeLens.enabled`: Toggle CodeLens display
+    -   `ssl.intellisense.signatureHelp.enabled`: Toggle signature help
+
+### Changed
+
+-   Enhanced extension activation with all language features
+-   Improved README with navigation and quick fix documentation
+
 ## [0.2.0] - 2025-11-12
 
 ### Added
