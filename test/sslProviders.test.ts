@@ -861,6 +861,129 @@ sTest := TestProcedure("test", 50);
 			assert.ok(hoverText.includes("bCC = .F."), "Should show bCC with default");
 		});
 
+		test("USER-CLASS: Provides hover for user-defined class in CreateUDObject", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:CLASS EmailHandler;
+:ENDCLASS;
+
+:PROCEDURE Main;
+	oHandler := CreateUDObject("EmailHandler");
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "EmailHandler" inside CreateUDObject string
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(4, 30), // Position inside "EmailHandler" string
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for user-defined class");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("EmailHandler"), "Should show class name");
+			assert.ok(hoverText.includes("User-defined class"), "Should indicate it's user-defined");
+			assert.ok(hoverText.includes("CreateUDObject"), "Should mention CreateUDObject");
+		});
+
+		test("USER-CLASS: Shows inheritance information", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:CLASS BaseClass;
+:ENDCLASS;
+
+:CLASS DerivedClass;
+:INHERIT BaseClass;
+:ENDCLASS;
+
+:PROCEDURE Main;
+	obj := CreateUDObject("DerivedClass");
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "DerivedClass"
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(8, 28), // Position inside "DerivedClass" string
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for derived class");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("DerivedClass"), "Should show class name");
+			assert.ok(hoverText.includes("BaseClass"), "Should show base class");
+			assert.ok(hoverText.includes("Inherits") || hoverText.includes("INHERIT"), "Should mention inheritance");
+		});
+
+		test("USER-CLASS: Handles namespace in class name", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:CLASS DataProcessor;
+:ENDCLASS;
+
+:PROCEDURE Main;
+	obj := CreateUDObject("Utilities.DataProcessor");
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "DataProcessor" in namespaced string
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(4, 38), // Position inside "Utilities.DataProcessor" string
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(hover, "Should provide hover for namespaced class");
+			const hoverText = hover.contents[0].toString();
+			assert.ok(hoverText.includes("DataProcessor"), "Should show class name");
+		});
+
+		test("USER-CLASS: No hover for non-existent class", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:PROCEDURE Main;
+	obj := CreateUDObject("NonExistentClass");
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "NonExistentClass" that doesn't exist
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(1, 28), // Position inside "NonExistentClass" string
+				new vscode.CancellationTokenSource().token
+			);
+
+			assert.ok(!hover, "Should not provide hover for non-existent class");
+		});
+
+		test("USER-CLASS: No hover outside CreateUDObject context", async () => {
+			const provider = new SSLHoverProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: `:CLASS EmailHandler;
+:ENDCLASS;
+
+:PROCEDURE Main;
+	sName := "EmailHandler";
+:ENDPROC;`,
+				language: "ssl"
+			});
+
+			// Hover over "EmailHandler" in a regular string assignment
+			const hover = provider.provideHover(
+				document,
+				new vscode.Position(4, 15), // Position inside regular string
+				new vscode.CancellationTokenSource().token
+			);
+
+			// Should not provide class hover since it's not in CreateUDObject
+			assert.ok(!hover || !hover.contents[0].toString().includes("User-defined class"),
+				"Should not show class hover outside CreateUDObject context");
+		});
+
 		test("BUILTIN-CLASS: Provides hover for Email class instantiation", async () => {
 			const provider = new SSLHoverProvider();
 			const document = await vscode.workspace.openTextDocument({

@@ -32,6 +32,12 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 			return userProcHover;
 		}
 
+		// Check if hovering over a class name in CreateUDObject
+		const userClassHover = this.getUserDefinedClassHover(document, position, lineText);
+		if (userClassHover) {
+			return userClassHover;
+		}
+
 		const range = document.getWordRangeAtPosition(position);
 		if (!range) {
 			return null;
@@ -412,6 +418,63 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 	}
 
 	/**
+	 * Provides hover information for user-defined classes called via CreateUDObject
+	 */
+	private getUserDefinedClassHover(
+		document: vscode.TextDocument,
+		position: vscode.Position,
+		lineText: string
+	): vscode.Hover | null {
+		// Check if we're inside a string literal
+		const stringInfo = this.getStringAtPosition(lineText, position.character);
+		if (!stringInfo) {
+			return null;
+		}
+
+		// Check if this string is the first argument to CreateUDObject
+		const beforeString = lineText.substring(0, stringInfo.start);
+		const createUDOMatch = beforeString.match(/\bCreateUDObject\s*\(\s*$/i);
+		if (!createUDOMatch) {
+			return null;
+		}
+
+		const className = stringInfo.content;
+
+		// Handle namespace (e.g., "NameSpace.ClassName")
+		const classParts = className.split('.');
+		const actualClassName = classParts[classParts.length - 1];
+
+		// Find the class definition
+		const classInfo = this.findClassDefinition(document, actualClassName);
+		if (!classInfo) {
+			return null;
+		}
+
+		// Create hover with class signature
+		const markdown = new vscode.MarkdownString();
+		let codeBlock = `:CLASS ${classInfo.name}`;
+		if (classInfo.inherits) {
+			codeBlock += `\n:INHERIT ${classInfo.inherits}`;
+		}
+		markdown.appendCodeblock(codeBlock, "ssl");
+		markdown.appendMarkdown(`\n**User-defined class**\n\n`);
+		if (classInfo.inherits) {
+			markdown.appendMarkdown(`**Inherits from:** ${classInfo.inherits}\n\n`);
+		}
+		markdown.appendMarkdown(`_Instantiated via CreateUDObject_`);
+
+		// Create range for the class name in the string
+		const range = new vscode.Range(
+			position.line,
+			stringInfo.start + 1,  // +1 to skip opening quote
+			position.line,
+			stringInfo.end - 1     // -1 to skip closing quote
+		);
+
+		return new vscode.Hover(markdown, range);
+	}
+
+	/**
 	 * Extracts string content and position if cursor is inside a string literal
 	 */
 	private getStringAtPosition(lineText: string, charPosition: number): { content: string; start: number; end: number } | null {
@@ -463,6 +526,45 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 				const paramInfo = this.extractProcedureParameters(lines, i);
 
 				return { name, params: paramInfo };
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Finds a class definition in the document with inheritance details
+	 */
+	private findClassDefinition(
+		document: vscode.TextDocument,
+		className: string
+	): { name: string; inherits: string | null } | null {
+		const text = document.getText();
+		const lines = text.split('\n');
+
+		const classPattern = new RegExp(`^\\s*:CLASS\\s+(${className})\\b`, 'i');
+
+		for (let i = 0; i < lines.length; i++) {
+			const match = lines[i].match(classPattern);
+			if (match) {
+				const name = match[1];
+
+				// Look for :INHERIT on the next few lines
+				let inherits: string | null = null;
+				for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+					const inheritMatch = lines[j].match(/^\s*:INHERIT\s+(\w+)/i);
+					if (inheritMatch) {
+						inherits = inheritMatch[1];
+						break;
+					}
+
+					// Stop if we hit another significant keyword (not :INHERIT)
+					if (/^\s*:(CLASS|PROCEDURE|DECLARE|IF|WHILE|FOR)\b/i.test(lines[j])) {
+						break;
+					}
+				}
+
+				return { name, inherits };
 			}
 		}
 
