@@ -150,26 +150,21 @@ export class SSLDiagnosticProvider {
 			if (doProcWithBracesMatch || doProcWithoutBracesMatch) {
 				const procedureName = doProcWithBracesMatch ? doProcWithBracesMatch[1] : doProcWithoutBracesMatch![1];
 				const argsString = doProcWithBracesMatch ? doProcWithBracesMatch[2].trim() : '';
-				const providedArgs = argsString ? argsString.split(',').map(a => a.trim()).filter(a => a.length > 0) : [];
+				
+				// Check if there's any non-whitespace, non-comma content in the braces
+				const hasContent = /[^,\s]/.test(argsString);
 				
 				// Get expected parameters for this procedure
 				const expectedParams = this.getProcedureParameters(lines, procedureName);
 				
-				if (expectedParams.length > 0 && providedArgs.length === 0) {
+				// Only warn if procedure expects parameters and none were provided (empty braces or no braces)
+				if (expectedParams.length > 0 && !hasContent) {
 					const diagnostic = new vscode.Diagnostic(
 						new vscode.Range(i, 0, i, line.length),
 						`Procedure '${procedureName}' expects ${expectedParams.length} parameter${expectedParams.length > 1 ? 's' : ''} (${expectedParams.join(', ')}) but none were provided`,
 						vscode.DiagnosticSeverity.Warning
 					);
 					diagnostic.code = "ssl-missing-params";
-					diagnostics.push(diagnostic);
-				} else if (expectedParams.length > 0 && providedArgs.length < expectedParams.length) {
-					const diagnostic = new vscode.Diagnostic(
-						new vscode.Range(i, 0, i, line.length),
-						`Procedure '${procedureName}' expects ${expectedParams.length} parameter${expectedParams.length > 1 ? 's' : ''} but only ${providedArgs.length} provided`,
-						vscode.DiagnosticSeverity.Warning
-					);
-					diagnostic.code = "ssl-insufficient-params";
 					diagnostics.push(diagnostic);
 				}
 			}
