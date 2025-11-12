@@ -17,13 +17,46 @@ This document provides a comprehensive list of all features available in the STA
 
 ## 2. Editor Features
 
-- **Code Folding**: Allows collapsing and expanding of code blocks for:
-    - Procedure blocks (`:PROCEDURE`)
-    - Loops (`:FOR`, `:WHILE`)
-    - Conditionals (`:IF...:ELSE`, `:BEGINCASE`)
-    - Exception handling (`:TRY...:CATCH`)
-    - Keyword-based regions (`:REGION` / `:ENDREGION`)
-    - Comment-based regions (`/* region ... ;` and `/* endregion;`)
+- **Code Folding**: Comprehensive folding support with intelligent block detection that allows collapsing and expanding of code structures for improved readability and navigation:
+    - **Procedure Blocks** (`:PROCEDURE...;:ENDPROCEDURE;`): Collapse entire procedure definitions including parameters, defaults, body, and return statements. Fold markers appear in the gutter next to procedure declarations.
+    - **Loop Structures**:
+        - `:FOR...;:TO...;:STEP...;:NEXT;` — Collapse for-loops with all their iterations
+        - `:WHILE...;:ENDWHILE;` — Collapse while-loop blocks
+        - `:FOREACH...;:IN...;:NEXT;` — Collapse foreach-loop blocks
+    - **Conditional Blocks**:
+        - `:IF...;:ELSEIF...;:ELSE...;:ENDIF;` — Collapse entire if-else chains or individual branches
+        - `:BEGINCASE...;:CASE...;:OTHERWISE...;:ENDCASE;` — Collapse case statements and individual case branches
+        - Supports nested conditionals with independent fold controls
+    - **Exception Handling** (`:TRY...;:CATCH...;:FINALLY...;:ENDTRY;`): Collapse try-catch-finally blocks independently or as a whole
+    - **Explicit Region Markers**:
+        - **Keyword-based regions**: `:REGION region_name;...;:ENDREGION;` — Create custom collapsible sections for organizing related code blocks (e.g., "Initialization", "Data Validation", "Cleanup")
+        - **Comment-based regions**: `/* region region_name;...;/* endregion;` — Alternative region syntax using SSL comments for compatibility
+        - Region names appear in the folded placeholder text for easy identification
+    - **Multi-line Comments**: `/* ... ;` — Fold large comment blocks to reduce visual clutter
+    - **Array and Object Literals**: Fold multi-line array `{...}` and code block `{|...|...}` literals
+    - **Fold All / Unfold All**: Use `Ctrl+K Ctrl+0` to collapse all foldable regions, `Ctrl+K Ctrl+J` to expand all
+    - **Fold Level Commands**: `Ctrl+K Ctrl+1` through `Ctrl+K Ctrl+7` to fold to specific nesting levels
+    - **Fold Recursively**: `Ctrl+K Ctrl+[` to fold the current region and all nested regions
+    - **Visual Indicators**: Subtle fold icons in the editor gutter; folded regions show `...` with context preview on hover
+
+- **Minimap Highlighting**: Enhanced minimap integration for rapid visual navigation and code overview:
+    - **Syntax-aware Colorization**: The minimap on the right side of the editor displays a scaled-down, syntax-highlighted view of the entire file, making it easy to scan for procedures, comments, and code blocks at a glance
+    - **Current Viewport Indicator**: Highlighted rectangle in the minimap shows the currently visible portion of the document; click or drag to navigate instantly to any part of the file
+    - **Symbol Markers**: Key language constructs are visually emphasized in the minimap:
+        - `:PROCEDURE` blocks appear as distinct color blocks for quick procedure location
+        - `:REGION` sections are visually demarcated
+        - Comments and documentation blocks are distinguished from code
+    - **Search Result Highlights**: Active search matches are highlighted in the minimap, allowing you to see the distribution of search results across the entire file
+    - **Diagnostic Markers**: Errors and warnings appear as colored bars (red for errors, yellow for warnings, blue for information) at their line positions in the minimap
+    - **Selection Highlighting**: Current selection and all matching occurrences of the selected text are highlighted in the minimap
+    - **Customizable Size**: Minimap width and character rendering can be configured via VS Code settings:
+        - `editor.minimap.enabled`: Toggle minimap on/off (default: true)
+        - `editor.minimap.size`: Control minimap size (`proportional`, `fill`, `fit`)
+        - `editor.minimap.scale`: Adjust minimap zoom level (1-3)
+        - `editor.minimap.showSlider`: Control viewport slider visibility (`always`, `mouseover`)
+        - `editor.minimap.maxColumn`: Limit maximum column rendered in minimap (default: 120)
+    - **Performance Optimized**: Efficiently renders even for large SSL files (1000+ lines) with minimal performance impact
+
 - **Bracket Matching**: Automatically highlights matching pairs of `()`, `[]`, and `{}`.
 - **Auto-Closing Pairs**: Automatically inserts the closing character for:
     - Brackets: `()`, `[]`, `{}`
@@ -153,53 +186,361 @@ This document provides a comprehensive list of all features available in the STA
 
 ## 6. Configuration
 
-- **Extension Settings**: Users can configure the extension via VS Code settings (`settings.json`).
+The SSL extension provides extensive configuration options accessible through VS Code's settings UI (`Ctrl+,` or `Cmd+,`) or directly in `settings.json`. Settings can be configured at the User level (global), Workspace level (project-specific), or Folder level (for multi-root workspaces).
+
+### 6.1 General Extension Settings
+
+- **Extension Settings**: Users can configure the extension via VS Code settings (`settings.json`) or the Settings UI.
 - **Strict Style Guide Mode**:
-    - `ssl.strictStyleGuideMode`: A boolean flag to enable or disable stricter style guide rules, such as **requiring** Hungarian notation (errors instead of warnings), preventing nested ternaries, requiring `:OTHERWISE` in case statements, and SQL injection prevention.
-- **Hungarian Notation Settings**:
-    - `ssl.naming.hungarianNotation.enabled`: boolean — enable Hungarian notation validation (default: true).
-    - `ssl.naming.hungarianNotation.strictMode`: boolean — when true, produces errors; when false, produces warnings (default: false).
-    - `ssl.naming.hungarianNotation.severity`: `warn | error` — severity level for violations (default: warn).
-    - `ssl.naming.hungarianNotation.prefixes`: object — custom prefix mappings (s=string, n=numeric, b=boolean, etc.).
-    - `ssl.naming.hungarianNotation.exceptions`: array — allowed exceptions like loop counters [i, j, k], SSL constants [NIL, .T., .F.], abbreviations [ID, SQL, URL, XML, HTML].
-- **Naming Convention Settings**:
-    - `ssl.naming.procedures`: `PascalCase | preserve` — procedure naming style (default: PascalCase).
-    - `ssl.naming.classes`: `PascalCase | preserve` — class naming style (default: PascalCase).
-    - `ssl.naming.variables`: `camelCase | preserve` — variable naming style (default: camelCase).
-    - `ssl.naming.constants`: `UPPER_SNAKE_CASE | preserve` — constant naming style (default: UPPER_SNAKE_CASE).
-    - `ssl.naming.maxVariableLength`: integer — maximum variable name length (default: 20).
-    - `ssl.naming.maxFunctionLength`: integer — maximum function name length (default: 30).
+    - `ssl.strictStyleGuideMode`: boolean — Master switch to enable stricter style guide rules. When enabled, converts many warnings to errors and enforces stricter coding standards including **required** Hungarian notation, preventing nested ternaries, requiring `:OTHERWISE` in case statements, and SQL injection prevention (default: false).
+    - Example: `"ssl.strictStyleGuideMode": true`
+
+### 6.2 Formatting Configuration
+
+Comprehensive control over code formatting behavior and style preferences:
+
+- **Indentation Style**:
+    - `ssl.format.indentStyle`: `tab | space` — Character type for indentation (default: `tab`).
+    - `ssl.format.indentWidth`: integer — Number of tabs or spaces per indent level (default: 1 for tabs, 4 for spaces).
+    - `ssl.format.continuationIndent`: integer — Additional indentation for wrapped lines (default: 1).
+    - Example: `"ssl.format.indentStyle": "space", "ssl.format.indentWidth": 4`
+
+- **Keyword & Identifier Casing**:
+    - `ssl.format.keywordCase`: `preserve | upper | lower` — Preferred casing for SSL keywords (default: `upper`).
+    - `ssl.format.builtinFunctionCase`: `preserve | PascalCase | lowercase | UPPERCASE` — Casing for built-in function names (default: `PascalCase`).
+    - `ssl.format.identifierCasing`: `preserve | camelCase | PascalCase` — Optional canonicalization of user-defined identifiers (default: `preserve`).
+    - Example: `"ssl.format.keywordCase": "upper", "ssl.format.builtinFunctionCase": "PascalCase"`
+
+- **Line Length & Wrapping**:
+    - `ssl.format.wrapLength`: integer — Maximum line length before wrapping (soft limit) (default: 90, range: 60-200).
+    - `ssl.format.wrapAtComma`: boolean — Prefer breaking lines at commas in argument lists (default: true).
+    - `ssl.format.wrapBeforeOperator`: boolean — When wrapping, place operators at the start of the new line (default: true).
+    - Example: `"ssl.format.wrapLength": 100`
+
+- **Whitespace & Spacing**:
+    - `ssl.format.trimTrailingWhitespace`: boolean — Remove trailing whitespace from all lines (default: true).
+    - `ssl.format.spaceAroundOperators`: boolean — Enforce spaces around assignment and comparison operators (default: true).
+    - `ssl.format.spaceAfterComma`: boolean — Enforce space after commas in parameter lists (default: true).
+    - `ssl.format.spaceInsideParentheses`: boolean — Add spaces inside parentheses (default: false).
+    - `ssl.format.spaceInsideBrackets`: boolean — Add spaces inside brackets (default: false).
+    - Example: `"ssl.format.spaceAroundOperators": true`
+
+- **Blank Lines**:
+    - `ssl.format.blankLinesBetweenProcedures`: integer — Number of blank lines between top-level blocks (default: 1, range: 0-5).
+    - `ssl.format.blankLinesBeforeRegion`: integer — Blank lines before `:REGION` markers (default: 1, range: 0-3).
+    - `ssl.format.maxConsecutiveBlankLines`: integer — Maximum allowed consecutive blank lines (default: 2, range: 1-5).
+    - Example: `"ssl.format.blankLinesBetweenProcedures": 2`
+
+- **File Endings**:
+    - `ssl.format.finalNewline`: boolean — Ensure file ends with a newline character (default: true).
+    - `ssl.format.lineEndings`: `lf | crlf | auto` — Line ending style: Unix (`lf`), Windows (`crlf`), or automatic detection (default: `lf`).
+    - `ssl.format.encoding`: string — File encoding (default: `utf-8`). Supported: `utf-8`, `utf-16le`, `utf-16be`, `iso-8859-1`, `windows-1252`.
+    - Example: `"ssl.format.lineEndings": "crlf"`
+
+- **Special Formatting Features**:
+    - `ssl.format.enableSqlFormatting`: boolean — When true, apply targeted SQL formatting inside SQL string literals with UPPERCASE keywords (default: true).
+    - `ssl.format.alignAssignments`: boolean — Vertically align consecutive assignment operators (default: false).
+    - `ssl.format.sortIncludes`: boolean — Automatically sort `:INCLUDE` statements (external before local) (default: true).
+    - Example: `"ssl.format.enableSqlFormatting": true`
+
+- **Format Triggers**:
+    - `ssl.format.formatOnSave`: boolean — Automatically format document when saving (default: false).
+    - `ssl.format.formatOnType`: boolean — Format incrementally as you type (default: false).
+    - `ssl.format.formatOnPaste`: boolean — Format pasted code blocks (default: false).
+    - Example: `"ssl.format.formatOnSave": true`
+
+### 6.3 Naming Convention Settings
+
+Control identifier naming rules and Hungarian notation enforcement:
+
+- **Hungarian Notation**:
+    - `ssl.naming.hungarianNotation.enabled`: boolean — Enable Hungarian notation validation (default: true).
+    - `ssl.naming.hungarianNotation.strictMode`: boolean — When true, produces errors; when false, produces warnings (default: false).
+    - `ssl.naming.hungarianNotation.severity`: `warn | error | info` — Severity level for violations (default: `warn`).
+    - `ssl.naming.hungarianNotation.prefixes`: object — Custom prefix mappings. Default:
+        ```json
+        {
+          "s": "string",
+          "n": "numeric",
+          "b": "boolean",
+          "l": "logical",
+          "d": "date",
+          "a": "array",
+          "o": "object",
+          "u": "udo"
+        }
+        ```
+    - `ssl.naming.hungarianNotation.exceptions`: array — Allowed exceptions (default: `["i", "j", "k", "NIL", ".T.", ".F.", "ID", "SQL", "URL", "XML", "HTML", "API", "UID", "GUID"]`).
+    - Example: 
+        ```json
+        "ssl.naming.hungarianNotation.enabled": true,
+        "ssl.naming.hungarianNotation.strictMode": false,
+        "ssl.naming.hungarianNotation.exceptions": ["i", "j", "k", "index", "temp"]
+        ```
+
+- **Identifier Casing Conventions**:
+    - `ssl.naming.procedures`: `PascalCase | preserve | camelCase` — Procedure naming style (default: `PascalCase`).
+    - `ssl.naming.classes`: `PascalCase | preserve` — Class naming style (default: `PascalCase`).
+    - `ssl.naming.variables`: `camelCase | preserve | PascalCase` — Variable naming style (default: `camelCase`).
+    - `ssl.naming.constants`: `UPPER_SNAKE_CASE | preserve | UPPERCASE` — Constant naming style (default: `UPPER_SNAKE_CASE`).
+    - `ssl.naming.privateMembers`: `_camelCase | camelCase | preserve` — Private member naming (default: `_camelCase`).
+    - Example: `"ssl.naming.procedures": "PascalCase", "ssl.naming.variables": "camelCase"`
+
+- **Length Restrictions**:
+    - `ssl.naming.maxVariableLength`: integer — Maximum variable name length (default: 20, range: 10-50).
+    - `ssl.naming.maxFunctionLength`: integer — Maximum function/procedure name length (default: 30, range: 15-60).
+    - `ssl.naming.minVariableLength`: integer — Minimum meaningful variable name length (default: 2, range: 1-5).
+    - Example: `"ssl.naming.maxVariableLength": 25`
+
+- **Naming Pattern Validation**:
+    - `ssl.naming.disallowAbbreviations`: boolean — Discourage ambiguous abbreviations in identifiers (default: false).
+    - `ssl.naming.requireDescriptiveNames`: boolean — Enforce descriptive names over single letters (except loop counters) (default: true).
+    - Example: `"ssl.naming.requireDescriptiveNames": true`
+
+### 6.4 Diagnostic & Code Quality Settings
+
+Configure linting rules, error detection, and code quality checks:
+
+- **General Diagnostics**:
+    - `ssl.maxNumberOfProblems`: integer — Maximum number of diagnostics to report per file (default: 100, range: 10-1000).
+    - `ssl.diagnostics.enabled`: boolean — Enable/disable all diagnostic checks (default: true).
+    - `ssl.diagnostics.onType`: boolean — Show diagnostics as you type (default: true) vs. only on save (false).
+    - Example: `"ssl.maxNumberOfProblems": 200`
+
+- **Style Guide Rules**:
+    - `ssl.styleGuide.limitBlockDepth`: integer — Maximum nesting level for control structures (default: 4, range: 2-10, 0=disabled).
+    - `ssl.styleGuide.maxParamsPerProcedure`: integer — Maximum procedure parameter count (default: 8, range: 3-15, 0=disabled).
+    - `ssl.styleGuide.disallowGlobals`: boolean — Discourage use of global variables (default: false).
+    - `ssl.styleGuide.requireOtherwiseInCase`: boolean — Require `:OTHERWISE` clause in `:BEGINCASE` blocks (default: true).
+    - `ssl.styleGuide.preferPositiveLogic`: boolean — Encourage positive conditionals over negative (default: true).
+    - `ssl.styleGuide.noNestedTernaries`: boolean — Prevent nested ternary expressions (default: true).
+    - `ssl.styleGuide.requireProcedureHeaders`: boolean — Require documentation header on all procedures (default: false).
+    - Example: `"ssl.styleGuide.limitBlockDepth": 5, "ssl.styleGuide.maxParamsPerProcedure": 6`
+
+### 6.5 Security Settings
+
+SQL injection prevention and secure coding practices:
+
+- **SQL Security**:
+    - `ssl.security.preventSqlInjection`: boolean — Warn about non-parameterized SQL queries (default: true).
+    - `ssl.security.requireParameterizedQueries`: boolean — Require `?PARAM?` or `?` placeholders in SQL strings (default: true).
+    - `ssl.security.validateDatabaseParameters`: `off | warn | error` — Validate parameter count matches placeholders (default: `warn`).
+    - `ssl.security.disallowDynamicSql`: boolean — Flag dynamic SQL construction via string concatenation (default: false).
+    - `ssl.security.warnUnsafeEval`: boolean — Warn about use of `eval()` and similar dynamic execution (default: true).
+    - Example: 
+        ```json
+        "ssl.security.preventSqlInjection": true,
+        "ssl.security.requireParameterizedQueries": true,
+        "ssl.security.validateDatabaseParameters": "error"
+        ```
+
+- **Data Sanitization**:
+    - `ssl.security.requireInputValidation`: boolean — Encourage validation of external input (default: true).
+    - `ssl.security.warnMissingErrorHandling`: boolean — Flag procedures without `:TRY...:CATCH` blocks (default: false).
+
+### 6.6 Performance Settings
+
+Optimization hints and performance-related diagnostics:
+
+- **SQL Performance**:
+    - `ssl.performance.preferExistsOverDistinct`: boolean — Suggest `EXISTS` over `SELECT DISTINCT` for existence checks (default: true).
+    - `ssl.performance.avoidSelectStar`: boolean — Warn against `SELECT *` queries (default: true).
+    - `ssl.performance.useBetweenForRanges`: boolean — Suggest `BETWEEN` for range queries (default: true).
+    - `ssl.performance.warnMissingIndexHints`: boolean — Hint when queries might benefit from indexes (default: false).
+    - Example: `"ssl.performance.avoidSelectStar": true`
+
+- **Code Performance**:
+    - `ssl.performance.warnNestedLoops`: boolean — Flag potentially inefficient nested loops (default: false).
+    - `ssl.performance.suggestArrayPreallocation`: boolean — Suggest preallocating arrays for large datasets (default: true).
+
+- **Indexing & Caching**:
+    - `ssl.performance.indexing.enabled`: boolean — Enable workspace symbol indexing (default: true).
+    - `ssl.performance.indexing.maxFiles`: integer — Maximum files to index (default: 10000, range: 100-50000).
+    - `ssl.performance.indexing.maxFileSize`: integer — Skip files larger than this (KB) (default: 1024, range: 100-10240).
+    - `ssl.performance.indexing.excludePatterns`: array — Glob patterns to exclude from indexing (default: `["**/node_modules/**", "**/temp/**", "**/.git/**"]`).
+    - `ssl.performance.caching.enabled`: boolean — Enable on-disk caching for faster startup (default: true).
+    - `ssl.performance.caching.invalidateOnChange`: boolean — Auto-invalidate cache when files change (default: true).
+    - Example: `"ssl.performance.indexing.maxFiles": 20000`
+
+### 6.7 File & Workspace Settings
+
+File handling, encoding, and workspace organization:
+
+- **File Encoding & Line Endings**:
+    - `ssl.files.encoding`: string — Default file encoding (default: `utf-8`). Supported: `utf-8`, `utf-16le`, `utf-16be`, `iso-8859-1`, `windows-1252`.
+    - `ssl.files.lineEndings`: `lf | crlf | auto` — Line ending preference (default: `lf`).
+    - `ssl.files.autoDetectEncoding`: boolean — Automatically detect file encoding (default: true).
+    - Example: `"ssl.files.encoding": "utf-8", "ssl.files.lineEndings": "lf"`
+
+- **File Organization**:
+    - `ssl.files.oneProcedurePerFile`: boolean — Enforce single procedure per file (default: false).
+    - `ssl.files.matchFilenameToProcedure`: boolean — Require filename to match procedure name (default: false).
+    - `ssl.files.includeOrder.enforceExternal First`: boolean — Enforce external includes before local (default: true).
+    - `ssl.files.includeOrder.alphabetize`: boolean — Sort includes alphabetically within groups (default: true).
+    - Example: `"ssl.files.oneProcedurePerFile": true`
+
+- **Workspace Settings**:
+    - `ssl.workspace.multiRoot.enabled`: boolean — Enable multi-root workspace support (default: true).
+    - `ssl.workspace.excludePatterns`: array — Exclude patterns for file search and indexing (default: `["**/node_modules/**", "**/temp/**", "**/*.log"]`).
+    - `ssl.workspace.followSymlinks`: boolean — Follow symbolic links during indexing (default: false).
+
+### 6.8 IntelliSense & Code Intelligence
+
+Control code completion, hover, and signature help behavior:
+
+- **Code Completion**:
+    - `ssl.intellisense.enabled`: boolean — Enable IntelliSense features (default: true).
+    - `ssl.intellisense.completionDetail`: `minimal | full` — Amount of detail in completion items (default: `full`).
+    - `ssl.intellisense.autoImport`: boolean — Automatically add `:INCLUDE` for external symbols (default: true).
+    - `ssl.intellisense.suggestBuiltins`: boolean — Include built-in functions in completions (default: true).
+    - `ssl.intellisense.suggestKeywords`: boolean — Include SSL keywords in completions (default: true).
+    - `ssl.intellisense.triggerCharacters`: array — Characters that trigger completion (default: `[":", ".", "("]`).
+    - Example: `"ssl.intellisense.autoImport": true`
+
+- **Hover & Signatures**:
+    - `ssl.intellisense.hover.enabled`: boolean — Show hover information (default: true).
+    - `ssl.intellisense.hover.documentation`: boolean — Include documentation in hover (default: true).
+    - `ssl.intellisense.signatureHelp.enabled`: boolean — Show parameter hints (default: true).
+    - `ssl.intellisense.signatureHelp.activeParameter`: boolean — Highlight active parameter (default: true).
+
+- **Advanced Features**:
+    - `ssl.intellisense.codeLens.enabled`: boolean — Show CodeLens reference counts (default: true).
+    - `ssl.intellisense.codeLens.showReferences`: boolean — Show reference counts above symbols (default: true).
+    - `ssl.intellisense.inlayHints.enabled`: boolean — Show inlay hints for parameters/types (default: false).
+    - `ssl.intellisense.inlayHints.parameterNames`: boolean — Show parameter name hints (default: false).
+
+### 6.9 Auto-Fix & Code Actions
+
+Configure automatic fixes and quick fix behavior:
+
+- **Auto-Fix on Save**:
+    - `ssl.autoFix.onSave`: boolean — Enable auto-fix when saving files (default: false).
+    - `ssl.autoFix.onSave.rules`: array — Specific rule IDs to auto-fix on save (default: `[]`). Examples: `["missing-semicolon", "keyword-casing", "trailing-whitespace"]`.
+    - `ssl.autoFix.timeout`: integer — Maximum time (ms) to spend on auto-fix (default: 5000, range: 1000-30000).
+    - Example: 
+        ```json
+        "ssl.autoFix.onSave": true,
+        "ssl.autoFix.onSave.rules": ["keyword-casing", "trailing-whitespace", "missing-semicolon"]
+        ```
+
+- **Code Actions**:
+    - `ssl.codeActions.enabled`: boolean — Enable code action quick fixes (default: true).
+    - `ssl.codeActions.showDocumentation`: boolean — Include documentation links in code actions (default: true).
+    - `ssl.codeActions.sortOrder`: `severity | alphabetical` — How to order quick fixes (default: `severity`).
+
+### 6.10 Debug & Developer Settings
+
+Settings for extension developers and troubleshooting:
+
 - **Server Tracing**:
-    - `ssl.trace.server`: A setting for developers to trace communication with the language server for debugging purposes.
+    - `ssl.trace.server`: `off | messages | verbose` — Trace communication with the language server for debugging (default: `off`).
+    - `ssl.trace.logFile`: string — Path to log file for trace output (default: empty, logs to output channel).
+    - Example: `"ssl.trace.server": "verbose"`
+
+- **Developer Options**:
+    - `ssl.developer.enableExperimentalFeatures`: boolean — Enable experimental/beta features (default: false).
+    - `ssl.developer.showParseTree`: boolean — Show AST/parse tree in developer tools (default: false).
+    - `ssl.developer.logPerformance`: boolean — Log performance metrics (default: false).
 
 - **Telemetry & Privacy**:
-    - `ssl.telemetry.enabled`: boolean — telemetry is opt-in and disabled by default; the extension will document what is collected and why.
+    - `ssl.telemetry.enabled`: boolean — Opt-in telemetry for extension improvement (default: false). Documents what is collected: usage patterns, error rates, feature adoption (no code content).
+    - `ssl.telemetry.level`: `off | error | usage | all` — Granularity of telemetry data (default: `off`).
 
-- **Localization / i18n Readiness**:
-    - All user-facing strings are prepared for localization and the extension is structured so translations can be added later.
+### 6.11 UI & Visual Settings
 
-- **Multi-root Workspace Support**:
-    - The extension fully supports VS Code multi-root workspaces, allowing you to work with multiple SSL projects simultaneously with independent configuration and symbol indexing per workspace folder.
+Control visual elements and user interface preferences:
 
 - **Theme & Color Customization**:
     - Semantic token support enables custom color themes to style SSL keywords, variables, functions, and other language elements.
-    - Users can customize syntax highlighting colors via VS Code's `editor.tokenColorCustomizations` setting.
-    - Extension provides semantic token modifiers for enhanced theming (e.g., `readonly`, `declaration`, `modification`).
+    - Users can customize syntax highlighting colors via VS Code's `editor.tokenColorCustomizations` setting:
+        ```json
+        "editor.tokenColorCustomizations": {
+          "[Your Theme Name]": {
+            "textMateRules": [
+              {
+                "scope": "keyword.control.ssl",
+                "settings": { "foreground": "#569CD6", "fontStyle": "bold" }
+              },
+              {
+                "scope": "entity.name.function.ssl",
+                "settings": { "foreground": "#DCDCAA" }
+              }
+            ]
+          }
+        }
+        ```
+    - Extension provides semantic token modifiers for enhanced theming: `readonly`, `declaration`, `modification`, `static`, `deprecated`.
 
-- **Security & Performance Settings**:
-    - `ssl.security.preventSqlInjection`: boolean — warn about non-parameterized SQL (default: true).
-    - `ssl.security.requireParameterizedQueries`: boolean — require `?PARAM?` in SQL strings (default: true).
-    - `ssl.security.validateDatabaseParameters`: `off | warn | error` — validate parameter count (default: warn).
-    - `ssl.performance.preferExistsOverDistinct`: boolean — SQL optimization hint (default: true).
-    - `ssl.performance.avoidSelectStar`: boolean — warn against `SELECT *` (default: true).
+- **Editor Integration**:
+    - `ssl.ui.showStatusBarItem`: boolean — Show SSL context in status bar (default: true).
+    - `ssl.ui.statusBarPosition`: `left | right` — Status bar item position (default: `left`).
+    - `ssl.ui.breadcrumbs.enabled`: boolean — Show breadcrumb navigation (default: true).
+    - `ssl.ui.outline.enabled`: boolean — Show outline view (default: true).
 
-- **Other Useful Settings**:
-    - `ssl.autoFix.onSave` — enable/disable auto fix on save (default: false).
-    - `ssl.autoFix.onSave.rules` — array of rule IDs to auto-fix on save.
-    - `ssl.performance.indexing.maxFiles` — tune indexing limits for very large workspaces (default: 10000).
-    - `ssl.files.encoding`: string — default file encoding (default: utf-8).
-    - `ssl.files.lineEndings`: `lf | crlf | auto` — line ending preference (default: lf).
-    - `ssl.files.oneProcedurePerFile`: boolean — enforce single procedure per file (default: false).
+### 6.12 Localization & Multi-Root Workspace
+
+- **Localization / i18n Readiness**:
+    - `ssl.localization.locale`: string — Preferred display language (default: `auto`, uses VS Code's display language).
+    - All user-facing strings are prepared for localization. Currently supports: English (`en`). Additional languages can be contributed.
+
+- **Multi-root Workspace Support**:
+    - The extension fully supports VS Code multi-root workspaces, allowing you to work with multiple SSL projects simultaneously with independent configuration and symbol indexing per workspace folder.
+    - Settings can be configured at workspace folder level to override workspace or user settings.
+    - Each workspace folder maintains its own symbol index and diagnostic state.
+
+### 6.13 Configuration Examples
+
+Complete `settings.json` examples for common scenarios:
+
+**Strict Enterprise Configuration:**
+```json
+{
+  "ssl.strictStyleGuideMode": true,
+  "ssl.naming.hungarianNotation.enabled": true,
+  "ssl.naming.hungarianNotation.strictMode": true,
+  "ssl.styleGuide.limitBlockDepth": 4,
+  "ssl.styleGuide.maxParamsPerProcedure": 6,
+  "ssl.styleGuide.requireOtherwiseInCase": true,
+  "ssl.security.preventSqlInjection": true,
+  "ssl.security.requireParameterizedQueries": true,
+  "ssl.security.validateDatabaseParameters": "error",
+  "ssl.files.oneProcedurePerFile": true,
+  "ssl.format.formatOnSave": true,
+  "ssl.format.keywordCase": "upper",
+  "ssl.format.builtinFunctionCase": "PascalCase"
+}
+```
+
+**Relaxed Development Configuration:**
+```json
+{
+  "ssl.strictStyleGuideMode": false,
+  "ssl.naming.hungarianNotation.enabled": true,
+  "ssl.naming.hungarianNotation.severity": "info",
+  "ssl.styleGuide.limitBlockDepth": 0,
+  "ssl.security.preventSqlInjection": true,
+  "ssl.security.validateDatabaseParameters": "warn",
+  "ssl.format.formatOnSave": false,
+  "ssl.maxNumberOfProblems": 50
+}
+```
+
+**Performance-Optimized for Large Workspaces:**
+```json
+{
+  "ssl.performance.indexing.maxFiles": 50000,
+  "ssl.performance.indexing.maxFileSize": 2048,
+  "ssl.performance.caching.enabled": true,
+  "ssl.diagnostics.onType": false,
+  "ssl.intellisense.codeLens.enabled": false,
+  "ssl.workspace.excludePatterns": [
+    "**/node_modules/**",
+    "**/archive/**",
+    "**/backup/**",
+    "**/*.log"
+  ]
+}
+```
 ## 7. Commands & Keybindings
 
 - The extension contributes several commands to the Command Palette (Command+Shift+P) and reasonable default keybindings which can be changed by users. Examples:
