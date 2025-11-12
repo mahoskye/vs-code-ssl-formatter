@@ -129,13 +129,10 @@
     },
     "comment": {
       "name": "comment.block.ssl",
+      "contentName": "comment.block.ssl",
       "begin": "/\\*",
       "end": ";",
-      "endCaptures": {
-        "0": {
-          "name": "punctuation.definition.comment.end.ssl"
-        }
-      }
+      "patterns": []
     },
     "string-double": {
       "name": "string.quoted.double.ssl",
@@ -217,7 +214,7 @@
     },
     "keywords-colon": {
       "name": "keyword.control.ssl",
-      "match": "(?i):(?:IF|ELSE|ELSEIF|ENDIF|WHILE|ENDWHILE|FOR|NEXT|BEGINCASE|CASE|OTHERWISE|ENDCASE|EXITCASE|TRY|CATCH|FINALLY|ENDTRY|DECLARE|DEFAULT|PARAMETERS|PUBLIC|INCLUDE|PROCEDURE|ENDPROC|ENDPROCEDURE|RETURN|CLASS|INHERIT|REGION|ENDREGION|ERROR|TO|STEP|BEGININLINECODE|ENDINLINECODE|LABEL|EXITFOR|EXITWHILE|LOOP|RESUME|FINISH|DEBUG|FOREACH|IN)\\b"
+      "match": "(?i):(?:IF|ELSE|ENDIF|WHILE|ENDWHILE|FOR|NEXT|BEGINCASE|CASE|OTHERWISE|ENDCASE|EXITCASE|TRY|CATCH|FINALLY|ENDTRY|DECLARE|DEFAULT|PARAMETERS|PUBLIC|INCLUDE|PROCEDURE|ENDPROC|ENDPROCEDURE|RETURN|CLASS|INHERIT|REGION|ENDREGION|ERROR|TO|STEP|BEGININLINECODE|ENDINLINECODE|LABEL|EXITFOR|EXITWHILE|LOOP|RESUME|FINISH|DEBUG|FOREACH|IN)\\b"
     },
     "identifier": {
       "name": "variable.other.ssl",
