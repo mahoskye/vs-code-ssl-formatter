@@ -752,10 +752,10 @@ sTest := TestProcedure("test", 50);
 			assert.strictEqual(highlights.length, 0, "Should not highlight keywords");
 		});
 
-		test("Excludes symbols in comments", async () => {
+		test("Excludes symbols in single-line comments", async () => {
 			const provider = new SSLDocumentHighlightProvider();
 			const document = await vscode.workspace.openTextDocument({
-				content: ":DECLARE nValue;\nnValue := 5;\n/* nValue comment; */",
+				content: ":DECLARE nValue;\nnValue := 5;\n/* nValue is in a comment;",
 				language: "ssl"
 			});
 
@@ -768,7 +768,30 @@ sTest := TestProcedure("test", 50);
 			// Should find declaration and assignment, but not comment
 			// Verify no highlights on line 2 (comment line)
 			const commentLineHighlights = highlights.filter(h => h.range.start.line === 2);
-			assert.strictEqual(commentLineHighlights.length, 0, "Should not highlight symbols in comments");
+			assert.strictEqual(commentLineHighlights.length, 0, "Should not highlight symbols in single-line comments");
+
+			// NOTE: SSL comments end with ; not */ (/* ... */ is INVALID SSL syntax!)
+		});
+
+		test("CRITICAL: Excludes symbols in multi-line comments", async () => {
+			const provider = new SSLDocumentHighlightProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":DECLARE nValue;\n/* Multi-line comment\n   nValue should be ignored\n   spanning multiple lines\n;\nnValue := 5;",
+				language: "ssl"
+			});
+
+			const highlights = provider.provideDocumentHighlights(
+				document,
+				new vscode.Position(0, 10), // Position on nValue
+				new vscode.CancellationTokenSource().token
+			);
+
+			// Should find: line 0 (declaration) and line 5 (assignment)
+			// Should NOT find: lines 2 (inside multi-line comment)
+			const commentLineHighlights = highlights.filter(h => h.range.start.line === 2);
+			assert.strictEqual(commentLineHighlights.length, 0,
+				"BUG: Should not highlight symbols inside multi-line comments! " +
+				"Current implementation only checks single line, so this test will FAIL");
 		});
 	});
 

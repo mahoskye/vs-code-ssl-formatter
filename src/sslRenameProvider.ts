@@ -78,7 +78,7 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 
 			while ((match = wordPattern.exec(line)) !== null) {
 				// Skip if in comment
-				if (this.isInComment(line, match.index)) {
+				if (this.isInComment(document, i, match.index)) {
 					continue;
 				}
 
@@ -142,18 +142,29 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 		return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	}
 
-	private isInComment(line: string, position: number): boolean {
-		const beforePos = line.substring(0, position);
-		const commentStart = beforePos.lastIndexOf("/*");
+	private isInComment(document: vscode.TextDocument, lineNumber: number, characterPosition: number): boolean {
+		// Scan through the document from the beginning to check if we're inside a multi-line comment
+		// SSL comments start with /* and end with ;
+		let inComment = false;
 
-		if (commentStart !== -1) {
-			const afterComment = line.substring(commentStart);
-			const commentEnd = afterComment.indexOf(";");
-			if (commentEnd === -1 || commentStart + commentEnd > position) {
-				return true;
+		for (let i = 0; i <= lineNumber; i++) {
+			const line = document.lineAt(i).text;
+			const relevantPart = i === lineNumber ? line.substring(0, characterPosition) : line;
+
+			for (let j = 0; j < relevantPart.length; j++) {
+				// Check for comment start
+				if (!inComment && j < relevantPart.length - 1 &&
+				    relevantPart[j] === '/' && relevantPart[j + 1] === '*') {
+					inComment = true;
+					j++; // Skip the '*'
+				}
+				// Check for comment end
+				else if (inComment && relevantPart[j] === ';') {
+					inComment = false;
+				}
 			}
 		}
 
-		return false;
+		return inComment;
 	}
 }

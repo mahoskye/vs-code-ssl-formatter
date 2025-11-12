@@ -52,18 +52,28 @@ export class SSLReferenceProvider implements vscode.ReferenceProvider {
 	}
 
 	private isInComment(document: vscode.TextDocument, position: vscode.Position): boolean {
-		const line = document.lineAt(position.line).text;
-		const beforePos = line.substring(0, position.character);
+		// Scan through the document from the beginning to check if we're inside a multi-line comment
+		// SSL comments start with /* and end with ;
+		let inComment = false;
 
-		// Check if we're after /* and before ;
-		const commentStart = beforePos.lastIndexOf("/*");
-		if (commentStart !== -1) {
-			const commentEnd = line.substring(commentStart).indexOf(";");
-			if (commentEnd === -1 || commentStart + commentEnd > position.character) {
-				return true;
+		for (let i = 0; i <= position.line; i++) {
+			const line = document.lineAt(i).text;
+			const relevantPart = i === position.line ? line.substring(0, position.character) : line;
+
+			for (let j = 0; j < relevantPart.length; j++) {
+				// Check for comment start
+				if (!inComment && j < relevantPart.length - 1 &&
+				    relevantPart[j] === '/' && relevantPart[j + 1] === '*') {
+					inComment = true;
+					j++; // Skip the '*'
+				}
+				// Check for comment end
+				else if (inComment && relevantPart[j] === ';') {
+					inComment = false;
+				}
 			}
 		}
 
-		return false;
+		return inComment;
 	}
 }
