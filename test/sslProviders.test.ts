@@ -250,6 +250,35 @@ sTest := TestProcedure("test", 50);
 			assert.ok(hungarianDiags.length > 0, "Should detect Hungarian notation violation for 'BadName'");
 		});
 
+		test("Detects Hungarian notation violations for ALL variables in multi-variable declaration", async () => {
+			const provider = new SSLDiagnosticProvider();
+			const document = await vscode.workspace.openTextDocument({
+				content: ":PROCEDURE Test;\n:DECLARE result, isActive, comment;\n:ENDPROC;",
+				language: "ssl"
+			});
+
+			provider.updateDiagnostics(document);
+
+			const diagnostics = vscode.languages.getDiagnostics(document.uri);
+			const hungarianDiags = diagnostics.filter(d =>
+				d.message.includes("Hungarian notation") ||
+				d.code === "ssl-hungarian-notation"
+			);
+
+			// All three variables should be flagged:
+			// - 'result' (should be sResult)
+			// - 'isActive' (should be bIsActive)
+			// - 'comment' (should be sComment)
+			assert.strictEqual(hungarianDiags.length, 3,
+				`Should flag all 3 variables without Hungarian notation, found ${hungarianDiags.length}`);
+
+			// Verify each variable is mentioned
+			const messages = hungarianDiags.map(d => d.message).join(" ");
+			assert.ok(messages.includes("result"), "Should flag 'result'");
+			assert.ok(messages.includes("isActive"), "Should flag 'isActive'");
+			assert.ok(messages.includes("comment"), "Should flag 'comment'");
+		});
+
 		test("Detects excessive block depth", async () => {
 			const provider = new SSLDiagnosticProvider();
 			const deeplyNested = `:IF x > 0;
