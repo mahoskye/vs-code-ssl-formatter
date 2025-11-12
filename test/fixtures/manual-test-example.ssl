@@ -118,7 +118,7 @@ DEFAULT_PRIORITY := "NORMAL";
 	:ENDTRY;
 	
 	/* Log completion;
-	usrmes("Processed " + Str(nProcessed) + " of " + Str(nTotal) + " samples", 0);
+	usrmes("Processed " + Str(nProcessed) + " of " + Str(nTotal) + " samples");
 	
 	:RETURN nProcessed;
 :ENDPROC;
@@ -218,7 +218,7 @@ DEFAULT_PRIORITY := "NORMAL";
 	
 	SQLExecute(sUpdateQuery, , , {dAnalysisDate, nWorksheetId, sSampleId});
 	
-	usrmes("Sample " + sSampleId + " assigned to worksheet " + Str(nWorksheetId), 0);
+	usrmes("Sample " + sSampleId + " assigned to worksheet " + Str(nWorksheetId));
 :ENDPROC;
 
 :PROCEDURE ApproveSample;
@@ -251,7 +251,7 @@ DEFAULT_PRIORITY := "NORMAL";
 	:IF nAffected > 0;
 		/* Generate final report;
 		DoProc("GenerateSampleReport", {sSampleId});
-		usrmes("Sample " + sSampleId + " approved successfully", 0);
+		usrmes("Sample " + sSampleId + " approved successfully");
 	:ELSE;
 		usrmes("Failed to approve sample " + sSampleId, 1);
 	:ENDIF;
@@ -450,7 +450,7 @@ DEFAULT_PRIORITY := "NORMAL";
 	sReportPath := oReport:Generate();
 	
 	:IF .NOT. Empty(sReportPath);
-		usrmes("Report generated: " + sReportPath, 0);
+		usrmes("Report generated: " + sReportPath);
 	:ENDIF;
 :ENDPROC;
 
@@ -534,13 +534,13 @@ DEFAULT_PRIORITY := "NORMAL";
 	nIndex := ascan(aNumbers, 45);
 	:IF nIndex > 0;
 		bFound := .T.;
-		usrmes("Value 45 found at index " + Str(nIndex), 0);
+		usrmes("Value 45 found at index " + Str(nIndex));
 	:ENDIF;
 	
 	/* Display results;
-	usrmes("Original count: " + Str(nCount), 0);
-	usrmes("Filtered count: " + Str(alen(aFiltered)), 0);
-	usrmes("Average: " + Str(nAverage), 0);
+	usrmes("Original count: " + Str(nCount));
+	usrmes("Filtered count: " + Str(alen(aFiltered)));
+	usrmes("Average: " + Str(nAverage));
 :ENDPROC;
 
 /* ============================================================================
@@ -559,7 +559,7 @@ DEFAULT_PRIORITY := "NORMAL";
 		nCounter := nCounter + 1;
 		
 		:IF nCounter == 50;
-			usrmes("Halfway point reached", 0);
+			usrmes("Halfway point reached");
 		:ENDIF;
 		
 		:IF nCounter >= 75;
@@ -602,7 +602,7 @@ DEFAULT_PRIORITY := "NORMAL";
 				:EXITCASE;
 		:ENDCASE;
 		
-		usrmes("Value " + Str(aValues[nCounter]) + " = " + sResult, 0);
+		usrmes("Value " + Str(aValues[nCounter]) + " = " + sResult);
 	:NEXT;
 :ENDPROC;
 
