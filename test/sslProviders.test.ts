@@ -659,9 +659,9 @@ sTest := TestProcedure("test", 50);
 			const document = await vscode.workspace.openTextDocument({
 				content: `:PROCEDURE ProcessData;
 :PARAMETERS sInput, nTimeout, bVerbose;
-:DEFAULT sInput = "";
-:DEFAULT nTimeout = 30;
-:DEFAULT bVerbose = .F.;
+:DEFAULT sInput, "";
+:DEFAULT nTimeout, 30;
+:DEFAULT bVerbose, .F.;
 	:RETURN .T.;
 :ENDPROC;
 
@@ -691,8 +691,8 @@ sTest := TestProcedure("test", 50);
 			const document = await vscode.workspace.openTextDocument({
 				content: `:PROCEDURE SendEmail;
 :PARAMETERS sTo, sSubject, sBody, bCC;
-:DEFAULT sBody = "";
-:DEFAULT bCC = .F.;
+:DEFAULT sBody, "";
+:DEFAULT bCC, .F.;
 	/* Send email code */;
 :ENDPROC;
 

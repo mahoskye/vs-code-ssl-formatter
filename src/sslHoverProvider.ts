@@ -429,8 +429,8 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 				paramList.push(...params);
 			}
 
-			// Check for :DEFAULT
-			const defaultMatch = line.match(/^\s*:DEFAULT\s+(\w+)\s*=\s*(.+?);/i);
+			// Check for :DEFAULT - SSL syntax is ":DEFAULT paramName, value;"
+			const defaultMatch = line.match(/^\s*:DEFAULT\s+(\w+)\s*,\s*(.+?);/i);
 			if (defaultMatch) {
 				defaults.set(defaultMatch[1], defaultMatch[2].trim());
 			}
