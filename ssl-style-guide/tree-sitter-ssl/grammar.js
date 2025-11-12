@@ -8,10 +8,6 @@ module.exports = grammar({
 
   word: $ => $.identifier,
 
-  conflicts: $ => [
-    [$.property_access, $.labeled_identifier],
-  ],
-
   rules: {
     source_file: $ => repeat($._statement),
 
@@ -314,7 +310,6 @@ module.exports = grammar({
     _kw_exitwhile: _ => token(seq(':', /EXITWHILE/i)),
     _kw_loop: _ => token(seq(':', /LOOP/i)),
     _kw_resume: _ => token(seq(':', /RESUME/i)),
-    _kw_step: _ => token(seq(':', /STEP/i)),
 
   }
 });

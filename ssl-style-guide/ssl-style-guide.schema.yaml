@@ -142,9 +142,8 @@ ssl_style_guide:
     - Begin major sections (procedures, classes, regions) with a short summary.
     - Use sentence‑case and keep comments concise.
     - Prefer comments that explain 'why' rather than restating 'what'.
-    - All comments must end with semicolon (SSL requirement).
-    - Single-line comments use /* comment; format.
-    - Multi-line comments: /* line1; /* line2; (each line terminates with semicolon).
+    - All comments must start with /* and end with a semicolon (;).
+    - A single comment block can span multiple lines.
     types:
       - documentation: for procedures, classes, complex logic
       - inline: for complex expressions, business rules
