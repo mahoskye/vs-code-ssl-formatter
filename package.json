@@ -192,9 +192,6 @@
         }
     },
     "main": "./out/src/extension.js",
-    "activationEvents": [
-        "onLanguage:ssl"
-    ],
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
