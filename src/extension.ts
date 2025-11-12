@@ -128,14 +128,14 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.languages.registerRenameProvider(documentSelector, new SSLRenameProvider())
     );
 
-    // Register signature help provider for parameter hints
-    context.subscriptions.push(
-        vscode.languages.registerSignatureHelpProvider(
-            documentSelector,
-            new SSLSignatureHelpProvider(),
-            "(", ","
-        )
-    );
+    // Signature help disabled - using inlay hints instead for less invasive parameter documentation
+    // context.subscriptions.push(
+    //     vscode.languages.registerSignatureHelpProvider(
+    //         documentSelector,
+    //         new SSLSignatureHelpProvider(),
+    //         "(", ","
+    //     )
+    // );
 
     // Register CodeLens provider for reference counts
     const codeLensProvider = new SSLCodeLensProvider();
