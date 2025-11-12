@@ -62,9 +62,12 @@ suite("SSL Workspace Features Test Suite", () => {
 				language: "ssl"
 			});
 
+			// Add a delay to allow the language server to process the document
+			await new Promise(resolve => setTimeout(resolve, 500));
+
 			const item = provider.prepareCallHierarchy(
 				document,
-				new vscode.Position(1, 12), // On MainProcedure
+				new vscode.Position(0, 12), // On MainProcedure
 				new vscode.CancellationTokenSource().token
 			);
 
@@ -84,7 +87,7 @@ suite("SSL Workspace Features Test Suite", () => {
 
 			const item = provider.prepareCallHierarchy(
 				document,
-				new vscode.Position(1, 12),
+				new vscode.Position(0, 12),
 				new vscode.CancellationTokenSource().token
 			);
 
@@ -107,7 +110,7 @@ suite("SSL Workspace Features Test Suite", () => {
 
 			const item = provider.prepareCallHierarchy(
 				document,
-				new vscode.Position(8, 12), // On HelperProcedure
+				new vscode.Position(6, 12), // On HelperProcedure
 				new vscode.CancellationTokenSource().token
 			);
 

@@ -43,12 +43,35 @@ export class SSLReferenceProvider implements vscode.ReferenceProvider {
 			}
 		}
 
-		// Filter out references in comments if desired
-		return locations.filter(loc => !this.isInComment(document, loc.range.start));
+		// Filter out references in comments and strings
+		return locations.filter(loc => 
+			!this.isInComment(document, loc.range.start) &&
+			!this.isInString(document, loc.range.start)
+		);
 	}
 
 	private escapeRegex(str: string): string {
 		return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	}
+
+	private isInString(document: vscode.TextDocument, position: vscode.Position): boolean {
+		const line = document.lineAt(position.line).text;
+		let inString = false;
+		let stringChar: string | null = null;
+
+		for (let i = 0; i < position.character; i++) {
+			const char = line[i];
+			
+			if (!inString && (char === '"' || char === "'")) {
+				inString = true;
+				stringChar = char;
+			} else if (inString && char === stringChar) {
+				inString = false;
+				stringChar = null;
+			}
+		}
+
+		return inString;
 	}
 
 	private isInComment(document: vscode.TextDocument, position: vscode.Position): boolean {

@@ -148,11 +148,37 @@ export class SSLDiagnosticProvider {
 				diagnostics.push(diagnostic);
 			}
 
-			// Check variable declarations for Hungarian notation
+			// Check variable declarations for Hungarian notation and invalid syntax
 			if (hungarianEnabled) {
 				const declareMatch = trimmed.match(/^:DECLARE\s+(.+?);/i);
 				if (declareMatch) {
-					const vars = declareMatch[1].split(",");
+					const declString = declareMatch[1];
+					
+					// Check for invalid :DECLARE with assignment
+					if (declString.includes(':=')) {
+						const diagnostic = new vscode.Diagnostic(
+							new vscode.Range(i, 0, i, line.length),
+							"Invalid syntax: :DECLARE cannot initialize values. Use ':DECLARE var;' followed by 'var := value;' on separate lines",
+							vscode.DiagnosticSeverity.Error
+						);
+						diagnostic.code = "ssl-invalid-declare";
+						diagnostics.push(diagnostic);
+						continue; // Skip Hungarian notation check for invalid syntax
+					}
+					
+					// Check for invalid 'const' or 'CONST' keyword
+					if (/\b(const|CONST)\b/.test(declString)) {
+						const diagnostic = new vscode.Diagnostic(
+							new vscode.Range(i, 0, i, line.length),
+							"Invalid syntax: 'const' is not a valid SSL keyword. Remove 'const' and use proper Hungarian notation",
+							vscode.DiagnosticSeverity.Error
+						);
+						diagnostic.code = "ssl-invalid-const";
+						diagnostics.push(diagnostic);
+						continue; // Skip Hungarian notation check for invalid syntax
+					}
+					
+					const vars = declString.split(",");
 					vars.forEach(varName => {
 						const cleanName = varName.trim();
 						if (!this.hasValidHungarianNotation(cleanName)) {

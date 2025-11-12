@@ -359,7 +359,9 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		};
 
 		const hint = prefixMap[prefix];
-		if (hint && word.length > 1 && word[1] === word[1].toUpperCase()) {
+		const secondChar = word[1];
+		// Check if second character is an uppercase letter (A-Z)
+		if (hint && word.length > 1 && /[A-Z]/.test(secondChar)) {
 			return `**Hungarian Notation:** ${hint}`;
 		}
 
@@ -598,8 +600,9 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 				defaults.set(defaultMatch[1], defaultMatch[2].trim());
 			}
 
-			// Stop if we hit another significant keyword
-			if (/^\s*:(PROCEDURE|DECLARE|IF|WHILE|FOR|RETURN|BEGINCASE)\b/i.test(line)) {
+			// Stop if we hit another significant keyword (but not :PARAMETERS or :DEFAULT)
+			if (/^\s*:(PROCEDURE|DECLARE|IF|WHILE|FOR|RETURN|BEGINCASE)\b/i.test(line) && 
+			    !line.match(/^\s*:(PARAMETERS|DEFAULT)\b/i)) {
 				break;
 			}
 		}

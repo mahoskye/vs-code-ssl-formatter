@@ -79,6 +79,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 	/**
 	 * Normalize keyword casing (e.g., :IF, :WHILE, :PROCEDURE)
+	 * Only processes keywords outside of strings and comments
 	 */
 	private normalizeKeywordCase(text: string, caseStyle: string): string {
 		if (caseStyle === "preserve") {
@@ -100,19 +101,30 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			"ERROR", "LABEL", "FOREACH", "IN"
 		];
 
-		keywords.forEach(keyword => {
-			const pattern = new RegExp(`:${keyword}\\b`, "gi");
-			const replacement = caseStyle === "upper"
-				? `:${keyword.toUpperCase()}`
-				: `:${keyword.toLowerCase()}`;
-			text = text.replace(pattern, replacement);
+		const lines = text.split('\n');
+		const formattedLines = lines.map(line => {
+			// Skip lines that are comments
+			if (line.trim().startsWith('/*')) {
+				return line;
+			}
+			
+			let result = line;
+			keywords.forEach(keyword => {
+				const pattern = new RegExp(`:${keyword}\\b`, "gi");
+				const replacement = caseStyle === "upper"
+					? `:${keyword.toUpperCase()}`
+					: `:${keyword.toLowerCase()}`;
+				result = this.replaceOutsideStrings(result, pattern, replacement);
+			});
+			return result;
 		});
 
-		return text;
+		return formattedLines.join('\n');
 	}
 
 	/**
 	 * Normalize built-in function casing
+	 * Only processes function names outside of strings
 	 */
 	private normalizeBuiltinFunctionCase(text: string, caseStyle: string): string {
 		if (caseStyle === "preserve") {
@@ -134,71 +146,137 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			"Val", "LimsTypeEx"
 		];
 
-		functions.forEach(func => {
-			const pattern = new RegExp(`\\b${func}\\b`, "gi");
-			let replacement: string;
-
-			switch (caseStyle) {
-				case "PascalCase":
-					replacement = this.toPascalCase(func);
-					break;
-				case "lowercase":
-					replacement = func.toLowerCase();
-					break;
-				case "UPPERCASE":
-					replacement = func.toUpperCase();
-					break;
-				default:
-					replacement = func;
+		const lines = text.split('\n');
+		const formattedLines = lines.map(line => {
+			// Skip comment lines
+			if (line.trim().startsWith('/*')) {
+				return line;
 			}
+			
+			let result = line;
+			functions.forEach(func => {
+				const pattern = new RegExp(`\\b${func}\\b`, "gi");
+				let replacement: string;
 
-			text = text.replace(pattern, replacement);
+				switch (caseStyle) {
+					case "PascalCase":
+						replacement = func;
+						break;
+					case "lowercase":
+						replacement = func.toLowerCase();
+						break;
+					case "UPPERCASE":
+						replacement = func.toUpperCase();
+						break;
+					default:
+						replacement = func;
+				}
+
+				result = this.replaceOutsideStrings(result, pattern, replacement);
+			});
+			return result;
 		});
 
-		return text;
-	}
-
-	/**
-	 * Convert string to PascalCase
-	 */
-	private toPascalCase(str: string): string {
-		return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase().replace(/([A-Z])/g, (match, p1, offset) => {
-			return offset > 0 ? p1.toUpperCase() : p1;
-		});
+		return formattedLines.join('\n');
 	}
 
 	/**
 	 * Normalize operator spacing
+	 * Only processes operators outside of strings
 	 */
 	private normalizeOperatorSpacing(text: string): string {
-		// Space around assignment operators
-		text = text.replace(/\s*:=\s*/g, " := ");
-		text = text.replace(/\s*\+=\s*/g, " += ");
-		text = text.replace(/\s*-=\s*/g, " -= ");
-		text = text.replace(/\s*\*=\s*/g, " *= ");
-		text = text.replace(/\s*\/=\s*/g, " /= ");
-		text = text.replace(/\s*\^=\s*/g, " ^= ");
-		text = text.replace(/\s*%=\s*/g, " %= ");
+		const lines = text.split('\n');
+		const formattedLines = lines.map(line => {
+			// Skip comment lines
+			if (line.trim().startsWith('/*')) {
+				return line;
+			}
+			
+			let result = line;
+			
+			// Space around assignment operators
+			result = this.replaceOutsideStrings(result, /\s*:=\s*/g, " := ");
+			result = this.replaceOutsideStrings(result, /\s*\+=\s*/g, " += ");
+			result = this.replaceOutsideStrings(result, /\s*-=\s*/g, " -= ");
+			result = this.replaceOutsideStrings(result, /\s*\*=\s*/g, " *= ");
+			result = this.replaceOutsideStrings(result, /\s*\/=\s*/g, " /= ");
+			result = this.replaceOutsideStrings(result, /\s*\^=\s*/g, " ^= ");
+			result = this.replaceOutsideStrings(result, /\s*%=\s*/g, " %= ");
 
-		// Space around comparison operators
-		text = text.replace(/\s*==\s*/g, " == ");
-		text = text.replace(/\s*!=\s*/g, " != ");
-		text = text.replace(/\s*<>\s*/g, " <> ");
-		text = text.replace(/\s*<=\s*/g, " <= ");
-		text = text.replace(/\s*>=\s*/g, " >= ");
+			// Space around arithmetic operators - apply multiple times for chained operators
+			let prev = '';
+			while (prev !== result) {
+				prev = result;
+				result = this.replaceOutsideStrings(result, /([a-zA-Z0-9_\)])(\+|\*|\/|\^|%)([a-zA-Z0-9_\(])/g, "$1 $2 $3");
+				result = this.replaceOutsideStrings(result, /([a-zA-Z0-9_\)])(-)([a-zA-Z0-9_\(])/g, "$1 $2 $3");
+			}
 
-		// Space around logical operators
-		text = text.replace(/\s*\.AND\.\s*/gi, " .AND. ");
-		text = text.replace(/\s*\.OR\.\s*/gi, " .OR. ");
-		text = text.replace(/\s*\.NOT\.\s*/gi, " .NOT. ");
+			// Space around comparison operators
+			result = this.replaceOutsideStrings(result, /\s*==\s*/g, " == ");
+			result = this.replaceOutsideStrings(result, /\s*!=\s*/g, " != ");
+			result = this.replaceOutsideStrings(result, /\s*<>\s*/g, " <> ");
+			result = this.replaceOutsideStrings(result, /\s*<=\s*/g, " <= ");
+			result = this.replaceOutsideStrings(result, /\s*>=\s*/g, " >= ");
 
-		// Space after commas
-		text = text.replace(/,\s*/g, ", ");
+			// Space around logical operators
+			result = this.replaceOutsideStrings(result, /\s*\.AND\.\s*/gi, " .AND. ");
+			result = this.replaceOutsideStrings(result, /\s*\.OR\.\s*/gi, " .OR. ");
+			result = this.replaceOutsideStrings(result, /\s*\.NOT\.\s*/gi, " .NOT. ");
 
-		// No space before semicolons
-		text = text.replace(/\s+;/g, ";");
+			// Space after commas
+			result = this.replaceOutsideStrings(result, /,(\S)/g, ", $1");
 
-		return text;
+			// No space before semicolons
+			result = this.replaceOutsideStrings(result, /\s+;/g, ";");
+			
+			return result;
+		});
+
+		return formattedLines.join('\n');
+	}
+	
+	/**
+	 * Replace text only outside of string literals
+	 */
+	private replaceOutsideStrings(line: string, pattern: RegExp, replacement: string): string {
+		const segments: { text: string; inString: boolean }[] = [];
+		let current = '';
+		let inString = false;
+		let stringChar: string | null = null;
+		
+		for (let i = 0; i < line.length; i++) {
+			const char = line[i];
+			
+			if (!inString && (char === '"' || char === "'")) {
+				if (current) {
+					segments.push({ text: current, inString: false });
+					current = '';
+				}
+				inString = true;
+				stringChar = char;
+				current = char;
+			} else if (inString && char === stringChar) {
+				current += char;
+				segments.push({ text: current, inString: true });
+				current = '';
+				inString = false;
+				stringChar = null;
+			} else {
+				current += char;
+			}
+		}
+		
+		if (current) {
+			segments.push({ text: current, inString });
+		}
+		
+		// Apply replacements only to non-string segments
+		return segments.map(seg => {
+			if (seg.inString) {
+				return seg.text;
+			}
+			return seg.text.replace(pattern, replacement);
+		}).join('');
 	}
 
 	/**
