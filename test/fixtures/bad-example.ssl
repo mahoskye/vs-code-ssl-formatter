@@ -1,91 +1,91 @@
-/  * Sample SSL file with poor formatting - needs cleanup;
-include "common / utilities.ssl";
-:INCLUDE "lib / database.ssl";
+/  * Extremely messy SSL: lots of formatting, casing and semantic errors to trigger diagnostics
+include "common / utilities.ssl" ; :INCLUDE  "lib / database.ssl"
 
-:REGION Configuration
-	:DECLARE const max_bonus_percent := 15.0;
-	:DECLARE CONST min_performance_score := 3.5;
-	:DECLARE CONST Bonus_Multiplier := 1.2e3;
-:ENDREGION /  * Main procedure to calculate and distribute bonuses;
-:PROCEDURE calculateEmployeeBonuses
-	:PARAMETERS nYear, sDepartment, bIncludeContractors := .f.;
-	:DECLARE nTotalEmployees := 0;
+REGION   Configuration  / mismatched region
+    :DECLARE const max_bonus_percent :=15.0
+	:DECLARE CONST min_performance_score :=3.5;;
+    :DECLARE CONST Bonus_Multiplier := 1.2e3 ;
+ENDREGION /  * Main procedure to calculate and distribute bonuses;
+:PROCEDURE calculateEmployeeBonuses    
+ :PARAMETERS nYear, sDepartment, bIncludeContractors := .f.
+:DECLARE nTotalEmployees := 0
 	:DECLARE nQualifiedCount := 0;
-	:DECLARE nTotalBonus := 0.0;
-	:DECLARE aEmployeeList := {};
-	:DECLARE sReportPath := "";
-	:DECLARE dProcessDate := TODAY( );
-	:TRY /  * Validate input parameters;
-		:IF nYear<2020 .OR. nYear>Year(TODAY())
-			:ERROR "Invalid year specified";
-			:RETURN .f.;
-		:ENDIF /  * Fetch employee data from database;
-		aEmployeeList := GetEmployeesByDepartment( sDepartment, nYear );
-		nTotalEmployees := LEN(aEmployeeList); /  * Process each employee;
-		:FOR i := 1 :TO nTotalEmployees :STEP 1
-			:DECLARE oEmployee := aEmployeeList[ i ];
-			:DECLARE nPerformanceScore := oEmployee.PerformanceScore;
-			:DECLARE nBaseSalary := oEmployee.BaseSalary;
-			:DECLARE nBonus := 0.0; /  * Determine eligibility and calculate bonus;
-			:IF nPerformanceScore >= min_performance_score
-				:BEGINCASE
-				:CASE nPerformanceScore >= 4.5
-					nBonus := nBaseSalary * (max_bonus_percent / 100.0);
-				:CASE nPerformanceScore >= 4.0
-					nBonus := nBaseSalary * 0.10;
-				:CASE nPerformanceScore >= 3.5
-					nBonus := nBaseSalary * 0.05;
-				:OTHERWISE
-					nBonus := 0.0;
-				:ENDCASE /  * Apply multiplier for exceptional cases;
-				:IF oEmployee.IsTopPerformer == .t.
-					nBonus := nBonus * 1.25;
-				:ENDIF
-				nQualifiedCount + = 1;
-				nTotalBonus + = nBonus; /  * Update employee record;
-				UpdateEmployeeBonus(oEmployee.EmployeeID, nBonus, nYear);
+    :DECLARE nTotalBonus := 0.0;;
+ :DECLARE aEmployeeList := {}    
+:DECLARE sReportPath := ""  
+:DECLARE dProcessDate := TODAY( )
+:TRY /  * Validate input parameters
+	:IF nYear<2020 .OR. nYear>Year(TODAY())
+		:ERROR "Invalid year specified"
+		:RETURN .f.
+	:ENDIF /  * Fetch employee data from database
+	aEmployeeList := GetEmployeesByDepartment( sDepartment, nYear );
+	nTotalEmployees := LEN(aEmployeeList)   /  * Process each employee
+	:FOR i := 1 :TO nTotalEmployees :STEP 1
+		:DECLARE oEmployee := aEmployeeList[ i ];
+		:DECLARE nPerformanceScore := oEmployee.PerformanceScore
+		:DECLARE nBaseSalary := oEmployee.BaseSalary;
+		:DECLARE nBonus := 0.0; /  * Determine eligibility and calculate bonus
+		:IF nPerformanceScore >= min_performance_score
+			:BEGINCASE
+			:CASE nPerformanceScore >= 4.5
+				nBonus := nBaseSalary * (max_bonus_percent / 100.0)
+			:CASE nPerformanceScore >= 4.0
+				nBonus := nBaseSalary * .10;
+			:CASE nPerformanceScore >= 3.5
+				nBonus := nBaseSalary * 0.05;
+			:OTHERWISE
+				nBonus := 0.0;    ;;;   // extra junk
+			:ENDCASE /  * Apply multiplier for exceptional cases
+			:IF oEmployee.IsTopPerformer == .t.
+				nBonus := nBonus * 1.25
 			:ENDIF
-		:NEXT /  * Generate summary report;
-		:DECLARE sMessage := "Processed " + ALLTRIM(Str(nTotalEmployees)) + " employees";
-		sMessage + = ", " + ALLTRIM(Str(nQualifiedCount)) + " qualified";
-		LogMessage( sMessage, "INFO" );
-		sReportPath := GenerateBonusReport(sDepartment, nYear, nTotalBonus);
-	:CATCH oError /  * Handle any errors during processing;
-		LogError("Bonus calculation failed: " + oError.Message);
-		:RETURN .F.;
-	:FINALLY /  * Cleanup resources;
-		CloseConnections( );
-	:ENDTRY
-	:RETURN .t.;
-:ENDPROC /  * Helper function to validate employee data;
-:PROCEDURE ValidateEmployeeData
-	:PARAMETERS oEmployee;
-	:DECLARE bIsValid := .t.;
-	:IF oEmployee == NIL
-		:RETURN .f.;
-	:ENDIF
-	:IF EMPTY(oEmployee.EmployeeID) .OR. EMPTY(oEmployee.BaseSalary)
-		bIsValid := .f.;
-	:ENDIF
-	:IF oEmployee.BaseSalary <= 0 .OR. oEmployee.PerformanceScore<0
-		bIsValid := .F.;
-	:ENDIF
-	:RETURN bIsValid;
-:ENDPROC /  * Class for managing bonus calculations;
-:CLASS BonusCalculator
-	:DECLARE nDefaultRate;
-	:DECLARE bDebugMode; /  * Initialize calculator with default rate;
-	:PROCEDURE Initialize
-		:PARAMETERS nRate := 10.0;
-		nDefaultRate := nRate;
-		bDebugMode := .f.;
-	:ENDPROC /  * Calculate bonus using configured rate;
-	:PROCEDURE Calculate
-		:PARAMETERS nSalary, nMultiplier := 1.0;
-		:DECLARE nResult := 0.0;
-		:IF nSalary>0
-			nResult := nSalary * (nDefaultRate / 100.0) * nMultiplier;
+			nQualifiedCount + = 1;   
+			nTotalBonus + = nBonus; /  * Update employee record
+			UpdateEmployeeBonus ( oEmployee.EmployeeID , nBonus, nYear );
 		:ENDIF
-		:RETURN nResult;
-	:ENDPROC
-	:endclass
+	:NEXT /  * Generate summary report
+	:DECLARE sMessage := "Processed " + ALLTRIM(Str(nTotalEmployees)) + " employees" long trailing nonsense text to exceed max line length and see how the linter reacts when it hits a single very long line that should be wrapped by the formatter but isn't
+sMessage + = ", " + ALLTRIM(Str(nQualifiedCount)) + " qualified"
+LogMessage( sMessage, "INFO" ) ;
+sReportPath := GenerateBonusReport(sDepartment, nYear, nTotalBonus)
+:CATCH oError /  * Handle any errors during processing
+LogError("Bonus calculation failed: " + oError.Message)
+:RETURN .F.
+:FINALLY /  * Cleanup resources
+CloseConnections( )
+:ENDTRY
+:RETURN .t.
+:ENDPROC /  * Helper function to validate employee data
+:PROCEDURE ValidateEmployeeData
+:PARAMETERS oEmployee;
+:DECLARE bIsValid := .t.
+:IF oEmployee == NIL
+:RETURN .f.
+:ENDIF
+:IF EMPTY(oEmployee.EmployeeID) .OR. EMPTY(oEmployee.BaseSalary)
+    bIsValid := .f.
+:ENDIF
+:IF oEmployee.BaseSalary <= 0 .OR. oEmployee.PerformanceScore<0
+    bIsValid := .F.
+:ENDIF
+:RETURN bIsValid
+:ENDPROC /  * Class for managing bonus calculations
+:CLASS BonusCalculator
+:DECLARE nDefaultRate;
+:DECLARE bDebugMode; /  * Initialize calculator with default rate
+:PROCEDURE Initialize
+:PARAMETERS nRate := 10.0;
+ nDefaultRate := nRate
+ bDebugMode := .f.
+:ENDPROC /  * Calculate bonus using configured rate
+:PROCEDURE Calculate
+:PARAMETERS nSalary, nMultiplier := 1.0
+:DECLARE nResult := 0.0
+:IF nSalary>0
+ nResult := nSalary * (nDefaultRate / 100.0) * nMultiplier
+:ENDIF
+:RETURN nResult
+:ENDPROC
+:endclass
+
