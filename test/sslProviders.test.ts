@@ -663,7 +663,7 @@ sTest := TestProcedure("test", 50);
 			assert.strictEqual(stringLineRefs.length, 0, "Should not find references in string literals");
 		});
 
-		test("Hover provider handles mixed case keywords", async () => {
+		test("Hover provider is case-insensitive (NOTE: style guide requires UPPERCASE)", async () => {
 			const provider = new SSLHoverProvider();
 			const document = await vscode.workspace.openTextDocument({
 				content: ":If x > 0;\n:EndIf;",
@@ -676,7 +676,11 @@ sTest := TestProcedure("test", 50);
 				new vscode.CancellationTokenSource().token
 			);
 
-			assert.ok(hover, "Should provide hover for mixed-case keyword");
+			// Hover works for user convenience, but :If is INCORRECT per style guide
+			// Keywords MUST be UPPERCASE (:IF, :ENDIF)
+			// The formatter will fix this, and ideally diagnostics should warn about it
+			assert.ok(hover, "Should provide hover even for mixed-case (helps users)");
+			assert.ok(hover.contents[0].toString().includes("IF"), "Hover should show correct UPPERCASE form");
 		});
 
 		test("Diagnostic provider respects cancellation token", async () => {
