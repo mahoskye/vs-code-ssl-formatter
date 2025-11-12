@@ -136,9 +136,41 @@ export class SSLDiagnosticProvider {
 							"Potential SQL injection: Use parameterized queries (?PARAM?) instead of string concatenation",
 							strictMode ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning
 						);
-						diagnostic.code = "ssl-sql-injection";
+						diagnostic.code = "sql-sql-injection";
 						diagnostics.push(diagnostic);
 					}
+				}
+			}
+
+			// Check DoProc calls for missing parameters
+			// Match both DoProc("Name", {...}) and DoProc("Name") patterns
+			const doProcWithBracesMatch = trimmed.match(/DoProc\s*\(\s*["']([^"']+)["']\s*,\s*\{([^}]*)\}/i);
+			const doProcWithoutBracesMatch = trimmed.match(/DoProc\s*\(\s*["']([^"']+)["']\s*\)/i);
+			
+			if (doProcWithBracesMatch || doProcWithoutBracesMatch) {
+				const procedureName = doProcWithBracesMatch ? doProcWithBracesMatch[1] : doProcWithoutBracesMatch![1];
+				const argsString = doProcWithBracesMatch ? doProcWithBracesMatch[2].trim() : '';
+				const providedArgs = argsString ? argsString.split(',').map(a => a.trim()).filter(a => a.length > 0) : [];
+				
+				// Get expected parameters for this procedure
+				const expectedParams = this.getProcedureParameters(lines, procedureName);
+				
+				if (expectedParams.length > 0 && providedArgs.length === 0) {
+					const diagnostic = new vscode.Diagnostic(
+						new vscode.Range(i, 0, i, line.length),
+						`Procedure '${procedureName}' expects ${expectedParams.length} parameter${expectedParams.length > 1 ? 's' : ''} (${expectedParams.join(', ')}) but none were provided`,
+						vscode.DiagnosticSeverity.Warning
+					);
+					diagnostic.code = "ssl-missing-params";
+					diagnostics.push(diagnostic);
+				} else if (expectedParams.length > 0 && providedArgs.length < expectedParams.length) {
+					const diagnostic = new vscode.Diagnostic(
+						new vscode.Range(i, 0, i, line.length),
+						`Procedure '${procedureName}' expects ${expectedParams.length} parameter${expectedParams.length > 1 ? 's' : ''} but only ${providedArgs.length} provided`,
+						vscode.DiagnosticSeverity.Warning
+					);
+					diagnostic.code = "ssl-insufficient-params";
+					diagnostics.push(diagnostic);
 				}
 			}
 
@@ -346,5 +378,43 @@ export class SSLDiagnosticProvider {
 			default:
 				return vscode.DiagnosticSeverity.Warning;
 		}
+	}
+
+	/**
+	 * Get the list of parameters defined for a procedure
+	 */
+	private getProcedureParameters(lines: string[], procedureName: string): string[] {
+		// Find the procedure definition
+		const procedurePattern = new RegExp(`^\\s*:PROCEDURE\\s+${procedureName}\\b`, 'i');
+		let procedureLineIndex = -1;
+
+		for (let i = 0; i < lines.length; i++) {
+			if (procedurePattern.test(lines[i])) {
+				procedureLineIndex = i;
+				break;
+			}
+		}
+
+		if (procedureLineIndex === -1) {
+			return []; // Procedure not found in document
+		}
+
+		// Look for :PARAMETERS line after :PROCEDURE
+		for (let i = procedureLineIndex + 1; i < Math.min(procedureLineIndex + 20, lines.length); i++) {
+			const line = lines[i].trim();
+
+			// Check for :PARAMETERS
+			const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
+			if (paramsMatch) {
+				return paramsMatch[1].split(',').map(p => p.trim());
+			}
+
+			// Stop at next procedure or other block keyword
+			if (/^:(PROCEDURE|ENDPROC|DECLARE)\b/i.test(line)) {
+				break;
+			}
+		}
+
+		return []; // No parameters found
 	}
 }
