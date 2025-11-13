@@ -13,6 +13,9 @@ export class SSLDiagnosticProvider {
 	}
 
 	public updateDiagnostics(document: vscode.TextDocument): void {
+		const fileName = document.fileName.split('/').pop();
+		console.log(`[SSL Debug] ========== Analyzing ${fileName} ==========`);
+		
 		const config = vscode.workspace.getConfiguration("ssl");
 		const maxProblems = config.get<number>("maxNumberOfProblems", 100);
 		const strictMode = config.get<boolean>("strictStyleGuideMode", false);
@@ -20,6 +23,8 @@ export class SSLDiagnosticProvider {
 		const diagnostics: vscode.Diagnostic[] = [];
 		const text = document.getText();
 		const lines = text.split("\n");
+		
+		console.log(`[SSL Debug] Total lines: ${lines.length}`);
 
 		// Track nesting depth
 		let blockDepth = 0;
@@ -62,6 +67,8 @@ export class SSLDiagnosticProvider {
 				paramPlaceholders.forEach(placeholder => {
 					const paramName = placeholder.replace(/\?/g, '');
 					
+					console.log(`[SSL Debug] Line ${i + 1}: Checking SQL param '${paramName}', declared identifiers: [${Array.from(declaredIdentifiers).join(', ')}]`);
+					
 					// Check if it's a valid identifier (constant or variable)
 					if (!declaredIdentifiers.has(paramName)) {
 						const columnIndex = line.indexOf(placeholder);
@@ -72,8 +79,31 @@ export class SSLDiagnosticProvider {
 						);
 						diagnostic.code = "ssl-invalid-sql-param";
 						diagnostics.push(diagnostic);
+						console.log(`[SSL Debug] ERROR: Invalid SQL param '${paramName}' at line ${i + 1}`);
 					}
 				});
+			}
+
+			// Check for undeclared variable assignments BEFORE skipping multi-line strings
+			// This ensures we catch assignments like: sQuery := "SELECT..."
+			const assignmentMatch = trimmed.match(/^([a-z][a-zA-Z0-9_]*)\s*:=/);
+			if (assignmentMatch && !trimmed.startsWith(':')) {
+				const varName = assignmentMatch[1];
+				const declaredIdentifiers = this.getDeclaredIdentifiers(lines, i);
+				
+				console.log(`[SSL Debug] Line ${i + 1}: Checking assignment '${varName}', declared identifiers: [${Array.from(declaredIdentifiers).join(', ')}]`);
+				
+				// Check if variable was declared before use
+				if (!declaredIdentifiers.has(varName)) {
+					const diagnostic = new vscode.Diagnostic(
+						new vscode.Range(i, 0, i, varName.length),
+						`Variable '${varName}' is used without being declared. Add ':DECLARE ${varName};' before first use.`,
+						vscode.DiagnosticSeverity.Warning
+					);
+					diagnostic.code = "ssl-undeclared-variable";
+					diagnostics.push(diagnostic);
+					console.log(`[SSL Debug] WARNING: Undeclared variable '${varName}' at line ${i + 1}`);
+				}
 			}
 
 			// Track multi-line string state
@@ -115,6 +145,68 @@ export class SSLDiagnosticProvider {
 			}
 			if (inMultiLineComment) {
 				continue; // Skip all lines inside multi-line comments
+			}
+
+			// Check for undeclared variable usage (reading variables)
+			// This catches cases like: infomes(sVariable); or DoProc("Test", {sVar});
+			// Skip lines that are declarations, assignments, or keywords
+			if (trimmed && 
+				!trimmed.startsWith(':') && 
+				!trimmed.startsWith('/*') && 
+				!trimmed.startsWith('*') &&
+				!/^[a-z][a-zA-Z0-9_]*\s*:=/.test(trimmed)) { // Skip assignments (already checked)
+				
+				const declaredIdentifiers = this.getDeclaredIdentifiers(lines, i);
+				
+				// Extract potential variable references (Hungarian notation variables)
+				// Match lowercase-starting identifiers (sVar, nCount, etc.) but not function calls
+				const varReferences = trimmed.match(/\b([a-z][a-zA-Z0-9_]*)\b/g);
+				
+				if (varReferences) {
+					// Filter out known keywords and function names
+					const sslKeywords = new Set([
+						'if', 'else', 'endif', 'while', 'endwhile', 'for', 'to', 'step', 'next',
+						'foreach', 'in', 'case', 'endcase', 'otherwise', 'exitcase', 'begincase',
+						'try', 'catch', 'finally', 'endtry', 'return', 'loop', 'exitwhile',
+						'and', 'or', 'not', 'nil', 'true', 'false'
+					]);
+					
+					// Common SSL functions (lowercase versions)
+					const sslFunctions = new Set([
+						'usrmes', 'infomes', 'doproc', 'sqlexecute', 'runsql', 'lsearch',
+						'alen', 'ascan', 'aadd', 'arraynew', 'empty', 'str', 'val', 'alltrim',
+						'now', 'getsetting', 'createudobject', 'createguid', 'getlastsslerror'
+					]);
+					
+					// Loop counter exceptions
+					const loopCounters = new Set(['i', 'j', 'k', 'x', 'y', 'z']);
+					
+					varReferences.forEach(varRef => {
+						const lowerRef = varRef.toLowerCase();
+						
+						// Skip keywords, functions, loop counters, and already declared identifiers
+						if (!sslKeywords.has(lowerRef) && 
+							!sslFunctions.has(lowerRef) &&
+							!loopCounters.has(lowerRef) &&
+							!declaredIdentifiers.has(varRef)) {
+							
+							// Check if this looks like a Hungarian notation variable
+							if (/^[a-z][A-Z]/.test(varRef)) { // e.g., sVar, nCount
+								const columnIndex = line.indexOf(varRef);
+								if (columnIndex !== -1) {
+									const diagnostic = new vscode.Diagnostic(
+										new vscode.Range(i, columnIndex, i, columnIndex + varRef.length),
+										`Variable '${varRef}' does not exist in the current scope. It may be declared in a different procedure or not declared at all.`,
+										vscode.DiagnosticSeverity.Error
+									);
+									diagnostic.code = "ssl-undefined-variable";
+									diagnostics.push(diagnostic);
+									console.log(`[SSL Debug] ERROR: Undefined variable '${varRef}' at line ${i + 1}`);
+								}
+							}
+						}
+					});
+				}
 			}
 
 			// Check block depth
@@ -369,6 +461,13 @@ export class SSLDiagnosticProvider {
 			}
 		}
 
+		console.log(`[SSL Debug] Found ${diagnostics.length} diagnostic${diagnostics.length !== 1 ? 's' : ''}`);
+		if (diagnostics.length > 0) {
+			diagnostics.forEach((d, idx) => {
+				console.log(`  ${idx + 1}. Line ${d.range.start.line + 1}: [${d.code}] ${d.message}`);
+			});
+		}
+		
 		this.diagnosticCollection.set(document.uri, diagnostics);
 	}
 
@@ -476,25 +575,25 @@ export class SSLDiagnosticProvider {
 
 	/**
 	 * Get all declared identifiers (variables, constants, parameters) visible at a given line
+	 * This is scope-aware: only returns identifiers that are accessible at the given line
 	 */
 	private getDeclaredIdentifiers(lines: string[], currentLine: number): Set<string> {
-		const identifiers = new Set<string>();
+		const globalIdentifiers = new Set<string>();
+		const localIdentifiers = new Set<string>();
 		let inProcedure = false;
-		let procedureStartLine = -1;
+		let currentProcedureStartLine = -1;
 		let inMultiLineComment = false;
 
-		// Scan from beginning to current line
-		for (let i = 0; i <= currentLine && i < lines.length; i++) {
+		// First pass: collect global declarations (before any procedure)
+		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i].trim();
 
 			// Skip comment lines
 			if (line.startsWith('/*')) {
-				// Check if it's a multi-line comment (doesn't end with ;)
 				if (!line.endsWith(';')) {
 					inMultiLineComment = true;
 					continue;
 				}
-				// Single-line comment, skip it
 				continue;
 			}
 			if (inMultiLineComment) {
@@ -504,60 +603,113 @@ export class SSLDiagnosticProvider {
 				continue;
 			}
 			if (line.startsWith('*')) {
-				continue; // Skip comment continuation lines
+				continue;
 			}
 
-			// Track procedure scope
+			// Stop at first procedure - everything before is global scope
 			if (/^:PROCEDURE\b/i.test(line)) {
-				inProcedure = true;
-				procedureStartLine = i;
-			}
-			if (/^:(ENDPROC|ENDPROCEDURE)\b/i.test(line)) {
-				inProcedure = false;
+				break;
 			}
 
-			// Collect :DECLARE variables
+			// Collect global :DECLARE variables
 			const declareMatch = line.match(/^:DECLARE\s+(.+?);/i);
 			if (declareMatch) {
 				const vars = declareMatch[1].split(',').map(v => v.trim());
 				vars.forEach(varName => {
-					// Clean up any assignments or whitespace
 					const cleanName = varName.split(':=')[0].trim();
 					if (cleanName) {
-						identifiers.add(cleanName);
+						globalIdentifiers.add(cleanName);
 					}
 				});
 			}
 
-			// Collect :PARAMETERS
-			const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
-			if (paramsMatch) {
-				const params = paramsMatch[1].split(',').map(p => p.trim());
-				params.forEach(paramName => {
-					if (paramName) {
-						identifiers.add(paramName);
-					}
-				});
-			}
-
-			// Collect global constants (variables assigned at file level, before any procedure)
-			// Look for patterns like: CONSTANT_NAME := value;
-			if (!inProcedure && /^[A-Z_][A-Z0-9_]*\s*:=/.test(line)) {
+			// Collect global constants (ALL_CAPS variables assigned at file level)
+			if (/^[A-Z_][A-Z0-9_]*\s*:=/.test(line)) {
 				const constMatch = line.match(/^([A-Z_][A-Z0-9_]*)\s*:=/);
 				if (constMatch) {
-					identifiers.add(constMatch[1]);
+					globalIdentifiers.add(constMatch[1]);
 				}
-			}
-
-			// Collect implicit variable declarations (assignment without :DECLARE)
-			// Pattern: varName := value; (where varName follows Hungarian notation)
-			const assignmentMatch = line.match(/^([a-z][a-zA-Z0-9_]*)\s*:=/);
-			if (assignmentMatch && !line.startsWith(':')) {
-				identifiers.add(assignmentMatch[1]);
 			}
 		}
 
-		return identifiers;
+		// Second pass: determine current scope and collect local identifiers
+		inProcedure = false;
+		currentProcedureStartLine = -1;
+		inMultiLineComment = false;
+		let procedureDepth = 0;
+
+		for (let i = 0; i <= currentLine && i < lines.length; i++) {
+			const line = lines[i].trim();
+
+			// Skip comment lines
+			if (line.startsWith('/*')) {
+				if (!line.endsWith(';')) {
+					inMultiLineComment = true;
+					continue;
+				}
+				continue;
+			}
+			if (inMultiLineComment) {
+				if (line.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				continue;
+			}
+			if (line.startsWith('*')) {
+				continue;
+			}
+
+			// Track procedure scope with nesting support
+			if (/^:PROCEDURE\b/i.test(line)) {
+				if (procedureDepth === 0) {
+					// Entering the outermost procedure
+					inProcedure = true;
+					currentProcedureStartLine = i;
+					localIdentifiers.clear(); // Clear previous procedure's locals
+				}
+				procedureDepth++;
+			}
+
+			if (/^:(ENDPROC|ENDPROCEDURE)\b/i.test(line)) {
+				procedureDepth = Math.max(0, procedureDepth - 1);
+				if (procedureDepth === 0) {
+					// Exiting the outermost procedure
+					inProcedure = false;
+					currentProcedureStartLine = -1;
+					localIdentifiers.clear();
+				}
+			}
+
+			// If we're in a procedure, collect local declarations
+			if (inProcedure && i >= currentProcedureStartLine) {
+				// Collect :DECLARE variables in current procedure
+				const declareMatch = line.match(/^:DECLARE\s+(.+?);/i);
+				if (declareMatch) {
+					const vars = declareMatch[1].split(',').map(v => v.trim());
+					vars.forEach(varName => {
+						const cleanName = varName.split(':=')[0].trim();
+						if (cleanName) {
+							localIdentifiers.add(cleanName);
+						}
+					});
+				}
+
+				// Collect :PARAMETERS in current procedure
+				const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
+				if (paramsMatch) {
+					const params = paramsMatch[1].split(',').map(p => p.trim());
+					params.forEach(paramName => {
+						if (paramName) {
+							localIdentifiers.add(paramName);
+						}
+					});
+				}
+			}
+		}
+
+		// Combine global and local identifiers
+		const allIdentifiers = new Set<string>([...globalIdentifiers, ...localIdentifiers]);
+		return allIdentifiers;
 	}
 }
 

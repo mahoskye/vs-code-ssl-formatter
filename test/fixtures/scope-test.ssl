@@ -1,0 +1,22 @@
+
+
+:DECLARE sSampleId, sQuery;
+sSampleId := "TEST123";
+
+sQuery := "
+	SELECT COUNT(*)
+	FROM tests
+	WHERE sample_id = ?sSampleId?
+	AND status NOT IN ('COMPLETE', 'CANCELLED')
+";
+
+:PROCEDURE testScope;
+	:DECLARE sResult;
+
+	sResult := SQLExecute(sQuery);
+
+	:RETURN sResult;
+:ENDPROC;
+
+
+infomes(sResult);
