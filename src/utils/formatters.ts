@@ -42,7 +42,9 @@ export function replaceOutsideStrings(line: string, pattern: RegExp, replacement
         current += char;
     }
 
-    if (current) segments.push({ text: current, inString });
+    if (current) {
+        segments.push({ text: current, inString });
+    }
 
     return segments
         .map((seg) => (seg.inString ? seg.text : seg.text.replace(pattern, replacement)))
@@ -73,15 +75,21 @@ export function normalizeOperatorSpacing(text: string): string {
             const trimmed = line.trim();
             // Track block comment start/end using the project's convention (/* ... ;)
             if (inBlockComment) {
-                if (trimmed.endsWith(';')) inBlockComment = false;
+                if (trimmed.endsWith(';')) {
+                    inBlockComment = false;
+                }
                 return line; // do not modify comment content
             }
-            if (!trimmed) return line;
+            if (!trimmed) {
+                return line;
+            }
             if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
                 inBlockComment = true;
                 return line;
             }
-            if (trimmed.startsWith('/*') || trimmed.startsWith('*')) return line;
+            if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+                return line;
+            }
 
             let out = line;
 
@@ -97,7 +105,14 @@ export function normalizeOperatorSpacing(text: string): string {
             out = replaceOutsideStrings(out, /\s*\*=\s*/g, ' *= ');
             out = replaceOutsideStrings(out, /\s*\/=\s*/g, ' /= ');
             out = replaceOutsideStrings(out, /\s*\^=\s*/g, ' ^= ');
-            out = replaceOutsideStrings(out, /\s*%\=\s*/g, ' %= ');
+            out = replaceOutsideStrings(out, /\s*%=\s*/g, ' %= ');
+
+            // Comparison operators: normalize to have spaces on both sides
+            out = replaceOutsideStrings(out, /\s*==\s*/g, ' == ');
+            out = replaceOutsideStrings(out, /\s*!=\s*/g, ' != ');
+            out = replaceOutsideStrings(out, /\s*<>\s*/g, ' <> ');
+            out = replaceOutsideStrings(out, /\s*<=\s*/g, ' <= ');
+            out = replaceOutsideStrings(out, /\s*>=\s*/g, ' >= ');
 
             // Ensure single-equals are only spaced when they look like assignment/comparison
             out = replaceOutsideStrings(out, /([A-Za-z0-9_\)])\s*=\s*([A-Za-z0-9_\(])/g, '$1 = $2');
@@ -105,6 +120,21 @@ export function normalizeOperatorSpacing(text: string): string {
             // Gentle spacing for < and > (avoid touching multi-char tokens already handled)
             out = replaceOutsideStrings(out, /([^<>=])\s*<\s*([^>=])/g, '$1 < $2');
             out = replaceOutsideStrings(out, /([^<>=])\s*>\s*([^=])/g, '$1 > $2');
+
+            // Logical operators
+            out = replaceOutsideStrings(out, /\s*\.AND\.\s*/gi, ' .AND. ');
+            out = replaceOutsideStrings(out, /\s*\.OR\.\s*/gi, ' .OR. ');
+            out = replaceOutsideStrings(out, /\s*\.NOT\.\s*/gi, ' .NOT. ');
+
+            // Unary ! operator
+            out = replaceOutsideStrings(out, /([a-zA-Z0-9_\)])\s*!/g, '$1 !');
+            out = replaceOutsideStrings(out, /!\s*([a-zA-Z0-9_\(])/g, '! $1');
+
+            // Space after commas
+            out = replaceOutsideStrings(out, /,\s*(\S)/g, ', $1');
+
+            // No space before semicolons
+            out = replaceOutsideStrings(out, /\s+;/g, ';');
 
             return out;
         })
@@ -117,6 +147,10 @@ export function normalizeOperatorSpacing(text: string): string {
  * leading whitespace) and otherwise returns the input unchanged. This keeps
  * the test focused on comment-content preservation.
  */
-export function normalizeIndentation(text: string, _indentStyle: string, _indentWidth: number, _tabSize: number): string {
+export function normalizeIndentation(text: string, indentStyle: string, indentWidth: number, tabSize: number): string {
+    // Minimal no-op implementation for tests. If you need a full reimplementation
+    // of the provider's indentation logic here, we can port it carefully and add
+    // unit tests. For now, keep indentation stable so comment-preservation tests
+    // focus on operator spacing.
     return text;
 }
