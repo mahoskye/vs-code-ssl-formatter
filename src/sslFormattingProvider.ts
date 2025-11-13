@@ -332,6 +332,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const lines = text.split("\n");
 		let indentLevel = 0;
 		let inMultiLineComment = false;
+		let continuationIndent = 0; // Extra indent for continuation lines
 		const indentChar = indentStyle === "tab" ? "\t" : " ".repeat(indentWidth);
 
 		const blockStart = /^\s*:(IF|WHILE|FOR|FOREACH|BEGINCASE|TRY|PROCEDURE|CLASS|REGION)\b/i;
@@ -340,7 +341,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const blockEnd = /^\s*:(ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDPROCEDURE|ENDREGION)\b/i;
 		const caseExit = /^\s*:EXITCASE\b/i;
 
-		const formatted = lines.map(line => {
+		const formatted = lines.map((line, index) => {
 			const trimmed = line.trim();
 
 			// Track multi-line comment state (SSL uses /* ... ; syntax)
@@ -359,21 +360,82 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				return line;
 			}
 
+			// Check if this is a continuation line
+			// Either: previous line ends with continuation operator OR current line starts with one
+			let isContinuation = false;
+			if (index > 0) {
+				const prevLine = lines[index - 1].trim();
+				const prevEndsWithOperator = /[+\-*/,]$/.test(prevLine);
+				const currentStartsWithOperator = /^[+\-*/,]/.test(trimmed);
+				
+				if ((prevEndsWithOperator || currentStartsWithOperator) && !inMultiLineComment) {
+					isContinuation = true;
+					
+					// Calculate continuation indent from the line with assignment if not already set
+					if (continuationIndent === 0) {
+						// Look backwards to find the line with the assignment
+						for (let i = index - 1; i >= 0; i--) {
+							const checkLine = lines[i].trim();
+							const assignMatch = lines[i].match(/^(\s*)(\w+)\s*:=\s*(.+)/);
+							
+							if (assignMatch) {
+								const baseIndent = assignMatch[1];
+								const varName = assignMatch[2];
+								const valueStart = assignMatch[3];
+								
+								// Calculate base position after :=
+								let alignPos = baseIndent.length + varName.length + ' := '.length;
+								
+								// If the value starts with a string quote or other continuation operator,
+								// we want to align with the actual content start
+								// For leading operators on continuation lines, align with the operator
+								// For trailing operators, align with the value itself
+								const firstNonSpace = valueStart.match(/^(\s*)/);
+								if (firstNonSpace) {
+									alignPos += firstNonSpace[1].length;
+								}
+								
+								continuationIndent = alignPos;
+								break;
+							}
+							
+							// Stop looking if we hit a line that doesn't end with continuation
+							if (!/[+\-*/,]$/.test(checkLine) && !/^[+\-*/,]/.test(lines[i + 1]?.trim() || '')) {
+								break;
+							}
+						}
+					}
+				} else if (!prevEndsWithOperator && !currentStartsWithOperator) {
+					// Reset continuation indent when we're no longer in a continuation
+					continuationIndent = 0;
+				}
+			}
+
 			// Decrease indent for block end and middle keywords
 			if (blockEnd.test(trimmed) || blockMiddle.test(trimmed)) {
 				indentLevel = Math.max(0, indentLevel - 1);
+				continuationIndent = 0; // Reset continuation on block keywords
 			}
 
 			// Decrease indent for :CASE and :OTHERWISE (they're at same level as :BEGINCASE)
 			if (caseKeyword.test(trimmed)) {
 				indentLevel = Math.max(0, indentLevel - 1);
+				continuationIndent = 0; // Reset continuation on block keywords
 			}
 
-			const indented = indentChar.repeat(indentLevel) + trimmed;
+			// Apply indentation
+			let indented;
+			if (isContinuation && continuationIndent > 0) {
+				// Use exact spacing for continuation lines
+				indented = ' '.repeat(continuationIndent) + trimmed;
+			} else {
+				indented = indentChar.repeat(indentLevel) + trimmed;
+			}
 
 			// Increase indent after block start
 			if (blockStart.test(trimmed)) {
 				indentLevel++;
+				continuationIndent = 0; // Reset continuation on block keywords
 			}
 
 			// Restore indent after middle keywords
@@ -384,6 +446,12 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			// Increase indent after :CASE and :OTHERWISE for their body
 			if (caseKeyword.test(trimmed)) {
 				indentLevel++;
+			}
+
+			// Reset continuation indent if this line doesn't participate in continuation
+			const nextLine = lines[index + 1]?.trim() || '';
+			if (!isContinuation && !/[+\-*/,]$/.test(trimmed) && !/^[+\-*/,]/.test(nextLine)) {
+				continuationIndent = 0;
 			}
 
 			return indented;

@@ -1,14 +1,14 @@
 /* ============================================================================
- * Sample Management System - Complete Example
- * 
- * This file demonstrates proper SSL formatting according to the style guide.
- * It includes: procedures, error handling, database operations, arrays,
- * control flow, object-oriented features, and comprehensive formatting.
- * 
- * Author: Manual Test Suite
- * Date: 2025-11-12
- * Version: 1.0.0
- * ============================================================================;
+* Sample Management System - Complete Example
+*
+* This file demonstrates proper SSL formatting according to the style guide.
+* It includes: procedures, error handling, database operations, arrays,
+* control flow, object-oriented features, and comprehensive formatting.
+*
+* Author: Manual Test Suite
+* Date: 2025-11-12
+* Version: 1.0.0
+* ============================================================================;
 
 :INCLUDE "SampleLib.ssl";
 :INCLUDE "ValidationUtils.ssl";
@@ -20,590 +20,593 @@ MIN_SAMPLE_VOLUME := 5.0;
 DEFAULT_PRIORITY := "NORMAL";
 
 /* ============================================================================
- * REGION Sample Processing Procedures
- * ============================================================================;
+* REGION Sample Processing Procedures
+* ============================================================================;
 
 :PROCEDURE ProcessSampleBatch;
-	/* Process a batch of samples with validation and error handling.
-	 * 
-	 * Parameters:
-	 *   aBatchIds - Array of sample IDs to process
-	 *   sProcessType - Type of processing (ANALYSIS, APPROVAL, REJECTION)
-	 *   bValidateOnly - If true, only validate without processing
-	 * 
-	 * Returns: Number of successfully processed samples;
-	:PARAMETERS aBatchIds, sProcessType, bValidateOnly;
-	:DEFAULT bValidateOnly, .F.;
-	
-	:DECLARE nProcessed, nTotal, nIndex, sQuery, aResults;
-	:DECLARE sSampleId, bIsValid, sErrorMsg, dProcessDate;
-	:DECLARE oSample, nVolume, sPriority;
-	
-	nProcessed := 0;
-	nTotal := alen(aBatchIds);
-	dProcessDate := Now();
-	
-	/* Validate batch size;
-	:IF nTotal > MAX_BATCH_SIZE;
-		usrmes("Batch size exceeds maximum of " + Str(MAX_BATCH_SIZE), 1);
-		:RETURN 0;
-	:ENDIF;
-	
-	/* Process each sample in the batch;
-	:TRY;
-		:FOR nIndex := 1 :TO nTotal :STEP 1;
-			sSampleId := aBatchIds[nIndex];
-			
-			/* Validate sample exists and meets criteria;
-			bIsValid := DoProc("ValidateSample", {sSampleId, @sErrorMsg});
-			
-			:IF .NOT. bIsValid;
-				usrmes("Sample " + sSampleId + " validation failed: " + sErrorMsg, 1);
-				:LOOP;
-			:ENDIF;
-			
-			/* Retrieve sample details;
-			sQuery := "SELECT sample_volume, priority_level " +
-				"FROM samples " +
-				"WHERE sample_id = ?SAMPLE_ID?";
-			
-			aResults := SQLExecute(sQuery, , , {sSampleId});
-			
-			:IF Empty(aResults);
-				usrmes("Sample not found: " + sSampleId, 1);
-				:LOOP;
-			:ENDIF;
-			
-			nVolume := aResults[1][1];
-			sPriority := AllTrim(aResults[1][2]);
-			
-			/* Check volume requirements;
-			:IF nVolume < MIN_SAMPLE_VOLUME;
-				usrmes("Insufficient volume for sample " + sSampleId, 1);
-				:LOOP;
-			:ENDIF;
-			
-			/* Determine processing action based on type;
-			:BEGINCASE;
-				:CASE sProcessType == "ANALYSIS";
-					:IF .NOT. bValidateOnly;
-						DoProc("PerformAnalysis", {sSampleId, sPriority});
-					:ENDIF;
-					:EXITCASE;
-				
-				:CASE sProcessType == "APPROVAL";
-					:IF .NOT. bValidateOnly;
-						DoProc("ApproveSample", {sSampleId, dProcessDate});
-					:ENDIF;
-					:EXITCASE;
-				
-				:CASE sProcessType == "REJECTION";
-					:IF .NOT. bValidateOnly;
-						DoProc("RejectSample", {sSampleId, "Batch rejection", dProcessDate});
-					:ENDIF;
-					:EXITCASE;
-				
-				:OTHERWISE;
-					usrmes("Unknown process type: " + sProcessType, 1);
-					:EXITCASE;
-			:ENDCASE;
-			
-			nProcessed := nProcessed + 1;
-		:NEXT;
-		
-	:CATCH;
-		sErrorMsg := GetLastSSLError();
-		usrmes("Error processing batch: " + sErrorMsg, 1);
-		:RETURN nProcessed;
-	:ENDTRY;
-	
-	/* Log completion;
-	usrmes("Processed " + Str(nProcessed) + " of " + Str(nTotal) + " samples");
-	
-	:RETURN nProcessed;
+/* Process a batch of samples with validation and error handling.
+*
+* Parameters:
+*   aBatchIds - Array of sample IDs to process
+*   sProcessType - Type of processing (ANALYSIS, APPROVAL, REJECTION)
+*   bValidateOnly - If true, only validate without processing
+*
+* Returns: Number of successfully processed samples;
+:PARAMETERS aBatchIds, sProcessType, bValidateOnly;
+:DEFAULT bValidateOnly, .F.;
+
+:DECLARE nProcessed, nTotal, nIndex, sQuery, aResults;
+:DECLARE sSampleId, bIsValid, sErrorMsg, dProcessDate;
+:DECLARE oSample, nVolume, sPriority;
+
+nProcessed := 0;
+nTotal := alen(aBatchIds);
+dProcessDate := Now();
+
+/* Validate batch size;
+:IF nTotal > MAX_BATCH_SIZE;
+usrmes("Batch size exceeds maximum of " + Str(MAX_BATCH_SIZE), 1);
+:RETURN 0;
+:ENDIF;
+
+/* Process each sample in the batch;
+:TRY;
+:FOR nIndex := 1 :TO nTotal :STEP 1;
+sSampleId := aBatchIds[nIndex];
+
+/* Validate sample exists and meets criteria;
+bIsValid := DoProc("ValidateSample", {sSampleId, @sErrorMsg});
+
+:IF .NOT. bIsValid;
+usrmes("Sample " + sSampleId + " validation failed: " + sErrorMsg, 1);
+:LOOP;
+:ENDIF;
+
+/* Retrieve sample details;
+sQuery := "SELECT sample_volume, priority_level " +
+"FROM samples " +
+"WHERE sample_id = ?SAMPLE_ID?";
+
+aResults := SQLExecute(sQuery, , , {sSampleId});
+
+:IF Empty(aResults);
+usrmes("Sample not found: " + sSampleId, 1);
+:LOOP;
+:ENDIF;
+
+nVolume := aResults[1][1];
+sPriority := AllTrim(aResults[1][2]);
+
+/* Check volume requirements;
+:IF nVolume < MIN_SAMPLE_VOLUME;
+usrmes("Insufficient volume for sample " + sSampleId, 1);
+:LOOP;
+:ENDIF;
+
+/* Determine processing action based on type;
+:BEGINCASE;
+:CASE sProcessType == "ANALYSIS";
+:IF .NOT. bValidateOnly;
+DoProc("PerformAnalysis", {sSampleId, sPriority});
+:ENDIF;
+:EXITCASE;
+
+:CASE sProcessType == "APPROVAL";
+:IF .NOT. bValidateOnly;
+DoProc("ApproveSample", {sSampleId, dProcessDate});
+:ENDIF;
+:EXITCASE;
+
+:CASE sProcessType == "REJECTION";
+:IF .NOT. bValidateOnly;
+DoProc("RejectSample", {sSampleId, "Batch rejection", dProcessDate});
+:ENDIF;
+:EXITCASE;
+
+:OTHERWISE;
+usrmes("Unknown process type: " + sProcessType, 1);
+:EXITCASE;
+:ENDCASE;
+
+nProcessed := nProcessed + 1;
+:NEXT;
+
+:CATCH;
+sErrorMsg := GetLastSSLError();
+usrmes("Error processing batch: " + sErrorMsg, 1);
+:RETURN nProcessed;
+:ENDTRY;
+
+/* Log completion;
+usrmes("Processed " + Str(nProcessed) + " of " + Str(nTotal) + " samples");
+
+:RETURN nProcessed;
 :ENDPROC;
 
 :PROCEDURE ValidateSample;
-	/* Validate a sample meets all processing requirements.
-	 * 
-	 * Parameters:
-	 *   sSampleId - Sample identifier to validate
-	 *   sErrorMsg - (Output) Error message if validation fails
-	 * 
-	 * Returns: .T. if valid, .F. otherwise;
-	:PARAMETERS sSampleId, sErrorMsg;
-	
-	:DECLARE sQuery, aResult, sStatus, nResultCount;
-	:DECLARE bHasTests, bIsApproved, dCollectionDate;
-	
-	/* Check sample exists and is in valid status;
-	sQuery := "SELECT s.status, s.collection_date, " +
-		"COUNT(t.test_id) AS test_count " +
-		"FROM samples s " +
-		"LEFT JOIN tests t ON s.sample_id = t.sample_id " +
-		"WHERE s.sample_id = ?SAMPLE_ID? " +
-		"GROUP BY s.status, s.collection_date";
-	
-	aResult := SQLExecute(sQuery, , , {sSampleId});
-	
-	:IF Empty(aResult);
-		sErrorMsg := "Sample not found in database";
-		:RETURN .F.;
-	:ENDIF;
-	
-	sStatus := AllTrim(aResult[1][1]);
-	dCollectionDate := aResult[1][2];
-	nResultCount := aResult[1][3];
-	
-	/* Validate status;
-	:IF sStatus == "CANCELLED" .OR. sStatus == "DELETED";
-		sErrorMsg := "Sample is in invalid status: " + sStatus;
-		:RETURN .F.;
-	:ENDIF;
-	
-	/* Validate collection date;
-	:IF Empty(dCollectionDate);
-		sErrorMsg := "Collection date is missing";
-		:RETURN .F.;
-	:ENDIF;
-	
-	/* Validate has assigned tests;
-	:IF nResultCount == 0;
-		sErrorMsg := "No tests assigned to sample";
-		:RETURN .F.;
-	:ENDIF;
-	
-	:RETURN .T.;
+/* Validate a sample meets all processing requirements.
+*
+* Parameters:
+*   sSampleId - Sample identifier to validate
+*   sErrorMsg - (Output) Error message if validation fails
+*
+* Returns: .T. if valid, .F. otherwise;
+:PARAMETERS sSampleId, sErrorMsg;
+
+:DECLARE sQuery, aResult, sStatus, nResultCount;
+:DECLARE bHasTests, bIsApproved, dCollectionDate;
+
+/* Check sample exists and is in valid status;
+/* Example: Trailing continuation operators;
+sQuery := "SELECT s.status, s.collection_date, " +
+"COUNT(t.test_id) AS test_count " +
+"FROM samples s " +
+"LEFT JOIN tests t ON s.sample_id = t.sample_id " +
+"WHERE s.sample_id = ?SAMPLE_ID? " +
+"GROUP BY s.status, s.collection_date";
+
+aResult := SQLExecute(sQuery, , , {sSampleId});
+
+:IF Empty(aResult);
+sErrorMsg := "Sample not found in database";
+:RETURN .F.;
+:ENDIF;
+
+sStatus := AllTrim(aResult[1][1]);
+dCollectionDate := aResult[1][2];
+nResultCount := aResult[1][3];
+
+/* Validate status;
+:IF sStatus == "CANCELLED" .OR. sStatus == "DELETED";
+sErrorMsg := "Sample is in invalid status: " + sStatus;
+:RETURN .F.;
+:ENDIF;
+
+/* Validate collection date;
+:IF Empty(dCollectionDate);
+sErrorMsg := "Collection date is missing";
+:RETURN .F.;
+:ENDIF;
+
+/* Validate has assigned tests;
+:IF nResultCount == 0;
+sErrorMsg := "No tests assigned to sample";
+:RETURN .F.;
+:ENDIF;
+
+:RETURN .T.;
 :ENDPROC;
 
 :PROCEDURE PerformAnalysis;
-	/* Execute analysis workflow for a sample.
-	 * 
-	 * Parameters:
-	 *   sSampleId - Sample to analyze
-	 *   sPriority - Priority level (HIGH, NORMAL, LOW);
-	:PARAMETERS sSampleId, sPriority;
-	
-	:DECLARE sUpdateQuery, aTestIds, nTestCount, i;
-	:DECLARE nWorksheetId, sWorksheetName, dAnalysisDate;
-	
-	dAnalysisDate := Now();
-	
-	/* Retrieve test assignments;
-	aTestIds := DoProc("GetSampleTests", {sSampleId});
-	nTestCount := alen(aTestIds);
-	
-	:IF nTestCount == 0;
-		:RETURN;
-	:ENDIF;
-	
-	/* Create worksheet based on priority;
-	:IF sPriority == "HIGH";
-		nWorksheetId := DoProc("CreateWorksheet", {"URGENT_" + sSampleId, dAnalysisDate});
-	:ELSE;
-		nWorksheetId := DoProc("CreateWorksheet", {"STD_" + sSampleId, dAnalysisDate});
-	:ENDIF;
-	
-	/* Assign tests to worksheet;
-	:FOR i := 1 :TO nTestCount;
-		DoProc("AssignTestToWorksheet", {aTestIds[i], nWorksheetId});
-	:NEXT;
-	
-	/* Update sample status;
-	sUpdateQuery := "UPDATE samples " +
-		"SET status = 'IN_ANALYSIS', " +
-		"analysis_start_date = ?ANALYSIS_DATE?, " +
-		"worksheet_id = ?WORKSHEET_ID? " +
-		"WHERE sample_id = ?SAMPLE_ID?";
-	
-	SQLExecute(sUpdateQuery, , , {dAnalysisDate, nWorksheetId, sSampleId});
-	
-	usrmes("Sample " + sSampleId + " assigned to worksheet " + Str(nWorksheetId));
+/* Execute analysis workflow for a sample.
+*
+* Parameters:
+*   sSampleId - Sample to analyze
+*   sPriority - Priority level (HIGH, NORMAL, LOW);
+:PARAMETERS sSampleId, sPriority;
+
+:DECLARE sUpdateQuery, aTestIds, nTestCount, i;
+:DECLARE nWorksheetId, sWorksheetName, dAnalysisDate;
+
+dAnalysisDate := Now();
+
+/* Retrieve test assignments;
+aTestIds := DoProc("GetSampleTests", {sSampleId});
+nTestCount := alen(aTestIds);
+
+:IF nTestCount == 0;
+:RETURN;
+:ENDIF;
+
+/* Create worksheet based on priority;
+:IF sPriority == "HIGH";
+nWorksheetId := DoProc("CreateWorksheet", {"URGENT_" + sSampleId, dAnalysisDate});
+:ELSE;
+nWorksheetId := DoProc("CreateWorksheet", {"STD_" + sSampleId, dAnalysisDate});
+:ENDIF;
+
+/* Assign tests to worksheet;
+:FOR i := 1 :TO nTestCount;
+DoProc("AssignTestToWorksheet", {aTestIds[i], nWorksheetId});
+:NEXT;
+
+/* Update sample status;
+/* Example: Leading continuation operators;
+sUpdateQuery := "UPDATE samples "
++ "SET status = 'IN_ANALYSIS', "
++ "analysis_start_date = ?ANALYSIS_DATE?, "
++ "worksheet_id = ?WORKSHEET_ID? "
++ "WHERE sample_id = ?SAMPLE_ID?";
+
+SQLExecute(sUpdateQuery, , , {dAnalysisDate, nWorksheetId, sSampleId});
+
+usrmes("Sample " + sSampleId + " assigned to worksheet " + Str(nWorksheetId));
 :ENDPROC;
 
 :PROCEDURE ApproveSample;
-	/* Approve a sample and finalize results.
-	 * 
-	 * Parameters:
-	 *   sSampleId - Sample to approve
-	 *   dApprovalDate - Date of approval;
-	:PARAMETERS sSampleId, dApprovalDate;
-	
-	:DECLARE sQuery, nAffected, aResults, bAllTestsComplete;
-	
-	/* Verify all tests are complete;
-	bAllTestsComplete := DoProc("CheckTestCompletion", {sSampleId});
-	
-	:IF .NOT. bAllTestsComplete;
-		usrmes("Cannot approve - incomplete tests for sample " + sSampleId, 1);
-		:RETURN;
-	:ENDIF;
-	
-	/* Update sample status;
-	sQuery := "UPDATE samples " +
-		"SET status = 'APPROVED', " +
-		"approval_date = ?APPROVAL_DATE?, " +
-		"approved_by = ?USER_ID? " +
-		"WHERE sample_id = ?SAMPLE_ID?";
-	
-	nAffected := SQLExecute(sQuery, , , {dApprovalDate, DoProc("GetUserId", {}), sSampleId});
-	
-	:IF nAffected > 0;
-		/* Generate final report;
-		DoProc("GenerateSampleReport", {sSampleId});
-		usrmes("Sample " + sSampleId + " approved successfully");
-	:ELSE;
-		usrmes("Failed to approve sample " + sSampleId, 1);
-	:ENDIF;
+/* Approve a sample and finalize results.
+*
+* Parameters:
+*   sSampleId - Sample to approve
+*   dApprovalDate - Date of approval;
+:PARAMETERS sSampleId, dApprovalDate;
+
+:DECLARE sQuery, nAffected, aResults, bAllTestsComplete;
+
+/* Verify all tests are complete;
+bAllTestsComplete := DoProc("CheckTestCompletion", {sSampleId});
+
+:IF .NOT. bAllTestsComplete;
+usrmes("Cannot approve - incomplete tests for sample " + sSampleId, 1);
+:RETURN;
+:ENDIF;
+
+/* Update sample status;
+sQuery := "UPDATE samples " +
+"SET status = 'APPROVED', " +
+"approval_date = ?APPROVAL_DATE?, " +
+"approved_by = ?USER_ID? " +
+"WHERE sample_id = ?SAMPLE_ID?";
+
+nAffected := SQLExecute(sQuery, , , {dApprovalDate, DoProc("GetUserId", {}), sSampleId});
+
+:IF nAffected > 0;
+/* Generate final report;
+DoProc("GenerateSampleReport", {sSampleId});
+usrmes("Sample " + sSampleId + " approved successfully");
+:ELSE;
+usrmes("Failed to approve sample " + sSampleId, 1);
+:ENDIF;
 :ENDPROC;
 
 :PROCEDURE RejectSample;
-	/* Reject a sample with reason.
-	 * 
-	 * Parameters:
-	 *   sSampleId - Sample to reject
-	 *   sReason - Rejection reason
-	 *   dRejectionDate - Date of rejection;
-	:PARAMETERS sSampleId, sReason, dRejectionDate;
-	
-	:DECLARE sQuery, nAffected;
-	
-	sQuery := "UPDATE samples " +
-		"SET status = 'REJECTED', " +
-		"rejection_date = ?REJECTION_DATE?, " +
-		"rejection_reason = ?REASON?, " +
-		"rejected_by = ?USER_ID? " +
-		"WHERE sample_id = ?SAMPLE_ID?";
-	
-	nAffected := SQLExecute(sQuery, , , {dRejectionDate, sReason, DoProc("GetUserId", {}), sSampleId});
-	
-	:IF nAffected > 0;
-		/* Cancel associated tests;
-		DoProc("CancelSampleTests", {sSampleId});
-		usrmes("Sample " + sSampleId + " rejected: " + sReason, 1);
-	:ENDIF;
+/* Reject a sample with reason.
+*
+* Parameters:
+*   sSampleId - Sample to reject
+*   sReason - Rejection reason
+*   dRejectionDate - Date of rejection;
+:PARAMETERS sSampleId, sReason, dRejectionDate;
+
+:DECLARE sQuery, nAffected;
+
+sQuery := "UPDATE samples " +
+"SET status = 'REJECTED', " +
+"rejection_date = ?REJECTION_DATE?, " +
+"rejection_reason = ?REASON?, " +
+"rejected_by = ?USER_ID? " +
+"WHERE sample_id = ?SAMPLE_ID?";
+
+nAffected := SQLExecute(sQuery, , , {dRejectionDate, sReason, DoProc("GetUserId", {}), sSampleId});
+
+:IF nAffected > 0;
+/* Cancel associated tests;
+DoProc("CancelSampleTests", {sSampleId});
+usrmes("Sample " + sSampleId + " rejected: " + sReason, 1);
+:ENDIF;
 :ENDPROC;
 
 /* ============================================================================
- * REGION Utility Functions
- * ============================================================================;
+* REGION Utility Functions
+* ============================================================================;
 
 :PROCEDURE GetSampleTests;
-	/* Retrieve all test IDs for a sample.
-	 * 
-	 * Parameters:
-	 *   sSampleId - Sample identifier
-	 * 
-	 * Returns: Array of test IDs;
-	:PARAMETERS sSampleId;
-	
-	:DECLARE sQuery, aResults, aTestIds, i, nCount;
-	
-	sQuery := "SELECT test_id " +
-		"FROM tests " +
-		"WHERE sample_id = ?SAMPLE_ID? " +
-		"AND status != 'CANCELLED' " +
-		"ORDER BY test_number";
-	
-	aResults := SQLExecute(sQuery, , , {sSampleId});
-	
-	:IF Empty(aResults);
-		:RETURN {};
-	:ENDIF;
-	
-	nCount := alen(aResults);
-	aTestIds := arraynew(nCount);
-	
-	:FOR i := 1 :TO nCount;
-		aTestIds[i] := aResults[i][1];
-	:NEXT;
-	
-	:RETURN aTestIds;
+/* Retrieve all test IDs for a sample.
+*
+* Parameters:
+*   sSampleId - Sample identifier
+*
+* Returns: Array of test IDs;
+:PARAMETERS sSampleId;
+
+:DECLARE sQuery, aResults, aTestIds, i, nCount;
+
+sQuery := "SELECT test_id " +
+"FROM tests " +
+"WHERE sample_id = ?SAMPLE_ID? " +
+"AND status != 'CANCELLED' " +
+"ORDER BY test_number";
+
+aResults := SQLExecute(sQuery, , , {sSampleId});
+
+:IF Empty(aResults);
+:RETURN {};
+:ENDIF;
+
+nCount := alen(aResults);
+aTestIds := arraynew(nCount);
+
+:FOR i := 1 :TO nCount;
+aTestIds[i] := aResults[i][1];
+:NEXT;
+
+:RETURN aTestIds;
 :ENDPROC;
 
 :PROCEDURE CheckTestCompletion;
-	/* Check if all tests for a sample are complete.
-	 * 
-	 * Parameters:
-	 *   sSampleId - Sample identifier
-	 * 
-	 * Returns: .T. if all tests complete, .F. otherwise;
-	:PARAMETERS sSampleId;
-	
-	:DECLARE sQuery, aResult, nIncomplete;
-	
-	sQuery := "SELECT COUNT(*) " +
-		"FROM tests " +
-		"WHERE sample_id = ?SAMPLE_ID? " +
-		"AND status NOT IN ('COMPLETE', 'CANCELLED')";
-	
-	aResult := SQLExecute(sQuery, , , {sSampleId});
-	
-	:IF Empty(aResult);
-		:RETURN .F.;
-	:ENDIF;
-	
-	nIncomplete := aResult[1][1];
-	
-	:RETURN (nIncomplete == 0);
+/* Check if all tests for a sample are complete.
+*
+* Parameters:
+*   sSampleId - Sample identifier
+*
+* Returns: .T. if all tests complete, .F. otherwise;
+:PARAMETERS sSampleId;
+
+:DECLARE sQuery, aResult, nIncomplete;
+
+sQuery := "SELECT COUNT(*) " +
+"FROM tests " +
+"WHERE sample_id = ?SAMPLE_ID? " +
+"AND status NOT IN ('COMPLETE', 'CANCELLED')";
+
+aResult := SQLExecute(sQuery, , , {sSampleId});
+
+:IF Empty(aResult);
+:RETURN .F.;
+:ENDIF;
+
+nIncomplete := aResult[1][1];
+
+:RETURN (nIncomplete == 0);
 :ENDPROC;
 
 :PROCEDURE CreateWorksheet;
-	/* Create a new worksheet for sample analysis.
-	 * 
-	 * Parameters:
-	 *   sWorksheetName - Name for the worksheet
-	 *   dCreateDate - Creation date
-	 * 
-	 * Returns: New worksheet ID;
-	:PARAMETERS sWorksheetName, dCreateDate;
-	
-	:DECLARE sQuery, nWorksheetId, sGuid;
-	
-	sGuid := CreateGUID();
-	
-	sQuery := "INSERT INTO worksheets " +
-		"(worksheet_name, creation_date, created_by, guid, status) " +
-		"VALUES (?NAME?, ?DATE?, ?USER?, ?GUID?, 'ACTIVE')";
-	
-	SQLExecute(sQuery, , , {sWorksheetName, dCreateDate, DoProc("GetUserId", {}), sGuid});
-	
-	/* Retrieve the generated ID;
-	nWorksheetId := DoProc("GetLastInsertId", {"worksheets"});
-	
-	:RETURN nWorksheetId;
+/* Create a new worksheet for sample analysis.
+*
+* Parameters:
+*   sWorksheetName - Name for the worksheet
+*   dCreateDate - Creation date
+*
+* Returns: New worksheet ID;
+:PARAMETERS sWorksheetName, dCreateDate;
+
+:DECLARE sQuery, nWorksheetId, sGuid;
+
+sGuid := CreateGUID();
+
+sQuery := "INSERT INTO worksheets " +
+"(worksheet_name, creation_date, created_by, guid, status) " +
+"VALUES (?NAME?, ?DATE?, ?USER?, ?GUID?, 'ACTIVE')";
+
+SQLExecute(sQuery, , , {sWorksheetName, dCreateDate, DoProc("GetUserId", {}), sGuid});
+
+/* Retrieve the generated ID;
+nWorksheetId := DoProc("GetLastInsertId", {"worksheets"});
+
+:RETURN nWorksheetId;
 :ENDPROC;
 
 :PROCEDURE AssignTestToWorksheet;
-	/* Assign a test to a worksheet.
-	 * 
-	 * Parameters:
-	 *   nTestId - Test identifier
-	 *   nWorksheetId - Worksheet identifier;
-	:PARAMETERS nTestId, nWorksheetId;
-	
-	:DECLARE sQuery;
-	
-	sQuery := "UPDATE tests " +
-		"SET worksheet_id = ?WORKSHEET_ID?, " +
-		"assignment_date = ?DATE? " +
-		"WHERE test_id = ?TEST_ID?";
-	
-	SQLExecute(sQuery, , , {nWorksheetId, Now(), nTestId});
+/* Assign a test to a worksheet.
+*
+* Parameters:
+*   nTestId - Test identifier
+*   nWorksheetId - Worksheet identifier;
+:PARAMETERS nTestId, nWorksheetId;
+
+:DECLARE sQuery;
+
+sQuery := "UPDATE tests " +
+"SET worksheet_id = ?WORKSHEET_ID?, " +
+"assignment_date = ?DATE? " +
+"WHERE test_id = ?TEST_ID?";
+
+SQLExecute(sQuery, , , {nWorksheetId, Now(), nTestId});
 :ENDPROC;
 
 :PROCEDURE CancelSampleTests;
-	/* Cancel all active tests for a sample.
-	 * 
-	 * Parameters:
-	 *   sSampleId - Sample identifier;
-	:PARAMETERS sSampleId;
-	
-	:DECLARE sQuery;
-	
-	sQuery := "UPDATE tests " +
-		"SET status = 'CANCELLED', " +
-		"cancellation_date = ?DATE?, " +
-		"cancelled_by = ?USER? " +
-		"WHERE sample_id = ?SAMPLE_ID? " +
-		"AND status NOT IN ('COMPLETE', 'CANCELLED')";
-	
-	SQLExecute(sQuery, , , {Now(), DoProc("GetUserId", {}), sSampleId});
+/* Cancel all active tests for a sample.
+*
+* Parameters:
+*   sSampleId - Sample identifier;
+:PARAMETERS sSampleId;
+
+:DECLARE sQuery;
+
+sQuery := "UPDATE tests " +
+"SET status = 'CANCELLED', " +
+"cancellation_date = ?DATE?, " +
+"cancelled_by = ?USER? " +
+"WHERE sample_id = ?SAMPLE_ID? " +
+"AND status NOT IN ('COMPLETE', 'CANCELLED')";
+
+SQLExecute(sQuery, , , {Now(), DoProc("GetUserId", {}), sSampleId});
 :ENDPROC;
 
 :PROCEDURE GenerateSampleReport;
-	/* Generate final report for an approved sample.
-	 * 
-	 * Parameters:
-	 *   sSampleId - Sample identifier;
-	:PARAMETERS sSampleId;
-	
-	:DECLARE sReportPath, sQuery, aData, oReport;
-	
-	/* Retrieve sample and test data;
-	sQuery := "SELECT s.sample_id, s.sample_name, s.collection_date, " +
-		"t.test_name, r.result_value, r.units " +
-		"FROM samples s " +
-		"JOIN tests t ON s.sample_id = t.sample_id " +
-		"JOIN results r ON t.test_id = r.test_id " +
-		"WHERE s.sample_id = ?SAMPLE_ID? " +
-		"ORDER BY t.test_number";
-	
-	aData := SQLExecute(sQuery, , , {sSampleId});
-	
-	:IF Empty(aData);
-		usrmes("No data found for report generation", 1);
-		:RETURN;
-	:ENDIF;
-	
-	/* Create report object;
-	oReport := CreateUDObject("ReportGenerator");
-	
-	:IF oReport == NIL;
-		usrmes("Failed to create report generator", 1);
-		:RETURN;
-	:ENDIF;
-	
-	/* Generate and save report;
-	oReport:SetData(aData);
-	oReport:SetTemplate("SampleReport");
-	sReportPath := oReport:Generate();
-	
-	:IF .NOT. Empty(sReportPath);
-		usrmes("Report generated: " + sReportPath);
-	:ENDIF;
+/* Generate final report for an approved sample.
+*
+* Parameters:
+*   sSampleId - Sample identifier;
+:PARAMETERS sSampleId;
+
+:DECLARE sReportPath, sQuery, aData, oReport;
+
+/* Retrieve sample and test data;
+/* Example: Mixed - trailing operators with comma;
+sQuery := "SELECT s.sample_id, s.sample_name, s.collection_date, "
++ "t.test_name, r.result_value, r.units "
++ "FROM samples s "
++ "JOIN tests t ON s.sample_id = t.sample_id "
++ "JOIN results r ON t.test_id = r.test_id "
++ "WHERE s.sample_id = ?SAMPLE_ID? "
++ "ORDER BY t.test_number";
+
+aData := SQLExecute(sQuery, , , {sSampleId});
+
+:IF Empty(aData);
+usrmes("No data found for report generation", 1);
+:RETURN;
+:ENDIF;
+
+/* Create report object;
+oReport := CreateUDObject("ReportGenerator");
+
+:IF oReport == NIL;
+usrmes("Failed to create report generator", 1);
+:RETURN;
+:ENDIF;
+
+/* Generate and save report;
+oReport:SetData(aData);
+oReport:SetTemplate("SampleReport");
+sReportPath := oReport:Generate();
+
+:IF .NOT. Empty(sReportPath);
+usrmes("Report generated: " + sReportPath);
+:ENDIF;
 :ENDPROC;
 
 :PROCEDURE GetUserId;
-	/* Get current user ID from system context.
-	 * 
-	 * Returns: User identifier string;
-	:DECLARE sUserId;
-	
-	sUserId := GetSetting("SYSTEM", "CURRENT_USER_ID");
-	
-	:IF Empty(sUserId);
-		sUserId := "SYSTEM";
-	:ENDIF;
-	
-	:RETURN sUserId;
+/* Get current user ID from system context.
+*
+* Returns: User identifier string;
+:DECLARE sUserId;
+
+sUserId := GetSetting("SYSTEM", "CURRENT_USER_ID");
+
+:IF Empty(sUserId);
+sUserId := "SYSTEM";
+:ENDIF;
+
+:RETURN sUserId;
 :ENDPROC;
 
 :PROCEDURE GetLastInsertId;
-	/* Retrieve the last auto-generated ID from a table.
-	 * 
-	 * Parameters:
-	 *   sTableName - Table name
-	 * 
-	 * Returns: Last inserted ID;
-	:PARAMETERS sTableName;
-	
-	:DECLARE sQuery, aResult, nLastId;
-	
-	sQuery := "SELECT MAX(ROWID) FROM " + sTableName;
-	aResult := SQLExecute(sQuery);
-	
-	:IF .NOT. Empty(aResult);
-		nLastId := aResult[1][1];
-	:ELSE;
-		nLastId := 0;
-	:ENDIF;
-	
-	:RETURN nLastId;
+/* Retrieve the last auto-generated ID from a table.
+*
+* Parameters:
+*   sTableName - Table name
+*
+* Returns: Last inserted ID;
+:PARAMETERS sTableName;
+
+:DECLARE sQuery, aResult, nLastId;
+
+sQuery := "SELECT MAX(ROWID) FROM " + sTableName;
+aResult := SQLExecute(sQuery);
+
+:IF .NOT. Empty(aResult);
+nLastId := aResult[1][1];
+:ELSE;
+nLastId := 0;
+:ENDIF;
+
+:RETURN nLastId;
 :ENDPROC;
 
 /* ============================================================================
- * REGION Array and Data Manipulation Examples
- * ============================================================================;
+* REGION Array and Data Manipulation Examples
+* ============================================================================;
 
 :PROCEDURE DemonstrateArrayOperations;
-	/* Demonstrate various array operations and transformations.
-	 * 
-	 * This procedure showcases array creation, manipulation, filtering,
-	 * and transformation operations.;
-	:DECLARE aNumbers, aFiltered, aSquared, nSum, nAverage;
-	:DECLARE i, nCount, bFound, nIndex;
-	
-	/* Create and populate array;
-	aNumbers := {10, 25, 30, 45, 50, 65, 70, 85, 90};
-	nCount := alen(aNumbers);
-	
-	/* Filter array - values greater than 50;
-	aFiltered := {};
-	:FOR i := 1 :TO nCount;
-		:IF aNumbers[i] > 50;
-			aadd(aFiltered, aNumbers[i]);
-		:ENDIF;
-	:NEXT;
-	
-	/* Transform array - square each value;
-	aSquared := arraynew(nCount);
-	:FOR i := 1 :TO nCount;
-		aSquared[i] := aNumbers[i] ^ 2;
-	:NEXT;
-	
-	/* Calculate sum and average;
-	nSum := 0;
-	:FOR i := 1 :TO nCount;
-		nSum := nSum + aNumbers[i];
-	:NEXT;
-	nAverage := nSum / nCount;
-	
-	/* Search for specific value;
-	bFound := .F.;
-	nIndex := ascan(aNumbers, 45);
-	:IF nIndex > 0;
-		bFound := .T.;
-		usrmes("Value 45 found at index " + Str(nIndex));
-	:ENDIF;
-	
-	/* Display results;
-	usrmes("Original count: " + Str(nCount));
-	usrmes("Filtered count: " + Str(alen(aFiltered)));
-	usrmes("Average: " + Str(nAverage));
+/* Demonstrate various array operations and transformations.
+*
+* This procedure showcases array creation, manipulation, filtering,
+* and transformation operations.;
+:DECLARE aNumbers, aFiltered, aSquared, nSum, nAverage;
+:DECLARE i, nCount, bFound, nIndex;
+
+/* Create and populate array;
+aNumbers := {10, 25, 30, 45, 50, 65, 70, 85, 90};
+nCount := alen(aNumbers);
+
+/* Filter array - values greater than 50;
+aFiltered := {};
+:FOR i := 1 :TO nCount;
+:IF aNumbers[i] > 50;
+aadd(aFiltered, aNumbers[i]);
+:ENDIF;
+:NEXT;
+
+/* Transform array - square each value;
+aSquared := arraynew(nCount);
+:FOR i := 1 :TO nCount;
+aSquared[i] := aNumbers[i] ^ 2;
+:NEXT;
+
+/* Calculate sum and average;
+nSum := 0;
+:FOR i := 1 :TO nCount;
+nSum := nSum + aNumbers[i];
+:NEXT;
+nAverage := nSum / nCount;
+
+/* Search for specific value;
+bFound := .F.;
+nIndex := ascan(aNumbers, 45);
+:IF nIndex > 0;
+bFound := .T.;
+usrmes("Value 45 found at index " + Str(nIndex));
+:ENDIF;
+
+/* Display results;
+usrmes("Original count: " + Str(nCount));
+usrmes("Filtered count: " + Str(alen(aFiltered)));
+usrmes("Average: " + Str(nAverage));
 :ENDPROC;
 
 /* ============================================================================
- * REGION Advanced Control Flow Examples
- * ============================================================================;
+* REGION Advanced Control Flow Examples
+* ============================================================================;
 
 :PROCEDURE DemonstrateControlFlow;
-	/* Demonstrate various control flow structures.;
-	:DECLARE nCounter, sResult, bContinue, aValues;
-	
-	/* While loop with exit condition;
-	nCounter := 0;
-	bContinue := .T.;
-	
-	:WHILE bContinue .AND. nCounter < 100;
-		nCounter := nCounter + 1;
-		
-		:IF nCounter == 50;
-			usrmes("Halfway point reached");
-		:ENDIF;
-		
-		:IF nCounter >= 75;
-			bContinue := .F.;
-			:EXITWHILE;
-		:ENDIF;
-	:ENDWHILE;
-	
-	/* Nested case statements;
-	aValues := {1, 2, 3, 4, 5};
-	
-	:FOR nCounter := 1 :TO alen(aValues);
-		:BEGINCASE;
-			:CASE aValues[nCounter] == 1;
-				sResult := "First";
-				:EXITCASE;
-			
-			:CASE aValues[nCounter] == 2 .OR. aValues[nCounter] == 3;
-				sResult := "Second or Third";
-				:EXITCASE;
-			
-			:CASE aValues[nCounter] >= 4;
-				:BEGINCASE;
-					:CASE aValues[nCounter] == 4;
-						sResult := "Fourth";
-						:EXITCASE;
-					
-					:CASE aValues[nCounter] == 5;
-						sResult := "Fifth";
-						:EXITCASE;
-					
-					:OTHERWISE;
-						sResult := "Higher";
-						:EXITCASE;
-				:ENDCASE;
-				:EXITCASE;
-			
-			:OTHERWISE;
-				sResult := "Unknown";
-				:EXITCASE;
-		:ENDCASE;
-		
-		usrmes("Value " + Str(aValues[nCounter]) + " = " + sResult);
-	:NEXT;
+/* Demonstrate various control flow structures.;
+:DECLARE nCounter, sResult, bContinue, aValues;
+
+/* While loop with exit condition;
+nCounter := 0;
+bContinue := .T.;
+
+:WHILE bContinue .AND. nCounter < 100;
+nCounter := nCounter + 1;
+
+:IF nCounter == 50;
+usrmes("Halfway point reached");
+:ENDIF;
+
+:IF nCounter >= 75;
+bContinue := .F.;
+:EXITWHILE;
+:ENDIF;
+:ENDWHILE;
+
+/* Nested case statements;
+aValues := {1, 2, 3, 4, 5};
+
+:FOR nCounter := 1 :TO alen(aValues);
+:BEGINCASE;
+:CASE aValues[nCounter] == 1;
+sResult := "First";
+:EXITCASE;
+
+:CASE aValues[nCounter] == 2 .OR. aValues[nCounter] == 3;
+sResult := "Second or Third";
+:EXITCASE;
+
+:CASE aValues[nCounter] >= 4;
+:BEGINCASE;
+:CASE aValues[nCounter] == 4;
+sResult := "Fourth";
+:EXITCASE;
+
+:CASE aValues[nCounter] == 5;
+sResult := "Fifth";
+:EXITCASE;
+
+:OTHERWISE;
+sResult := "Higher";
+:EXITCASE;
+:ENDCASE;
+:EXITCASE;
+
+:OTHERWISE;
+sResult := "Unknown";
+:EXITCASE;
+:ENDCASE;
+
+usrmes("Value " + Str(aValues[nCounter]) + " = " + sResult);
+:NEXT;
 :ENDPROC;
 
 /* End of file;
