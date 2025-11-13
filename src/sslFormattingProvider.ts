@@ -78,6 +78,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		formatted = formatted.replace(/\r\n/g, "\n");
 
 		// Apply formatting rules
+		formatted = this.splitMultipleStatements(formatted);
 		formatted = this.normalizeKeywordCase(formatted, keywordCase);
 		formatted = this.normalizeBuiltinFunctionCase(formatted, builtinFunctionCase);
 		formatted = this.normalizeOperatorSpacing(formatted);
@@ -93,6 +94,86 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		}
 
 		return [vscode.TextEdit.replace(range, formatted)];
+	}
+
+	/**
+	 * Split multiple statements on the same line into separate lines
+	 * Handles cases like: :ENDCASE; nProcessed := nProcessed + 1;
+	 */
+	private splitMultipleStatements(text: string): string {
+		const lines = text.split('\n');
+		let inMultiLineComment = false;
+		let inMultiLineString = false;
+		let stringDelimiter = "";
+		
+		const formattedLines = lines.flatMap(line => {
+			const trimmed = line.trim();
+			
+			// Track multi-line string state
+			if (!inMultiLineString) {
+				const doubleQuoteCount = (line.match(/"/g) || []).length;
+				const singleQuoteCount = (line.match(/'/g) || []).length;
+				
+				if (doubleQuoteCount % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = '"';
+				} else if (singleQuoteCount % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = "'";
+				}
+			} else {
+				const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : "'", 'g')) || []).length;
+				if (delimiterCount % 2 !== 0) {
+					inMultiLineString = false;
+					stringDelimiter = "";
+				}
+				return [line]; // Don't split string content
+			}
+			
+			// Track multi-line comment state
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+			}
+			if (inMultiLineComment) {
+				if (trimmed.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				return [line]; // Don't split comment content
+			}
+			
+			// Skip comment lines
+			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+				return [line];
+			}
+			
+			// Find all keywords that should be on their own line
+			const keywordPattern = new RegExp(`(:[A-Z]+)\\s*;`, 'g');
+			
+			// Check if line has multiple semicolon-terminated keywords
+			const parts: string[] = [];
+			let remaining = line;
+			let match: RegExpExecArray | null;
+			
+			// Look for patterns like ":KEYWORD; something else"
+			const splitPattern = /^(\s*:[A-Z]+\s*;)(.+)/;
+			const splitMatch = remaining.match(splitPattern);
+			
+			if (splitMatch) {
+				const keywordPart = splitMatch[1];
+				const afterKeyword = splitMatch[2].trim();
+				
+				if (afterKeyword) {
+					// Split into two lines
+					parts.push(keywordPart);
+					parts.push(afterKeyword);
+					return parts;
+				}
+			}
+			
+			return [line];
+		});
+		
+		return formattedLines.join('\n');
 	}
 
 	/**
@@ -251,16 +332,19 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				result = this.replaceOutsideStrings(result, /([a-zA-Z0-9_\)])(-)([a-zA-Z0-9_\(])/g, "$1 $2 $3");
 			}
 
-			// Space around comparison operators
-			result = this.replaceOutsideStrings(result, /\s*==\s*/g, " == ");
+			// Space around comparison operators (process multi-char operators first!)
+			// Handle both == and =  = (with spaces) variations
+			result = this.replaceOutsideStrings(result, /\s*=\s*=+\s*/g, " == ");
 			result = this.replaceOutsideStrings(result, /\s*!=\s*/g, " != ");
 			result = this.replaceOutsideStrings(result, /\s*<>\s*/g, " <> ");
 			result = this.replaceOutsideStrings(result, /\s*<=\s*/g, " <= ");
 			result = this.replaceOutsideStrings(result, /\s*>=\s*/g, " >= ");
-			result = this.replaceOutsideStrings(result, /\s*=\s*/g, " = ");
-			result = this.replaceOutsideStrings(result, /\s*<\s*/g, " < ");
-			result = this.replaceOutsideStrings(result, /\s*>\s*/g, " > ");
 			result = this.replaceOutsideStrings(result, /\s*#\s*/g, " # ");
+			// Single = operator last (to avoid breaking == into =  =)
+			result = this.replaceOutsideStrings(result, /([^=<>!])\s*=\s*([^=])/g, "$1 = $2");
+			// Single < and > operators (avoid breaking <= and >=)
+			result = this.replaceOutsideStrings(result, /([^<>=])\s*<\s*([^>=])/g, "$1 < $2");
+			result = this.replaceOutsideStrings(result, /([^<>=])\s*>\s*([^=])/g, "$1 > $2");
 
 			// Space around logical operators
 			result = this.replaceOutsideStrings(result, /\s*\.AND\.\s*/gi, " .AND. ");
