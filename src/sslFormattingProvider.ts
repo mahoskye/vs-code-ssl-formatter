@@ -332,19 +332,31 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	 * Normalize indentation
 	 */
 	private normalizeIndentation(text: string, indentStyle: string, indentWidth: number, tabSize: number): string {
+		// Two-pass approach:
+		// Pass 1: Fix block-level indentation
+		// Pass 2: Fix continuation line alignment based on corrected indentation
+		
+		let firstPass = this.normalizeBlockIndentation(text, indentStyle, indentWidth);
+		let secondPass = this.normalizeContinuationIndentation(firstPass, indentStyle, tabSize);
+		
+		return secondPass;
+	}
+
+	/**
+	 * First pass: Normalize block-level indentation (IF/WHILE/FOR/etc.)
+	 */
+	private normalizeBlockIndentation(text: string, indentStyle: string, indentWidth: number): string {
 		const lines = text.split("\n");
 		let indentLevel = 0;
 		let inMultiLineComment = false;
-		let continuationIndent = 0; // Extra indent for continuation lines
 		const indentChar = indentStyle === "tab" ? "\t" : " ".repeat(indentWidth);
 
 		const blockStart = /^\s*:(IF|WHILE|FOR|FOREACH|BEGINCASE|TRY|PROCEDURE|CLASS|REGION)\b/i;
 		const blockMiddle = /^\s*:(ELSE|CATCH|FINALLY)\b/i;
 		const caseKeyword = /^\s*:(CASE|OTHERWISE)\b/i;
 		const blockEnd = /^\s*:(ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDPROCEDURE|ENDREGION)\b/i;
-		const caseExit = /^\s*:EXITCASE\b/i;
 
-		const formatted = lines.map((line, index) => {
+		const formatted = lines.map((line) => {
 			const trimmed = line.trim();
 
 			// Track multi-line comment state (SSL uses /* ... ; syntax)
@@ -363,8 +375,68 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				return line;
 			}
 
+			// Decrease indent for block end and middle keywords
+			if (blockEnd.test(trimmed) || blockMiddle.test(trimmed)) {
+				indentLevel = Math.max(0, indentLevel - 1);
+			}
+
+			// Decrease indent for :CASE and :OTHERWISE (they're at same level as :BEGINCASE)
+			if (caseKeyword.test(trimmed)) {
+				indentLevel = Math.max(0, indentLevel - 1);
+			}
+
+			// Apply block indentation
+			const indented = indentChar.repeat(indentLevel) + trimmed;
+
+			// Increase indent after block start
+			if (blockStart.test(trimmed)) {
+				indentLevel++;
+			}
+
+			// Restore indent after middle keywords
+			if (blockMiddle.test(trimmed)) {
+				indentLevel++;
+			}
+
+			// Increase indent after :CASE and :OTHERWISE for their body
+			if (caseKeyword.test(trimmed)) {
+				indentLevel++;
+			}
+
+			return indented;
+		});
+
+		return formatted.join("\n");
+	}
+
+	/**
+	 * Second pass: Normalize continuation line indentation
+	 */
+	private normalizeContinuationIndentation(text: string, indentStyle: string, tabSize: number): string {
+		const lines = text.split("\n");
+		let inMultiLineComment = false;
+		let continuationIndent = 0;
+
+		const formatted = lines.map((line, index) => {
+			const trimmed = line.trim();
+
+			// Track multi-line comment state
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+			}
+			if (inMultiLineComment) {
+				if (trimmed.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				return line;
+			}
+
+			// Skip empty lines or comment lines
+			if (!trimmed || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
+				return line;
+			}
+
 			// Check if this is a continuation line
-			// Either: previous line ends with continuation operator OR current line starts with one
 			let isContinuation = false;
 			if (index > 0) {
 				const prevLine = lines[index - 1].trim();
@@ -417,18 +489,6 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				}
 			}
 
-			// Decrease indent for block end and middle keywords
-			if (blockEnd.test(trimmed) || blockMiddle.test(trimmed)) {
-				indentLevel = Math.max(0, indentLevel - 1);
-				continuationIndent = 0; // Reset continuation on block keywords
-			}
-
-			// Decrease indent for :CASE and :OTHERWISE (they're at same level as :BEGINCASE)
-			if (caseKeyword.test(trimmed)) {
-				indentLevel = Math.max(0, indentLevel - 1);
-				continuationIndent = 0; // Reset continuation on block keywords
-			}
-
 			// Apply indentation
 			let indented;
 			if (isContinuation && continuationIndent > 0) {
@@ -443,23 +503,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 					indented = ' '.repeat(continuationIndent) + trimmed;
 				}
 			} else {
-				indented = indentChar.repeat(indentLevel) + trimmed;
-			}
-
-			// Increase indent after block start
-			if (blockStart.test(trimmed)) {
-				indentLevel++;
-				continuationIndent = 0; // Reset continuation on block keywords
-			}
-
-			// Restore indent after middle keywords
-			if (blockMiddle.test(trimmed)) {
-				indentLevel++;
-			}
-
-			// Increase indent after :CASE and :OTHERWISE for their body
-			if (caseKeyword.test(trimmed)) {
-				indentLevel++;
+				// Not a continuation line - keep the indentation from first pass
+				return line;
 			}
 
 			// Reset continuation indent if this line doesn't participate in continuation
