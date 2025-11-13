@@ -1,22 +1,13 @@
+/* Test Case 1: Basic global variable;
+:DECLARE sGlobalVar;
+sGlobalVar := "test";
 
-
-:DECLARE sSampleId, sQuery;
-sSampleId := "TEST123";
-
-sQuery := "
-	SELECT COUNT(*)
-	FROM tests
-	WHERE sample_id = ?sSampleId?
-	AND status NOT IN ('COMPLETE', 'CANCELLED')
-";
-
-:PROCEDURE testScope;
-	:DECLARE sResult;
-
-	sResult := SQLExecute(sQuery);
-
-	:RETURN sResult;
+/* Test Case 2: Procedure using global without redeclaring - should WARN;
+:PROCEDURE useGlobal;
+	:DECLARE sLocal;
+	sLocal := sGlobalVar;
+	:RETURN sLocal;
 :ENDPROC;
 
-
-infomes(sResult);
+/* Test Case 3: Using procedure variable in global scope - should ERROR;
+infomes(sLocal);

@@ -149,18 +149,27 @@ export class SSLDiagnosticProvider {
 
 			// Check for undeclared variable usage (reading variables)
 			// This catches cases like: infomes(sVariable); or DoProc("Test", {sVar});
-			// Skip lines that are declarations, assignments, or keywords
+			// Also checks RHS of assignments: sVar := SomeFunc(sOtherVar);
+			// Skip lines that are declarations or keywords
 			if (trimmed && 
 				!trimmed.startsWith(':') && 
 				!trimmed.startsWith('/*') && 
-				!trimmed.startsWith('*') &&
-				!/^[a-z][a-zA-Z0-9_]*\s*:=/.test(trimmed)) { // Skip assignments (already checked)
+				!trimmed.startsWith('*')) {
 				
-				const declaredIdentifiers = this.getDeclaredIdentifiers(lines, i);
+				const scopeInfo = this.getScopeInfo(lines, i);
+				const declaredIdentifiers = scopeInfo.allIdentifiers;
+				
+				// For lines with assignments, only check the RHS for variable usage
+				let textToCheck = trimmed;
+				const assignmentMatch = trimmed.match(/^([a-z][a-zA-Z0-9_]*)\s*:=\s*(.+)$/);
+				if (assignmentMatch) {
+					// Only check the right-hand side of the assignment
+					textToCheck = assignmentMatch[2];
+				}
 				
 				// Extract potential variable references (Hungarian notation variables)
 				// Match lowercase-starting identifiers (sVar, nCount, etc.) but not function calls
-				const varReferences = trimmed.match(/\b([a-z][a-zA-Z0-9_]*)\b/g);
+				const varReferences = textToCheck.match(/\b([a-z][a-zA-Z0-9_]*)\b/g);
 				
 				if (varReferences) {
 					// Filter out known keywords and function names
@@ -184,24 +193,57 @@ export class SSLDiagnosticProvider {
 					varReferences.forEach(varRef => {
 						const lowerRef = varRef.toLowerCase();
 						
-						// Skip keywords, functions, loop counters, and already declared identifiers
+						// Skip keywords, functions, loop counters
 						if (!sslKeywords.has(lowerRef) && 
 							!sslFunctions.has(lowerRef) &&
-							!loopCounters.has(lowerRef) &&
-							!declaredIdentifiers.has(varRef)) {
+							!loopCounters.has(lowerRef)) {
 							
 							// Check if this looks like a Hungarian notation variable
 							if (/^[a-z][A-Z]/.test(varRef)) { // e.g., sVar, nCount
 								const columnIndex = line.indexOf(varRef);
 								if (columnIndex !== -1) {
-									const diagnostic = new vscode.Diagnostic(
-										new vscode.Range(i, columnIndex, i, columnIndex + varRef.length),
-										`Variable '${varRef}' does not exist in the current scope. It may be declared in a different procedure or not declared at all.`,
-										vscode.DiagnosticSeverity.Error
-									);
-									diagnostic.code = "ssl-undefined-variable";
-									diagnostics.push(diagnostic);
-									console.log(`[SSL Debug] ERROR: Undefined variable '${varRef}' at line ${i + 1}`);
+									const isInLocalScope = scopeInfo.localIdentifiers.has(varRef);
+									const isInGlobalScope = scopeInfo.globalIdentifiers.has(varRef);
+									
+									if (scopeInfo.inProcedure) {
+										// Inside a procedure
+										if (!isInLocalScope && !isInGlobalScope) {
+											// Variable doesn't exist anywhere - ERROR
+											const diagnostic = new vscode.Diagnostic(
+												new vscode.Range(i, columnIndex, i, columnIndex + varRef.length),
+												`Variable '${varRef}' is not declared. Add ':DECLARE ${varRef};' or pass it as a parameter.`,
+												vscode.DiagnosticSeverity.Error
+											);
+											diagnostic.code = "ssl-undefined-variable";
+											diagnostics.push(diagnostic);
+											console.log(`[SSL Debug] ERROR: Undefined variable '${varRef}' at line ${i + 1}`);
+										} else if (!isInLocalScope && isInGlobalScope) {
+											// Variable exists globally but not declared locally - WARNING
+											const diagnostic = new vscode.Diagnostic(
+												new vscode.Range(i, columnIndex, i, columnIndex + varRef.length),
+												`Procedure uses global variable '${varRef}' without declaring it locally. Declare it with ':DECLARE ${varRef};' or pass it as a parameter for better encapsulation.`,
+												vscode.DiagnosticSeverity.Warning
+											);
+											diagnostic.code = "ssl-global-variable-in-procedure";
+											diagnostics.push(diagnostic);
+											console.log(`[SSL Debug] WARNING: Global variable used in procedure '${varRef}' at line ${i + 1}`);
+										}
+										// else: variable is in local scope, all good!
+									} else {
+										// Outside a procedure (global scope)
+										if (!isInGlobalScope) {
+											// Variable doesn't exist in global scope - ERROR
+											const diagnostic = new vscode.Diagnostic(
+												new vscode.Range(i, columnIndex, i, columnIndex + varRef.length),
+												`Variable '${varRef}' is not declared in global scope. It may only exist inside a procedure.`,
+												vscode.DiagnosticSeverity.Error
+											);
+											diagnostic.code = "ssl-undefined-variable";
+											diagnostics.push(diagnostic);
+											console.log(`[SSL Debug] ERROR: Undefined variable in global scope '${varRef}' at line ${i + 1}`);
+										}
+										// else: variable is in global scope, all good!
+									}
 								}
 							}
 						}
@@ -710,6 +752,155 @@ export class SSLDiagnosticProvider {
 		// Combine global and local identifiers
 		const allIdentifiers = new Set<string>([...globalIdentifiers, ...localIdentifiers]);
 		return allIdentifiers;
+	}
+
+	/**
+	 * Get scope information at a given line including global/local identifiers and procedure state
+	 */
+	private getScopeInfo(lines: string[], currentLine: number): {
+		globalIdentifiers: Set<string>;
+		localIdentifiers: Set<string>;
+		allIdentifiers: Set<string>;
+		inProcedure: boolean;
+	} {
+		const globalIdentifiers = new Set<string>();
+		const localIdentifiers = new Set<string>();
+		let inProcedure = false;
+		let currentProcedureStartLine = -1;
+		let inMultiLineComment = false;
+
+		// First pass: collect global declarations (before any procedure)
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i].trim();
+
+			// Skip comment lines
+			if (line.startsWith('/*')) {
+				if (!line.endsWith(';')) {
+					inMultiLineComment = true;
+					continue;
+				}
+				continue;
+			}
+			if (inMultiLineComment) {
+				if (line.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				continue;
+			}
+			if (line.startsWith('*')) {
+				continue;
+			}
+
+			// Stop at first procedure - everything before is global scope
+			if (/^:PROCEDURE\b/i.test(line)) {
+				break;
+			}
+
+			// Collect global :DECLARE variables
+			const declareMatch = line.match(/^:DECLARE\s+(.+?);/i);
+			if (declareMatch) {
+				const vars = declareMatch[1].split(',').map(v => v.trim());
+				vars.forEach(varName => {
+					const cleanName = varName.split(':=')[0].trim();
+					if (cleanName) {
+						globalIdentifiers.add(cleanName);
+					}
+				});
+			}
+
+			// Collect global constants (ALL_CAPS variables assigned at file level)
+			if (/^[A-Z_][A-Z0-9_]*\s*:=/.test(line)) {
+				const constMatch = line.match(/^([A-Z_][A-Z0-9_]*)\s*:=/);
+				if (constMatch) {
+					globalIdentifiers.add(constMatch[1]);
+				}
+			}
+		}
+
+		// Second pass: determine current scope and collect local identifiers
+		inProcedure = false;
+		currentProcedureStartLine = -1;
+		inMultiLineComment = false;
+		let procedureDepth = 0;
+
+		for (let i = 0; i <= currentLine && i < lines.length; i++) {
+			const line = lines[i].trim();
+
+			// Skip comment lines
+			if (line.startsWith('/*')) {
+				if (!line.endsWith(';')) {
+					inMultiLineComment = true;
+					continue;
+				}
+				continue;
+			}
+			if (inMultiLineComment) {
+				if (line.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				continue;
+			}
+			if (line.startsWith('*')) {
+				continue;
+			}
+
+			// Track procedure scope with nesting support
+			if (/^:PROCEDURE\b/i.test(line)) {
+				if (procedureDepth === 0) {
+					// Entering the outermost procedure
+					inProcedure = true;
+					currentProcedureStartLine = i;
+					localIdentifiers.clear(); // Clear previous procedure's locals
+				}
+				procedureDepth++;
+			}
+
+			if (/^:(ENDPROC|ENDPROCEDURE)\b/i.test(line)) {
+				procedureDepth = Math.max(0, procedureDepth - 1);
+				if (procedureDepth === 0) {
+					// Exiting the outermost procedure
+					inProcedure = false;
+					currentProcedureStartLine = -1;
+					localIdentifiers.clear();
+				}
+			}
+
+			// If we're in a procedure, collect local declarations
+			if (inProcedure && i >= currentProcedureStartLine) {
+				// Collect :DECLARE variables in current procedure
+				const declareMatch = line.match(/^:DECLARE\s+(.+?);/i);
+				if (declareMatch) {
+					const vars = declareMatch[1].split(',').map(v => v.trim());
+					vars.forEach(varName => {
+						const cleanName = varName.split(':=')[0].trim();
+						if (cleanName) {
+							localIdentifiers.add(cleanName);
+						}
+					});
+				}
+
+				// Collect :PARAMETERS in current procedure
+				const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
+				if (paramsMatch) {
+					const params = paramsMatch[1].split(',').map(p => p.trim());
+					params.forEach(paramName => {
+						if (paramName) {
+							localIdentifiers.add(paramName);
+						}
+					});
+				}
+			}
+		}
+
+		// Combine global and local identifiers
+		const allIdentifiers = new Set<string>([...globalIdentifiers, ...localIdentifiers]);
+		
+		return {
+			globalIdentifiers,
+			localIdentifiers,
+			allIdentifiers,
+			inProcedure
+		};
 	}
 }
 
