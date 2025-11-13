@@ -295,11 +295,16 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		this.functionSignatures.set("LSEARCH", ["query", "parameters"]);
 		this.functionSignatures.set("ARRAYCALC", ["array", "expression"]);
 		this.functionSignatures.set("BUILDARRAY", ["values"]);
+		this.functionSignatures.set("ARRAYNEW", ["size"]);
 		this.functionSignatures.set("DIRECTORY", ["path", "mask"]);
 		this.functionSignatures.set("CREATEGUID", []);
 		this.functionSignatures.set("DATEADD", ["date", "interval", "units"]);
 		this.functionSignatures.set("DATEDIFF", ["startDate", "endDate", "units"]);
 		this.functionSignatures.set("STRTRAN", ["string", "search", "replace"]);
+		this.functionSignatures.set("STR", ["value", "length", "decimals"]);
+		this.functionSignatures.set("NOW", []);
+		this.functionSignatures.set("TODAY", []);
+		this.functionSignatures.set("GETLASTSSLERROR", []);
 	}
 
 	/**

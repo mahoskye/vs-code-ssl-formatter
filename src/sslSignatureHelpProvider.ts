@@ -386,5 +386,35 @@ export class SSLSignatureHelpProvider implements vscode.SignatureHelpProvider {
 			parameters: ["query: string", "parameters: array"],
 			documentation: "Execute a SQL query and return the first value"
 		});
+
+		this.functionSignatures.set("ARRAYNEW", {
+			label: "ArrayNew(size)",
+			parameters: ["size: number"],
+			documentation: "Create a new array with the specified size"
+		});
+
+		this.functionSignatures.set("STR", {
+			label: "Str(value, length, decimals)",
+			parameters: ["value: number", "length: number", "decimals: number"],
+			documentation: "Convert a numeric value to a string with optional formatting"
+		});
+
+		this.functionSignatures.set("NOW", {
+			label: "Now()",
+			parameters: [],
+			documentation: "Get the current date and time"
+		});
+
+		this.functionSignatures.set("TODAY", {
+			label: "Today()",
+			parameters: [],
+			documentation: "Get the current date (without time)"
+		});
+
+		this.functionSignatures.set("GETLASTSSLERROR", {
+			label: "GetLastSSLError()",
+			parameters: [],
+			documentation: "Get the last SSL error message"
+		});
 	}
 }

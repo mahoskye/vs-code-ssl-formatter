@@ -143,10 +143,12 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			{ name: "buildstring", description: "Build formatted string", params: "(format, values)" },
 			{ name: "ascan", description: "Search array", params: "(array, value)" },
 			{ name: "alen", description: "Get array length", params: "(array)" },
+			{ name: "arraynew", description: "Create new array", params: "(size)" },
 			{ name: "arraycalc", description: "Calculate array values", params: "(array, expression)" },
 			{ name: "buildarray", description: "Build array from values", params: "(values)" },
 			{ name: "Directory", description: "Get directory listing", params: "(path)" },
 			{ name: "CreateGUID", description: "Create GUID", params: "()" },
+			{ name: "Str", description: "Convert number to string", params: "(value, length, decimals)" },
 			{ name: "Left", description: "Get left portion of string", params: "(string, count)" },
 			{ name: "Right", description: "Get right portion of string", params: "(string, count)" },
 			{ name: "SubStr", description: "Get substring", params: "(string, start, length)" },
@@ -156,7 +158,8 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			{ name: "CToD", description: "Convert string to date", params: "(dateString)" },
 			{ name: "GetSetting", description: "Get system setting", params: "(settingName)" },
 			{ name: "GetUserData", description: "Get user data", params: "(key)" },
-			{ name: "SetUserData", description: "Set user data", params: "(key, value)" }
+			{ name: "SetUserData", description: "Set user data", params: "(key, value)" },
+			{ name: "GetLastSSLError", description: "Get last SSL error", params: "()" }
 		];
 
 		this.builtinFunctions = functions.map(func => {
