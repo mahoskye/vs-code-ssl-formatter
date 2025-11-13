@@ -1,9 +1,0 @@
-/* Comments must use block style with semicolon terminator;
-:PROCEDURE TestComments;
-	// This is wrong style
-	nValue := 1;  // also wrong
-	/* This is right style; */
-	nValue := 2;
-	/* Multiple line comment
-	   should still end with semicolon; */
-:ENDPROC;

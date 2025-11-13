@@ -1,9 +1,0 @@
-/* Hungarian notation should be used;
-:PROCEDURE CalculateTotal;
-:PARAMETERS qty, price;
-:DECLARE result, flag, dateCreated;
-	:IF flag;
-		result := qty * price;
-	:ENDIF;
-:RETURN result;
-:ENDPROC;

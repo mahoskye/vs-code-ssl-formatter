@@ -76,6 +76,42 @@ export class SSLDiagnosticProvider {
 		const enforceKeywordCase = config.get<boolean>(CONFIG_KEYS.STYLE_GUIDE_ENFORCE_KEYWORD_CASE, CONFIG_DEFAULTS[CONFIG_KEYS.STYLE_GUIDE_ENFORCE_KEYWORD_CASE]);
 		const enforceCommentSyntax = config.get<boolean>(CONFIG_KEYS.STYLE_GUIDE_ENFORCE_COMMENT_SYNTAX, CONFIG_DEFAULTS[CONFIG_KEYS.STYLE_GUIDE_ENFORCE_COMMENT_SYNTAX]);
 
+		// Block matching validation - track all block keywords
+		interface BlockStackItem {
+			keyword: string;
+			line: number;
+		}
+		const blockStack: BlockStackItem[] = [];
+		const BLOCK_PAIRS: Record<string, string> = {
+			'IF': 'ENDIF',
+			'WHILE': 'ENDWHILE',
+			'FOR': 'NEXT',
+			'BEGINCASE': 'ENDCASE',
+			'TRY': 'ENDTRY',
+			'PROCEDURE': 'ENDPROC',
+			'REGION': 'ENDREGION',
+			'BEGININLINECODE': 'ENDINLINECODE'
+		};
+		const BLOCK_MIDDLE: Record<string, string> = {
+			'ELSE': 'IF',
+			'CATCH': 'TRY',
+			'FINALLY': 'TRY',
+			'CASE': 'BEGINCASE',
+			'OTHERWISE': 'BEGINCASE',
+			'TO': 'FOR',
+			'STEP': 'FOR'
+		};
+		const LOOP_CONTROL: Record<string, string> = {
+			'EXITWHILE': 'WHILE',
+			'LOOP': 'WHILE',
+			'EXITFOR': 'FOR',
+			'EXITCASE': 'BEGINCASE'
+		};
+		const CONTEXT_KEYWORDS: Record<string, string> = {
+			'DEFAULT': 'PARAMETERS'
+		};
+		let hasParametersInCurrentProcedure = false;
+
 		for (let i = 0; i < lines.length && diagnostics.length < maxProblems; i++) {
 			const line = lines[i];
 			const trimmed = line.trim();
@@ -167,6 +203,102 @@ export class SSLDiagnosticProvider {
 			}
 			if (inMultiLineComment) {
 				continue; // Skip all lines inside multi-line comments
+			}
+
+			// Block keyword validation
+			// Extract keyword from line (if any)
+			const keywordMatch = trimmed.match(/^:([A-Z]+)\b/i);
+			if (keywordMatch) {
+				const keyword = keywordMatch[1].toUpperCase();
+
+				// Track PARAMETERS for DEFAULT validation
+				if (keyword === 'PROCEDURE') {
+					hasParametersInCurrentProcedure = false;
+				}
+				if (keyword === 'PARAMETERS') {
+					hasParametersInCurrentProcedure = true;
+				}
+				if (keyword === 'ENDPROC') {
+					hasParametersInCurrentProcedure = false;
+				}
+
+				// Check if it's a block start keyword
+				if (BLOCK_PAIRS[keyword]) {
+					blockStack.push({ keyword, line: i });
+				}
+
+				// Check if it's a block end keyword
+				const expectedStart = Object.keys(BLOCK_PAIRS).find(k => BLOCK_PAIRS[k] === keyword);
+				if (expectedStart) {
+					const lastBlock = blockStack[blockStack.length - 1];
+					if (!lastBlock) {
+						// No matching start block
+						const diagnostic = new vscode.Diagnostic(
+							new vscode.Range(i, 0, i, line.length),
+							DIAGNOSTIC_MESSAGES.UNMATCHED_BLOCK_END(keyword, expectedStart),
+							vscode.DiagnosticSeverity.Error
+						);
+						diagnostic.code = DIAGNOSTIC_CODES.UNMATCHED_BLOCK_END;
+						diagnostics.push(diagnostic);
+					} else if (lastBlock.keyword !== expectedStart) {
+						// Mismatched block
+						const expectedEnd = BLOCK_PAIRS[lastBlock.keyword];
+						const diagnostic = new vscode.Diagnostic(
+							new vscode.Range(i, 0, i, line.length),
+							DIAGNOSTIC_MESSAGES.MISMATCHED_BLOCK_END(keyword, expectedEnd, lastBlock.keyword),
+							vscode.DiagnosticSeverity.Error
+						);
+						diagnostic.code = DIAGNOSTIC_CODES.MISMATCHED_BLOCK_END;
+						diagnostics.push(diagnostic);
+					} else {
+						// Valid match - pop from stack
+						blockStack.pop();
+					}
+				}
+
+				// Check if it's a block middle keyword
+				if (BLOCK_MIDDLE[keyword]) {
+					const requiredBlock = BLOCK_MIDDLE[keyword];
+					const hasMatchingBlock = blockStack.some(block => block.keyword === requiredBlock);
+					if (!hasMatchingBlock) {
+						const diagnostic = new vscode.Diagnostic(
+							new vscode.Range(i, 0, i, line.length),
+							DIAGNOSTIC_MESSAGES.KEYWORD_WITHOUT_CONTEXT(keyword, requiredBlock),
+							vscode.DiagnosticSeverity.Error
+						);
+						diagnostic.code = DIAGNOSTIC_CODES.KEYWORD_WITHOUT_CONTEXT;
+						diagnostics.push(diagnostic);
+					}
+				}
+
+				// Check if it's a loop control keyword
+				if (LOOP_CONTROL[keyword]) {
+					const requiredLoop = LOOP_CONTROL[keyword];
+					const hasMatchingLoop = blockStack.some(block => block.keyword === requiredLoop);
+					if (!hasMatchingLoop) {
+						const diagnostic = new vscode.Diagnostic(
+							new vscode.Range(i, 0, i, line.length),
+							DIAGNOSTIC_MESSAGES.KEYWORD_WITHOUT_CONTEXT(keyword, requiredLoop),
+							vscode.DiagnosticSeverity.Error
+						);
+						diagnostic.code = DIAGNOSTIC_CODES.KEYWORD_WITHOUT_CONTEXT;
+						diagnostics.push(diagnostic);
+					}
+				}
+
+				// Check context keywords (like DEFAULT requiring PARAMETERS)
+				if (CONTEXT_KEYWORDS[keyword]) {
+					const requiredContext = CONTEXT_KEYWORDS[keyword];
+					if (keyword === 'DEFAULT' && !hasParametersInCurrentProcedure) {
+						const diagnostic = new vscode.Diagnostic(
+							new vscode.Range(i, 0, i, line.length),
+							DIAGNOSTIC_MESSAGES.KEYWORD_WITHOUT_CONTEXT(keyword, requiredContext),
+							vscode.DiagnosticSeverity.Error
+						);
+						diagnostic.code = DIAGNOSTIC_CODES.KEYWORD_WITHOUT_CONTEXT;
+						diagnostics.push(diagnostic);
+					}
+				}
 			}
 
 			// Check for undeclared variable usage (reading variables)

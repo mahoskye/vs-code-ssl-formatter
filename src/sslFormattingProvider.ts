@@ -5,7 +5,8 @@ import {
     BLOCK_START_KEYWORDS,
     BLOCK_END_KEYWORDS,
     BLOCK_MIDDLE_KEYWORDS,
-    CASE_KEYWORDS
+    CASE_KEYWORDS,
+    PROCEDURE_LEVEL_KEYWORDS
 } from "./constants/language";
 import {
     CONFIG_KEYS,
@@ -84,6 +85,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		formatted = this.normalizeBuiltinFunctionCase(formatted, builtinFunctionCase);
 	formatted = normalizeOperatorSpacing(formatted);
 		formatted = this.normalizeIndentation(formatted, indentStyle, indentWidth, tabSize);
+		formatted = this.normalizeBlankLines(formatted);
 
 		if (trimTrailingWhitespace) {
 			formatted = this.trimTrailingWhitespace(formatted);
@@ -106,15 +108,15 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		let inMultiLineComment = false;
 		let inMultiLineString = false;
 		let stringDelimiter = "";
-		
+
 		const formattedLines = lines.flatMap(line => {
 			const trimmed = line.trim();
-			
+
 			// Track multi-line string state
 			if (!inMultiLineString) {
 				const doubleQuoteCount = (line.match(/"/g) || []).length;
 				const singleQuoteCount = (line.match(/'/g) || []).length;
-				
+
 				if (doubleQuoteCount % 2 !== 0) {
 					inMultiLineString = true;
 					stringDelimiter = '"';
@@ -130,7 +132,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				}
 				return [line]; // Don't split string content
 			}
-			
+
 			// Track multi-line comment state
 			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
 				inMultiLineComment = true;
@@ -141,39 +143,65 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				}
 				return [line]; // Don't split comment content
 			}
-			
+
 			// Skip comment lines
 			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
 				return [line];
 			}
-			
-			// Find all keywords that should be on their own line
-			const keywordPattern = new RegExp(`(:[A-Z]+)\\s*;`, 'g');
-			
-			// Check if line has multiple semicolon-terminated keywords
-			const parts: string[] = [];
-			let remaining = line;
-			let match: RegExpExecArray | null;
-			
-			// Look for patterns like ":KEYWORD; something else"
-			const splitPattern = /^(\s*:[A-Z]+\s*;)(.+)/;
-			const splitMatch = remaining.match(splitPattern);
-			
-			if (splitMatch) {
-				const keywordPart = splitMatch[1];
-				const afterKeyword = splitMatch[2].trim();
-				
-				if (afterKeyword) {
-					// Split into two lines
-					parts.push(keywordPart);
-					parts.push(afterKeyword);
-					return parts;
+
+			// Skip keywords and empty lines
+			if (trimmed === '' || /^\s*:[A-Z]+\s*;?\s*$/i.test(trimmed)) {
+				return [line];
+			}
+
+			// Split multiple statements on the same line
+			// We need to find semicolons that aren't inside strings
+			const leadingWhitespace = line.match(/^\s*/)?.[0] || '';
+			const statements: string[] = [];
+			let currentStatement = '';
+			let inString = false;
+			let stringChar = '';
+
+			for (let i = 0; i < trimmed.length; i++) {
+				const char = trimmed[i];
+				const prevChar = i > 0 ? trimmed[i - 1] : '';
+
+				// Track string boundaries
+				if (!inString && (char === '"' || char === "'")) {
+					inString = true;
+					stringChar = char;
+					currentStatement += char;
+				} else if (inString && char === stringChar && prevChar !== '\\') {
+					inString = false;
+					stringChar = '';
+					currentStatement += char;
+				} else if (char === ';' && !inString) {
+					// Found a statement terminator outside of strings
+					currentStatement += char;
+					const stmt = currentStatement.trim();
+					if (stmt) {
+						statements.push(leadingWhitespace + stmt);
+					}
+					currentStatement = '';
+				} else {
+					currentStatement += char;
 				}
 			}
-			
-			return [line];
+
+			// Add any remaining content
+			const remaining = currentStatement.trim();
+			if (remaining) {
+				statements.push(leadingWhitespace + remaining);
+			}
+
+			// If we only found one statement, return the original line
+			if (statements.length <= 1) {
+				return [line];
+			}
+
+			return statements;
 		});
-		
+
 		return formattedLines.join('\n');
 	}
 
@@ -261,7 +289,9 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			
 			let result = line;
 			functions.forEach(func => {
-				const pattern = new RegExp(`\\b${func}\\b`, "gi");
+				// Only match function names when followed by opening parenthesis
+				// This prevents matching variable names that happen to match function names
+				const pattern = new RegExp(`\\b${func}(?=\\s*\\()`, "gi");
 				let replacement: string;
 
 				switch (caseStyle) {
@@ -323,12 +353,15 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		let inMultiLineComment = false;
 		let inMultiLineString = false;
 		let stringDelimiter = "";
+		let procedureDepth = 0; // Track nesting depth of PROCEDURE blocks
 		const indentChar = indentStyle === "tab" ? "\t" : " ".repeat(indentWidth);
 
 		const blockStart = new RegExp(`^\\s*:(${BLOCK_START_KEYWORDS.join('|')})\\b`, 'i');
 		const blockMiddle = new RegExp(`^\\s*:(${BLOCK_MIDDLE_KEYWORDS.join('|')})\\b`, 'i');
 		const caseKeyword = new RegExp(`^\\s*:(${CASE_KEYWORDS.join('|')})\\b`, 'i');
 		const blockEnd = new RegExp(`^\\s*:(${BLOCK_END_KEYWORDS.join('|')})\\b`, 'i');
+		const procedureLevelKeyword = new RegExp(`^\\s*:(${PROCEDURE_LEVEL_KEYWORDS.join('|')})\\b`, 'i');
+		const procedureKeyword = /^\s*:PROCEDURE\b/i;
 
 		const formatted = lines.map((line) => {
 			const trimmed = line.trim();
@@ -365,14 +398,32 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				return line; // Don't re-indent comment content
 			}
 
-			// Skip empty lines or return original comment lines
-			if (!trimmed || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
+			// Skip empty lines
+			if (!trimmed) {
 				return line;
+			}
+
+			// Handle single-line comments early (will use currentIndentLevel calculated below)
+			// Skip this check for now - we'll handle comments along with regular code
+
+			// Lines starting with * but not part of a multi-line comment are NOT comment lines
+			// (they're likely continuation of something else), so skip them
+			if (trimmed.startsWith("*")) {
+				return line;
+			}
+
+			// Track PROCEDURE blocks
+			if (procedureKeyword.test(trimmed)) {
+				procedureDepth++;
 			}
 
 			// Decrease indent for block end and middle keywords
 			if (blockEnd.test(trimmed) || blockMiddle.test(trimmed)) {
 				indentLevel = Math.max(0, indentLevel - 1);
+				// Decrease procedure depth when ending a procedure
+				if (/^\s*:ENDPROC\b/i.test(trimmed)) {
+					procedureDepth = Math.max(0, procedureDepth - 1);
+				}
 			}
 
 			// Decrease indent for :CASE and :OTHERWISE (they're at same level as :BEGINCASE)
@@ -380,8 +431,27 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				indentLevel = Math.max(0, indentLevel - 1);
 			}
 
+			// Procedure-level keywords (PARAMETERS, DECLARE, DEFAULT, RETURN, PUBLIC)
+			// should be at the same level as PROCEDURE (not indented)
+			// Comments at procedure level should also be at column 0
+			let currentIndentLevel = indentLevel;
+			if (procedureLevelKeyword.test(trimmed) && procedureDepth > 0) {
+				currentIndentLevel = Math.max(0, indentLevel - 1);
+			}
+			// Comments that are originally at column 0 (like doc comments) should stay at column 0
+			// Only apply this if the original line starts with /* (not indented)
+			if (trimmed.startsWith("/*") && line.trim() === trimmed && line.startsWith("/*")) {
+				currentIndentLevel = 0;
+			}
+
+			// Handle comments with calculated indentation
+			if (trimmed.startsWith("/*")) {
+				const indented = indentChar.repeat(currentIndentLevel) + trimmed;
+				return indented;
+			}
+
 			// Apply block indentation
-			const indented = indentChar.repeat(indentLevel) + trimmed;
+			const indented = indentChar.repeat(currentIndentLevel) + trimmed;
 
 			// Increase indent after block start
 			if (blockStart.test(trimmed)) {
@@ -542,5 +612,61 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	 */
 	private trimTrailingWhitespace(text: string): string {
 		return text.split("\n").map(line => line.trimEnd()).join("\n");
+	}
+
+	/**
+	 * Normalize blank lines between procedures
+	 * - Ensure exactly 1 blank line between procedures
+	 * - Remove excessive blank lines (multiple blanks → single blank)
+	 */
+	private normalizeBlankLines(text: string): string {
+		const lines = text.split('\n');
+		const result: string[] = [];
+		let lastWasEndProc = false;
+		let blankLineCount = 0;
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			const trimmed = line.trim();
+
+			// Track blank lines
+			if (trimmed === '') {
+				blankLineCount++;
+				continue;
+			}
+
+			// If we hit a PROCEDURE after an ENDPROC, ensure exactly 1 blank line
+			if (lastWasEndProc && /^\s*:PROCEDURE\b/i.test(line)) {
+				if (blankLineCount === 0) {
+					result.push(''); // Add missing blank line
+				} else if (blankLineCount > 1) {
+					result.push(''); // Normalize multiple blanks to 1
+				} else {
+					result.push(''); // Keep the 1 blank line
+				}
+				blankLineCount = 0;
+			} else if (blankLineCount > 0) {
+				// For other cases, preserve blank lines but collapse multiple into fewer
+				// (keeping some blank lines for readability within procedures)
+				const blanksToAdd = Math.min(blankLineCount, 2);
+				for (let j = 0; j < blanksToAdd; j++) {
+					result.push('');
+				}
+				blankLineCount = 0;
+			}
+
+			result.push(line);
+
+			// Track if this line is ENDPROC
+			lastWasEndProc = /^\s*:ENDPROC\b/i.test(line);
+		}
+
+		// Handle any trailing blank lines
+		while (blankLineCount > 0 && result.length > 0) {
+			result.push('');
+			blankLineCount--;
+		}
+
+		return result.join('\n');
 	}
 }

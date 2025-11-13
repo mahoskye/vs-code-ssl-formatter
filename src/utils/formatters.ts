@@ -51,6 +51,28 @@ export function replaceOutsideStrings(line: string, pattern: RegExp, replacement
         .join('');
 }
 
+/**
+ * Convert implicit string concatenation to explicit with + operator
+ * SSL allows "string1" "string2" but style guide requires "string1" + "string2"
+ */
+function replaceImplicitStringConcatenation(line: string): string {
+    // Match: closing quote, whitespace, opening quote (same type)
+    // We need to handle both double quotes and single quotes
+    // Pattern: (["'])  \s+  (["'])
+    // But we need to make sure the closing and opening quotes match
+    // Also ensure we don't match single strings like " " by requiring
+    // non-whitespace before the first quote and after the second quote
+
+    // Match double-quoted strings followed by whitespace and another double-quoted string
+    // Require non-whitespace before first quote and after second quote to avoid matching " "
+    let result = line.replace(/([^\s])"\s+"([^\s])/g, '$1" + "$2');
+
+    // Match single-quoted strings followed by whitespace and another single-quoted string
+    result = result.replace(/([^\s])'\s+'([^\s])/g, "$1' + '$2");
+
+    return result;
+}
+
 export function normalizeOperatorSpacing(text: string): string {
     const lines = text.split('\n');
     let inBlockComment = false;
@@ -107,6 +129,14 @@ export function normalizeOperatorSpacing(text: string): string {
             out = replaceOutsideStrings(out, /\s*\^=\s*/g, ' ^= ');
             out = replaceOutsideStrings(out, /\s*%=\s*/g, ' %= ');
 
+            // Arithmetic operators: add spaces around binary operators
+            // Match: identifier/number/paren followed by operator followed by identifier/number/paren
+            // This avoids matching unary operators like -5 or +5
+            out = replaceOutsideStrings(out, /([A-Za-z0-9_\)])\s*\+\s*([A-Za-z0-9_\(])/g, '$1 + $2');
+            out = replaceOutsideStrings(out, /([A-Za-z0-9_\)])\s*-\s*([A-Za-z0-9_\(])/g, '$1 - $2');
+            out = replaceOutsideStrings(out, /([A-Za-z0-9_\)])\s*\*\s*([A-Za-z0-9_\(])/g, '$1 * $2');
+            out = replaceOutsideStrings(out, /([A-Za-z0-9_\)])\s*\/\s*([A-Za-z0-9_\(])/g, '$1 / $2');
+
             // Comparison operators: normalize to have spaces on both sides
             out = replaceOutsideStrings(out, /\s*==\s*/g, ' == ');
             out = replaceOutsideStrings(out, /\s*!=\s*/g, ' != ');
@@ -130,11 +160,40 @@ export function normalizeOperatorSpacing(text: string): string {
             out = replaceOutsideStrings(out, /([a-zA-Z0-9_\)])\s*!/g, '$1 !');
             out = replaceOutsideStrings(out, /!\s*([a-zA-Z0-9_\(])/g, '! $1');
 
-            // Space after commas
+            // No space before commas, space after commas
+            out = replaceOutsideStrings(out, /\s+,/g, ',');
             out = replaceOutsideStrings(out, /,\s*(\S)/g, ', $1');
+            // Handle comma followed by string delimiter (which is in a different segment)
+            out = out.replace(/,"/g, ', "').replace(/,'/g, ", '");
 
             // No space before semicolons
             out = replaceOutsideStrings(out, /\s+;/g, ';');
+
+            // No space before opening parenthesis in function calls
+            // Match: identifier followed by spaces and opening paren
+            out = replaceOutsideStrings(out, /([a-zA-Z0-9_])\s+\(/g, '$1(');
+
+            // Object property/method access: no spaces around colon
+            // Match: identifier/paren followed by optional spaces, colon, optional spaces, identifier/paren
+            // This matches: obj:Prop or obj :Prop or obj: Prop or obj : Prop
+            // But NOT: :FOR or :TO (which have space/start before the colon)
+            // The key: we require an identifier character immediately before the space-colon sequence
+            out = replaceOutsideStrings(out, /([a-zA-Z0-9_\)])\s*:\s*([a-zA-Z_\(])/g, '$1:$2');
+
+            // Ensure space before colon-prefixed keywords (like :TO, :FOR, :STEP, etc.)
+            // This corrects cases where the above rule removed space before keywords
+            const keywords = ['TO', 'FOR', 'IF', 'ELSE', 'ELSEIF', 'ENDIF', 'WHILE', 'ENDWHILE',
+                              'NEXT', 'STEP', 'CASE', 'BEGINCASE', 'ENDCASE', 'OTHERWISE',
+                              'TRY', 'CATCH', 'FINALLY', 'ENDTRY', 'PROCEDURE', 'ENDPROC',
+                              'PARAMETERS', 'DECLARE', 'RETURN', 'PUBLIC', 'DEFAULT'];
+            for (const kw of keywords) {
+                const kwPattern = new RegExp(`(\\w):(${kw})\\b`, 'g');
+                out = replaceOutsideStrings(out, kwPattern, `$1 :$2`);
+            }
+
+            // Convert implicit string concatenation to explicit with +
+            // Match: string literal followed by whitespace and another string literal
+            out = replaceImplicitStringConcatenation(out);
 
             return out;
         })

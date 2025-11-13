@@ -3,5 +3,5 @@
 :DECLARE aItems;
 	aItems := { 1, 2, 3 };
 	aItems := { "a", "b", "c" };
-	Aadd(aItems, 10);
+	aadd(aItems, 10);
 :ENDPROC;

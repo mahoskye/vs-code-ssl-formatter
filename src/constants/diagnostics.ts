@@ -19,7 +19,10 @@ export const DIAGNOSTIC_CODES = {
     MISSING_OTHERWISE: "ssl-missing-otherwise",
     KEYWORD_CASE: "ssl-keyword-case",
     COMMENT_SYNTAX: "ssl-comment-syntax",
-    MISSING_PARAMS: "ssl-missing-params"
+    MISSING_PARAMS: "ssl-missing-params",
+    MISMATCHED_BLOCK_END: "ssl-mismatched-block-end",
+    UNMATCHED_BLOCK_END: "ssl-unmatched-block-end",
+    KEYWORD_WITHOUT_CONTEXT: "ssl-keyword-without-context"
 } as const;
 
 export const DIAGNOSTIC_MESSAGES = {
@@ -65,7 +68,16 @@ export const DIAGNOSTIC_MESSAGES = {
     INVALID_COMMENT_SYNTAX: "Invalid SSL comment syntax: Comments should use /* ... ; (semicolon terminator, not */)",
 
     MISSING_PROCEDURE_PARAMS: (procName: string, expectedCount: number, expectedParams: string[]) =>
-        `Procedure '${procName}' expects ${expectedCount} parameter${expectedCount > 1 ? 's' : ''} (${expectedParams.join(', ')}) but none were provided`
+        `Procedure '${procName}' expects ${expectedCount} parameter${expectedCount > 1 ? 's' : ''} (${expectedParams.join(', ')}) but none were provided`,
+
+    MISMATCHED_BLOCK_END: (endKeyword: string, expectedEnd: string, startKeyword: string) =>
+        `Mismatched block keyword: :${endKeyword} found but expected :${expectedEnd} to close :${startKeyword}`,
+
+    UNMATCHED_BLOCK_END: (endKeyword: string, expectedStart: string) =>
+        `Unmatched :${endKeyword} - no matching :${expectedStart} block found`,
+
+    KEYWORD_WITHOUT_CONTEXT: (keyword: string, requiredContext: string) =>
+        `:${keyword} requires :${requiredContext} but none was found`
 } as const;
 
 export const DIAGNOSTIC_SEVERITIES = {

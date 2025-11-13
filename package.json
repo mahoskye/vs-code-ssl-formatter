@@ -198,11 +198,14 @@
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
-        "test": "node ./out/test/runTest.js",
-        "test:format-fix": "node ./scripts/assert-format-fix.js"
-        ,"test:comments-preserved": "node ./scripts/assert-comments-preserved.js"
+        "test": "npm run test:unit && node ./out/test/runTest.js",
+        "test:unit": "mocha --require ts-node/register --require tests/setup.ts 'tests/**/*.test.ts'",
+        "test:integration": "node ./out/test/runTest.js",
+        "test:format-fix": "node ./scripts/assert-format-fix.js",
+        "test:comments-preserved": "node ./scripts/assert-comments-preserved.js"
     },
     "devDependencies": {
+        "@types/chai": "^4.3.20",
         "@types/glob": "^8.1.0",
         "@types/mocha": "^10.0.10",
         "@types/node": "^22.7.5",
@@ -210,9 +213,11 @@
         "@typescript-eslint/eslint-plugin": "^5.59.1",
         "@typescript-eslint/parser": "^5.59.1",
         "@vscode/test-electron": "^2.5.2",
+        "chai": "^4.5.0",
         "eslint": "^8.39.0",
         "glob": "^11.0.0",
-        "mocha": "^10.7.3",
+        "mocha": "^10.8.2",
+        "ts-node": "^10.9.2",
         "typescript": "~5.1.6"
     }
 }

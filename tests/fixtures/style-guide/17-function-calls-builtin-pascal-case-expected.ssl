@@ -3,6 +3,6 @@
 :DECLARE sResult;
 	sResult := AllTrim("  test  ");
 	sResult := SQLExecute("SELECT *", "query", 0, 0, 0, "", "", "", 0);
-	sResult := CreateUdoObject("Object");
+	sResult := CreateUdObject("Object");
 :RETURN sResult;
 :ENDPROC;
