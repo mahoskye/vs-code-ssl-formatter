@@ -69,7 +69,6 @@ ssl_style_guide:
     - :EXITFOR
     - :EXITWHILE
     - :LOOP
-    - :RESUME
     - :BEGINCASE
     - :CASE
     - :OTHERWISE
@@ -131,7 +130,6 @@ ssl_style_guide:
       optional_identifier: true
     error_marker: :ERROR
     label: :LABEL
-    resume: :RESUME
   comments:
     block:
       begin: /*
@@ -429,14 +427,12 @@ ssl_style_guide:
       - :EXITFOR
       - :EXITWHILE
       - :LOOP
-      - :RESUME
   error_handling:
     required: true
     structure:
       traditional:
         - :ERROR
         - error handling code
-        - :RESUME
       structured:
         - :TRY
         - body

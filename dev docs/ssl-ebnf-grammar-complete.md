@@ -175,7 +175,6 @@ ForStatement ::= ":" "FOR" Identifier ":=" Expression ":" "TO" Expression
 NextStatement ::= ":" "NEXT"
 ExitForStatement ::= ":" "EXITFOR"
 LoopContinue ::= ":" "LOOP" (* Represents a 'continue' for the current loop iteration *)
-ResumeStatement ::= ":" "RESUME" (* Resume execution from a particular point *)
 StepStatement ::= ":" "STEP" (* Step execution for debugging *)
 
 (* Switch case statements *)

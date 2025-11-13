@@ -1,4 +1,26 @@
 import * as vscode from "vscode";
+import {
+    SSL_KEYWORDS,
+    SSL_BUILTIN_FUNCTIONS,
+    BLOCK_START_KEYWORDS,
+    BLOCK_END_KEYWORDS,
+    BLOCK_MIDDLE_KEYWORDS,
+    CASE_KEYWORDS,
+    MULTILINE_CONSTRUCT_KEYWORDS
+} from "./constants/language";
+import {
+    CONFIG_KEYS,
+    CONFIG_DEFAULTS
+} from "./constants/config";
+import {
+    PATTERNS
+} from "./constants/patterns";
+import {
+    DIAGNOSTIC_CODES,
+    DIAGNOSTIC_MESSAGES,
+    DIAGNOSTIC_SEVERITIES
+} from "./constants/diagnostics";
+import { hasValidHungarianNotation } from "./constants/hungarian";
 
 /**
  * SSL Diagnostic Provider
@@ -17,8 +39,8 @@ export class SSLDiagnosticProvider {
 		console.log(`[SSL Debug] ========== Analyzing ${fileName} ==========`);
 		
 		const config = vscode.workspace.getConfiguration("ssl");
-		const maxProblems = config.get<number>("maxNumberOfProblems", 100);
-		const strictMode = config.get<boolean>("strictStyleGuideMode", false);
+		const maxProblems = config.get<number>(CONFIG_KEYS.MAX_NUMBER_OF_PROBLEMS, CONFIG_DEFAULTS[CONFIG_KEYS.MAX_NUMBER_OF_PROBLEMS]);
+		const strictMode = config.get<boolean>(CONFIG_KEYS.STRICT_STYLE_GUIDE_MODE, CONFIG_DEFAULTS[CONFIG_KEYS.STRICT_STYLE_GUIDE_MODE]);
 
 		const diagnostics: vscode.Diagnostic[] = [];
 		const text = document.getText();
@@ -28,12 +50,12 @@ export class SSLDiagnosticProvider {
 
 		// Track nesting depth
 		let blockDepth = 0;
-		const maxBlockDepth = config.get<number>("styleGuide.limitBlockDepth", 4);
+		const maxBlockDepth = config.get<number>(CONFIG_KEYS.STYLE_GUIDE_LIMIT_BLOCK_DEPTH, CONFIG_DEFAULTS[CONFIG_KEYS.STYLE_GUIDE_LIMIT_BLOCK_DEPTH]);
 
 		// Track procedure info
 		let inProcedure = false;
 		let procedureParams = 0;
-		const maxParams = config.get<number>("styleGuide.maxParamsPerProcedure", 8);
+		const maxParams = config.get<number>(CONFIG_KEYS.STYLE_GUIDE_MAX_PARAMS_PER_PROCEDURE, CONFIG_DEFAULTS[CONFIG_KEYS.STYLE_GUIDE_MAX_PARAMS_PER_PROCEDURE]);
 
 		// Track multi-line comment state
 		let inMultiLineComment = false;
@@ -43,16 +65,16 @@ export class SSLDiagnosticProvider {
 		let stringDelimiter = "";
 
 		// Hungarian notation settings
-		const hungarianEnabled = config.get<boolean>("naming.hungarianNotation.enabled", true);
-		const hungarianSeverity = config.get<string>("naming.hungarianNotation.severity", "warn");
+		const hungarianEnabled = config.get<boolean>(CONFIG_KEYS.NAMING_HUNGARIAN_ENABLED, CONFIG_DEFAULTS[CONFIG_KEYS.NAMING_HUNGARIAN_ENABLED]);
+		const hungarianSeverity = config.get<string>(CONFIG_KEYS.NAMING_HUNGARIAN_SEVERITY, CONFIG_DEFAULTS[CONFIG_KEYS.NAMING_HUNGARIAN_SEVERITY]);
 
 		// Security settings
-		const preventSqlInjection = config.get<boolean>("security.preventSqlInjection", true);
-		const requireParameterized = config.get<boolean>("security.requireParameterizedQueries", true);
+		const preventSqlInjection = config.get<boolean>(CONFIG_KEYS.SECURITY_PREVENT_SQL_INJECTION, CONFIG_DEFAULTS[CONFIG_KEYS.SECURITY_PREVENT_SQL_INJECTION]);
+		const requireParameterized = config.get<boolean>(CONFIG_KEYS.SECURITY_REQUIRE_PARAMETERIZED_QUERIES, CONFIG_DEFAULTS[CONFIG_KEYS.SECURITY_REQUIRE_PARAMETERIZED_QUERIES]);
 
 		// Style guide settings
-		const enforceKeywordCase = config.get<boolean>("styleGuide.enforceKeywordCase", true);
-		const enforceCommentSyntax = config.get<boolean>("styleGuide.enforceCommentSyntax", true);
+		const enforceKeywordCase = config.get<boolean>(CONFIG_KEYS.STYLE_GUIDE_ENFORCE_KEYWORD_CASE, CONFIG_DEFAULTS[CONFIG_KEYS.STYLE_GUIDE_ENFORCE_KEYWORD_CASE]);
+		const enforceCommentSyntax = config.get<boolean>(CONFIG_KEYS.STYLE_GUIDE_ENFORCE_COMMENT_SYNTAX, CONFIG_DEFAULTS[CONFIG_KEYS.STYLE_GUIDE_ENFORCE_COMMENT_SYNTAX]);
 
 		for (let i = 0; i < lines.length && diagnostics.length < maxProblems; i++) {
 			const line = lines[i];
@@ -60,7 +82,7 @@ export class SSLDiagnosticProvider {
 
 			// Validate SQL parameter placeholders BEFORE skipping strings
 			// This catches parameters in query strings, including multi-line strings
-			const paramPlaceholders = line.match(/\?(\w+)\?/g);
+			const paramPlaceholders = line.match(PATTERNS.SQL_PARAMETER_PLACEHOLDER);
 			if (paramPlaceholders && preventSqlInjection) {
 				const declaredIdentifiers = this.getDeclaredIdentifiers(lines, i);
 				
@@ -74,10 +96,10 @@ export class SSLDiagnosticProvider {
 						const columnIndex = line.indexOf(placeholder);
 						const diagnostic = new vscode.Diagnostic(
 							new vscode.Range(i, columnIndex, i, columnIndex + placeholder.length),
-							`SQL parameter '${paramName}' does not reference a valid variable or constant. Use lowercase variable names like '?sResult?' to pass through strings.`,
+							DIAGNOSTIC_MESSAGES.INVALID_SQL_PARAM(paramName),
 							vscode.DiagnosticSeverity.Error
 						);
-						diagnostic.code = "ssl-invalid-sql-param";
+						diagnostic.code = DIAGNOSTIC_CODES.INVALID_SQL_PARAM;
 						diagnostics.push(diagnostic);
 						console.log(`[SSL Debug] ERROR: Invalid SQL param '${paramName}' at line ${i + 1}`);
 					}
@@ -86,7 +108,7 @@ export class SSLDiagnosticProvider {
 
 			// Check for undeclared variable assignments BEFORE skipping multi-line strings
 			// This ensures we catch assignments like: sQuery := "SELECT..."
-			const assignmentMatch = trimmed.match(/^([a-z][a-zA-Z0-9_]*)\s*:=/);
+			const assignmentMatch = trimmed.match(PATTERNS.VARIABLE_ASSIGNMENT);
 			if (assignmentMatch && !trimmed.startsWith(':')) {
 				const varName = assignmentMatch[1];
 				const declaredIdentifiers = this.getDeclaredIdentifiers(lines, i);
@@ -97,10 +119,10 @@ export class SSLDiagnosticProvider {
 				if (!declaredIdentifiers.has(varName)) {
 					const diagnostic = new vscode.Diagnostic(
 						new vscode.Range(i, 0, i, varName.length),
-						`Variable '${varName}' is used without being declared. Add ':DECLARE ${varName};' before first use.`,
+						DIAGNOSTIC_MESSAGES.UNDECLARED_VARIABLE(varName),
 						vscode.DiagnosticSeverity.Warning
 					);
-					diagnostic.code = "ssl-undeclared-variable";
+					diagnostic.code = DIAGNOSTIC_CODES.UNDECLARED_VARIABLE;
 					diagnostics.push(diagnostic);
 					console.log(`[SSL Debug] WARNING: Undeclared variable '${varName}' at line ${i + 1}`);
 				}
@@ -173,22 +195,13 @@ export class SSLDiagnosticProvider {
 				
 				if (varReferences) {
 					// Filter out known keywords and function names
-					const sslKeywords = new Set([
-						'if', 'else', 'endif', 'while', 'endwhile', 'for', 'to', 'step', 'next',
-						'foreach', 'in', 'case', 'endcase', 'otherwise', 'exitcase', 'begincase',
-						'try', 'catch', 'finally', 'endtry', 'return', 'loop', 'exitwhile',
-						'and', 'or', 'not', 'nil', 'true', 'false'
-					]);
+					const sslKeywords = new Set(SSL_KEYWORDS.map(k => k.toLowerCase()));
 					
 					// Common SSL functions (lowercase versions)
-					const sslFunctions = new Set([
-						'usrmes', 'infomes', 'doproc', 'sqlexecute', 'runsql', 'lsearch',
-						'alen', 'ascan', 'aadd', 'arraynew', 'empty', 'str', 'val', 'alltrim',
-						'now', 'getsetting', 'createudobject', 'createguid', 'getlastsslerror'
-					]);
+					const sslFunctions = new Set(SSL_BUILTIN_FUNCTIONS.map(f => f.name.toLowerCase()));
 					
 					// Loop counter exceptions
-					const loopCounters = new Set(['i', 'j', 'k', 'x', 'y', 'z']);
+					const loopCounters = new Set(['i', 'j', 'k', 'x', 'y', 'z']); // TODO: Move to constants
 					
 					varReferences.forEach(varRef => {
 						const lowerRef = varRef.toLowerCase();
@@ -257,10 +270,10 @@ export class SSLDiagnosticProvider {
 				if (maxBlockDepth > 0 && blockDepth > maxBlockDepth) {
 					const diagnostic = new vscode.Diagnostic(
 						new vscode.Range(i, 0, i, line.length),
-						`Block nesting depth (${blockDepth}) exceeds maximum (${maxBlockDepth})`,
+						DIAGNOSTIC_MESSAGES.BLOCK_DEPTH_EXCEEDED(blockDepth, maxBlockDepth),
 						strictMode ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning
 					);
-					diagnostic.code = "ssl-block-depth";
+					diagnostic.code = DIAGNOSTIC_CODES.BLOCK_DEPTH;
 					diagnostics.push(diagnostic);
 				}
 			}
@@ -284,10 +297,10 @@ export class SSLDiagnosticProvider {
 				if (maxParams > 0 && procedureParams > maxParams) {
 					const diagnostic = new vscode.Diagnostic(
 						new vscode.Range(i, 0, i, line.length),
-						`Procedure has ${procedureParams} parameters, exceeds maximum (${maxParams})`,
+						DIAGNOSTIC_MESSAGES.MAX_PARAMS_EXCEEDED(procedureParams, maxParams),
 						strictMode ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning
 					);
-					diagnostic.code = "ssl-max-params";
+					diagnostic.code = DIAGNOSTIC_CODES.MAX_PARAMS;
 					diagnostics.push(diagnostic);
 				}
 
@@ -309,7 +322,7 @@ export class SSLDiagnosticProvider {
 				}
 			}
 
-			const endProcMatch = trimmed.match(/^:(ENDPROC|ENDPROCEDURE)\b/i);
+			const endProcMatch = trimmed.match(/^:ENDPROC\b/i);
 			if (endProcMatch) {
 				inProcedure = false;
 			}
@@ -522,40 +535,21 @@ export class SSLDiagnosticProvider {
 	}
 
 	private isBlockStart(line: string): boolean {
-		return /^:(IF|WHILE|FOR|FOREACH|BEGINCASE|TRY|PROCEDURE|CLASS|REGION)\b/i.test(line);
+		return BLOCK_START_KEYWORDS.some(keyword => new RegExp(`^:${keyword}\\b`, 'i').test(line));
 	}
 
 	private isBlockEnd(line: string): boolean {
-		return /^:(ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDPROCEDURE|ENDREGION)\b/i.test(line);
+		return BLOCK_END_KEYWORDS.some(keyword => new RegExp(`^:${keyword}\\b`, 'i').test(line));
 	}
 
 	private isMultilineConstruct(line: string): boolean {
 		// Check if line is part of a multi-line construct that doesn't need semicolon on every line
 		// Or is a control flow keyword that ends with the keyword itself
-		return /^:(IF|ELSE|WHILE|FOR|TO|STEP|FOREACH|IN|BEGINCASE|CASE|OTHERWISE|EXITCASE|TRY|CATCH|FINALLY|PROCEDURE|PARAMETERS|DEFAULT|CLASS|INHERIT|REGION|ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDPROCEDURE|ENDREGION|LOOP|EXITWHILE|RETURN)\b/i.test(line);
+		return MULTILINE_CONSTRUCT_KEYWORDS.some(keyword => new RegExp(`^:${keyword}\\b`, 'i').test(line));
 	}
 
 	private hasValidHungarianNotation(name: string): boolean {
-		// Exceptions for loop counters and constants
-		const exceptions = ["i", "j", "k", "NIL", ".T.", ".F.", "ID", "SQL", "URL", "XML", "HTML", "API", "UID", "GUID"];
-		if (exceptions.includes(name)) {
-			return true;
-		}
-
-		// Allow ALL_CAPS constants (global constants pattern)
-		if (/^[A-Z][A-Z0-9_]+$/.test(name)) {
-			return true;
-		}
-
-		if (name.length < 2) {
-			return false;
-		}
-
-		const prefix = name[0].toLowerCase();
-		const validPrefixes = ["s", "n", "b", "l", "d", "a", "o", "u"];
-
-		// Check if first char is valid prefix and second char is uppercase
-		return validPrefixes.includes(prefix) && name[1] === name[1].toUpperCase();
+		return hasValidHungarianNotation(name);
 	}
 
 	private getSeverity(severityString: string, strictMode: boolean): vscode.DiagnosticSeverity {
@@ -564,13 +558,11 @@ export class SSLDiagnosticProvider {
 		}
 
 		switch (severityString.toLowerCase()) {
-			case "error":
+			case DIAGNOSTIC_SEVERITIES.ERROR:
 				return vscode.DiagnosticSeverity.Error;
-			case "warn":
-			case "warning":
+			case DIAGNOSTIC_SEVERITIES.WARNING:
 				return vscode.DiagnosticSeverity.Warning;
-			case "info":
-			case "information":
+			case DIAGNOSTIC_SEVERITIES.INFO:
 				return vscode.DiagnosticSeverity.Information;
 			default:
 				return vscode.DiagnosticSeverity.Warning;
@@ -601,7 +593,7 @@ export class SSLDiagnosticProvider {
 			const line = lines[i].trim();
 
 			// Check for :PARAMETERS
-			const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
+			const paramsMatch = line.match(PATTERNS.PARAMETERS_DEFINITION);
 			if (paramsMatch) {
 				return paramsMatch[1].split(',').map(p => p.trim());
 			}
@@ -649,7 +641,7 @@ export class SSLDiagnosticProvider {
 			}
 
 			// Stop at first procedure - everything before is global scope
-			if (/^:PROCEDURE\b/i.test(line)) {
+			if (PATTERNS.PROCEDURE_DEFINITION.test(line)) {
 				break;
 			}
 
@@ -712,7 +704,7 @@ export class SSLDiagnosticProvider {
 				procedureDepth++;
 			}
 
-			if (/^:(ENDPROC|ENDPROCEDURE)\b/i.test(line)) {
+			if (/^:ENDPROC\b/i.test(line)) {
 				procedureDepth = Math.max(0, procedureDepth - 1);
 				if (procedureDepth === 0) {
 					// Exiting the outermost procedure
@@ -792,7 +784,7 @@ export class SSLDiagnosticProvider {
 			}
 
 			// Stop at first procedure - everything before is global scope
-			if (/^:PROCEDURE\b/i.test(line)) {
+			if (PATTERNS.PROCEDURE_DEFINITION.test(line)) {
 				break;
 			}
 
@@ -855,7 +847,7 @@ export class SSLDiagnosticProvider {
 				procedureDepth++;
 			}
 
-			if (/^:(ENDPROC|ENDPROCEDURE)\b/i.test(line)) {
+			if (/^:ENDPROC\b/i.test(line)) {
 				procedureDepth = Math.max(0, procedureDepth - 1);
 				if (procedureDepth === 0) {
 					// Exiting the outermost procedure

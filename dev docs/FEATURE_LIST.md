@@ -18,11 +18,10 @@ This document provides a comprehensive list of all features available in the STA
 ## 2. Editor Features
 
 - **Code Folding**: Comprehensive folding support with intelligent block detection that allows collapsing and expanding of code structures for improved readability and navigation:
-    - **Procedure Blocks** (`:PROCEDURE...;:ENDPROCEDURE;`): Collapse entire procedure definitions including parameters, defaults, body, and return statements. Fold markers appear in the gutter next to procedure declarations.
+    - **Procedure Blocks** (`:PROCEDURE...;:ENDPROC;`): Collapse entire procedure definitions including parameters, defaults, body, and return statements. Fold markers appear in the gutter next to procedure declarations.
     - **Loop Structures**:
         - `:FOR...;:TO...;:STEP...;:NEXT;` — Collapse for-loops with all their iterations
         - `:WHILE...;:ENDWHILE;` — Collapse while-loop blocks
-        - `:FOREACH...;:IN...;:NEXT;` — Collapse foreach-loop blocks
     - **Conditional Blocks**:
         - `:IF...;:ELSEIF...;:ELSE...;:ENDIF;` — Collapse entire if-else chains or individual branches
         - `:BEGINCASE...;:CASE...;:OTHERWISE...;:ENDCASE;` — Collapse case statements and individual case branches
@@ -132,7 +131,7 @@ This document provides a comprehensive list of all features available in the STA
         - SQL optimization hints (prefer `EXISTS` over `DISTINCT`, use `BETWEEN` for ranges, avoid `SELECT *`).
 - **Configurable Problem Limits**: `ssl.maxNumberOfProblems` setting to control the maximum number of reported diagnostics.
 
-- **Code Actions / Quick Fixes**: Diagnostic-based code actions and quick fixes for common problems (for example: add missing `:END` / `:ENDPROCEDURE`, add a missing variable declaration, suggest canonical keyword casing). These appear in the lightbulb menu and the Quick Fix command.
+- **Code Actions / Quick Fixes**: Diagnostic-based code actions and quick fixes for common problems (for example: add missing `:END` / `:ENDPROC`, add a missing variable declaration, suggest canonical keyword casing). These appear in the lightbulb menu and the Quick Fix command.
 - **Auto-Fix / Fix All**: Configurable auto-fix on save and "Fix All" behavior for certain rule classes. Controlled by settings such as `ssl.autoFix.onSave` and `ssl.autoFix.onSave.rules`.
 - **Suppression & Severity Levels**: Rules can be configured to be errors, warnings, or info; diagnostics can be locally suppressed via inline annotations (if supported) and globally via settings.
 

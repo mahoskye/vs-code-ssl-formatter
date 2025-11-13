@@ -18,7 +18,7 @@ A comprehensive Visual Studio Code extension providing syntax highlighting, code
 Comprehensive folding support for improved code navigation:
 
 - **Procedure Blocks**: `:PROCEDURE...;:ENDPROC;`
-- **Loop Structures**: `:FOR...;:NEXT;`, `:WHILE...;:ENDWHILE;`, `:FOREACH...;:NEXT;`
+- **Loop Structures**: `:FOR...;:NEXT;`, `:WHILE...;:ENDWHILE;`
 - **Conditional Blocks**: `:IF...;:ENDIF;`, `:BEGINCASE...;:ENDCASE;`
 - **Exception Handling**: `:TRY...;:CATCH...;:ENDTRY;`
 - **Region Markers**: `:REGION...;:ENDREGION;` and `/* region...;/* endregion;`

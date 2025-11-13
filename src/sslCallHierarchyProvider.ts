@@ -32,7 +32,7 @@ export class SSLCallHierarchyProvider implements vscode.CallHierarchyProvider {
 				// Find the end of the procedure
 				let endLine = i;
 				for (let j = i + 1; j < lines.length; j++) {
-					if (/^\s*:(ENDPROC|ENDPROCEDURE)\b/i.test(lines[j])) {
+					if (/^\s*:ENDPROC\b/i.test(lines[j])) {
 						endLine = j;
 						break;
 					}
@@ -85,7 +85,7 @@ export class SSLCallHierarchyProvider implements vscode.CallHierarchyProvider {
 					// Find end of procedure
 					let endLine = i;
 					for (let j = i + 1; j < lines.length; j++) {
-						if (/^\s*:(ENDPROC|ENDPROCEDURE)\b/i.test(lines[j])) {
+						if (/^\s*:ENDPROC\b/i.test(lines[j])) {
 							endLine = j;
 							break;
 						}
@@ -168,7 +168,7 @@ export class SSLCallHierarchyProvider implements vscode.CallHierarchyProvider {
 					let endLine = i;
 
 					for (let j = i + 1; j < lines.length; j++) {
-						if (/^\s*:(ENDPROC|ENDPROCEDURE)\b/i.test(lines[j])) {
+						if (/^\s*:ENDPROC\b/i.test(lines[j])) {
 							endLine = j;
 							break;
 						}

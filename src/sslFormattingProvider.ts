@@ -1,4 +1,19 @@
 import * as vscode from "vscode";
+import {
+    SSL_KEYWORDS,
+    SSL_BUILTIN_FUNCTIONS,
+    BLOCK_START_KEYWORDS,
+    BLOCK_END_KEYWORDS,
+    BLOCK_MIDDLE_KEYWORDS,
+    CASE_KEYWORDS
+} from "./constants/language";
+import {
+    CONFIG_KEYS,
+    CONFIG_DEFAULTS
+} from "./constants/config";
+import {
+    PATTERNS
+} from "./constants/patterns";
 
 /**
  * SSL Formatting Provider
@@ -50,11 +65,11 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		let formatted = text;
 
 		// Get configuration settings
-		const indentStyle = config.get<string>("format.indentStyle", "tab");
-		const indentWidth = config.get<number>("format.indentWidth", 1);
-		const keywordCase = config.get<string>("format.keywordCase", "upper");
-		const builtinFunctionCase = config.get<string>("format.builtinFunctionCase", "PascalCase");
-		const trimTrailingWhitespace = config.get<boolean>("format.trimTrailingWhitespace", true);
+		const indentStyle = config.get<string>(CONFIG_KEYS.FORMAT_INDENT_STYLE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_INDENT_STYLE]);
+		const indentWidth = config.get<number>(CONFIG_KEYS.FORMAT_INDENT_WIDTH, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_INDENT_WIDTH]);
+		const keywordCase = config.get<string>(CONFIG_KEYS.FORMAT_KEYWORD_CASE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_KEYWORD_CASE]);
+		const builtinFunctionCase = config.get<string>(CONFIG_KEYS.FORMAT_BUILTIN_FUNCTION_CASE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_BUILTIN_FUNCTION_CASE]);
+		const trimTrailingWhitespace = config.get<boolean>(CONFIG_KEYS.FORMAT_TRIM_TRAILING_WHITESPACE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_TRIM_TRAILING_WHITESPACE]);
 		
 		// Use editor's tab size for calculating visual positions
 		const tabSize = options.tabSize || 4;
@@ -89,20 +104,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			return text;
 		}
 
-		const keywords = [
-			"IF", "ELSE", "ENDIF",
-			"WHILE", "ENDWHILE",
-			"FOR", "TO", "STEP", "NEXT", "EXITFOR",
-			"EXITWHILE", "LOOP", "RESUME",
-			"BEGINCASE", "CASE", "OTHERWISE", "ENDCASE", "EXITCASE",
-			"TRY", "CATCH", "FINALLY", "ENDTRY",
-			"DECLARE", "DEFAULT", "PARAMETERS", "PUBLIC",
-			"INCLUDE", "PROCEDURE", "ENDPROC", "ENDPROCEDURE", "RETURN",
-			"CLASS", "INHERIT",
-			"REGION", "ENDREGION",
-			"BEGININLINECODE", "ENDINLINECODE",
-			"ERROR", "LABEL", "FOREACH", "IN"
-		];
+		const keywords = SSL_KEYWORDS;
 
 		const lines = text.split('\n');
 		let inMultiLineComment = false;
@@ -150,18 +152,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			return text;
 		}
 
-		const functions = [
-			"SQLExecute", "DoProc", "ExecFunction", "Empty", "Len", "usrmes", "Chr",
-			"aadd", "AllTrim", "At", "Now", "Today",
-			"CreateUDObject", "buildstring", "ascan", "alen", "arraycalc", "buildarray",
-			"Directory", "CreateGUID", "BuildStringForIn", "ascanexact",
-			"Day", "arraynew", "Branch", "DateAdd", "DateDiff", "Abs",
-			"Left", "Right", "SubStr", "StrTran", "Upper", "Lower", "Trim",
-			"aeval", "RunSQL", "LSearch", "GetDataSet",
-			"CToD", "InfoMes", "ErrorMes", "GetSetting", "GetUserData", "SetUserData",
-			"GetLastSSLError", "ReturnLastSQLError", "FormatErrorMessage", "RaiseError",
-			"Val", "LimsTypeEx"
-		];
+		const functions = SSL_BUILTIN_FUNCTIONS.map(f => f.name);
 
 		const lines = text.split('\n');
 		let inMultiLineComment = false;
@@ -266,11 +257,19 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			result = this.replaceOutsideStrings(result, /\s*<>\s*/g, " <> ");
 			result = this.replaceOutsideStrings(result, /\s*<=\s*/g, " <= ");
 			result = this.replaceOutsideStrings(result, /\s*>=\s*/g, " >= ");
+			result = this.replaceOutsideStrings(result, /\s*=\s*/g, " = ");
+			result = this.replaceOutsideStrings(result, /\s*<\s*/g, " < ");
+			result = this.replaceOutsideStrings(result, /\s*>\s*/g, " > ");
+			result = this.replaceOutsideStrings(result, /\s*#\s*/g, " # ");
 
 			// Space around logical operators
 			result = this.replaceOutsideStrings(result, /\s*\.AND\.\s*/gi, " .AND. ");
 			result = this.replaceOutsideStrings(result, /\s*\.OR\.\s*/gi, " .OR. ");
 			result = this.replaceOutsideStrings(result, /\s*\.NOT\.\s*/gi, " .NOT. ");
+
+			// Handle unary ! operator
+			result = this.replaceOutsideStrings(result, /([a-zA-Z0-9_\)])\s*!/g, "$1 !");
+			result = this.replaceOutsideStrings(result, /!\s*([a-zA-Z0-9_\(])/g, "! $1");
 
 			// Space after commas
 			result = this.replaceOutsideStrings(result, /,(\S)/g, ", $1");
@@ -353,10 +352,10 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		let stringDelimiter = "";
 		const indentChar = indentStyle === "tab" ? "\t" : " ".repeat(indentWidth);
 
-		const blockStart = /^\s*:(IF|WHILE|FOR|FOREACH|BEGINCASE|TRY|PROCEDURE|CLASS|REGION)\b/i;
-		const blockMiddle = /^\s*:(ELSE|CATCH|FINALLY)\b/i;
-		const caseKeyword = /^\s*:(CASE|OTHERWISE)\b/i;
-		const blockEnd = /^\s*:(ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDPROCEDURE|ENDREGION)\b/i;
+		const blockStart = new RegExp(`^\\s*:(${BLOCK_START_KEYWORDS.join('|')})\\b`, 'i');
+		const blockMiddle = new RegExp(`^\\s*:(${BLOCK_MIDDLE_KEYWORDS.join('|')})\\b`, 'i');
+		const caseKeyword = new RegExp(`^\\s*:(${CASE_KEYWORDS.join('|')})\\b`, 'i');
+		const blockEnd = new RegExp(`^\\s*:(${BLOCK_END_KEYWORDS.join('|')})\\b`, 'i');
 
 		const formatted = lines.map((line) => {
 			const trimmed = line.trim();

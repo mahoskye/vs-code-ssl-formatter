@@ -11,7 +11,7 @@
 - **Arrays** use `{ ... }`; indexers support `[i]`, `[i,j]`, and chained forms with 1-based indexing.
 - **Object access** uses `object:property` and `object:method(args)`.
 - **Control structures** include `:IF/:ELSE/:ENDIF`, `:WHILE/:ENDWHILE`, `:FOR ... :NEXT`, `:BEGINCASE/:CASE/:OTHERWISE/:ENDCASE`, and structured exceptions `:TRY/:CATCH/:FINALLY/:ENDTRY`.
-- **Loop control** includes `:EXITFOR`, `:EXITWHILE`, `:LOOP`, and `:RESUME` statements.
+- **Loop control** includes `:EXITFOR`, `:EXITWHILE`, and `:LOOP` statements.
 - **Procedures and classes** with full parameter handling, default values, and inheritance support.
 - **Database integration** with parameterized queries and function call patterns.
 

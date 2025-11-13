@@ -1,4 +1,13 @@
 import * as vscode from "vscode";
+import {
+    SSL_KEYWORD_DESCRIPTIONS,
+    SSL_BUILTIN_FUNCTIONS,
+    SSL_BUILTIN_CLASSES,
+    SSLFunction
+} from "./constants/language";
+import {
+    PATTERNS
+} from "./constants/patterns";
 
 /**
  * SSL Hover Provider
@@ -6,7 +15,7 @@ import * as vscode from "vscode";
  */
 export class SSLHoverProvider implements vscode.HoverProvider {
 
-	private functionDocs: Map<string, { description: string; params: string; returns: string }>;
+	private functionDocs: Map<string, SSLFunction>;
 	private keywordDocs: Map<string, string>;
 	private builtInClassDocs: Map<string, { description: string; instantiation: string; commonMethods: string[]; commonProperties: string[] }>;
 
@@ -64,11 +73,31 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		const funcDoc = this.functionDocs.get(word.toUpperCase());
 		if (funcDoc) {
 			const markdown = new vscode.MarkdownString();
-			markdown.appendCodeblock(`${word}${funcDoc.params}`, "ssl");
+
+			// Use signature if available, otherwise construct from name and params
+			const signature = funcDoc.signature || `${word}${funcDoc.params}`;
+			markdown.appendCodeblock(signature, "ssl");
+
 			markdown.appendMarkdown(`\n**Description:** ${funcDoc.description}\n\n`);
-			if (funcDoc.returns) {
+
+			if (funcDoc.returnType) {
+				markdown.appendMarkdown(`**Returns:** \`${funcDoc.returnType}\`\n\n`);
+			} else if (funcDoc.returns) {
 				markdown.appendMarkdown(`**Returns:** ${funcDoc.returns}\n\n`);
 			}
+
+			if (funcDoc.category) {
+				markdown.appendMarkdown(`**Category:** ${funcDoc.category}\n\n`);
+			}
+
+			if (funcDoc.frequency) {
+				markdown.appendMarkdown(`**Usage Frequency:** ${funcDoc.frequency}\n\n`);
+			}
+
+			if (funcDoc.untypedSignature) {
+				markdown.appendMarkdown(`**Untyped Signature:** \`${funcDoc.untypedSignature}\`\n\n`);
+			}
+
 			return new vscode.Hover(markdown, range);
 		}
 
@@ -99,255 +128,25 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 	}
 
 	private initializeKeywordDocs(): void {
-		this.keywordDocs.set("IF", "Conditional statement - executes code block if condition is true");
-		this.keywordDocs.set("ELSE", "Alternative code path when IF condition is false (use nested :IF for else-if logic)");
-		this.keywordDocs.set("ENDIF", "Marks the end of an IF conditional block");
-		this.keywordDocs.set("WHILE", "Loop that executes while condition is true");
-		this.keywordDocs.set("ENDWHILE", "Marks the end of a WHILE loop");
-		this.keywordDocs.set("FOR", "Loop with counter variable");
-		this.keywordDocs.set("TO", "Specifies the upper bound of a FOR loop");
-		this.keywordDocs.set("STEP", "Specifies the increment for a FOR loop");
-		this.keywordDocs.set("NEXT", "Marks the end of a FOR loop");
-		this.keywordDocs.set("FOREACH", "Iterates over collection elements");
-		this.keywordDocs.set("IN", "Specifies the collection to iterate in FOREACH");
-		this.keywordDocs.set("BEGINCASE", "Start of a CASE statement for multiple conditions");
-		this.keywordDocs.set("CASE", "Individual condition in a CASE statement");
-		this.keywordDocs.set("OTHERWISE", "Default case when no other CASE conditions match");
-		this.keywordDocs.set("ENDCASE", "Marks the end of a CASE statement");
-		this.keywordDocs.set("TRY", "Begin error handling block");
-		this.keywordDocs.set("CATCH", "Handle errors from TRY block");
-		this.keywordDocs.set("FINALLY", "Code that always executes after TRY/CATCH");
-		this.keywordDocs.set("ENDTRY", "Marks the end of TRY/CATCH block");
-		this.keywordDocs.set("PROCEDURE", "Defines a reusable code procedure/function");
-		this.keywordDocs.set("ENDPROC", "Marks the end of a PROCEDURE");
-		this.keywordDocs.set("ENDPROCEDURE", "Marks the end of a PROCEDURE (alternative)");
-		this.keywordDocs.set("PARAMETERS", "Declares procedure parameters");
-		this.keywordDocs.set("DEFAULT", "Sets default value for a parameter");
-		this.keywordDocs.set("RETURN", "Returns a value from a procedure");
-		this.keywordDocs.set("DECLARE", "Declares local variables");
-		this.keywordDocs.set("PUBLIC", "Declares public/global variables");
-		this.keywordDocs.set("INCLUDE", "Includes external SSL file");
-		this.keywordDocs.set("REGION", "Marks the beginning of a code region for organization");
-		this.keywordDocs.set("ENDREGION", "Marks the end of a code region");
-		this.keywordDocs.set("CLASS", "Defines a class");
-		this.keywordDocs.set("INHERIT", "Specifies base class for inheritance");
-		this.keywordDocs.set("BEGININLINECODE", "Marks the beginning of an inline code block");
-		this.keywordDocs.set("ENDINLINECODE", "Marks the end of an inline code block");
-		this.keywordDocs.set("EXITFOR", "Exits a FOR loop immediately");
-		this.keywordDocs.set("EXITWHILE", "Exits a WHILE loop immediately");
-		this.keywordDocs.set("EXITCASE", "Exits a CASE statement immediately");
-		this.keywordDocs.set("LOOP", "Jump back to start of loop");
-		this.keywordDocs.set("RESUME", "Resume execution after error");
-		this.keywordDocs.set("ERROR", "Mark error handling point");
-		this.keywordDocs.set("LABEL", "Define a label for GOTO");
+		Object.entries(SSL_KEYWORD_DESCRIPTIONS).forEach(([keyword, description]) => {
+			this.keywordDocs.set(keyword, description);
+		});
 	}
 
 	private initializeFunctionDocs(): void {
-		this.functionDocs.set("SQLEXECUTE", {
-			description: "Execute a SQL query and return results",
-			params: "(query, dataset)",
-			returns: "Result dataset or status"
-		});
-
-		this.functionDocs.set("DOPROC", {
-			description: "Call a procedure by name",
-			params: "(procName, params)",
-			returns: "Procedure return value"
-		});
-
-		this.functionDocs.set("EXECFUNCTION", {
-			description: "Execute a function dynamically",
-			params: "(funcName, params)",
-			returns: "Function return value"
-		});
-
-		this.functionDocs.set("EMPTY", {
-			description: "Check if a value is empty, null, or zero",
-			params: "(value)",
-			returns: "Boolean (.T. or .F.)"
-		});
-
-		this.functionDocs.set("LEN", {
-			description: "Get the length of a string or array",
-			params: "(value)",
-			returns: "Numeric length"
-		});
-
-		this.functionDocs.set("USRMES", {
-			description: "Display a message to the user",
-			params: "(message)",
-			returns: "void"
-		});
-
-		this.functionDocs.set("CHR", {
-			description: "Convert ASCII code to character",
-			params: "(code)",
-			returns: "Character string"
-		});
-
-		this.functionDocs.set("AADD", {
-			description: "Add an element to an array",
-			params: "(array, element)",
-			returns: "Updated array"
-		});
-
-		this.functionDocs.set("ALLTRIM", {
-			description: "Remove leading and trailing whitespace",
-			params: "(string)",
-			returns: "Trimmed string"
-		});
-
-		this.functionDocs.set("AT", {
-			description: "Find the position of substring in string",
-			params: "(needle, haystack)",
-			returns: "Numeric position (1-based) or 0 if not found"
-		});
-
-		this.functionDocs.set("NOW", {
-			description: "Get current date and time",
-			params: "()",
-			returns: "Date/time value"
-		});
-
-		this.functionDocs.set("TODAY", {
-			description: "Get current date",
-			params: "()",
-			returns: "Date value"
-		});
-
-		this.functionDocs.set("CREATEUDOBJECT", {
-			description: "Create a UDO (User Defined Object) instance",
-			params: "(className, params)",
-			returns: "Object instance"
-		});
-
-		this.functionDocs.set("BUILDSTRING", {
-			description: "Build a formatted string from template and values",
-			params: "(format, values)",
-			returns: "Formatted string"
-		});
-
-		this.functionDocs.set("ASCAN", {
-			description: "Search for a value in an array",
-			params: "(array, value)",
-			returns: "Index of first match (1-based) or 0 if not found"
-		});
-
-		this.functionDocs.set("ALEN", {
-			description: "Get the length of an array",
-			params: "(array)",
-			returns: "Numeric length"
-		});
-
-		this.functionDocs.set("LEFT", {
-			description: "Get leftmost characters from string",
-			params: "(string, count)",
-			returns: "Substring"
-		});
-
-		this.functionDocs.set("RIGHT", {
-			description: "Get rightmost characters from string",
-			params: "(string, count)",
-			returns: "Substring"
-		});
-
-		this.functionDocs.set("SUBSTR", {
-			description: "Extract substring from string",
-			params: "(string, start, length)",
-			returns: "Substring"
-		});
-
-		this.functionDocs.set("UPPER", {
-			description: "Convert string to uppercase",
-			params: "(string)",
-			returns: "Uppercase string"
-		});
-
-		this.functionDocs.set("LOWER", {
-			description: "Convert string to lowercase",
-			params: "(string)",
-			returns: "Lowercase string"
-		});
-
-		this.functionDocs.set("VAL", {
-			description: "Convert string to numeric value",
-			params: "(string)",
-			returns: "Numeric value"
-		});
-
-		this.functionDocs.set("CTOD", {
-			description: "Convert string to date",
-			params: "(dateString)",
-			returns: "Date value"
-		});
-
-		this.functionDocs.set("GETSETTING", {
-			description: "Get a system setting value",
-			params: "(settingName)",
-			returns: "Setting value"
-		});
-
-		this.functionDocs.set("GETUSERDATA", {
-			description: "Get user-specific data value",
-			params: "(key)",
-			returns: "User data value"
-		});
-
-		this.functionDocs.set("SETUSERDATA", {
-			description: "Set user-specific data value",
-			params: "(key, value)",
-			returns: "Boolean success status"
-		});
-
-		this.functionDocs.set("ARRAYNEW", {
-			description: "Create a new array with the specified size",
-			params: "(size)",
-			returns: "Array with specified number of elements"
-		});
-
-		this.functionDocs.set("STR", {
-			description: "Convert a numeric value to a string with optional formatting",
-			params: "(value, length, decimals)",
-			returns: "String representation of the number"
-		});
-
-		this.functionDocs.set("GETLASTSSLERROR", {
-			description: "Get the last SSL error message from the system",
-			params: "()",
-			returns: "Error message string"
+		SSL_BUILTIN_FUNCTIONS.forEach(func => {
+			this.functionDocs.set(func.name.toUpperCase(), func);
 		});
 	}
 
 	private initializeBuiltInClassDocs(): void {
-		this.builtInClassDocs.set("EMAIL", {
-			description: "Built-in email class for sending emails. Instantiate with Email{} then use colon notation for methods and properties.",
-			instantiation: "oEmail := Email{}",
-			commonMethods: [
-				"oEmail:Send()",
-				"oEmail:AddAttachment(path)",
-				"oEmail:SetRecipient(address)"
-			],
-			commonProperties: [
-				"oEmail:Subject",
-				"oEmail:Body",
-				"oEmail:From",
-				"oEmail:To"
-			]
-		});
-
-		this.builtInClassDocs.set("SSLREGEX", {
-			description: "Built-in regular expression class for pattern matching. Instantiate with SSLRegex{} then use colon notation for methods and properties.",
-			instantiation: "oRegex := SSLRegex{}",
-			commonMethods: [
-				"oRegex:Match(pattern, text)",
-				"oRegex:Replace(pattern, replacement, text)",
-				"oRegex:Test(pattern, text)"
-			],
-			commonProperties: [
-				"oRegex:Pattern",
-				"oRegex:IgnoreCase",
-				"oRegex:Multiline"
-			]
+		SSL_BUILTIN_CLASSES.forEach(cls => {
+			this.builtInClassDocs.set(cls.name.toUpperCase(), {
+				description: cls.description,
+				instantiation: cls.instantiation,
+				commonMethods: cls.methods.map(m => `${cls.name.toLowerCase()}:${m}()`),
+				commonProperties: cls.properties.map(p => `${cls.name.toLowerCase()}:${p}`)
+			});
 		});
 	}
 

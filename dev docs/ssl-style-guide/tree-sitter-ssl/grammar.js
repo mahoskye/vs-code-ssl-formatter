@@ -251,14 +251,12 @@ module.exports = grammar({
     loop_control_statement: $ => choice(
       $.exit_for_statement,
       $.exit_while_statement,
-      $.loop_continue_statement,
-      $.resume_statement
+      $.loop_continue_statement
     ),
 
     exit_for_statement: $ => seq($._kw_exitfor, ';'),
     exit_while_statement: $ => seq($._kw_exitwhile, ';'),
     loop_continue_statement: $ => seq($._kw_loop, ';'),
-    resume_statement: $ => seq($._kw_resume, ';'),
 
     // ───── Keywords (case-insensitive) ─────
     _kw_if: _ => token(seq(':', /IF/i)),
@@ -309,7 +307,6 @@ module.exports = grammar({
     _kw_exitfor: _ => token(seq(':', /EXITFOR/i)),
     _kw_exitwhile: _ => token(seq(':', /EXITWHILE/i)),
     _kw_loop: _ => token(seq(':', /LOOP/i)),
-    _kw_resume: _ => token(seq(':', /RESUME/i)),
 
   }
 });

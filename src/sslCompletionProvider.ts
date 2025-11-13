@@ -1,4 +1,17 @@
 import * as vscode from "vscode";
+import {
+    SSL_KEYWORDS,
+    SSL_BUILTIN_FUNCTIONS,
+    SSL_BUILTIN_CLASSES,
+    SSL_KEYWORD_DESCRIPTIONS
+} from "./constants/language";
+import {
+    CONFIG_KEYS,
+    CONFIG_DEFAULTS
+} from "./constants/config";
+import {
+    PATTERNS
+} from "./constants/patterns";
 
 /**
  * SSL Completion Provider
@@ -25,7 +38,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		context: vscode.CompletionContext
 	): vscode.CompletionItem[] {
 		const config = vscode.workspace.getConfiguration("ssl");
-		const intellisenseEnabled = config.get<boolean>("intellisense.enabled", true);
+		const intellisenseEnabled = config.get<boolean>(CONFIG_KEYS.INTELLISENSE_ENABLED, CONFIG_DEFAULTS[CONFIG_KEYS.INTELLISENSE_ENABLED]);
 
 		if (!intellisenseEnabled) {
 			return [];
@@ -35,7 +48,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		const textBeforeCursor = lineText.substring(0, position.character);
 
 		// Check if we're inside a DoProc call suggesting procedure names
-		const doProcMatch = textBeforeCursor.match(/DoProc\s*\(\s*["']([^"']*)$/i);
+		const doProcMatch = textBeforeCursor.match(/DoProc\s*\(\s*["']([^"']*)$/i); // TODO: Use PATTERNS
 		if (doProcMatch) {
 			return this.getProcedureCompletions(document);
 		}
@@ -73,121 +86,54 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 	}
 
 	private initializeKeywords(): void {
-		const keywords = [
-			{ name: "IF", description: "Conditional statement" },
-			{ name: "ELSE", description: "Alternative condition (use nested :IF for else-if logic)" },
-			{ name: "ENDIF", description: "End conditional block" },
-			{ name: "WHILE", description: "While loop" },
-			{ name: "ENDWHILE", description: "End while loop" },
-			{ name: "FOR", description: "For loop" },
-			{ name: "TO", description: "Loop upper bound" },
-			{ name: "STEP", description: "Loop increment" },
-			{ name: "NEXT", description: "End for loop" },
-			{ name: "FOREACH", description: "For each loop" },
-			{ name: "IN", description: "Collection to iterate" },
-			{ name: "BEGINCASE", description: "Case statement" },
-			{ name: "CASE", description: "Case condition" },
-			{ name: "OTHERWISE", description: "Default case" },
-			{ name: "ENDCASE", description: "End case statement" },
-			{ name: "TRY", description: "Try block for error handling" },
-			{ name: "CATCH", description: "Catch errors" },
-			{ name: "FINALLY", description: "Always execute block" },
-			{ name: "ENDTRY", description: "End try-catch block" },
-			{ name: "PROCEDURE", description: "Define a procedure" },
-			{ name: "ENDPROC", description: "End procedure" },
-			{ name: "PARAMETERS", description: "Procedure parameters" },
-			{ name: "DEFAULT", description: "Default parameter value" },
-			{ name: "RETURN", description: "Return from procedure" },
-			{ name: "DECLARE", description: "Declare variables" },
-			{ name: "PUBLIC", description: "Public variable declaration" },
-			{ name: "INCLUDE", description: "Include external file" },
-			{ name: "REGION", description: "Start code region" },
-			{ name: "ENDREGION", description: "End code region" },
-			{ name: "CLASS", description: "Define a class" },
-			{ name: "INHERIT", description: "Inherit from base class" },
-			{ name: "BEGININLINECODE", description: "Begin inline code block" },
-			{ name: "ENDINLINECODE", description: "End inline code block" },
-			{ name: "ERROR", description: "Error marker" },
-			{ name: "LABEL", description: "Label for GOTO" },
-			{ name: "EXITFOR", description: "Exit for loop" },
-			{ name: "EXITWHILE", description: "Exit while loop" },
-			{ name: "EXITCASE", description: "Exit case statement" },
-			{ name: "LOOP", description: "Loop control" },
-			{ name: "RESUME", description: "Resume after error" }
-		];
-
-		this.keywords = keywords.map(kw => {
-			const item = new vscode.CompletionItem(kw.name, vscode.CompletionItemKind.Keyword);
-			item.detail = kw.description;
-			item.insertText = kw.name;
-			item.filterText = `:${kw.name}`;
+		this.keywords = SSL_KEYWORDS.map(kw => {
+			const item = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
+			item.detail = SSL_KEYWORD_DESCRIPTIONS[kw];
+			item.insertText = kw;
+			item.filterText = `:${kw}`;
 			return item;
 		});
 	}
 
 	private initializeBuiltinFunctions(): void {
-		const functions = [
-			{ name: "SQLExecute", description: "Execute SQL query", params: "(query, dataset)" },
-			{ name: "DoProc", description: "Call a procedure", params: "(procName, params)" },
-			{ name: "ExecFunction", description: "Execute a function", params: "(funcName, params)" },
-			{ name: "Empty", description: "Check if value is empty", params: "(value)" },
-			{ name: "Len", description: "Get length of string or array", params: "(value)" },
-			{ name: "usrmes", description: "Display message to user", params: "(message1, message2)" },
-			{ name: "Chr", description: "Get character from ASCII code", params: "(code)" },
-			{ name: "aadd", description: "Add element to array", params: "(array, element)" },
-			{ name: "AllTrim", description: "Trim whitespace from string", params: "(string)" },
-			{ name: "At", description: "Find substring position", params: "(needle, haystack)" },
-			{ name: "Now", description: "Get current date and time", params: "()" },
-			{ name: "Today", description: "Get current date", params: "()" },
-			{ name: "CreateUDObject", description: "Create UDO object", params: "(className, params)" },
-			{ name: "buildstring", description: "Build formatted string", params: "(format, values)" },
-			{ name: "ascan", description: "Search array", params: "(array, value)" },
-			{ name: "alen", description: "Get array length", params: "(array)" },
-			{ name: "arraynew", description: "Create new array", params: "(size)" },
-			{ name: "arraycalc", description: "Calculate array values", params: "(array, expression)" },
-			{ name: "buildarray", description: "Build array from values", params: "(values)" },
-			{ name: "Directory", description: "Get directory listing", params: "(path)" },
-			{ name: "CreateGUID", description: "Create GUID", params: "()" },
-			{ name: "Str", description: "Convert number to string", params: "(value, length, decimals)" },
-			{ name: "Left", description: "Get left portion of string", params: "(string, count)" },
-			{ name: "Right", description: "Get right portion of string", params: "(string, count)" },
-			{ name: "SubStr", description: "Get substring", params: "(string, start, length)" },
-			{ name: "Upper", description: "Convert to uppercase", params: "(string)" },
-			{ name: "Lower", description: "Convert to lowercase", params: "(string)" },
-			{ name: "Val", description: "Convert string to number", params: "(string)" },
-			{ name: "CToD", description: "Convert string to date", params: "(dateString)" },
-			{ name: "GetSetting", description: "Get system setting", params: "(settingName)" },
-			{ name: "GetUserData", description: "Get user data", params: "(key)" },
-			{ name: "SetUserData", description: "Set user data", params: "(key, value)" },
-			{ name: "GetLastSSLError", description: "Get last SSL error", params: "()" }
-		];
-
-		this.builtinFunctions = functions.map(func => {
+		this.builtinFunctions = SSL_BUILTIN_FUNCTIONS.map(func => {
 			const item = new vscode.CompletionItem(func.name, vscode.CompletionItemKind.Function);
 			item.detail = func.description;
+
+			// Use signature if available, otherwise construct from name and params
+			const signature = func.signature || `${func.name}${func.params}`;
 			item.insertText = new vscode.SnippetString(`${func.name}($1)`);
-			item.documentation = new vscode.MarkdownString(`**${func.name}**${func.params}\n\n${func.description}`);
+
+			// Build rich documentation with all available metadata
+			let documentation = `**${func.name}**\n\n${func.description}`;
+
+			if (func.signature) {
+				documentation += `\n\n**Signature:** \`${func.signature}\``;
+			}
+
+			if (func.returnType) {
+				documentation += `\n\n**Returns:** \`${func.returnType}\``;
+			}
+
+			if (func.category) {
+				documentation += `\n\n**Category:** ${func.category}`;
+			}
+
+			if (func.frequency) {
+				documentation += `\n\n**Usage:** ${func.frequency}`;
+			}
+
+			if (func.untypedSignature) {
+				documentation += `\n\n**Untyped:** \`${func.untypedSignature}\``;
+			}
+
+			item.documentation = new vscode.MarkdownString(documentation);
 			return item;
 		});
 	}
 
 	private initializeBuiltinClasses(): void {
-		const classes = [
-			{
-				name: "Email",
-				description: "Built-in email class for sending emails",
-				instantiation: "Email{}",
-				usage: "oEmail := Email{}; oEmail:Subject := 'Test'; oEmail:Send();"
-			},
-			{
-				name: "SSLRegex",
-				description: "Built-in regular expression class for pattern matching",
-				instantiation: "SSLRegex{}",
-				usage: "oRegex := SSLRegex{}; result := oRegex:Match(pattern, text);"
-			}
-		];
-
-		this.builtinClasses = classes.map(cls => {
+		this.builtinClasses = SSL_BUILTIN_CLASSES.map(cls => {
 			const item = new vscode.CompletionItem(cls.name, vscode.CompletionItemKind.Class);
 			item.detail = cls.description;
 			item.insertText = new vscode.SnippetString(`${cls.name}{}`);
@@ -312,7 +258,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			const builtinMatch = line.match(new RegExp(`\\b${objectName}\\s*:=\\s*(\\w+)\\{\\}`, 'i'));
 			if (builtinMatch) {
 				const className = builtinMatch[1].toUpperCase();
-				if (className === 'EMAIL' || className === 'SSLREGEX') {
+				if (SSL_BUILTIN_CLASSES.some(cls => cls.name.toUpperCase() === className)) {
 					return { type: 'builtin', className };
 				}
 			}
