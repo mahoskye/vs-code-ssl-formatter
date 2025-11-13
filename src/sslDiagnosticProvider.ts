@@ -53,6 +53,29 @@ export class SSLDiagnosticProvider {
 			const line = lines[i];
 			const trimmed = line.trim();
 
+			// Validate SQL parameter placeholders BEFORE skipping strings
+			// This catches parameters in query strings, including multi-line strings
+			const paramPlaceholders = line.match(/\?(\w+)\?/g);
+			if (paramPlaceholders && preventSqlInjection) {
+				const declaredIdentifiers = this.getDeclaredIdentifiers(lines, i);
+				
+				paramPlaceholders.forEach(placeholder => {
+					const paramName = placeholder.replace(/\?/g, '');
+					
+					// Check if it's a valid identifier (constant or variable)
+					if (!declaredIdentifiers.has(paramName)) {
+						const columnIndex = line.indexOf(placeholder);
+						const diagnostic = new vscode.Diagnostic(
+							new vscode.Range(i, columnIndex, i, columnIndex + placeholder.length),
+							`SQL parameter '${paramName}' does not reference a valid variable or constant. Use lowercase variable names like '?sResult?' to pass through strings.`,
+							vscode.DiagnosticSeverity.Error
+						);
+						diagnostic.code = "ssl-invalid-sql-param";
+						diagnostics.push(diagnostic);
+					}
+				});
+			}
+
 			// Track multi-line string state
 			// Check if line opens a string that doesn't close
 			if (!inMultiLineString) {
@@ -450,4 +473,91 @@ export class SSLDiagnosticProvider {
 
 		return []; // No parameters found
 	}
+
+	/**
+	 * Get all declared identifiers (variables, constants, parameters) visible at a given line
+	 */
+	private getDeclaredIdentifiers(lines: string[], currentLine: number): Set<string> {
+		const identifiers = new Set<string>();
+		let inProcedure = false;
+		let procedureStartLine = -1;
+		let inMultiLineComment = false;
+
+		// Scan from beginning to current line
+		for (let i = 0; i <= currentLine && i < lines.length; i++) {
+			const line = lines[i].trim();
+
+			// Skip comment lines
+			if (line.startsWith('/*')) {
+				// Check if it's a multi-line comment (doesn't end with ;)
+				if (!line.endsWith(';')) {
+					inMultiLineComment = true;
+					continue;
+				}
+				// Single-line comment, skip it
+				continue;
+			}
+			if (inMultiLineComment) {
+				if (line.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				continue;
+			}
+			if (line.startsWith('*')) {
+				continue; // Skip comment continuation lines
+			}
+
+			// Track procedure scope
+			if (/^:PROCEDURE\b/i.test(line)) {
+				inProcedure = true;
+				procedureStartLine = i;
+			}
+			if (/^:(ENDPROC|ENDPROCEDURE)\b/i.test(line)) {
+				inProcedure = false;
+			}
+
+			// Collect :DECLARE variables
+			const declareMatch = line.match(/^:DECLARE\s+(.+?);/i);
+			if (declareMatch) {
+				const vars = declareMatch[1].split(',').map(v => v.trim());
+				vars.forEach(varName => {
+					// Clean up any assignments or whitespace
+					const cleanName = varName.split(':=')[0].trim();
+					if (cleanName) {
+						identifiers.add(cleanName);
+					}
+				});
+			}
+
+			// Collect :PARAMETERS
+			const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
+			if (paramsMatch) {
+				const params = paramsMatch[1].split(',').map(p => p.trim());
+				params.forEach(paramName => {
+					if (paramName) {
+						identifiers.add(paramName);
+					}
+				});
+			}
+
+			// Collect global constants (variables assigned at file level, before any procedure)
+			// Look for patterns like: CONSTANT_NAME := value;
+			if (!inProcedure && /^[A-Z_][A-Z0-9_]*\s*:=/.test(line)) {
+				const constMatch = line.match(/^([A-Z_][A-Z0-9_]*)\s*:=/);
+				if (constMatch) {
+					identifiers.add(constMatch[1]);
+				}
+			}
+
+			// Collect implicit variable declarations (assignment without :DECLARE)
+			// Pattern: varName := value; (where varName follows Hungarian notation)
+			const assignmentMatch = line.match(/^([a-z][a-zA-Z0-9_]*)\s*:=/);
+			if (assignmentMatch && !line.startsWith(':')) {
+				identifiers.add(assignmentMatch[1]);
+			}
+		}
+
+		return identifiers;
+	}
 }
+

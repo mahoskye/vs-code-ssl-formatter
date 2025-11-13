@@ -66,7 +66,7 @@ DEFAULT_PRIORITY := "NORMAL";
             /* Retrieve sample details;
 			sQuery := "SELECT sample_volume, priority_level " +
 					  "FROM samples " +
-					  "WHERE sample_id = ?SAMPLE_ID?";
+					  "WHERE sample_id = ?sSampleId?";
 
 
 			aResults := SQLExecute(sQuery, , , {sSampleId});
@@ -142,7 +142,7 @@ DEFAULT_PRIORITY := "NORMAL";
 			  "COUNT(t.test_id) AS test_count " +
 			  "FROM samples s " +
 			  "LEFT JOIN tests t ON s.sample_id = t.sample_id " +
-			  "WHERE s.sample_id = ?SAMPLE_ID? " +
+			  "WHERE s.sample_id = ?sSampleId? " +
 			  "GROUP BY s.status, s.collection_date";
 
 
@@ -216,9 +216,9 @@ DEFAULT_PRIORITY := "NORMAL";
     /* Example: Leading continuation operators;
 	sUpdateQuery := "UPDATE samples "
 					+ "SET status = 'IN_ANALYSIS', "
-					+ "analysis_start_date = ?ANALYSIS_DATE?, "
-					+ "worksheet_id = ?WORKSHEET_ID? "
-					+ "WHERE sample_id = ?SAMPLE_ID?";
+					+ "analysis_start_date = ?dAnalysisDate?, "
+					+ "worksheet_id = ?nWorksheetId? "
+					+ "WHERE sample_id = ?sSampleId?";
 
 
 
@@ -236,6 +236,7 @@ DEFAULT_PRIORITY := "NORMAL";
 	:PARAMETERS sSampleId, dApprovalDate;
 
 	:DECLARE sQuery, nAffected, aResults, bAllTestsComplete;
+	:DECLARE sUserId;
 
     /* Verify all tests are complete;
 	bAllTestsComplete := DoProc("CheckTestCompletion", {sSampleId});
@@ -245,15 +246,17 @@ DEFAULT_PRIORITY := "NORMAL";
 		:RETURN;
 	:ENDIF;
 
+	sUserId := DoProc("GetUserId", {});
+
     /* Update sample status;
 	sQuery := "UPDATE samples " +
 			  "SET status = 'APPROVED', " +
-			  "approval_date = ?APPROVAL_DATE?, " +
-			  "approved_by = ?USER_ID? " +
-			  "WHERE sample_id = ?SAMPLE_ID?";
+			  "approval_date = ?dApprovalDate?, " +
+			  "approved_by = ?sUserId? " +
+			  "WHERE sample_id = ?sSampleId?";
 
 
-	nAffected := SQLExecute(sQuery, , , {dApprovalDate, DoProc("GetUserId", {}), sSampleId});
+	nAffected := SQLExecute(sQuery, , , {dApprovalDate, sUserId, sSampleId});
 
 	:IF nAffected > 0;
     /* Generate final report;
@@ -273,18 +276,20 @@ DEFAULT_PRIORITY := "NORMAL";
  *   dRejectionDate - Date of rejection;
 	:PARAMETERS sSampleId, sReason, dRejectionDate;
 
-	:DECLARE sQuery, nAffected;
+	:DECLARE sQuery, nAffected, sUserId;
+
+	sUserId := DoProc("GetUserId", {});
 
 	sQuery := "UPDATE samples " +
 			  "SET status = 'REJECTED', " +
-			  "rejection_date = ?REJECTION_DATE?, " +
-			  "rejection_reason = ?REASON?, " +
-			  "rejected_by = ?USER_ID? " +
-			  "WHERE sample_id = ?SAMPLE_ID?";
+			  "rejection_date = ?dRejectionDate?, " +
+			  "rejection_reason = ?sReason?, " +
+			  "rejected_by = ?sUserId? " +
+			  "WHERE sample_id = ?sSampleId?";
 
 
 
-	nAffected := SQLExecute(sQuery, , , {dRejectionDate, sReason, DoProc("GetUserId", {}), sSampleId});
+	nAffected := SQLExecute(sQuery, , , {dRejectionDate, sReason, sUserId, sSampleId});
 
 	:IF nAffected > 0;
     /* Cancel associated tests;
@@ -312,7 +317,7 @@ DEFAULT_PRIORITY := "NORMAL";
 
 	sQuery := "SELECT test_id " +
 			  "FROM tests " +
-			  "WHERE sample_id = ?SAMPLE_ID? " +
+			  "WHERE sample_id = ?sSampleId? " +
 			  "AND status != 'CANCELLED' " +
 			  "ORDER BY test_number";
 
@@ -346,7 +351,7 @@ DEFAULT_PRIORITY := "NORMAL";
 
 	sQuery := "SELECT COUNT(*) " +
 			  "FROM tests " +
-			  "WHERE sample_id = ?SAMPLE_ID? " +
+			  "WHERE sample_id = ?sSampleId? " +
 			  "AND status NOT IN ('COMPLETE', 'CANCELLED')";
 
 
@@ -371,16 +376,17 @@ DEFAULT_PRIORITY := "NORMAL";
  * Returns: New worksheet ID;
 	:PARAMETERS sWorksheetName, dCreateDate;
 
-	:DECLARE sQuery, nWorksheetId, sGuid;
+	:DECLARE sQuery, nWorksheetId, sGuid, sUserId;
 
 	sGuid := CreateGUID();
+	sUserId := DoProc("GetUserId", {});
 
 	sQuery := "INSERT INTO worksheets " +
 			  "(worksheet_name, creation_date, created_by, guid, status) " +
-			  "VALUES (?NAME?, ?DATE?, ?USER?, ?GUID?, 'ACTIVE')";
+			  "VALUES (?sWorksheetName?, ?dCreateDate?, ?sUserId?, ?sGuid?, 'ACTIVE')";
 
 
-	SQLExecute(sQuery, , , {sWorksheetName, dCreateDate, DoProc("GetUserId", {}), sGuid});
+	SQLExecute(sQuery, , , {sWorksheetName, dCreateDate, sUserId, sGuid});
 
     /* Retrieve the generated ID;
 	nWorksheetId := DoProc("GetLastInsertId", {"worksheets"});
@@ -396,14 +402,16 @@ DEFAULT_PRIORITY := "NORMAL";
  *   nWorksheetId - Worksheet identifier;
 	:PARAMETERS nTestId, nWorksheetId;
 
-	:DECLARE sQuery;
+	:DECLARE sQuery, dDate;
+
+	dDate := Now();
 
 	sQuery := "UPDATE tests " +
-			  "SET worksheet_id = ?WORKSHEET_ID?, " +
-			  "assignment_date = ?DATE? " +
-			  "WHERE test_id = ?TEST_ID?";
+			  "SET worksheet_id = ?nWorksheetId?, " +
+			  "assignment_date = ?dDate? " +
+			  "WHERE test_id = ?nTestId?";
 
-	SQLExecute(sQuery, , , {nWorksheetId, Now(), nTestId});
+	SQLExecute(sQuery, , , {nWorksheetId, dDate, nTestId});
 :ENDPROC;
 
 :PROCEDURE CancelSampleTests;
@@ -413,16 +421,19 @@ DEFAULT_PRIORITY := "NORMAL";
  *   sSampleId - Sample identifier;
 	:PARAMETERS sSampleId;
 
-	:DECLARE sQuery;
+	:DECLARE sQuery, dDate, sUserId;
+
+	dDate := Now();
+	sUserId := DoProc("GetUserId", {});
 
 	sQuery := "UPDATE tests " +
 			  "SET status = 'CANCELLED', " +
-			  "cancellation_date = ?DATE?, " +
-			  "cancelled_by = ?USER? " +
-			  "WHERE sample_id = ?SAMPLE_ID? " +
+			  "cancellation_date = ?dDate?, " +
+			  "cancelled_by = ?sUserId? " +
+			  "WHERE sample_id = ?sSampleId? " +
 			  "AND status NOT IN ('COMPLETE', 'CANCELLED')";
 
-	SQLExecute(sQuery, , , {Now(), DoProc("GetUserId", {}), sSampleId});
+	SQLExecute(sQuery, , , {dDate, sUserId, sSampleId});
 :ENDPROC;
 
 :PROCEDURE GenerateSampleReport;
@@ -441,7 +452,7 @@ DEFAULT_PRIORITY := "NORMAL";
 			  + "FROM samples s "
 			  + "JOIN tests t ON s.sample_id = t.sample_id "
 			  + "JOIN results r ON t.test_id = r.test_id "
-			  + "WHERE s.sample_id = ?SAMPLE_ID? "
+			  + "WHERE s.sample_id = ?sSampleId? "
 			  + "ORDER BY t.test_number";
 
 	aData := SQLExecute(sQuery, , , {sSampleId});
@@ -629,10 +640,13 @@ DEFAULT_PRIORITY := "NORMAL";
 
 
 
+/* :DECLARE sSampleId; ;
+/* sSampleId := "TEST123"; ;
+
 sQuery := "
 	SELECT COUNT(*)
 	FROM tests
-	WHERE sample_id = ?SAMPLE_ID?
+	WHERE sample_id = ?sSampleId?
 	AND status NOT IN ('COMPLETE', 'CANCELLED')
 ";
 
