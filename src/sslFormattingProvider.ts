@@ -55,6 +55,9 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const keywordCase = config.get<string>("format.keywordCase", "upper");
 		const builtinFunctionCase = config.get<string>("format.builtinFunctionCase", "PascalCase");
 		const trimTrailingWhitespace = config.get<boolean>("format.trimTrailingWhitespace", true);
+		
+		// Use editor's tab size for calculating visual positions
+		const tabSize = options.tabSize || 4;
 
 		// Normalize line endings to \n for processing
 		formatted = formatted.replace(/\r\n/g, "\n");
@@ -63,7 +66,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		formatted = this.normalizeKeywordCase(formatted, keywordCase);
 		formatted = this.normalizeBuiltinFunctionCase(formatted, builtinFunctionCase);
 		formatted = this.normalizeOperatorSpacing(formatted);
-		formatted = this.normalizeIndentation(formatted, indentStyle, indentWidth);
+		formatted = this.normalizeIndentation(formatted, indentStyle, indentWidth, tabSize);
 
 		if (trimTrailingWhitespace) {
 			formatted = this.trimTrailingWhitespace(formatted);
@@ -328,7 +331,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	/**
 	 * Normalize indentation
 	 */
-	private normalizeIndentation(text: string, indentStyle: string, indentWidth: number): string {
+	private normalizeIndentation(text: string, indentStyle: string, indentWidth: number, tabSize: number): string {
 		const lines = text.split("\n");
 		let indentLevel = 0;
 		let inMultiLineComment = false;
@@ -383,8 +386,11 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 								const varName = assignMatch[2];
 								const valueStart = assignMatch[3];
 								
+								// Convert tabs to spaces for accurate position calculation
+								const expandedIndent = baseIndent.replace(/\t/g, ' '.repeat(tabSize));
+								
 								// Calculate base position after :=
-								let alignPos = baseIndent.length + varName.length + ' := '.length;
+								let alignPos = expandedIndent.length + varName.length + ' := '.length;
 								
 								// If the value starts with a string quote or other continuation operator,
 								// we want to align with the actual content start
@@ -426,8 +432,16 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			// Apply indentation
 			let indented;
 			if (isContinuation && continuationIndent > 0) {
-				// Use exact spacing for continuation lines
-				indented = ' '.repeat(continuationIndent) + trimmed;
+				// For continuation lines, we need to match the visual position
+				// If using tabs, convert the continuation indent to tabs + spaces
+				if (indentStyle === "tab") {
+					const numTabs = Math.floor(continuationIndent / tabSize);
+					const numSpaces = continuationIndent % tabSize;
+					indented = '\t'.repeat(numTabs) + ' '.repeat(numSpaces) + trimmed;
+				} else {
+					// Use exact spacing for continuation lines when using spaces
+					indented = ' '.repeat(continuationIndent) + trimmed;
+				}
 			} else {
 				indented = indentChar.repeat(indentLevel) + trimmed;
 			}
