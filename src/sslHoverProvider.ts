@@ -306,6 +306,24 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 			params: "(key, value)",
 			returns: "Boolean success status"
 		});
+
+		this.functionDocs.set("ARRAYNEW", {
+			description: "Create a new array with the specified size",
+			params: "(size)",
+			returns: "Array with specified number of elements"
+		});
+
+		this.functionDocs.set("STR", {
+			description: "Convert a numeric value to a string with optional formatting",
+			params: "(value, length, decimals)",
+			returns: "String representation of the number"
+		});
+
+		this.functionDocs.set("GETLASTSSLERROR", {
+			description: "Get the last SSL error message from the system",
+			params: "()",
+			returns: "Error message string"
+		});
 	}
 
 	private initializeBuiltInClassDocs(): void {
