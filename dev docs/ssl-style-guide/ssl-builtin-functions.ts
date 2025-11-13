@@ -5,7 +5,7 @@
  * Total functions: 187
  */
 
-import { SSLFunction } from '../src/constants/language';
+import { SSLFunction } from '../../src/constants/language';
 
 export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
     {
