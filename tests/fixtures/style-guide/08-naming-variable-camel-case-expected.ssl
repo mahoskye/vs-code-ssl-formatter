@@ -1,0 +1,9 @@
+/* Variable names should be camelCase with Hungarian prefix;
+:PROCEDURE TestVarNaming;
+:DECLARE sUserName, sEmail, sFirstName;
+:DECLARE nTotalCount, nValue;
+:DECLARE aListItems;
+	sUserName := "John";
+	sEmail := "john@example.com";
+	nTotalCount := 10;
+:ENDPROC;

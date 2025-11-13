@@ -1,0 +1,8 @@
+/* Built-in functions should be PascalCase;
+:PROCEDURE TestBuiltinFunctions;
+:DECLARE sResult;
+	sResult := alltrim("  test  ");
+	sResult := sqlexecute("SELECT *","query",0,0,0,"","","",0);
+	sResult := createudobject("Object");
+:RETURN sResult;
+:ENDPROC;

@@ -1,0 +1,12 @@
+/* Procedure names should be PascalCase;
+:PROCEDURE calculate_total;
+	nResult := 0;
+:ENDPROC;
+
+:PROCEDURE getDataFromDatabase;
+	nResult := 1;
+:ENDPROC;
+
+:PROCEDURE VALIDATE_USER_INPUT;
+	nResult := 2;
+:ENDPROC;
