@@ -198,7 +198,9 @@
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
-        "test": "node ./out/test/runTest.js"
+        "test": "node ./out/test/runTest.js",
+        "test:format-fix": "node ./scripts/assert-format-fix.js"
+        ,"test:comments-preserved": "node ./scripts/assert-comments-preserved.js"
     },
     "devDependencies": {
         "@types/glob": "^8.1.0",

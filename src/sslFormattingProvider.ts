@@ -12,8 +12,9 @@ import {
     CONFIG_DEFAULTS
 } from "./constants/config";
 import {
-    PATTERNS
+	PATTERNS
 } from "./constants/patterns";
+import { normalizeOperatorSpacing, replaceOutsideStrings } from "./utils/formatters";
 
 /**
  * SSL Formatting Provider
@@ -81,7 +82,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		formatted = this.splitMultipleStatements(formatted);
 		formatted = this.normalizeKeywordCase(formatted, keywordCase);
 		formatted = this.normalizeBuiltinFunctionCase(formatted, builtinFunctionCase);
-		formatted = this.normalizeOperatorSpacing(formatted);
+	formatted = normalizeOperatorSpacing(formatted);
 		formatted = this.normalizeIndentation(formatted, indentStyle, indentWidth, tabSize);
 
 		if (trimTrailingWhitespace) {
@@ -216,7 +217,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				const replacement = caseStyle === "upper"
 					? `:${keyword.toUpperCase()}`
 					: `:${keyword.toLowerCase()}`;
-				result = this.replaceOutsideStrings(result, pattern, replacement);
+				result = replaceOutsideStrings(result, pattern, replacement);
 			});
 			return result;
 		});
@@ -277,7 +278,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 						replacement = func;
 				}
 
-				result = this.replaceOutsideStrings(result, pattern, replacement);
+				result = replaceOutsideStrings(result, pattern, replacement);
 			});
 			return result;
 		});
@@ -289,128 +290,15 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	 * Normalize operator spacing
 	 * Only processes operators outside of strings
 	 */
+	// Use shared implementation from utils/formatters
 	private normalizeOperatorSpacing(text: string): string {
-		const lines = text.split('\n');
-		let inMultiLineComment = false;
-		
-		const formattedLines = lines.map(line => {
-			const trimmed = line.trim();
-			
-			// Track multi-line comment state (SSL uses /* ... ; syntax)
-			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
-				inMultiLineComment = true;
-				return line;
-			}
-			if (inMultiLineComment) {
-				if (trimmed.endsWith(';')) {
-					inMultiLineComment = false;
-				}
-				return line; // Don't format comment content
-			}
-			
-			// Skip single-line comments
-			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
-				return line;
-			}
-			
-			let result = line;
-			
-			// Space around assignment operators
-			result = this.replaceOutsideStrings(result, /\s*:=\s*/g, " := ");
-			result = this.replaceOutsideStrings(result, /\s*\+=\s*/g, " += ");
-			result = this.replaceOutsideStrings(result, /\s*-=\s*/g, " -= ");
-			result = this.replaceOutsideStrings(result, /\s*\*=\s*/g, " *= ");
-			result = this.replaceOutsideStrings(result, /\s*\/=\s*/g, " /= ");
-			result = this.replaceOutsideStrings(result, /\s*\^=\s*/g, " ^= ");
-			result = this.replaceOutsideStrings(result, /\s*%=\s*/g, " %= ");
-
-			// Space around arithmetic operators - apply multiple times for chained operators
-			let prev = '';
-			while (prev !== result) {
-				prev = result;
-				result = this.replaceOutsideStrings(result, /([a-zA-Z0-9_\)])(\+|\*|\/|\^|%)([a-zA-Z0-9_\(])/g, "$1 $2 $3");
-				result = this.replaceOutsideStrings(result, /([a-zA-Z0-9_\)])(-)([a-zA-Z0-9_\(])/g, "$1 $2 $3");
-			}
-
-			// Space around comparison operators (process multi-char operators first!)
-			// Handle both == and =  = (with spaces) variations
-			result = this.replaceOutsideStrings(result, /\s*=\s*=+\s*/g, " == ");
-			result = this.replaceOutsideStrings(result, /\s*!=\s*/g, " != ");
-			result = this.replaceOutsideStrings(result, /\s*<>\s*/g, " <> ");
-			result = this.replaceOutsideStrings(result, /\s*<=\s*/g, " <= ");
-			result = this.replaceOutsideStrings(result, /\s*>=\s*/g, " >= ");
-			result = this.replaceOutsideStrings(result, /\s*#\s*/g, " # ");
-			// Single = operator last (to avoid breaking == into =  =)
-			// Exclude ':' on the left so we don't split the assignment operator ':=' into ': ='
-			result = this.replaceOutsideStrings(result, /([^=<>!:])\s*=\s*([^=])/g, "$1 = $2");
-			// Single < and > operators (avoid breaking <= and >=)
-			result = this.replaceOutsideStrings(result, /([^<>=])\s*<\s*([^>=])/g, "$1 < $2");
-			result = this.replaceOutsideStrings(result, /([^<>=])\s*>\s*([^=])/g, "$1 > $2");
-
-			// Space around logical operators
-			result = this.replaceOutsideStrings(result, /\s*\.AND\.\s*/gi, " .AND. ");
-			result = this.replaceOutsideStrings(result, /\s*\.OR\.\s*/gi, " .OR. ");
-			result = this.replaceOutsideStrings(result, /\s*\.NOT\.\s*/gi, " .NOT. ");
-
-			// Handle unary ! operator
-			result = this.replaceOutsideStrings(result, /([a-zA-Z0-9_\)])\s*!/g, "$1 !");
-			result = this.replaceOutsideStrings(result, /!\s*([a-zA-Z0-9_\(])/g, "! $1");
-
-			// Space after commas
-			result = this.replaceOutsideStrings(result, /,(\S)/g, ", $1");
-
-			// No space before semicolons
-			result = this.replaceOutsideStrings(result, /\s+;/g, ";");
-			
-			return result;
-		});
-
-		return formattedLines.join('\n');
+		return normalizeOperatorSpacing(text);
 	}
 	
 	/**
 	 * Replace text only outside of string literals
 	 */
-	private replaceOutsideStrings(line: string, pattern: RegExp, replacement: string): string {
-		const segments: { text: string; inString: boolean }[] = [];
-		let current = '';
-		let inString = false;
-		let stringChar: string | null = null;
-		
-		for (let i = 0; i < line.length; i++) {
-			const char = line[i];
-			
-			if (!inString && (char === '"' || char === "'")) {
-				if (current) {
-					segments.push({ text: current, inString: false });
-					current = '';
-				}
-				inString = true;
-				stringChar = char;
-				current = char;
-			} else if (inString && char === stringChar) {
-				current += char;
-				segments.push({ text: current, inString: true });
-				current = '';
-				inString = false;
-				stringChar = null;
-			} else {
-				current += char;
-			}
-		}
-		
-		if (current) {
-			segments.push({ text: current, inString });
-		}
-		
-		// Apply replacements only to non-string segments
-		return segments.map(seg => {
-			if (seg.inString) {
-				return seg.text;
-			}
-			return seg.text.replace(pattern, replacement);
-		}).join('');
-	}
+	// replaceOutsideStrings functionality is provided by utils/formatters.replaceOutsideStrings
 
 	/**
 	 * Normalize indentation
