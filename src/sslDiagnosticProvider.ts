@@ -172,9 +172,15 @@ export class SSLDiagnosticProvider {
 			// Check for missing semicolons
 			// Skip: empty lines, comments, multi-line constructs, lines ending with semicolon
 			// Skip: lines ending with operators (continuation lines)
+			// Skip: lines starting with operators (continuation lines with leading operator)
+			// Skip: lines where the next line starts with an operator (leading continuation style)
 			const isSingleLineComment = trimmed.startsWith("/*") && trimmed.endsWith(";");
 			const isCommentLine = trimmed.startsWith("*") || trimmed.startsWith("/*");
-			const isContinuationLine = /[+\-*/,]$/.test(trimmed); // Ends with operator or comma
+			const endsWithOperator = /[+\-*/,]$/.test(trimmed);
+			const startsWithOperator = /^[+\-*/,]/.test(trimmed);
+			const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : "";
+			const nextStartsWithOperator = /^[+\-*/,]/.test(nextLine);
+			const isContinuationLine = endsWithOperator || startsWithOperator || nextStartsWithOperator;
 			
 			if (trimmed && !trimmed.endsWith(";") && !isCommentLine && !this.isMultilineConstruct(trimmed) && !isContinuationLine) {
 				const diagnostic = new vscode.Diagnostic(

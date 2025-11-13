@@ -84,32 +84,30 @@ DEFAULT_PRIORITY := "NORMAL";
 				:LOOP;
 			:ENDIF;
 
-            /* Determine processing action based on type;
+			/* Determine processing action based on type;
+			:IF bValidateOnly;
+				/* Validation only mode - skip processing;
+				nProcessed := nProcessed + 1;
+				:LOOP;
+			:ENDIF;
+
 			:BEGINCASE;
 			:CASE sProcessType == "ANALYSIS";
-				:IF .NOT. bValidateOnly;
-					DoProc("PerformAnalysis", {sSampleId, sPriority});
-				:ENDIF;
+				DoProc("PerformAnalysis", {sSampleId, sPriority});
 				:EXITCASE;
 
 			:CASE sProcessType == "APPROVAL";
-				:IF .NOT. bValidateOnly;
-					DoProc("ApproveSample", {sSampleId, dProcessDate});
-				:ENDIF;
+				DoProc("ApproveSample", {sSampleId, dProcessDate});
 				:EXITCASE;
 
 			:CASE sProcessType == "REJECTION";
-				:IF .NOT. bValidateOnly;
-					DoProc("RejectSample", {sSampleId, "Batch rejection", dProcessDate});
-				:ENDIF;
+				DoProc("RejectSample", {sSampleId, "Batch rejection", dProcessDate});
 				:EXITCASE;
 
 			:OTHERWISE;
 				usrmes("Unknown process type: " + sProcessType, 1);
 				:EXITCASE;
-			:ENDCASE;
-
-			nProcessed := nProcessed + 1;
+			:ENDCASE;			nProcessed := nProcessed + 1;
 		:NEXT;
 
 	:CATCH;
