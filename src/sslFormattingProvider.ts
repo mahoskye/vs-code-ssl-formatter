@@ -341,7 +341,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			result = this.replaceOutsideStrings(result, /\s*>=\s*/g, " >= ");
 			result = this.replaceOutsideStrings(result, /\s*#\s*/g, " # ");
 			// Single = operator last (to avoid breaking == into =  =)
-			result = this.replaceOutsideStrings(result, /([^=<>!])\s*=\s*([^=])/g, "$1 = $2");
+			// Exclude ':' on the left so we don't split the assignment operator ':=' into ': ='
+			result = this.replaceOutsideStrings(result, /([^=<>!:])\s*=\s*([^=])/g, "$1 = $2");
 			// Single < and > operators (avoid breaking <= and >=)
 			result = this.replaceOutsideStrings(result, /([^<>=])\s*<\s*([^>=])/g, "$1 < $2");
 			result = this.replaceOutsideStrings(result, /([^<>=])\s*>\s*([^=])/g, "$1 > $2");
