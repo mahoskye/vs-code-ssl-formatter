@@ -95,14 +95,6 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 			}
 		}
 
-		// Check for Hungarian notation hints
-		const hungarianHint = this.getHungarianNotationHint(word);
-		if (hungarianHint) {
-			const markdown = new vscode.MarkdownString();
-			markdown.appendMarkdown(hungarianHint);
-			return new vscode.Hover(markdown, range);
-		}
-
 		return null;
 	}
 
@@ -357,32 +349,6 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 				"oRegex:Multiline"
 			]
 		});
-	}
-
-	private getHungarianNotationHint(word: string): string | null {
-		if (word.length < 2) {
-			return null;
-		}
-
-		const prefix = word[0].toLowerCase();
-		const prefixMap: { [key: string]: string } = {
-			"s": "String variable",
-			"n": "Numeric variable",
-			"b": "Boolean variable",
-			"l": "Logical variable",
-			"d": "Date variable",
-			"a": "Array variable",
-			"o": "Object variable (UDO)"
-		};
-
-		const hint = prefixMap[prefix];
-		const secondChar = word[1];
-		// Check if second character is an uppercase letter (A-Z)
-		if (hint && word.length > 1 && /[A-Z]/.test(secondChar)) {
-			return `**Hungarian Notation:** ${hint}`;
-		}
-
-		return null;
 	}
 
 	/**

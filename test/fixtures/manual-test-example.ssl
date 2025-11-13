@@ -19,6 +19,7 @@ MAX_BATCH_SIZE := 100;
 MIN_SAMPLE_VOLUME := 5.0;
 DEFAULT_PRIORITY := "NORMAL";
 
+/* region sample processing procedures;
 /* ============================================================================
  * REGION Sample Processing Procedures
  * ============================================================================;
@@ -292,6 +293,8 @@ DEFAULT_PRIORITY := "NORMAL";
 	:ENDIF;
 :ENDPROC;
 
+/* endregion;
+/* region utility functions;
 /* ============================================================================
  * REGION Utility Functions
  * ============================================================================;
@@ -504,6 +507,8 @@ DEFAULT_PRIORITY := "NORMAL";
 	:RETURN nLastId;
 :ENDPROC;
 
+/* endregion;
+/* region array and data manipulation examples;
 /* ============================================================================
  * REGION Array and Data Manipulation Examples
  * ============================================================================;
@@ -555,6 +560,8 @@ DEFAULT_PRIORITY := "NORMAL";
 	usrmes("Average: " + Str(nAverage));
 :ENDPROC;
 
+/* endregion;
+/* region advanced control flow examples;
 /* ============================================================================
  * REGION Advanced Control Flow Examples
  * ============================================================================;
@@ -617,5 +624,23 @@ DEFAULT_PRIORITY := "NORMAL";
 		usrmes("Value " + Str(aValues[nCounter]) + " = " + sResult);
 	:NEXT;
 :ENDPROC;
+
+/* endregion;
+
+
+
+sQuery := "
+	SELECT COUNT(*)
+	FROM tests
+	WHERE sample_id = ?SAMPLE_ID?
+	AND status NOT IN ('COMPLETE', 'CANCELLED')
+";
+
+
+
+
+
+
+
 
 /* End of file;

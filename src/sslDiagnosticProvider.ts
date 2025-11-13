@@ -32,6 +32,10 @@ export class SSLDiagnosticProvider {
 
 		// Track multi-line comment state
 		let inMultiLineComment = false;
+		
+		// Track multi-line string state
+		let inMultiLineString = false;
+		let stringDelimiter = "";
 
 		// Hungarian notation settings
 		const hungarianEnabled = config.get<boolean>("naming.hungarianNotation.enabled", true);
@@ -48,6 +52,34 @@ export class SSLDiagnosticProvider {
 		for (let i = 0; i < lines.length && diagnostics.length < maxProblems; i++) {
 			const line = lines[i];
 			const trimmed = line.trim();
+
+			// Track multi-line string state
+			// Check if line opens a string that doesn't close
+			if (!inMultiLineString) {
+				// Check for opening quote (double or single) that doesn't close on same line
+				const doubleQuoteMatch = line.match(/"/g);
+				const singleQuoteMatch = line.match(/'/g);
+				
+				if (doubleQuoteMatch && doubleQuoteMatch.length % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = '"';
+					continue; // Skip this line - it opens a multi-line string
+				} else if (singleQuoteMatch && singleQuoteMatch.length % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = "'";
+					continue; // Skip this line - it opens a multi-line string
+				}
+			} else {
+				// We're inside a multi-line string, check if it closes
+				const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : "'", 'g')) || []).length;
+				if (delimiterCount % 2 !== 0) {
+					// String closes on this line
+					inMultiLineString = false;
+					stringDelimiter = "";
+				}
+				// Skip all processing for lines inside strings
+				continue;
+			}
 
 			// Track multi-line comment state
 			// Multi-line comments in SSL: /* ... ; (end with semicolon, not */)

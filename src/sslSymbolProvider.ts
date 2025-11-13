@@ -21,6 +21,36 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 			const line = lines[i];
 			const trimmed = line.trim();
 
+			// Match comment regions: /* region Name; or /*region Name;
+			const commentRegionMatch = trimmed.match(/^\/\*\s*region\s+(.+?);/i);
+			if (commentRegionMatch) {
+				const name = commentRegionMatch[1].trim();
+				const range = new vscode.Range(i, 0, i, line.length);
+				const selectionRange = new vscode.Range(i, line.indexOf(name), i, line.indexOf(name) + name.length);
+
+				currentRegion = new vscode.DocumentSymbol(
+					name,
+					"Region",
+					vscode.SymbolKind.Namespace,
+					range,
+					selectionRange
+				);
+
+				symbols.push(currentRegion);
+				continue;
+			}
+
+			// Match end of comment region: /* endregion; or /*endregion;
+			const commentEndRegionMatch = trimmed.match(/^\/\*\s*endregion/i);
+			if (commentEndRegionMatch && currentRegion) {
+				currentRegion.range = new vscode.Range(
+					currentRegion.range.start,
+					new vscode.Position(i, line.length)
+				);
+				currentRegion = null;
+				continue;
+			}
+
 			// Match procedures
 			const procMatch = trimmed.match(/^:PROCEDURE\s+(\w+)/i);
 			if (procMatch) {

@@ -177,8 +177,26 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Register inlay hints provider for parameter names
+    const inlayHintsProvider = new SSLInlayHintsProvider();
     context.subscriptions.push(
-        vscode.languages.registerInlayHintsProvider(documentSelector, new SSLInlayHintsProvider())
+        vscode.languages.registerInlayHintsProvider(documentSelector, inlayHintsProvider)
+    );
+
+    // Refresh inlay hints when cursor position changes
+    let lastActiveLine: number | undefined = undefined;
+    context.subscriptions.push(
+        vscode.window.onDidChangeTextEditorSelection((event) => {
+            const editor = event.textEditor;
+            if (editor.document.languageId === 'ssl') {
+                const currentLine = editor.selection.active.line;
+                // Only refresh if we moved to a different line
+                if (lastActiveLine !== currentLine) {
+                    lastActiveLine = currentLine;
+                    // Trigger inlay hints refresh using the provider's event
+                    inlayHintsProvider.refresh();
+                }
+            }
+        })
     );
 
     console.log("SSL extension fully activated with all language features including workspace search, call hierarchy, and inlay hints");

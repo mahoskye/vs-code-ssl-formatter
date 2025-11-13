@@ -1,0 +1,37 @@
+:PROCEDURE TestMultilineStrings;
+/* Test that multi-line strings preserve their internal formatting;
+
+	:DECLARE sQuery, sMessage;
+
+	/* Example 1: Multi-line SQL query with indentation;
+	sQuery := "
+		SELECT COUNT(*)
+		FROM tests
+		WHERE sample_id = ?SAMPLE_ID?
+			AND status NOT IN ('COMPLETE', 'CANCELLED')
+	";
+
+	/* Example 2: Another query;
+	sQuery := "
+		SELECT s.sample_id, s.sample_name, s.collection_date,
+			t.test_name, r.result_value, r.units
+		FROM samples s
+		JOIN tests t ON s.sample_id = t.sample_id
+		JOIN results r ON t.test_id = r.test_id
+		WHERE s.sample_id = ?SAMPLE_ID?
+		ORDER BY t.test_number
+	";
+
+	/* Example 3: Multi-line message;
+	sMessage := "This is a long message
+that spans multiple lines
+	with various indentation
+		for formatting purposes";
+
+	/* Example 4: Single quote string;
+	sMessage := 'Another multi-line
+string with single quotes
+	and indentation';
+
+	:RETURN .T.;
+:ENDPROC;

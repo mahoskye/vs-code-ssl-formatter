@@ -349,6 +349,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const lines = text.split("\n");
 		let indentLevel = 0;
 		let inMultiLineComment = false;
+		let inMultiLineString = false;
+		let stringDelimiter = "";
 		const indentChar = indentStyle === "tab" ? "\t" : " ".repeat(indentWidth);
 
 		const blockStart = /^\s*:(IF|WHILE|FOR|FOREACH|BEGINCASE|TRY|PROCEDURE|CLASS|REGION)\b/i;
@@ -358,6 +360,27 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 		const formatted = lines.map((line) => {
 			const trimmed = line.trim();
+
+			// Track multi-line string state
+			if (!inMultiLineString) {
+				const doubleQuoteCount = (line.match(/"/g) || []).length;
+				const singleQuoteCount = (line.match(/'/g) || []).length;
+				
+				if (doubleQuoteCount % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = '"';
+				} else if (singleQuoteCount % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = "'";
+				}
+			} else {
+				const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : "'", 'g')) || []).length;
+				if (delimiterCount % 2 !== 0) {
+					inMultiLineString = false;
+					stringDelimiter = "";
+				}
+				return line; // Don't re-indent string content
+			}
 
 			// Track multi-line comment state (SSL uses /* ... ; syntax)
 			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
@@ -415,10 +438,33 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	private normalizeContinuationIndentation(text: string, indentStyle: string, tabSize: number): string {
 		const lines = text.split("\n");
 		let inMultiLineComment = false;
+		let inMultiLineString = false;
+		let stringDelimiter = "";
 		let continuationIndent = 0;
 
 		const formatted = lines.map((line, index) => {
 			const trimmed = line.trim();
+
+			// Track multi-line string state
+			if (!inMultiLineString) {
+				const doubleQuoteCount = (line.match(/"/g) || []).length;
+				const singleQuoteCount = (line.match(/'/g) || []).length;
+				
+				if (doubleQuoteCount % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = '"';
+				} else if (singleQuoteCount % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = "'";
+				}
+			} else {
+				const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : "'", 'g')) || []).length;
+				if (delimiterCount % 2 !== 0) {
+					inMultiLineString = false;
+					stringDelimiter = "";
+				}
+				return line; // Don't re-indent string content
+			}
 
 			// Track multi-line comment state
 			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {

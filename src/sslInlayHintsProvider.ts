@@ -7,10 +7,19 @@ import * as vscode from "vscode";
 export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 	private functionSignatures: Map<string, string[]>;
+	private _onDidChangeInlayHints = new vscode.EventEmitter<void>();
+	public readonly onDidChangeInlayHints = this._onDidChangeInlayHints.event;
 
 	constructor() {
 		this.functionSignatures = new Map();
 		this.initializeFunctionSignatures();
+	}
+
+	/**
+	 * Trigger a refresh of inlay hints
+	 */
+	public refresh(): void {
+		this._onDidChangeInlayHints.fire();
 	}
 
 	public provideInlayHints(
@@ -19,15 +28,32 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		token: vscode.CancellationToken
 	): vscode.InlayHint[] {
 		const config = vscode.workspace.getConfiguration("ssl");
-		const inlayHintsEnabled = config.get<boolean>("intellisense.inlayHints.enabled", false);
-		const showParameterNames = config.get<boolean>("intellisense.inlayHints.parameterNames", false);
+		const inlayHintsEnabled = config.get<boolean>("intellisense.inlayHints.enabled", true);
+		const showParameterNames = config.get<boolean>("intellisense.inlayHints.parameterNames", true);
 
 		if (!inlayHintsEnabled || !showParameterNames) {
 			return [];
 		}
 
+		// Only show hints for the active line
+		const editor = vscode.window.activeTextEditor;
+		if (!editor || editor.document !== document) {
+			return [];
+		}
+
+		const activeLine = editor.selection.active.line;
+		
+		// Only process if the range includes the active line
+		if (activeLine < range.start.line || activeLine > range.end.line) {
+			return [];
+		}
+
+		// Get only the active line text
+		const lineRange = document.lineAt(activeLine).range;
+		const text = document.getText(lineRange);
+		const lineStartOffset = document.offsetAt(lineRange.start);
+
 		const hints: vscode.InlayHint[] = [];
-		const text = document.getText(range);
 
 		// Find function calls with balanced parentheses
 		const functionMatches = this.findFunctionCalls(text);
@@ -50,7 +76,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 					groups: undefined
 				}) as RegExpExecArray;
 				
-				const doProcHints = this.getDoProcInlayHints(document, range, regExpMatch);
+				const doProcHints = this.getDoProcInlayHints(document, lineStartOffset, regExpMatch);
 				hints.push(...doProcHints);
 				continue;
 			}
@@ -74,8 +100,8 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 					continue;
 				}
 
-				// Calculate the position in the document
-				const absoluteOffset = document.offsetAt(range.start) + currentOffset;
+				// Calculate the position in the document using line start offset
+				const absoluteOffset = lineStartOffset + currentOffset;
 				const position = document.positionAt(absoluteOffset);
 
 				// Skip whitespace
@@ -107,7 +133,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 	 */
 	private getDoProcInlayHints(
 		document: vscode.TextDocument,
-		range: vscode.Range,
+		lineStartOffset: number,
 		match: RegExpExecArray
 	): vscode.InlayHint[] {
 		const hints: vscode.InlayHint[] = [];
@@ -171,7 +197,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 				continue;
 			}
 
-			const absoluteOffset = document.offsetAt(range.start) + currentOffset;
+			const absoluteOffset = lineStartOffset + currentOffset;
 			const position = document.positionAt(absoluteOffset);
 
 			// Skip whitespace to find actual argument start
