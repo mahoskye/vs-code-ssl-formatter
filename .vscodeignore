@@ -5,6 +5,7 @@ node_modules/**
 out/test/**
 out/tests/**
 out/scripts/**
+out/docs/**
 out/dev docs/**
 out/ssl-style-guide/**
 
@@ -16,7 +17,7 @@ scripts/**
 tsconfig.json
 
 # Development documentation
-dev docs/**
+docs/**
 .claude/**
 
 # CI/CD
