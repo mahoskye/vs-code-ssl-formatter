@@ -15,6 +15,7 @@ import { SSLWorkspaceSymbolProvider } from "./sslWorkspaceSymbolProvider";
 import { SSLDocumentHighlightProvider } from "./sslDocumentHighlightProvider";
 import { SSLCallHierarchyProvider } from "./sslCallHierarchyProvider";
 import { SSLInlayHintsProvider } from "./sslInlayHintsProvider";
+import { Logger } from "./utils/logger";
 
 /**
  * Activates the SSL extension.
@@ -23,7 +24,9 @@ import { SSLInlayHintsProvider } from "./sslInlayHintsProvider";
  * @param context The extension context provided by VS Code.
  */
 export function activate(context: vscode.ExtensionContext) {
-    console.log("SSL extension is now active!");
+    // Initialize logger
+    Logger.initialize(context);
+    Logger.info("SSL extension is now active!");
 
     const documentSelector: vscode.DocumentSelector = { language: "ssl", scheme: "file" };
 
@@ -199,7 +202,7 @@ export function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    console.log("SSL extension fully activated with all language features including workspace search, call hierarchy, and inlay hints");
+    Logger.info("SSL extension fully activated with all language features including workspace search, call hierarchy, and inlay hints");
 }
 
 /**
@@ -208,5 +211,6 @@ export function activate(context: vscode.ExtensionContext) {
  * Use this to clean up your extension resources.
  */
 export function deactivate() {
-    console.log("SSL extension is being deactivated");
+    Logger.info("SSL extension is being deactivated");
+    Logger.dispose();
 }

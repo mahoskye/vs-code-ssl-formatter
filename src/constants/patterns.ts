@@ -107,6 +107,7 @@ export const PATTERNS = {
     // DoProc patterns
     DOPROC_CALL: /DoProc\s*\(\s*["']([^"']+)["']\s*,\s*\{([^}]*)\}/i,
     DOPROC_NO_PARAMS: /DoProc\s*\(\s*["']([^"']+)["']\s*\)/i,
+    DOPROC_COMPLETION: /DoProc\s*\(\s*["']([^"']*)$/i,
 
     // Function call patterns
     FUNCTION_CALL: /\b(\w+)\s*\(/g,

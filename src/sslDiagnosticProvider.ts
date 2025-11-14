@@ -6,7 +6,8 @@ import {
     BLOCK_END_KEYWORDS,
     BLOCK_MIDDLE_KEYWORDS,
     CASE_KEYWORDS,
-    MULTILINE_CONSTRUCT_KEYWORDS
+    MULTILINE_CONSTRUCT_KEYWORDS,
+    LOOP_COUNTER_EXCEPTIONS
 } from "./constants/language";
 import {
     CONFIG_KEYS,
@@ -21,6 +22,7 @@ import {
     DIAGNOSTIC_SEVERITIES
 } from "./constants/diagnostics";
 import { hasValidHungarianNotation } from "./constants/hungarian";
+import { Logger } from "./utils/logger";
 
 /**
  * SSL Diagnostic Provider
@@ -36,8 +38,8 @@ export class SSLDiagnosticProvider {
 
 	public updateDiagnostics(document: vscode.TextDocument): void {
 		const fileName = document.fileName.split('/').pop();
-		console.log(`[SSL Debug] ========== Analyzing ${fileName} ==========`);
-		
+		Logger.debug(`========== Analyzing ${fileName} ==========`);
+
 		const config = vscode.workspace.getConfiguration("ssl");
 		const maxProblems = config.get<number>(CONFIG_KEYS.MAX_NUMBER_OF_PROBLEMS, CONFIG_DEFAULTS[CONFIG_KEYS.MAX_NUMBER_OF_PROBLEMS]);
 		const strictMode = config.get<boolean>(CONFIG_KEYS.STRICT_STYLE_GUIDE_MODE, CONFIG_DEFAULTS[CONFIG_KEYS.STRICT_STYLE_GUIDE_MODE]);
@@ -45,8 +47,8 @@ export class SSLDiagnosticProvider {
 		const diagnostics: vscode.Diagnostic[] = [];
 		const text = document.getText();
 		const lines = text.split("\n");
-		
-		console.log(`[SSL Debug] Total lines: ${lines.length}`);
+
+		Logger.debug(`Total lines: ${lines.length}`);
 
 		// Track nesting depth
 		let blockDepth = 0;
@@ -124,9 +126,9 @@ export class SSLDiagnosticProvider {
 				
 				paramPlaceholders.forEach(placeholder => {
 					const paramName = placeholder.replace(/\?/g, '');
-					
-					console.log(`[SSL Debug] Line ${i + 1}: Checking SQL param '${paramName}', declared identifiers: [${Array.from(declaredIdentifiers).join(', ')}]`);
-					
+
+					Logger.debug(`Line ${i + 1}: Checking SQL param '${paramName}', declared identifiers: [${Array.from(declaredIdentifiers).join(', ')}]`);
+
 					// Check if it's a valid identifier (constant or variable)
 					if (!declaredIdentifiers.has(paramName)) {
 						const columnIndex = line.indexOf(placeholder);
@@ -137,7 +139,7 @@ export class SSLDiagnosticProvider {
 						);
 						diagnostic.code = DIAGNOSTIC_CODES.INVALID_SQL_PARAM;
 						diagnostics.push(diagnostic);
-						console.log(`[SSL Debug] ERROR: Invalid SQL param '${paramName}' at line ${i + 1}`);
+						Logger.debug(`ERROR: Invalid SQL param '${paramName}' at line ${i + 1}`);
 					}
 				});
 			}
@@ -148,9 +150,9 @@ export class SSLDiagnosticProvider {
 			if (assignmentMatch && !trimmed.startsWith(':')) {
 				const varName = assignmentMatch[1];
 				const declaredIdentifiers = this.getDeclaredIdentifiers(lines, i);
-				
-				console.log(`[SSL Debug] Line ${i + 1}: Checking assignment '${varName}', declared identifiers: [${Array.from(declaredIdentifiers).join(', ')}]`);
-				
+
+				Logger.debug(`Line ${i + 1}: Checking assignment '${varName}', declared identifiers: [${Array.from(declaredIdentifiers).join(', ')}]`);
+
 				// Check if variable was declared before use
 				if (!declaredIdentifiers.has(varName)) {
 					const diagnostic = new vscode.Diagnostic(
@@ -160,7 +162,7 @@ export class SSLDiagnosticProvider {
 					);
 					diagnostic.code = DIAGNOSTIC_CODES.UNDECLARED_VARIABLE;
 					diagnostics.push(diagnostic);
-					console.log(`[SSL Debug] WARNING: Undeclared variable '${varName}' at line ${i + 1}`);
+					Logger.debug(`WARNING: Undeclared variable '${varName}' at line ${i + 1}`);
 				}
 			}
 
@@ -331,9 +333,9 @@ export class SSLDiagnosticProvider {
 					
 					// Common SSL functions (lowercase versions)
 					const sslFunctions = new Set(SSL_BUILTIN_FUNCTIONS.map(f => f.name.toLowerCase()));
-					
+
 					// Loop counter exceptions
-					const loopCounters = new Set(['i', 'j', 'k', 'x', 'y', 'z']); // TODO: Move to constants
+					const loopCounters = new Set(LOOP_COUNTER_EXCEPTIONS);
 					
 					varReferences.forEach(varRef => {
 						const lowerRef = varRef.toLowerCase();
@@ -361,7 +363,7 @@ export class SSLDiagnosticProvider {
 											);
 											diagnostic.code = "ssl-undefined-variable";
 											diagnostics.push(diagnostic);
-											console.log(`[SSL Debug] ERROR: Undefined variable '${varRef}' at line ${i + 1}`);
+											Logger.debug(`ERROR: Undefined variable '${varRef}' at line ${i + 1}`);
 										} else if (!isInLocalScope && isInGlobalScope) {
 											// Variable exists globally but not declared locally - WARNING
 											const diagnostic = new vscode.Diagnostic(
@@ -371,7 +373,7 @@ export class SSLDiagnosticProvider {
 											);
 											diagnostic.code = "ssl-global-variable-in-procedure";
 											diagnostics.push(diagnostic);
-											console.log(`[SSL Debug] WARNING: Global variable used in procedure '${varRef}' at line ${i + 1}`);
+											Logger.debug(`WARNING: Global variable used in procedure '${varRef}' at line ${i + 1}`);
 										}
 										// else: variable is in local scope, all good!
 									} else {
@@ -385,7 +387,7 @@ export class SSLDiagnosticProvider {
 											);
 											diagnostic.code = "ssl-undefined-variable";
 											diagnostics.push(diagnostic);
-											console.log(`[SSL Debug] ERROR: Undefined variable in global scope '${varRef}' at line ${i + 1}`);
+											Logger.debug(`ERROR: Undefined variable in global scope '${varRef}' at line ${i + 1}`);
 										}
 										// else: variable is in global scope, all good!
 									}
@@ -670,10 +672,10 @@ export class SSLDiagnosticProvider {
 			}
 		}
 
-		console.log(`[SSL Debug] Found ${diagnostics.length} diagnostic${diagnostics.length !== 1 ? 's' : ''}`);
+		Logger.debug(`Found ${diagnostics.length} diagnostic${diagnostics.length !== 1 ? 's' : ''}`);
 		if (diagnostics.length > 0) {
 			diagnostics.forEach((d, idx) => {
-				console.log(`  ${idx + 1}. Line ${d.range.start.line + 1}: [${d.code}] ${d.message}`);
+				Logger.debug(`  ${idx + 1}. Line ${d.range.start.line + 1}: [${d.code}] ${d.message}`);
 			});
 		}
 		

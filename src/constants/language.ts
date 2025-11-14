@@ -45,6 +45,14 @@ export const MULTILINE_CONSTRUCT_KEYWORDS = [
     "LOOP", "EXITWHILE", "RETURN"
 ];
 
+/**
+ * Common loop counter variable names
+ * These are exceptions to Hungarian notation rules
+ */
+export const LOOP_COUNTER_EXCEPTIONS = [
+    "i", "j", "k", "x", "y", "z"
+];
+
 export interface SSLFunction {
     name: string;
     description: string;

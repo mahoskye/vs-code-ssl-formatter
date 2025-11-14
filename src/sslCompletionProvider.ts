@@ -48,7 +48,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		const textBeforeCursor = lineText.substring(0, position.character);
 
 		// Check if we're inside a DoProc call suggesting procedure names
-		const doProcMatch = textBeforeCursor.match(/DoProc\s*\(\s*["']([^"']*)$/i); // TODO: Use PATTERNS
+		const doProcMatch = textBeforeCursor.match(PATTERNS.DOPROC_COMPLETION);
 		if (doProcMatch) {
 			return this.getProcedureCompletions(document);
 		}
