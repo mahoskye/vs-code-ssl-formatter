@@ -1,5 +1,21 @@
 import * as vscode from "vscode";
 import { SSLFoldingProvider } from "./sslFoldingProvider";
+import { SSLFormattingProvider } from "./sslFormattingProvider";
+import { SSLSymbolProvider } from "./sslSymbolProvider";
+import { SSLCompletionProvider } from "./sslCompletionProvider";
+import { SSLHoverProvider } from "./sslHoverProvider";
+import { SSLDiagnosticProvider } from "./sslDiagnosticProvider";
+import { SSLDefinitionProvider } from "./sslDefinitionProvider";
+import { SSLReferenceProvider } from "./sslReferenceProvider";
+import { SSLRenameProvider } from "./sslRenameProvider";
+import { SSLSignatureHelpProvider } from "./sslSignatureHelpProvider";
+import { SSLCodeLensProvider } from "./sslCodeLensProvider";
+import { SSLCodeActionProvider } from "./sslCodeActionProvider";
+import { SSLWorkspaceSymbolProvider } from "./sslWorkspaceSymbolProvider";
+import { SSLDocumentHighlightProvider } from "./sslDocumentHighlightProvider";
+import { SSLCallHierarchyProvider } from "./sslCallHierarchyProvider";
+import { SSLInlayHintsProvider } from "./sslInlayHintsProvider";
+import { Logger } from "./utils/logger";
 
 /**
  * Activates the SSL extension.
@@ -8,12 +24,185 @@ import { SSLFoldingProvider } from "./sslFoldingProvider";
  * @param context The extension context provided by VS Code.
  */
 export function activate(context: vscode.ExtensionContext) {
-    console.log("SSL extension is now active!");
+    // Initialize logger
+    Logger.initialize(context);
+    Logger.info("SSL extension is now active!");
+
+    const documentSelector: vscode.DocumentSelector = { language: "ssl", scheme: "file" };
 
     // Register the folding range provider for SSL language
     context.subscriptions.push(
-        vscode.languages.registerFoldingRangeProvider({ language: "ssl" }, new SSLFoldingProvider())
+        vscode.languages.registerFoldingRangeProvider(documentSelector, new SSLFoldingProvider())
     );
+
+    // Register formatting providers
+    const formattingProvider = new SSLFormattingProvider();
+    context.subscriptions.push(
+        vscode.languages.registerDocumentFormattingEditProvider(documentSelector, formattingProvider)
+    );
+    context.subscriptions.push(
+        vscode.languages.registerDocumentRangeFormattingEditProvider(documentSelector, formattingProvider)
+    );
+
+    // Register document symbol provider for outline and breadcrumbs
+    context.subscriptions.push(
+        vscode.languages.registerDocumentSymbolProvider(documentSelector, new SSLSymbolProvider())
+    );
+
+    // Register completion provider for IntelliSense
+    context.subscriptions.push(
+        vscode.languages.registerCompletionItemProvider(
+            documentSelector,
+            new SSLCompletionProvider(),
+            ":", ".", "(", '"', "'"
+        )
+    );
+
+    // Register hover provider for symbol information
+    context.subscriptions.push(
+        vscode.languages.registerHoverProvider(documentSelector, new SSLHoverProvider())
+    );
+
+    // Register diagnostic provider for code quality checks
+    const diagnosticProvider = new SSLDiagnosticProvider();
+    context.subscriptions.push(diagnosticProvider);
+
+    // Update diagnostics on document changes
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument(document => {
+            if (document.languageId === "ssl") {
+                diagnosticProvider.updateDiagnostics(document);
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeTextDocument(event => {
+            if (event.document.languageId === "ssl") {
+                diagnosticProvider.updateDiagnostics(event.document);
+            }
+        })
+    );
+
+    context.subscriptions.push(
+        vscode.workspace.onDidCloseTextDocument(document => {
+            if (document.languageId === "ssl") {
+                diagnosticProvider.clear(document);
+            }
+        })
+    );
+
+    // Run diagnostics on already open SSL documents
+    vscode.workspace.textDocuments.forEach(document => {
+        if (document.languageId === "ssl") {
+            diagnosticProvider.updateDiagnostics(document);
+        }
+    });
+
+    // Register format on save if enabled
+    context.subscriptions.push(
+        vscode.workspace.onWillSaveTextDocument(event => {
+            const config = vscode.workspace.getConfiguration("ssl");
+            const formatOnSave = config.get<boolean>("format.formatOnSave", false);
+
+            if (event.document.languageId === "ssl" && formatOnSave) {
+                const editor = vscode.window.activeTextEditor;
+                if (editor && editor.document === event.document) {
+                    event.waitUntil(
+                        vscode.commands.executeCommand("editor.action.formatDocument")
+                    );
+                }
+            }
+        })
+    );
+
+    // Register definition provider for Go to Definition
+    context.subscriptions.push(
+        vscode.languages.registerDefinitionProvider(documentSelector, new SSLDefinitionProvider())
+    );
+
+    // Register reference provider for Find All References
+    context.subscriptions.push(
+        vscode.languages.registerReferenceProvider(documentSelector, new SSLReferenceProvider())
+    );
+
+    // Register rename provider for symbol renaming
+    context.subscriptions.push(
+        vscode.languages.registerRenameProvider(documentSelector, new SSLRenameProvider())
+    );
+
+    // Signature help disabled - using inlay hints instead for less invasive parameter documentation
+    // context.subscriptions.push(
+    //     vscode.languages.registerSignatureHelpProvider(
+    //         documentSelector,
+    //         new SSLSignatureHelpProvider(),
+    //         "(", ","
+    //     )
+    // );
+
+    // Register CodeLens provider for reference counts
+    const codeLensProvider = new SSLCodeLensProvider();
+    context.subscriptions.push(
+        vscode.languages.registerCodeLensProvider(documentSelector, codeLensProvider)
+    );
+
+    // Refresh CodeLens when document changes
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeTextDocument(() => {
+            codeLensProvider.refresh();
+        })
+    );
+
+    // Register code action provider for quick fixes
+    context.subscriptions.push(
+        vscode.languages.registerCodeActionsProvider(
+            documentSelector,
+            new SSLCodeActionProvider(),
+            {
+                providedCodeActionKinds: SSLCodeActionProvider.providedCodeActionKinds
+            }
+        )
+    );
+
+    // Register workspace symbol provider for global search (Ctrl+T)
+    context.subscriptions.push(
+        vscode.languages.registerWorkspaceSymbolProvider(new SSLWorkspaceSymbolProvider())
+    );
+
+    // Register document highlight provider for symbol occurrence highlighting
+    context.subscriptions.push(
+        vscode.languages.registerDocumentHighlightProvider(documentSelector, new SSLDocumentHighlightProvider())
+    );
+
+    // Register call hierarchy provider for procedure call trees
+    context.subscriptions.push(
+        vscode.languages.registerCallHierarchyProvider(documentSelector, new SSLCallHierarchyProvider())
+    );
+
+    // Register inlay hints provider for parameter names
+    const inlayHintsProvider = new SSLInlayHintsProvider();
+    context.subscriptions.push(
+        vscode.languages.registerInlayHintsProvider(documentSelector, inlayHintsProvider)
+    );
+
+    // Refresh inlay hints when cursor position changes
+    let lastActiveLine: number | undefined = undefined;
+    context.subscriptions.push(
+        vscode.window.onDidChangeTextEditorSelection((event) => {
+            const editor = event.textEditor;
+            if (editor.document.languageId === 'ssl') {
+                const currentLine = editor.selection.active.line;
+                // Only refresh if we moved to a different line
+                if (lastActiveLine !== currentLine) {
+                    lastActiveLine = currentLine;
+                    // Trigger inlay hints refresh using the provider's event
+                    inlayHintsProvider.refresh();
+                }
+            }
+        })
+    );
+
+    Logger.info("SSL extension fully activated with all language features including workspace search, call hierarchy, and inlay hints");
 }
 
 /**
@@ -22,5 +211,6 @@ export function activate(context: vscode.ExtensionContext) {
  * Use this to clean up your extension resources.
  */
 export function deactivate() {
-    // Currently, no cleanup is necessary
+    Logger.info("SSL extension is being deactivated");
+    Logger.dispose();
 }

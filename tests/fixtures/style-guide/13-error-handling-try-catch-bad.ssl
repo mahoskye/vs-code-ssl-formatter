@@ -1,0 +1,12 @@
+/* TRY/CATCH/FINALLY structure;
+:PROCEDURE TestTryCatch;
+:DECLARE nResult;
+	:TRY;
+	nResult := SQLExecute("SELECT * FROM table","query",0,0,0,"","","",0);
+	:CATCH;
+	sError := GetLastSSLError();
+	:FINALLY;
+	/* cleanup;
+	:ENDTRY;
+:RETURN nResult;
+:ENDPROC;

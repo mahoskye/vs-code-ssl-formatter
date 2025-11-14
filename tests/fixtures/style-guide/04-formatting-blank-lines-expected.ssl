@@ -1,0 +1,12 @@
+/* Procedure one;
+:PROCEDURE ProcedureOne;
+	nValue := 1;
+:ENDPROC;
+
+:PROCEDURE ProcedureTwo;
+	nValue := 2;
+:ENDPROC;
+
+:PROCEDURE ProcedureThree;
+	nValue := 3;
+:ENDPROC;

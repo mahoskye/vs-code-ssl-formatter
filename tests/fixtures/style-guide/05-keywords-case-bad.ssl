@@ -1,0 +1,11 @@
+/* Keywords must be uppercase with colon prefix;
+:procedure TestKeywordCase;
+:parameters nValue;
+:declare nResult;
+	:if nValue > 0;
+		nResult := 1;
+	:else;
+		nResult := 0;
+	:endif;
+:return nResult;
+:endproc;

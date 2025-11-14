@@ -1,0 +1,146 @@
+/* Test file to check if mismatched block keywords throw errors;
+
+/* Test 1: ENDIF without IF;
+:PROCEDURE TestEndIfWithoutIf;
+	:DECLARE sResult;
+	sResult := "test";
+	:ENDIF;  /* Should error: no matching IF;
+:ENDPROC;
+
+/* Test 2: ELSE without IF;
+:PROCEDURE TestElseWithoutIf;
+	:DECLARE sResult;
+	sResult := "test";
+	:ELSE;  /* Should error: no matching IF;
+	sResult := "else";
+:ENDPROC;
+
+/* Test 3: EXITWHILE without WHILE;
+:PROCEDURE TestExitWhileWithoutWhile;
+	:DECLARE nCount;
+	nCount := 0;
+	:EXITWHILE;  /* Should error: no matching WHILE;
+:ENDPROC;
+
+/* Test 4: ENDWHILE without WHILE;
+:PROCEDURE TestEndWhileWithoutWhile;
+	:DECLARE nCount;
+	nCount := 0;
+	:ENDWHILE;  /* Should error: no matching WHILE;
+:ENDPROC;
+
+/* Test 5: LOOP without WHILE;
+:PROCEDURE TestLoopWithoutWhile;
+	:DECLARE nCount;
+	nCount := 0;
+	:IF nCount < 10;
+		:LOOP;  /* Should error: no matching WHILE;
+	:ENDIF;
+:ENDPROC;
+
+/* Test 6: ENDCASE without BEGINCASE;
+:PROCEDURE TestEndCaseWithoutBeginCase;
+	:DECLARE sValue;
+	sValue := "test";
+	:ENDCASE;  /* Should error: no matching BEGINCASE;
+:ENDPROC;
+
+/* Test 7: ENDPROC without PROCEDURE;
+:DECLARE sGlobal;
+sGlobal := "test";
+:ENDPROC;  /* Should error: no matching PROCEDURE;
+
+/* Test 8: NEXT without FOR;
+:PROCEDURE TestNextWithoutFor;
+	:DECLARE nCount;
+	nCount := 0;
+	:NEXT;  /* Should error: no matching FOR;
+:ENDPROC;
+
+/* Test 9: TO without FOR;
+:PROCEDURE TestToWithoutFor;
+	:DECLARE nCount;
+	nCount := 0;
+	:TO 10;  /* Should error: no matching FOR;
+:ENDPROC;
+
+/* Test 10: STEP without FOR;
+:PROCEDURE TestStepWithoutFor;
+	:DECLARE nCount;
+	nCount := 0;
+	:STEP 2;  /* Should error: no matching FOR;
+:ENDPROC;
+
+/* Test 11: DEFAULT without PARAMETERS;
+:PROCEDURE TestDefaultWithoutParameters;
+	:DECLARE sValue;
+	:DEFAULT "test";  /* Should error: no matching PARAMETERS;
+	sValue := "test";
+:ENDPROC;
+
+/* Test 12: ENDREGION without REGION;
+:PROCEDURE TestEndRegionWithoutRegion;
+	:DECLARE sValue;
+	sValue := "test";
+	:ENDREGION;  /* Should error: no matching REGION;
+:ENDPROC;
+
+/* Test 13: ENDINLINECODE without BEGININLINECODE;
+:PROCEDURE TestEndInlineCodeWithoutBeginInlineCode;
+	:DECLARE sValue;
+	sValue := "test";
+	:ENDINLINECODE;  /* Should error: no matching BEGININLINECODE;
+:ENDPROC;
+
+/* Test 14: CATCH without TRY;
+:PROCEDURE TestCatchWithoutTry;
+	:DECLARE sValue;
+	sValue := "test";
+	:CATCH;  /* Should error: no matching TRY;
+	sValue := "error";
+:ENDPROC;
+
+/* Test 15: FINALLY without TRY;
+:PROCEDURE TestFinallyWithoutTry;
+	:DECLARE sValue;
+	sValue := "test";
+	:FINALLY;  /* Should error: no matching TRY;
+	sValue := "cleanup";
+:ENDPROC;
+
+/* Test 16: ENDTRY without TRY;
+:PROCEDURE TestEndTryWithoutTry;
+	:DECLARE sValue;
+	sValue := "test";
+	:ENDTRY;  /* Should error: no matching TRY;
+:ENDPROC;
+
+/* Test 17: CASE without BEGINCASE;
+:PROCEDURE TestCaseWithoutBeginCase;
+	:DECLARE nValue;
+	nValue := 1;
+	:CASE nValue = 1;  /* Should error: no matching BEGINCASE;
+	nValue := 2;
+:ENDPROC;
+
+/* Test 18: OTHERWISE without BEGINCASE;
+:PROCEDURE TestOtherwiseWithoutBeginCase;
+	:DECLARE nValue;
+	nValue := 1;
+	:OTHERWISE;  /* Should error: no matching BEGINCASE;
+	nValue := 2;
+:ENDPROC;
+
+/* Test 19: EXITCASE without BEGINCASE;
+:PROCEDURE TestExitCaseWithoutBeginCase;
+	:DECLARE nValue;
+	nValue := 1;
+	:EXITCASE;  /* Should error: no matching BEGINCASE;
+:ENDPROC;
+
+/* Test 20: EXITFOR without FOR;
+:PROCEDURE TestExitForWithoutFor;
+	:DECLARE nCount;
+	nCount := 0;
+	:EXITFOR;  /* Should error: no matching FOR;
+:ENDPROC;
