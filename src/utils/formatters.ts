@@ -5,6 +5,9 @@
  * that look like comments (block-start '/*' or leading '*') or lines inside a
  * multi-line comment. Replacements are done only on code lines and are applied
  * outside string literals.
+ *
+ * Note: SSL does not support escape sequences. Backslashes are literal characters,
+ * not escape characters. A quote character always ends a string.
  */
 
 export function replaceOutsideStrings(line: string, pattern: RegExp, replacement: string): string {
@@ -15,7 +18,7 @@ export function replaceOutsideStrings(line: string, pattern: RegExp, replacement
 
     for (let i = 0; i < line.length; i++) {
         const char = line[i];
-        // Handle start of string (simple - does not attempt to fully parse escapes)
+        // Handle start of string
         if (!inString && (char === '"' || char === "'")) {
             if (current) {
                 segments.push({ text: current, inString: false });
@@ -29,7 +32,7 @@ export function replaceOutsideStrings(line: string, pattern: RegExp, replacement
 
         if (inString) {
             current += char;
-            // naive string end detection (works for our fixtures)
+            // String end detection: quote always ends the string (no escape sequences in SSL)
             if (char === stringChar) {
                 segments.push({ text: current, inString: true });
                 current = '';

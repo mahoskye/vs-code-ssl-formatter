@@ -5,6 +5,22 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2025-11-14
+
+### Fixed
+
+- **String Parsing**: Fixed incorrect escape sequence handling in string parsing and syntax highlighting
+  - SSL does not support escape sequences - backslashes are literal characters, not escape characters
+  - Removed incorrect `prevChar !== '\\'` check in `sslFormattingProvider.ts` that was treating backslashes as escape characters
+  - Removed escape sequence patterns from TextMate grammar (`ssl.tmLanguage.json`) that were incorrectly highlighting `\s`, `\"`, etc. as escape sequences
+  - A quote character always ends a string in SSL (e.g., `"\"` is a string containing a single backslash, followed by end-of-string)
+  - String examples that now work correctly:
+    - `"\"` - String containing a single backslash
+    - `"\" for "/"` - Two separate strings: `"\"` and `"/"`
+    - `"C:\string\"` - String containing `C:\string\` (backslashes are literal, quote ends the string)
+    - `"test\"` - String containing `test\` (backslash is literal, quote ends the string)
+  - Updated comments in `formatters.ts` and `sslFoldingProvider.ts` to clarify that SSL has no escape sequences
+
 ## [1.0.0] - 2025-11-14
 
 ### 🎉 Production Release

@@ -150,10 +150,6 @@
       },
       "patterns": [
         {
-          "match": "\\\\.",
-          "name": "constant.character.escape.ssl"
-        },
-        {
           "name": "keyword.other.database-parameter.ssl",
           "match": "\\?[^?]*\\?"
         }
@@ -174,10 +170,6 @@
         }
       },
       "patterns": [
-        {
-          "match": "\\\\.",
-          "name": "constant.character.escape.ssl"
-        },
         {
           "name": "string.quoted.single.ssl keyword.other.database-parameter.ssl",
           "match": "\\?[^?]*\\?",

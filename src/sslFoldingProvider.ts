@@ -65,7 +65,7 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
                 continue;
             }
 
-            // Ignore content within strings
+            // Ignore content within strings (SSL has no escape sequences - quotes always end strings)
             if ((line.match(/"/g) || []).length % 2 !== 0) {
                 inString = !inString;
             }

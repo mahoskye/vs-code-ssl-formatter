@@ -171,7 +171,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 					inString = true;
 					stringChar = char;
 					currentStatement += char;
-				} else if (inString && char === stringChar && prevChar !== '\\') {
+				} else if (inString && char === stringChar) {
 					inString = false;
 					stringChar = '';
 					currentStatement += char;
