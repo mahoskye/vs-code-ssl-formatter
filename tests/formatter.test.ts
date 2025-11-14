@@ -211,8 +211,11 @@ describe('SSL Formatter - Style Guide Fixtures', () => {
 			const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
 			const formatted = applyEdits(input, edits as any[]);
 
+			// Normalize line endings for cross-platform compatibility
+			const normalizeLineEndings = (str: string) => str.replace(/\r\n/g, '\n');
+
 			// Compare actual output to expected output
-			expect(formatted).to.equal(expected,
+			expect(normalizeLineEndings(formatted)).to.equal(normalizeLineEndings(expected),
 				`Formatter output for ${fixtureName} doesn't match expected.\n` +
 				`Input file: ${badPath}\n` +
 				`Expected file: ${expectedPath}`
