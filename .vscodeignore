@@ -1,4 +1,38 @@
+# Build and test directories
 .vscode/**
 .vscode-test/**
+node_modules/**
+out/test/**
+out/tests/**
+out/scripts/**
+out/dev docs/**
+out/ssl-style-guide/**
+
+# Source files (only ship compiled JS)
+src/**
+tests/**
+scripts/**
+*.ts
+tsconfig.json
+
+# Development documentation
+dev docs/**
+.claude/**
+
+# CI/CD
+.github/**
+
+# Git files
+.git/**
 .gitignore
+.gitattributes
+
+# NPM files
+.npmignore
+
+# Editor files
+.editorconfig
+.eslintrc.json
+
+# Documentation (keep README.md and CHANGELOG.md)
 vsc-extension-quickstart.md

@@ -1,5 +1,9 @@
 # STARLIMS Scripting Language (SSL) Extension for VS Code
 
+![CI](https://github.com/mahoskye/vs-code-ssl-formatter/workflows/CI/badge.svg)
+[![Version](https://img.shields.io/visual-studio-marketplace/v/mahoskye.vs-code-ssl-formatter.svg)](https://marketplace.visualstudio.com/items?itemName=mahoskye.vs-code-ssl-formatter)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/mahoskye.vs-code-ssl-formatter.svg)](https://marketplace.visualstudio.com/items?itemName=mahoskye.vs-code-ssl-formatter)
+
 A comprehensive Visual Studio Code extension providing syntax highlighting, code formatting, IntelliSense, and code quality tools for STARLIMS Scripting Language (SSL).
 
 ## Features

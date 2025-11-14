@@ -4,7 +4,7 @@
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
     "version": "0.4.0",
     "engines": {
-        "vscode": "^1.94.0"
+        "vscode": "^1.105.0"
     },
     "categories": [
         "Programming Languages",
@@ -202,7 +202,9 @@
         "test:unit": "NODE_OPTIONS='--no-warnings' mocha --require ts-node/register --require tests/setup.ts 'tests/**/*.test.ts'",
         "test:integration": "node ./out/test/runTest.js",
         "test:format-fix": "node ./scripts/assert-format-fix.js",
-        "test:comments-preserved": "node ./scripts/assert-comments-preserved.js"
+        "test:comments-preserved": "node ./scripts/assert-comments-preserved.js",
+        "package": "vsce package",
+        "publish": "vsce publish"
     },
     "devDependencies": {
         "@types/chai": "^4.3.20",
@@ -213,6 +215,7 @@
         "@typescript-eslint/eslint-plugin": "^5.59.1",
         "@typescript-eslint/parser": "^5.59.1",
         "@vscode/test-electron": "^2.5.2",
+        "@vscode/vsce": "^3.2.1",
         "chai": "^4.5.0",
         "eslint": "^8.39.0",
         "glob": "^11.0.0",
