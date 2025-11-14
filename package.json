@@ -199,7 +199,7 @@
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
         "test": "npm run test:unit && node ./out/test/runTest.js",
-        "test:unit": "NODE_OPTIONS='--no-warnings' mocha --require ts-node/register --require tests/setup.ts 'tests/**/*.test.ts'",
+        "test:unit": "mocha --require ts-node/register --require tests/setup.ts 'tests/**/*.test.ts'",
         "test:integration": "node ./out/test/runTest.js",
         "test:format-fix": "node ./scripts/assert-format-fix.js",
         "test:comments-preserved": "node ./scripts/assert-comments-preserved.js",
