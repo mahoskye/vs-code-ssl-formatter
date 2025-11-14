@@ -353,7 +353,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		let inMultiLineComment = false;
 		let inMultiLineString = false;
 		let stringDelimiter = "";
-		let procedureDepth = 0; // Track nesting depth of PROCEDURE blocks
+		let inProcedure = false; // Track if we're inside a procedure
 		const indentChar = indentStyle === "tab" ? "\t" : " ".repeat(indentWidth);
 
 		const blockStart = new RegExp(`^\\s*:(${BLOCK_START_KEYWORDS.join('|')})\\b`, 'i');
@@ -362,8 +362,9 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const blockEnd = new RegExp(`^\\s*:(${BLOCK_END_KEYWORDS.join('|')})\\b`, 'i');
 		const procedureLevelKeyword = new RegExp(`^\\s*:(${PROCEDURE_LEVEL_KEYWORDS.join('|')})\\b`, 'i');
 		const procedureKeyword = /^\s*:PROCEDURE\b/i;
+		const endProcKeyword = /^\s*:ENDPROC\b/i;
 
-		const formatted = lines.map((line) => {
+		const formatted = lines.map((line, index) => {
 			const trimmed = line.trim();
 
 			// Track multi-line string state
@@ -390,12 +391,15 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			// Track multi-line comment state (SSL uses /* ... ; syntax)
 			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
 				inMultiLineComment = true;
+				// Multi-line comment start - keep at column 0
+				return trimmed;
 			}
 			if (inMultiLineComment) {
 				if (trimmed.endsWith(';')) {
 					inMultiLineComment = false;
 				}
-				return line; // Don't re-indent comment content
+				// Multi-line comment continuation/end - keep at column 0
+				return trimmed;
 			}
 
 			// Skip empty lines
@@ -403,26 +407,18 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				return line;
 			}
 
-			// Handle single-line comments early (will use currentIndentLevel calculated below)
-			// Skip this check for now - we'll handle comments along with regular code
-
 			// Lines starting with * but not part of a multi-line comment are NOT comment lines
 			// (they're likely continuation of something else), so skip them
 			if (trimmed.startsWith("*")) {
 				return line;
 			}
 
-			// Track PROCEDURE blocks
-			if (procedureKeyword.test(trimmed)) {
-				procedureDepth++;
-			}
-
 			// Decrease indent for block end and middle keywords
 			if (blockEnd.test(trimmed) || blockMiddle.test(trimmed)) {
 				indentLevel = Math.max(0, indentLevel - 1);
-				// Decrease procedure depth when ending a procedure
-				if (/^\s*:ENDPROC\b/i.test(trimmed)) {
-					procedureDepth = Math.max(0, procedureDepth - 1);
+				// Exit procedure when we hit ENDPROC and reset indent to 0
+				if (endProcKeyword.test(trimmed)) {
+					inProcedure = false;
 				}
 			}
 
@@ -431,30 +427,31 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				indentLevel = Math.max(0, indentLevel - 1);
 			}
 
-			// Procedure-level keywords (PARAMETERS, DECLARE, DEFAULT, RETURN, PUBLIC)
-			// should be at the same level as PROCEDURE (not indented)
-			// Comments at procedure level should also be at column 0
+			// Calculate the current indentation level for this line
 			let currentIndentLevel = indentLevel;
-			if (procedureLevelKeyword.test(trimmed) && procedureDepth > 0) {
-				currentIndentLevel = Math.max(0, indentLevel - 1);
-			}
-			// Comments that are originally at column 0 (like doc comments) should stay at column 0
-			// Only apply this if the original line starts with /* (not indented)
-			if (trimmed.startsWith("/*") && line.trim() === trimmed && line.startsWith("/*")) {
+
+			// Procedure-level keywords should stay at column 0
+			const isProcedureLevelKeyword = procedureLevelKeyword.test(trimmed);
+			
+			if (isProcedureLevelKeyword) {
 				currentIndentLevel = 0;
 			}
-
-			// Handle comments with calculated indentation
-			if (trimmed.startsWith("/*")) {
-				const indented = indentChar.repeat(currentIndentLevel) + trimmed;
-				return indented;
+			// Single-line comments (/* ... ;) should match the indentation of the current code block
+			else if (trimmed.startsWith("/*") && trimmed.endsWith(";")) {
+				currentIndentLevel = indentLevel;
 			}
 
-			// Apply block indentation
+			// Apply indentation
 			const indented = indentChar.repeat(currentIndentLevel) + trimmed;
 
-			// Increase indent after block start
-			if (blockStart.test(trimmed)) {
+			// Track PROCEDURE blocks - set indent to 1 for procedure body AFTER formatting the PROCEDURE line
+			if (procedureKeyword.test(trimmed)) {
+				inProcedure = true;
+				indentLevel = 1;
+			}
+
+			// Increase indent after block start keywords (but NOT after PROCEDURE - handled above)
+			if (blockStart.test(trimmed) && !procedureKeyword.test(trimmed)) {
 				indentLevel++;
 			}
 
@@ -646,9 +643,9 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				}
 				blankLineCount = 0;
 			} else if (blankLineCount > 0) {
-				// For other cases, preserve blank lines but collapse multiple into fewer
-				// (keeping some blank lines for readability within procedures)
-				const blanksToAdd = Math.min(blankLineCount, 2);
+				// For other cases, preserve blank lines but collapse excessive ones
+				// Allow up to 10 consecutive blank lines for visual separation
+				const blanksToAdd = Math.min(blankLineCount, 10);
 				for (let j = 0; j < blanksToAdd; j++) {
 					result.push('');
 				}

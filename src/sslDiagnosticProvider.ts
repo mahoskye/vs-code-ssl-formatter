@@ -460,14 +460,36 @@ export class SSLDiagnosticProvider {
 			}
 
 			// Check for SQL injection risks
-			if (preventSqlInjection) {
+			if (preventSqlInjection && requireParameterized) {
 				const sqlMatch = trimmed.match(/(SQLExecute|RunSQL|LSearch)\s*\(/i);
 				if (sqlMatch) {
-					const hasParameter = /\?(\w+)?\?/.test(trimmed);
-					if (!hasParameter && requireParameterized && /\+/.test(trimmed)) {
+					const functionName = sqlMatch[1];
+					
+					// Check if the line has parameter placeholders (? or ?PARAM?)
+					const hasNamedParameter = /\?[a-z_]\w*\?/i.test(trimmed);
+					const hasPositionalParameter = /\?(?!\?)/i.test(trimmed);
+					const hasAnyParameter = hasNamedParameter || hasPositionalParameter;
+					
+					// Check for direct value concatenation patterns that indicate SQL injection risk
+					// Pattern: WHERE/HAVING/SET followed by quoted string being concatenated
+					// Example: WHERE name = '" + userName + "' (BAD)
+					// This excludes: "SELECT * FROM " + sTableName (GOOD - just table name)
+					// This excludes: "WHERE id = ?id?" even with table concatenation (GOOD - has parameters)
+					const dangerousValueConcat = /\b(WHERE|HAVING|SET)\b[^;]*?=\s*['"]\s*\+|=\s*['"][^'"]*['"][^;]*?\+\s*\w+\s*\+\s*['"]/.test(trimmed);
+					
+					// Only warn if there's dangerous value concatenation AND no parameter placeholders
+					if (dangerousValueConcat && !hasAnyParameter) {
+						let warningMessage = "";
+						
+						if (functionName.toLowerCase() === 'sqlexecute') {
+							warningMessage = "Potential SQL injection: Use parameterized queries (?PARAM? or ?) instead of concatenating values into WHERE/SET clauses";
+						} else {
+							warningMessage = `Potential SQL injection: Use parameter placeholders (? or ?PARAM?) in the query string instead of concatenating values`;
+						}
+						
 						const diagnostic = new vscode.Diagnostic(
 							new vscode.Range(i, 0, i, line.length),
-							"Potential SQL injection: Use parameterized queries (?PARAM?) instead of string concatenation",
+							warningMessage,
 							strictMode ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning
 						);
 						diagnostic.code = "sql-sql-injection";

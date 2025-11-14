@@ -2,7 +2,7 @@
 :PROCEDURE TestIndentation;
 :PARAMETERS nValue;
 :DECLARE nResult;
-/* Using spaces instead of tabs - BAD;
+	/* Using spaces instead of tabs - BAD;
 	nResult := 0;
 	nResult := nResult + nValue;
 	nResult := nResult * 2;

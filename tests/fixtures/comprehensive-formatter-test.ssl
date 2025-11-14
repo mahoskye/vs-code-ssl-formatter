@@ -11,7 +11,6 @@ Date......... : 2025-11-13
 :INCLUDE "common-utilities";
 
 /* External library includes complete;
-
 :DECLARE aGlobalArray, nGlobalCounter, sGlobalMessage;
 :DEFAULT nGlobalCounter, 0;
 :DEFAULT sGlobalMessage, "Test";
@@ -21,7 +20,7 @@ Date......... : 2025-11-13
 :PROCEDURE TestIfElseNesting;
 :PARAMETERS nValue;
 :DECLARE nResult, bProcessed;
-/* Test nested IF/ELSE structures;
+	/* Test nested IF/ELSE structures;
 	:IF nValue > 100;
 		bProcessed := .T.;
 		nResult := nValue * 2;
@@ -44,6 +43,15 @@ Date......... : 2025-11-13
 
 /* endregion;
 
+
+
+
+
+
+
+
+
+
 /* region Loop Control Tests;
 
 :PROCEDURE TestForLoopWithStep;
@@ -51,7 +59,7 @@ Date......... : 2025-11-13
 :DECLARE nIndex, nTotal, nStep;
 	nTotal := 0;
 	nStep := 2;
-/* Test FOR loop with STEP and EXITFOR;
+	/* Test FOR loop with STEP and EXITFOR;
 	:FOR nIndex := 1 :TO Len(aItems):STEP nStep;
 		:IF aItems[nIndex] == NIL;
 			:EXITFOR;
@@ -65,7 +73,7 @@ Date......... : 2025-11-13
 :PARAMETERS nStartValue;
 :DECLARE nCounter;
 	nCounter := nStartValue;
-/* Test WHILE loop with EXITWHILE;
+	/* Test WHILE loop with EXITWHILE;
 	:WHILE nCounter < 100;
 		:IF nCounter == 50;
 			:EXITWHILE;
@@ -79,7 +87,7 @@ Date......... : 2025-11-13
 :PARAMETERS nMaxIterations;
 :DECLARE nIteration;
 	nIteration := 0;
-/* Test LOOP keyword with conditional exit;
+	/* Test LOOP keyword with conditional exit;
 	:LOOP;
 	nIteration := nIteration + 1;
 	:IF nIteration >= nMaxIterations;
@@ -96,7 +104,7 @@ Date......... : 2025-11-13
 :PROCEDURE TestCaseStatement;
 :PARAMETERS sInputValue;
 :DECLARE nReturnCode;
-/* Test BEGINCASE/CASE/OTHERWISE/ENDCASE structure;
+	/* Test BEGINCASE/CASE/OTHERWISE/ENDCASE structure;
 	:BEGINCASE;
 	:CASE sInputValue == "START";
 		nReturnCode := 1;
@@ -120,7 +128,7 @@ Date......... : 2025-11-13
 :PROCEDURE TestTryCatchFinally;
 :PARAMETERS sSqlQuery;
 :DECLARE aResultSet, sErrorMessage;
-/* Test TRY/CATCH/FINALLY/ENDTRY error handling;
+	/* Test TRY/CATCH/FINALLY/ENDTRY error handling;
 	:TRY;
 		aResultSet := SQLExecute(sSqlQuery, "query", 0, 0, 0, "", "", "", 0);
 		:IF Len(aResultSet) == 0;
@@ -128,12 +136,12 @@ Date......... : 2025-11-13
 		:ENDIF;
 	:CATCH;
 		sErrorMessage := GetLastSSLError();
-/* Handle error;
+		/* Handle error;
 		aResultSet := {};
 	:FINALLY;
-/* Cleanup operations;
+		/* Cleanup operations;
 		:IF .NOT. Empty(aResultSet);
-/* Process results;
+			/* Process results;
 		:ENDIF;
 	:ENDTRY;
 :RETURN aResultSet;
@@ -146,9 +154,9 @@ Date......... : 2025-11-13
 :PROCEDURE TestOperatorsAndExpressions;
 :PARAMETERS nA, nB, sValue;
 :DECLARE nResult, bCondition, sOutput;
-/* Test all operator types with proper spacing;
+	/* Test all operator types with proper spacing;
 
-/* Assignment operators;
+	/* Assignment operators;
 	nResult := nA;
 	nResult += nB;
 	nResult -= 5;
@@ -157,7 +165,7 @@ Date......... : 2025-11-13
 	nResult ^= 2;
 	nResult %= 7;
 
-/* Comparison operators;
+	/* Comparison operators;
 	bCondition := nA == nB;
 	bCondition := nA != nB;
 	bCondition := nA <> nB;
@@ -167,15 +175,15 @@ Date......... : 2025-11-13
 	bCondition := nA >= nB;
 	bCondition := nA # nB;
 
-/* Logical operators;
+	/* Logical operators;
 	bCondition := nA > 0 .AND. nB < 100;
 	bCondition := nA > 0 .OR. nB < 100;
 	bCondition := .NOT. (nA == nB);
 
-/* String concatenation;
+	/* String concatenation;
 	sOutput := "Result: " + Trim(sValue);
 
-/* Prefix and postfix operators;
+	/* Prefix and postfix operators;
 	nA++;
 	nB--;
 	++nResult;
@@ -184,29 +192,31 @@ Date......... : 2025-11-13
 :RETURN nResult;
 :ENDPROC;
 
+
 /* endregion;
+
 
 /* region Boolean and Null Values Tests;
 
 :PROCEDURE TestBooleanAndNullValues;
 :DECLARE bTrue, bFalse, oNilValue;
-/* Test boolean literals (.T. and .F.);
+	/* Test boolean literals (.T. and .F.);
 	bTrue := .T.;
 	bFalse := .F.;
 
-/* Test NIL literal;
+	/* Test NIL literal;
 	oNilValue := NIL;
 
 	:IF bTrue;
-/* Boolean true;
+		/* Boolean true;
 	:ENDIF;
 
 	:IF .NOT. bFalse;
-/* Boolean false negation;
+		/* Boolean false negation;
 	:ENDIF;
 
 	:IF Empty(oNilValue);
-/* NIL is empty;
+		/* NIL is empty;
 	:ENDIF;
 
 :RETURN bTrue;
@@ -219,14 +229,14 @@ Date......... : 2025-11-13
 :PROCEDURE TestArraysAndStrings;
 :PARAMETERS sInput;
 :DECLARE aStringArray, nPosition, sSubstring;
-/* Test array literal syntax;
+	/* Test array literal syntax;
 	aStringArray := {"alpha", "beta", "gamma", "delta"};
 
-/* Test array functions;
+	/* Test array functions;
 	aadd(aStringArray, "epsilon");
 	nPosition := ascan(aStringArray, "beta");
 
-/* String operations;
+	/* String operations;
 	sSubstring := SubStr(sInput, 1, 5);
 	nPosition := At("test", sInput);
 	sInput := AllTrim(sInput);
@@ -242,15 +252,15 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestDateAndTime;
 :DECLARE dToday, dSpecificDate, nDayDifference;
-/* Test date functions;
+	/* Test date functions;
 	dToday := Today();
 	dToday := Now();
 
-/* Date literal syntax;
+	/* Date literal syntax;
 	dSpecificDate := {2025, 11, 13};
 	dSpecificDate := {2025, 11, 13, 14, 30, 0};
 
-/* Date calculations;
+	/* Date calculations;
 	nDayDifference := DateDiff(dToday, dSpecificDate);
 	dSpecificDate := DateAdd(dToday, 30);
 
@@ -264,19 +274,19 @@ Date......... : 2025-11-13
 :PROCEDURE TestDatabaseOperations;
 :PARAMETERS sTableName, nRecordId;
 :DECLARE aQueryResult, sSelectQuery, sUpdateQuery;
-/* Test SQLExecute with parameters;
+	/* Test SQLExecute with parameters;
 	sSelectQuery := "SELECT field1, field2 FROM " + sTableName + " WHERE id = ?id?";
 	aQueryResult := SQLExecute(sSelectQuery, "select_query", 0, 0, 0, "", "", "", 1);
 
-/* Alternative query with positional parameters;
+	/* Alternative query with positional parameters;
 	sSelectQuery := "SELECT * FROM " + sTableName + " WHERE status = ?";
 	aQueryResult := SQLExecute(sSelectQuery, "param_query", 0, 0, 0, "", "", "", 0);
 
-/* Test RunSQL for modifications;
+	/* Test RunSQL for modifications;
 	sUpdateQuery := "UPDATE " + sTableName + " SET status = 'active' WHERE id = ?id?";
 	RunSQL(sUpdateQuery, "update_query");
 
-/* Test LSearch for single result;
+	/* Test LSearch for single result;
 	aQueryResult := LSearch("SELECT TOP 1 value FROM " + sTableName);
 
 :RETURN aQueryResult;
@@ -289,19 +299,19 @@ Date......... : 2025-11-13
 :PROCEDURE TestFunctionCalls;
 :PARAMETERS nValue;
 :DECLARE nLength, bIsEmpty, nAbsoluteValue, sCharacter;
-/* Test built-in function calls with proper formatting;
+	/* Test built-in function calls with proper formatting;
 	nLength := Len("test string");
 	bIsEmpty := Empty(nValue);
 	nAbsoluteValue := Abs(nValue);
 	sCharacter := Chr(65);
 
-/* Test procedure call with DOPROC;
+	/* Test procedure call with DOPROC;
 	DoProc("ExternalProcedure", {nValue, "parameter"});
 
-/* Test EXECFUNCTION;
+	/* Test EXECFUNCTION;
 	ExecFunction("CalculateTotal", {10, 20, 30});
 
-/* Test array operations;
+	/* Test array operations;
 	aadd(aGlobalArray, nValue);
 	alen(aGlobalArray);
 	ascan(aGlobalArray, nValue);
@@ -316,14 +326,14 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestObjectOperations;
 :DECLARE oUserObject, oDataSet, sUserName;
-/* Test UDO creation;
+	/* Test UDO creation;
 	oUserObject := CreateUdoObject("UserAccount");
 
-/* Test object property access;
+	/* Test object property access;
 	sUserName := oUserObject:UserName;
 	oUserObject:UserName := "John Doe";
 
-/* Test object method calls;
+	/* Test object method calls;
 	oDataSet := oUserObject:GetDataset();
 	oUserObject:Save();
 	oUserObject:Initialize("NewUser", "user@example.com");
@@ -341,7 +351,7 @@ Date......... : 2025-11-13
 :DEFAULT nPublicParam2, 100;
 :DECLARE nLocal1, nLocal2, sLocalString;
 :DECLARE aLocalArray, dLocalDate;
-/* Test local variable declarations;
+	/* Test local variable declarations;
 	nLocal1 := nPublicParam1 + nPublicParam2;
 	nLocal2 := nLocal1 * 2;
 	sLocalString := "Local variable";
@@ -358,12 +368,12 @@ Date......... : 2025-11-13
 :PROCEDURE TestTypeConversion;
 :PARAMETERS vMixedValue;
 :DECLARE nNumeric, sString, lLogical;
-/* Type conversion functions;
+	/* Type conversion functions;
 	nNumeric := Val(vMixedValue);
 	sString := Trim(vMixedValue);
 	lLogical := .T.;
 
-/* Bitwise operations;
+	/* Bitwise operations;
 	nNumeric := _AND(15, 7);
 	nNumeric := _OR(8, 4);
 	nNumeric := _XOR(12, 10);
@@ -379,13 +389,13 @@ Date......... : 2025-11-13
 :PROCEDURE TestCodeBlocks;
 :PARAMETERS aNumbers;
 :DECLARE codeBlock, nResult;
-/* Test code block literals;
+	/* Test code block literals;
 	codeBlock := {|x| x * 2};
 
-/* Apply code block to array evaluation;
+	/* Apply code block to array evaluation;
 	nResult := aeval(aNumbers, codeBlock);
 
-/* More complex code block;
+	/* More complex code block;
 	codeBlock := {|x, y| x + y > 50};
 
 :RETURN nResult;
@@ -400,16 +410,16 @@ Date......... : 2025-11-13
 :DECLARE nValue;
 	nValue := 0;
 
-/* Test early returns;
+	/* Test early returns;
 	:IF nCondition == 1;
-	:RETURN 1;
+:RETURN 1;
 	:ENDIF;
 
 	:IF nCondition == 2;
-	:RETURN 2;
+:RETURN 2;
 	:ENDIF;
 
-/* Default return;
+	/* Default return;
 :RETURN nValue;
 :ENDPROC;
 
@@ -424,7 +434,7 @@ Date......... : 2025-11-13
 	nCounter := nCounter + 1;
 
 	:IF nCounter < 10;
-/* Process;
+		/* Process;
 	:ENDIF;
 
 	:IF nCounter >= 10;
@@ -443,164 +453,164 @@ Date......... : 2025-11-13
 	:CLASS TestDataModel;
 		:INHERIT BaseModel;
 
-		:DECLARE sClassName, nVersion, aProperties;
-		:DECLARE bIsInitialized;
+:DECLARE sClassName, nVersion, aProperties;
+:DECLARE bIsInitialized;
 
 		:PROCEDURE Initialize;
-		:PARAMETERS sName, nVer;
-			sClassName := sName;
-			nVersion := nVer;
-			bIsInitialized := .T.;
-			aProperties := {};
-		:RETURN .T.;
-		:ENDPROC;
+:PARAMETERS sName, nVer;
+	sClassName := sName;
+	nVersion := nVer;
+	bIsInitialized := .T.;
+	aProperties := {};
+:RETURN .T.;
+:ENDPROC;
 
-		:PROCEDURE AddProperty;
-		:PARAMETERS sPropertyName, vPropertyValue;
-			aadd(aProperties, {sPropertyName, vPropertyValue});
-		:RETURN Len(aProperties);
-		:ENDPROC;
+:PROCEDURE AddProperty;
+:PARAMETERS sPropertyName, vPropertyValue;
+	aadd(aProperties, {sPropertyName, vPropertyValue});
+:RETURN Len(aProperties);
+:ENDPROC;
 
-		:PROCEDURE GetProperty;
-		:PARAMETERS sPropertyName;
-		:DECLARE nIndex, vReturnValue;
-			nIndex := ascan(aProperties, sPropertyName);
-			:IF nIndex > 0;
-				vReturnValue := aProperties[nIndex, 2];
-			:ELSE;
-				vReturnValue := NIL;
-			:ENDIF;
-		:RETURN vReturnValue;
-		:ENDPROC;
+:PROCEDURE GetProperty;
+:PARAMETERS sPropertyName;
+:DECLARE nIndex, vReturnValue;
+	nIndex := ascan(aProperties, sPropertyName);
+	:IF nIndex > 0;
+		vReturnValue := aProperties[nIndex, 2];
+	:ELSE;
+		vReturnValue := NIL;
+	:ENDIF;
+:RETURN vReturnValue;
+:ENDPROC;
 
-		:PROCEDURE Validate;
-			:IF .NOT. bIsInitialized;
-				:ERROR "Object not initialized";
-			:ENDIF;
-		:RETURN .T.;
-		:ENDPROC;
+:PROCEDURE Validate;
+	:IF .NOT. bIsInitialized;
+		:ERROR "Object not initialized";
+	:ENDIF;
+:RETURN .T.;
+:ENDPROC;
 
-	:ENDREGION;
+:ENDREGION;
 
 /* endregion;
 
 /* region Complex Nested Control Flow;
 
-	:PROCEDURE TestComplexControlFlow;
-	:PARAMETERS nLevel;
-	:DECLARE nCounter, bContinue;
-		bContinue := .T.;
-		nCounter := 0;
+:PROCEDURE TestComplexControlFlow;
+:PARAMETERS nLevel;
+:DECLARE nCounter, bContinue;
+	bContinue := .T.;
+	nCounter := 0;
 
-		:WHILE bContinue;
-			:FOR nCounter := 1 :TO nLevel;
-				:IF nCounter == 5;
-					:BEGINCASE;
-					:CASE nLevel > 10;
-						nCounter := nCounter + 5;
-					:CASE nLevel > 5;
-						nCounter := nCounter + 2;
-					:OTHERWISE;
-						nCounter := nCounter + 1;
-					:ENDCASE;
-				:ENDIF;
-			:NEXT;
-
-			:IF nCounter > 50;
-				bContinue := .F.;
+	:WHILE bContinue;
+		:FOR nCounter := 1 :TO nLevel;
+			:IF nCounter == 5;
+				:BEGINCASE;
+				:CASE nLevel > 10;
+					nCounter := nCounter + 5;
+				:CASE nLevel > 5;
+					nCounter := nCounter + 2;
+				:OTHERWISE;
+					nCounter := nCounter + 1;
+				:ENDCASE;
 			:ENDIF;
-		:ENDWHILE;
+		:NEXT;
 
-	:RETURN nCounter;
-	:ENDPROC;
+		:IF nCounter > 50;
+			bContinue := .F.;
+		:ENDIF;
+	:ENDWHILE;
+
+:RETURN nCounter;
+:ENDPROC;
 
 /* endregion;
 
 /* region System and Utility Functions;
 
-	:PROCEDURE TestSystemFunctions;
-	:DECLARE sEnvironment, nRecordCount, sDirectory, sNewId;
-/* System information functions;
-		sEnvironment := GetSetting("ENVIRONMENT");
-		nRecordCount := 0;
+:PROCEDURE TestSystemFunctions;
+:DECLARE sEnvironment, nRecordCount, sDirectory, sNewId;
+	/* System information functions;
+	sEnvironment := GetSetting("ENVIRONMENT");
+	nRecordCount := 0;
 
-/* User interaction;
-		usrmes("Operation completed successfully");
-		InfoMes("Process: " + Transform(Today()));
+	/* User interaction;
+	usrmes("Operation completed successfully");
+	InfoMes("Process: " + Transform(Today()));
 
-/* Directory operations;
-		sDirectory := Directory("*.ssl");
+	/* Directory operations;
+	sDirectory := Directory("*.ssl");
 
-/* GUID generation;
-		sNewId := CreateGUID();
+	/* GUID generation;
+	sNewId := CreateGUID();
 
-	:RETURN sEnvironment;
-	:ENDPROC;
+:RETURN sEnvironment;
+:ENDPROC;
 
 /* endregion;
 
 /* region String Formatting and Building;
 
-	:PROCEDURE TestStringBuilding;
-	:PARAMETERS nCount, sPrefix;
-	:DECLARE sResult, aStringParts;
-/* Test string building functions;
-		aStringParts := {};
-		aadd(aStringParts, sPrefix);
-		aadd(aStringParts, ": ");
-		aadd(aStringParts, Transform(nCount));
+:PROCEDURE TestStringBuilding;
+:PARAMETERS nCount, sPrefix;
+:DECLARE sResult, aStringParts;
+	/* Test string building functions;
+	aStringParts := {};
+	aadd(aStringParts, sPrefix);
+	aadd(aStringParts, ": ");
+	aadd(aStringParts, Transform(nCount));
 
-/* Build string from array;
-		sResult := buildstring(aStringParts, "");
+	/* Build string from array;
+	sResult := buildstring(aStringParts, "");
 
-/* Test string substitution;
-		sResult := StrTran(sResult, ":", " equals ");
+	/* Test string substitution;
+	sResult := StrTran(sResult, ":", " equals ");
 
-	:RETURN sResult;
-	:ENDPROC;
+:RETURN sResult;
+:ENDPROC;
 
 /* endregion;
 
 /* region Main Test Execution;
 
-	:PROCEDURE FormatterComprehensiveTest;
-	:DECLARE nTestsPassed, nTestsFailed, aTestResults, sErrorMessage;
-	:DEFAULT nTestsPassed, 0;
-	:DEFAULT nTestsFailed, 0;
+:PROCEDURE FormatterComprehensiveTest;
+:DECLARE nTestsPassed, nTestsFailed, aTestResults, sErrorMessage;
+:DEFAULT nTestsPassed, 0;
+:DEFAULT nTestsFailed, 0;
 
-		aTestResults := {};
+	aTestResults := {};
 
-/* Execute all tests;
-		:TRY;
-			aadd(aTestResults, TestIfElseNesting(50));
-			aadd(aTestResults, TestForLoopWithStep({10, 20, 30}));
-			aadd(aTestResults, TestWhileLoopWithExitwhile(10));
-			aadd(aTestResults, TestLoopKeyword(5));
-			aadd(aTestResults, TestCaseStatement("START"));
-			aadd(aTestResults, TestBooleanAndNullValues());
-			aadd(aTestResults, TestArraysAndStrings("test string"));
-			aadd(aTestResults, TestDateAndTime());
-			aadd(aTestResults, TestFunctionCalls(42));
-			aadd(aTestResults, TestVariableDeclarations(10, 20));
-			aadd(aTestResults, TestTypeConversion("123"));
-			aadd(aTestResults, TestReturnStatements(1));
-			aadd(aTestResults, TestLabelsAndErrors());
-			aadd(aTestResults, TestComplexControlFlow(8));
-			aadd(aTestResults, TestSystemFunctions());
-			aadd(aTestResults, TestStringBuilding(42, "Count"));
+	/* Execute all tests;
+	:TRY;
+		aadd(aTestResults, TestIfElseNesting(50));
+		aadd(aTestResults, TestForLoopWithStep({10, 20, 30}));
+		aadd(aTestResults, TestWhileLoopWithExitwhile(10));
+		aadd(aTestResults, TestLoopKeyword(5));
+		aadd(aTestResults, TestCaseStatement("START"));
+		aadd(aTestResults, TestBooleanAndNullValues());
+		aadd(aTestResults, TestArraysAndStrings("test string"));
+		aadd(aTestResults, TestDateAndTime());
+		aadd(aTestResults, TestFunctionCalls(42));
+		aadd(aTestResults, TestVariableDeclarations(10, 20));
+		aadd(aTestResults, TestTypeConversion("123"));
+		aadd(aTestResults, TestReturnStatements(1));
+		aadd(aTestResults, TestLabelsAndErrors());
+		aadd(aTestResults, TestComplexControlFlow(8));
+		aadd(aTestResults, TestSystemFunctions());
+		aadd(aTestResults, TestStringBuilding(42, "Count"));
 
-			nTestsPassed := Len(aTestResults);
-			usrmes("All " + Transform(nTestsPassed) + " tests completed");
-		:CATCH;
-			nTestsFailed := 1;
-			sErrorMessage := GetLastSSLError();
-			ErrorMes("Test failed: " + sErrorMessage);
-		:FINALLY;
-/* Test cleanup;
-		:ENDTRY;
+		nTestsPassed := Len(aTestResults);
+		usrmes("All " + Transform(nTestsPassed) + " tests completed");
+	:CATCH;
+		nTestsFailed := 1;
+		sErrorMessage := GetLastSSLError();
+		ErrorMes("Test failed: " + sErrorMessage);
+	:FINALLY;
+		/* Test cleanup;
+	:ENDTRY;
 
-	:RETURN nTestsPassed;
-	:ENDPROC;
+:RETURN nTestsPassed;
+:ENDPROC;
 
 /* endregion;
 
