@@ -87,6 +87,12 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		formatted = this.normalizeIndentation(formatted, indentStyle, indentWidth, tabSize);
 		formatted = this.normalizeBlankLines(formatted);
 
+		// Wrap long lines if configured
+		const wrapLength = config.get<number>(CONFIG_KEYS.FORMAT_WRAP_LENGTH, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_WRAP_LENGTH]);
+		if (wrapLength > 0) {
+			formatted = this.wrapLongLines(formatted, wrapLength, indentStyle, tabSize);
+		}
+
 		if (trimTrailingWhitespace) {
 			formatted = this.trimTrailingWhitespace(formatted);
 		}
@@ -694,5 +700,399 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		}
 
 		return result.join('\n');
+	}
+
+	/**
+	 * Wrap long lines that exceed the specified length
+	 */
+	private wrapLongLines(text: string, wrapLength: number, indentStyle: string, tabSize: number): string {
+		const lines = text.split('\n');
+		const result: string[] = [];
+		let inMultiLineComment = false;
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			const trimmed = line.trim();
+
+			// Track multi-line comment state (SSL uses /* ... ; syntax)
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+			}
+			if (inMultiLineComment) {
+				result.push(line);
+				if (trimmed.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				continue;
+			}
+
+			// Skip lines that don't need wrapping
+			if (line.length <= wrapLength) {
+				result.push(line);
+				continue;
+			}
+
+			// Skip keywords, single-line comments, and empty lines
+			if (!trimmed || trimmed.startsWith(':') || trimmed.includes('/*')) {
+				result.push(line);
+				continue;
+			}
+
+			// Try to wrap assignments
+			const assignmentMatch = trimmed.match(/^([a-zA-Z_]\w*)\s*:=\s*(.+);$/);
+			if (assignmentMatch) {
+				const varName = assignmentMatch[1];
+				const value = assignmentMatch[2];
+
+				// Check if it's a string (with or without concatenation)
+				if (value.startsWith('"') || value.startsWith("'")) {
+					const wrapped = this.wrapString(varName, value, wrapLength);
+					if (wrapped) {
+						result.push(...wrapped);
+						continue;
+					}
+				}
+
+				// Check if it's a bracketed list (function call, array, etc.)
+				if (/[\(\{]/.test(value)) {
+					const wrapped = this.wrapBracketedList(varName, value, wrapLength);
+					if (wrapped) {
+						result.push(...wrapped);
+						continue;
+					}
+				}
+
+				// Check if it's a logical expression
+				if (/\.(?:AND|OR|NOT)\./.test(value)) {
+					const wrapped = this.wrapLogicalExpression(varName, value, wrapLength);
+					if (wrapped) {
+						result.push(...wrapped);
+						continue;
+					}
+				}
+			}
+
+			// If we couldn't wrap it, keep the original line
+			result.push(line);
+		}
+
+		return result.join('\n');
+	}
+
+	/**
+	 * Wrap a long string or string concatenation assignment across multiple lines
+	 */
+	private wrapString(varName: string, value: string, wrapLength: number): string[] | null {
+		// Parse the string parts (might already be concatenated with +)
+		let parts: string[] = [];
+		let current = '';
+		let inString = false;
+		let stringChar = '';
+
+		for (let i = 0; i < value.length; i++) {
+			const char = value[i];
+
+			if (!inString && (char === '"' || char === "'")) {
+				inString = true;
+				stringChar = char;
+				current += char;
+			} else if (inString && char === stringChar) {
+				current += char;
+				inString = false;
+			} else if (!inString && char === '+') {
+				// Found a concatenation operator
+				if (current.trim()) {
+					parts.push(current.trim());
+				}
+				current = '';
+			} else {
+				current += char;
+			}
+		}
+
+		// Add the last part
+		const lastPart = current.trim();
+		if (lastPart && lastPart !== ';') {
+			// Remove semicolon if it's at the end
+			parts.push(lastPart.endsWith(';') ? lastPart.slice(0, -1) : lastPart);
+		}
+
+		// If only one part, try to split it
+		if (parts.length === 1) {
+			const singleString = parts[0];
+			// Only split if it's a quoted string and it's too long
+			if ((singleString.startsWith('"') || singleString.startsWith("'")) && singleString.length > 40) {
+				parts = this.splitLongString(singleString, 60); // Reasonable chunk size
+			}
+		}
+
+		// If still just one part or no parts, can't wrap
+		if (parts.length <= 1) {
+			return null;
+		}
+
+		// Build wrapped lines without indentation (indentation engine will handle it)
+		const wrapped: string[] = [];
+
+		// First line: varName := firstPart +
+		wrapped.push(`${varName} := ${parts[0]} +`);
+
+		// Middle lines: part +
+		for (let i = 1; i < parts.length - 1; i++) {
+			wrapped.push(`${parts[i]} +`);
+		}
+
+		// Last line: lastPart;
+		wrapped.push(`${parts[parts.length - 1]};`);
+
+		return wrapped;
+	}
+
+	/**
+	 * Split a single long string into multiple parts at whitespace boundaries only
+	 */
+	private splitLongString(str: string, maxLength: number): string[] {
+		// Remove quotes
+		const quote = str[0];
+		const content = str.slice(1, -1);
+
+		if (content.length <= maxLength) {
+			return [str];
+		}
+
+		const parts: string[] = [];
+		let remaining = content;
+
+		while (remaining.length > 0) {
+			if (remaining.length <= maxLength) {
+				parts.push(`${quote}${remaining}${quote}`);
+				break;
+			}
+
+			// Find the last space within maxLength to break at a word boundary
+			let breakPoint = remaining.lastIndexOf(' ', maxLength);
+
+			// If no space found within maxLength, look for the first space after maxLength
+			// This ensures we never break mid-word
+			if (breakPoint === -1) {
+				breakPoint = remaining.indexOf(' ', maxLength);
+				// If still no space found, the remaining string has no spaces - keep it whole
+				if (breakPoint === -1) {
+					parts.push(`${quote}${remaining}${quote}`);
+					break;
+				}
+			}
+
+			const part = remaining.substring(0, breakPoint).trimEnd();
+			parts.push(`${quote}${part}${quote}`);
+			remaining = remaining.substring(breakPoint).trimStart();
+		}
+
+		return parts;
+	}
+
+	/**
+	 * Wrap a long bracketed list (function call, array literal, etc.) across multiple lines
+	 */
+	private wrapBracketedList(varName: string, value: string, wrapLength: number): string[] | null {
+		// Match bracketed patterns: FunctionName(...) or {...}
+		const bracketMatch = value.match(/^(\w+)?\s*([\(\{])(.+)([\)\}]);?$/);
+		if (!bracketMatch) {
+			return null;
+		}
+
+		const prefix = bracketMatch[1] || ''; // Function name if it's a function call
+		const openBracket = bracketMatch[2];
+		const content = bracketMatch[3];
+		const closeBracket = bracketMatch[4];
+
+		// Parse items (comma-separated)
+		const items: string[] = [];
+		let current = '';
+		let depth = 0;
+		let inString = false;
+		let stringChar = '';
+
+		for (let i = 0; i < content.length; i++) {
+			const char = content[i];
+
+			if (!inString && (char === '"' || char === "'")) {
+				inString = true;
+				stringChar = char;
+			} else if (inString && char === stringChar) {
+				inString = false;
+			}
+
+			if (!inString) {
+				if (char === '(' || char === '{' || char === '[') depth++;
+				else if (char === ')' || char === '}' || char === ']') depth--;
+				else if (char === ',' && depth === 0) {
+					items.push(current.trim());
+					current = '';
+					continue;
+				}
+			}
+
+			current += char;
+		}
+
+		if (current.trim()) {
+			items.push(current.trim());
+		}
+
+		// If only one item or can't wrap, return null
+		if (items.length <= 1) {
+			return null;
+		}
+
+		// Decide wrapping strategy: condensed vs expanded
+		// Use condensed if items are short (avg < 20 chars) and not too many (< 8 items)
+		const avgItemLength = items.reduce((sum, item) => sum + item.length, 0) / items.length;
+		const maxItemLength = Math.max(...items.map(i => i.length));
+		const useCondensed = avgItemLength < 20 && items.length < 8 && maxItemLength < 40;
+
+		if (useCondensed) {
+			return this.wrapBracketedListCondensed(varName, prefix, openBracket, closeBracket, items, wrapLength);
+		} else {
+			return this.wrapBracketedListExpanded(varName, prefix, openBracket, closeBracket, items);
+		}
+	}
+
+	/**
+	 * Wrap bracketed list in condensed mode - multiple items per line
+	 */
+	private wrapBracketedListCondensed(varName: string, prefix: string, openBracket: string, closeBracket: string, items: string[], wrapLength: number): string[] {
+		const wrapped: string[] = [];
+		const firstLinePrefix = `${varName} := ${prefix}${openBracket}`;
+		const targetLineLength = wrapLength - 10; // Leave some margin
+
+		let currentLine = firstLinePrefix;
+
+		for (let i = 0; i < items.length; i++) {
+			const item = items[i];
+			const isLast = i === items.length - 1;
+			const separator = isLast ? closeBracket + ';' : ', ';
+			const itemWithSep = item + separator;
+
+			// Check if adding this item would exceed the line length
+			if (currentLine.length + itemWithSep.length > targetLineLength && currentLine !== firstLinePrefix) {
+				// Finish current line and start new one
+				wrapped.push(currentLine);
+				currentLine = itemWithSep;
+			} else {
+				// Add to current line
+				if (currentLine === firstLinePrefix) {
+					currentLine += item + (isLast ? closeBracket + ';' : ',');
+				} else {
+					currentLine += ' ' + item + (isLast ? closeBracket + ';' : ',');
+				}
+			}
+		}
+
+		// Add the last line if it has content
+		if (currentLine !== firstLinePrefix) {
+			wrapped.push(currentLine);
+		}
+
+		return wrapped;
+	}
+
+	/**
+	 * Wrap bracketed list in expanded mode - one item per line
+	 */
+	private wrapBracketedListExpanded(varName: string, prefix: string, openBracket: string, closeBracket: string, items: string[]): string[] {
+		const wrapped: string[] = [];
+
+		// First line: varName := prefix(item1, or varName := {item1,
+		if (prefix) {
+			wrapped.push(`${varName} := ${prefix}${openBracket}${items[0]},`);
+		} else {
+			wrapped.push(`${varName} := ${openBracket}${items[0]},`);
+		}
+
+		// Middle lines: item,
+		for (let i = 1; i < items.length - 1; i++) {
+			wrapped.push(`${items[i]},`);
+		}
+
+		// Last line: lastItem);
+		wrapped.push(`${items[items.length - 1]}${closeBracket};`);
+
+		return wrapped;
+	}
+
+	/**
+	 * Wrap a long logical expression across multiple lines
+	 */
+	private wrapLogicalExpression(varName: string, value: string, wrapLength: number): string[] | null {
+		// Split by logical operators while preserving them
+		const parts: string[] = [];
+		let current = '';
+		let inString = false;
+		let stringChar = '';
+		let i = 0;
+
+		while (i < value.length) {
+			const char = value[i];
+
+			if (!inString && (char === '"' || char === "'")) {
+				inString = true;
+				stringChar = char;
+				current += char;
+				i++;
+			} else if (inString && char === stringChar) {
+				inString = false;
+				current += char;
+				i++;
+			} else if (!inString && value.substring(i).match(/^\s*(\.(?:AND|OR|NOT)\.)/i)) {
+				// Found a logical operator
+				const match = value.substring(i).match(/^\s*(\.(?:AND|OR|NOT)\.)/i);
+				if (match) {
+					// Push current part
+					if (current.trim()) {
+						parts.push(current.trim());
+					}
+					// Start new part with the operator
+					current = match[1] + ' ';
+					i += match[0].length;
+				}
+			} else {
+				current += char;
+				i++;
+			}
+		}
+
+		// Add the last part (remove trailing semicolon)
+		const lastPart = current.trim();
+		if (lastPart && lastPart !== ';') {
+			parts.push(lastPart.endsWith(';') ? lastPart.slice(0, -1) : lastPart);
+		}
+
+		// If only one part, can't wrap
+		if (parts.length <= 1) {
+			return null;
+		}
+
+		// Build wrapped lines without indentation (indentation engine will handle it)
+		const wrapped: string[] = [];
+
+		// Check if first part starts with a logical operator
+		if (parts[0].match(/^\.(AND|OR|NOT)\./i)) {
+			// First line: varName := operator rest
+			wrapped.push(`${varName} := ${parts[0]}`);
+		} else {
+			// First line: varName := firstPart
+			wrapped.push(`${varName} := ${parts[0]}`);
+		}
+
+		// Remaining lines with operators
+		for (let i = 1; i < parts.length - 1; i++) {
+			wrapped.push(parts[i]);
+		}
+
+		// Last line with semicolon
+		wrapped.push(`${parts[parts.length - 1]};`);
+
+		return wrapped;
 	}
 }
