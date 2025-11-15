@@ -420,15 +420,15 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			// Track multi-line comment state (SSL uses /* ... ; syntax)
 			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
 				inMultiLineComment = true;
-				// Multi-line comment start - keep at column 0
-				return trimmed;
+				// Multi-line comment start - preserve original formatting
+				return line;
 			}
 			if (inMultiLineComment) {
 				if (trimmed.endsWith(';')) {
 					inMultiLineComment = false;
 				}
-				// Multi-line comment continuation/end - keep at column 0
-				return trimmed;
+				// Multi-line comment continuation/end - preserve original formatting
+				return line;
 			}
 
 			// Skip empty lines

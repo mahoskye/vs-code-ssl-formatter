@@ -220,6 +220,80 @@ describe('SSL Formatter - Comment Preservation', () => {
 	});
 });
 
+describe('SSL Formatter - Multi-line Comment Formatting', () => {
+	const formatter = new SSLFormattingProvider();
+	const options = createFormattingOptions();
+
+	it('should preserve indentation inside multi-line comments', () => {
+		const input = `/*
+// This is a comment block
+//     Indented explanation or pseudo-code
+//     - Bullet 1
+//     - Bullet 2
+;`;
+		const expected = `/*
+// This is a comment block
+//     Indented explanation or pseudo-code
+//     - Bullet 1
+//     - Bullet 2
+;\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Indentation inside comments should be preserved');
+	});
+
+	it('should preserve spacing in ASCII diagrams within comments', () => {
+		const input = `/*
+    +---+
+    | A |
+    +---+
+      |
+    +---+
+    | B |
+    +---+
+;`;
+		const expected = `/*
+    +---+
+    | A |
+    +---+
+      |
+    +---+
+    | B |
+    +---+
+;\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'ASCII diagrams should maintain exact spacing');
+	});
+
+	it('should preserve aligned parameter documentation in comments', () => {
+		const input = `/*
+Parameters:
+    nValue   - The input value
+    sName    - The name string
+    bActive  - Active flag
+;`;
+		const expected = `/*
+Parameters:
+    nValue   - The input value
+    sName    - The name string
+    bActive  - Active flag
+;\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Aligned documentation should be preserved');
+	});
+});
+
 describe('SSL Formatter - Style Guide Fixtures', () => {
 	const formatter = new SSLFormattingProvider();
 	const options = createFormattingOptions();
