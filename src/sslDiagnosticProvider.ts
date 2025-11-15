@@ -536,10 +536,10 @@ export class SSLDiagnosticProvider {
 			// Skip: lines where the next line starts with an operator (leading continuation style)
 			const isSingleLineComment = trimmed.startsWith("/*") && trimmed.endsWith(";");
 			const isCommentLine = trimmed.startsWith("*") || trimmed.startsWith("/*");
-			const endsWithOperator = /[+\-*/,]$/.test(trimmed);
-			const startsWithOperator = /^[+\-*/,]/.test(trimmed);
+			const endsWithOperator = /[+\-*/,]$|\.(?:AND|OR|NOT)\.\s*$/i.test(trimmed);
+			const startsWithOperator = /^[+\-*/,]|^\.(?:AND|OR|NOT)\./i.test(trimmed);
 			const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : "";
-			const nextStartsWithOperator = /^[+\-*/,]/.test(nextLine);
+			const nextStartsWithOperator = /^[+\-*/,]|^\.(?:AND|OR|NOT)\./i.test(nextLine);
 			const isContinuationLine = endsWithOperator || startsWithOperator || nextStartsWithOperator;
 			
 			if (trimmed && !trimmed.endsWith(";") && !isCommentLine && !this.isMultilineConstruct(trimmed) && !isContinuationLine) {
