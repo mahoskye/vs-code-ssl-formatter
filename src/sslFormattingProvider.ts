@@ -102,6 +102,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	/**
 	 * Split multiple statements on the same line into separate lines
 	 * Handles cases like: :ENDCASE; nProcessed := nProcessed + 1;
+	 * Preserves inline comments after statements
 	 */
 	private splitMultipleStatements(text: string): string {
 		const lines = text.split('\n');
@@ -155,7 +156,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			}
 
 			// Split multiple statements on the same line
-			// We need to find semicolons that aren't inside strings
+			// We need to find semicolons that aren't inside strings or followed by inline comments
 			const leadingWhitespace = line.match(/^\s*/)?.[0] || '';
 			const statements: string[] = [];
 			let currentStatement = '';
@@ -178,24 +179,52 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				} else if (char === ';' && !inString) {
 					// Found a statement terminator outside of strings
 					currentStatement += char;
-					const stmt = currentStatement.trim();
-					if (stmt) {
-						statements.push(leadingWhitespace + stmt);
+
+					// Check if there's an inline comment following this semicolon
+					// Look ahead to see if the rest of the line starts with a comment
+					const restOfLine = trimmed.substring(i + 1).trim();
+					const hasInlineComment = restOfLine.startsWith('/*');
+
+					if (hasInlineComment) {
+						// Keep the comment with the current statement, with normalized spacing
+						currentStatement += ' ' + restOfLine;
+						// Push the statement with its inline comment
+						const stmt = currentStatement.trim();
+						if (stmt) {
+							statements.push(leadingWhitespace + stmt);
+						}
+						// Clear current statement to prevent duplication
+						currentStatement = '';
+						// We've consumed the rest of the line, so break
+						break;
+					} else {
+						// No inline comment, split normally
+						const stmt = currentStatement.trim();
+						if (stmt) {
+							statements.push(leadingWhitespace + stmt);
+						}
+						currentStatement = '';
 					}
-					currentStatement = '';
 				} else {
 					currentStatement += char;
 				}
 			}
 
-			// Add any remaining content
+			// Add any remaining content (only if we didn't break out early)
 			const remaining = currentStatement.trim();
 			if (remaining) {
 				statements.push(leadingWhitespace + remaining);
 			}
 
-			// If we only found one statement, return the original line
+			// If we only found one statement, check if it needs inline comment spacing normalization
 			if (statements.length <= 1) {
+				// Normalize spacing before inline comments even for single statements
+				const hasInlineComment = /;\s{2,}\/\*/.test(trimmed);
+				if (hasInlineComment) {
+					// Normalize multiple spaces after semicolon to single space
+					const normalized = leadingWhitespace + trimmed.replace(/;\s+\/\*/g, '; /*');
+					return [normalized];
+				}
 				return [line];
 			}
 

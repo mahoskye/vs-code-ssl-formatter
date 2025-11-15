@@ -178,6 +178,48 @@ describe('SSL Formatter - Builtin Functions', () => {
 	});
 });
 
+describe('SSL Formatter - Comment Preservation', () => {
+	const formatter = new SSLFormattingProvider();
+	const options = createFormattingOptions();
+
+	it('should preserve inline comments after statements', () => {
+		const input = 'dropSql := "drop table " + tempTable; /*drop temp table if created;';
+		const expected = 'dropSql := "drop table " + tempTable; /*drop temp table if created;\n';
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Inline comments should stay on the same line');
+	});
+
+	it('should preserve multiple inline comments', () => {
+		const tests = [
+			['count := count + 1;  /*increment counter;', 'count := count + 1; /*increment counter;\n'],
+			['isValid := FALSE;    /*reset validation flag;', 'isValid := FALSE; /*reset validation flag;\n'],
+			['result := Calculate(x, y);  /*perform calculation;', 'result := Calculate(x, y); /*perform calculation;\n']
+		];
+
+		tests.forEach(([input, expected]) => {
+			const doc = createDocument(input);
+			const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+			const formatted = applyEdits(input, edits as any[]);
+			expect(formatted).to.equal(expected, `Failed to preserve comment for: ${input}`);
+		});
+	});
+
+	it('should still split multiple statements when no inline comment present', () => {
+		const input = ':ENDCASE; nProcessed := nProcessed + 1;';
+		const expected = ':ENDCASE;\nnProcessed := nProcessed + 1;\n';
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Multiple statements without comments should still be split');
+	});
+});
+
 describe('SSL Formatter - Style Guide Fixtures', () => {
 	const formatter = new SSLFormattingProvider();
 	const options = createFormattingOptions();
