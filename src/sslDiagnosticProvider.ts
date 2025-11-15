@@ -155,8 +155,10 @@ export class SSLDiagnosticProvider {
 
 				// Check if variable was declared before use
 				if (!declaredIdentifiers.has(varName)) {
+					// Find actual column position of variable name (excluding leading whitespace)
+					const columnIndex = line.indexOf(varName);
 					const diagnostic = new vscode.Diagnostic(
-						new vscode.Range(i, 0, i, varName.length),
+						new vscode.Range(i, columnIndex, i, columnIndex + varName.length),
 						DIAGNOSTIC_MESSAGES.UNDECLARED_VARIABLE(varName),
 						vscode.DiagnosticSeverity.Warning
 					);
