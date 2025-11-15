@@ -351,6 +351,12 @@ export class SSLDiagnosticProvider {
 							if (/^[a-z][A-Z]/.test(varRef)) { // e.g., sVar, nCount
 								const columnIndex = line.indexOf(varRef);
 								if (columnIndex !== -1) {
+									// Skip if this is a class property access (Me:propertyName)
+									const textBeforeVar = line.substring(0, columnIndex);
+									if (/Me:\s*$/.test(textBeforeVar)) {
+										return; // Skip - this is a class property, not an undeclared variable
+									}
+
 									const isInLocalScope = scopeInfo.localIdentifiers.has(varRef);
 									const isInGlobalScope = scopeInfo.globalIdentifiers.has(varRef);
 									
