@@ -114,6 +114,9 @@ export class SSLDiagnosticProvider {
 		};
 		let hasParametersInCurrentProcedure = false;
 
+		// Track undeclared variables that have already been reported to avoid duplicates
+		const reportedUndeclaredVars = new Set<string>();
+
 		for (let i = 0; i < lines.length && diagnostics.length < maxProblems; i++) {
 			const line = lines[i];
 			const trimmed = line.trim();
@@ -154,14 +157,17 @@ export class SSLDiagnosticProvider {
 				Logger.debug(`Line ${i + 1}: Checking assignment '${varName}', declared identifiers: [${Array.from(declaredIdentifiers).join(', ')}]`);
 
 				// Check if variable was declared before use
-				if (!declaredIdentifiers.has(varName)) {
+				if (!declaredIdentifiers.has(varName) && !reportedUndeclaredVars.has(varName)) {
+					// Find actual column position of variable name (excluding leading whitespace)
+					const columnIndex = line.indexOf(varName);
 					const diagnostic = new vscode.Diagnostic(
-						new vscode.Range(i, 0, i, varName.length),
+						new vscode.Range(i, columnIndex, i, columnIndex + varName.length),
 						DIAGNOSTIC_MESSAGES.UNDECLARED_VARIABLE(varName),
 						vscode.DiagnosticSeverity.Warning
 					);
 					diagnostic.code = DIAGNOSTIC_CODES.UNDECLARED_VARIABLE;
 					diagnostics.push(diagnostic);
+					reportedUndeclaredVars.add(varName);
 					Logger.debug(`WARNING: Undeclared variable '${varName}' at line ${i + 1}`);
 				}
 			}
@@ -349,21 +355,28 @@ export class SSLDiagnosticProvider {
 							if (/^[a-z][A-Z]/.test(varRef)) { // e.g., sVar, nCount
 								const columnIndex = line.indexOf(varRef);
 								if (columnIndex !== -1) {
+									// Skip if this is a class property access (Me:propertyName)
+									const textBeforeVar = line.substring(0, columnIndex);
+									if (/Me:\s*$/.test(textBeforeVar)) {
+										return; // Skip - this is a class property, not an undeclared variable
+									}
+
 									const isInLocalScope = scopeInfo.localIdentifiers.has(varRef);
 									const isInGlobalScope = scopeInfo.globalIdentifiers.has(varRef);
 									
 									if (scopeInfo.inProcedure) {
 										// Inside a procedure
-										if (!isInLocalScope && !isInGlobalScope) {
-											// Variable doesn't exist anywhere - ERROR
+										if (!isInLocalScope && !isInGlobalScope && !reportedUndeclaredVars.has(varRef)) {
+											// Variable doesn't exist anywhere - ERROR (downgraded to WARNING to match assignment check)
 											const diagnostic = new vscode.Diagnostic(
 												new vscode.Range(i, columnIndex, i, columnIndex + varRef.length),
 												`Variable '${varRef}' is not declared. Add ':DECLARE ${varRef};' or pass it as a parameter.`,
-												vscode.DiagnosticSeverity.Error
+												vscode.DiagnosticSeverity.Warning
 											);
 											diagnostic.code = "ssl-undefined-variable";
 											diagnostics.push(diagnostic);
-											Logger.debug(`ERROR: Undefined variable '${varRef}' at line ${i + 1}`);
+											reportedUndeclaredVars.add(varRef);
+											Logger.debug(`WARNING: Undefined variable '${varRef}' at line ${i + 1}`);
 										} else if (!isInLocalScope && isInGlobalScope) {
 											// Variable exists globally but not declared locally - WARNING
 											const diagnostic = new vscode.Diagnostic(
@@ -378,16 +391,17 @@ export class SSLDiagnosticProvider {
 										// else: variable is in local scope, all good!
 									} else {
 										// Outside a procedure (global scope)
-										if (!isInGlobalScope) {
-											// Variable doesn't exist in global scope - ERROR
+										if (!isInGlobalScope && !reportedUndeclaredVars.has(varRef)) {
+											// Variable doesn't exist in global scope - WARNING
 											const diagnostic = new vscode.Diagnostic(
 												new vscode.Range(i, columnIndex, i, columnIndex + varRef.length),
 												`Variable '${varRef}' is not declared in global scope. It may only exist inside a procedure.`,
-												vscode.DiagnosticSeverity.Error
+												vscode.DiagnosticSeverity.Warning
 											);
 											diagnostic.code = "ssl-undefined-variable";
 											diagnostics.push(diagnostic);
-											Logger.debug(`ERROR: Undefined variable in global scope '${varRef}' at line ${i + 1}`);
+											reportedUndeclaredVars.add(varRef);
+											Logger.debug(`WARNING: Undefined variable in global scope '${varRef}' at line ${i + 1}`);
 										}
 										// else: variable is in global scope, all good!
 									}
@@ -534,10 +548,10 @@ export class SSLDiagnosticProvider {
 			// Skip: lines where the next line starts with an operator (leading continuation style)
 			const isSingleLineComment = trimmed.startsWith("/*") && trimmed.endsWith(";");
 			const isCommentLine = trimmed.startsWith("*") || trimmed.startsWith("/*");
-			const endsWithOperator = /[+\-*/,]$/.test(trimmed);
-			const startsWithOperator = /^[+\-*/,]/.test(trimmed);
+			const endsWithOperator = /[+\-*/,]$|\.(?:AND|OR|NOT)\.\s*$/i.test(trimmed);
+			const startsWithOperator = /^[+\-*/,]|^\.(?:AND|OR|NOT)\./i.test(trimmed);
 			const nextLine = i + 1 < lines.length ? lines[i + 1].trim() : "";
-			const nextStartsWithOperator = /^[+\-*/,]/.test(nextLine);
+			const nextStartsWithOperator = /^[+\-*/,]|^\.(?:AND|OR|NOT)\./i.test(nextLine);
 			const isContinuationLine = endsWithOperator || startsWithOperator || nextStartsWithOperator;
 			
 			if (trimmed && !trimmed.endsWith(";") && !isCommentLine && !this.isMultilineConstruct(trimmed) && !isContinuationLine) {

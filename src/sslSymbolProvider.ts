@@ -16,6 +16,7 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 
 		let currentProcedure: vscode.DocumentSymbol | null = null;
 		let currentRegion: vscode.DocumentSymbol | null = null;
+		let currentClass: vscode.DocumentSymbol | null = null;
 
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i];
@@ -66,7 +67,9 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 					selectionRange
 				);
 
-				if (currentRegion) {
+				if (currentClass) {
+					currentClass.children.push(currentProcedure);
+				} else if (currentRegion) {
 					currentRegion.children.push(currentProcedure);
 				} else {
 					symbols.push(currentProcedure);
@@ -130,6 +133,8 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 
 					if (currentProcedure) {
 						currentProcedure.children.push(varSymbol);
+					} else if (currentClass) {
+						currentClass.children.push(varSymbol);
 					} else if (currentRegion) {
 						currentRegion.children.push(varSymbol);
 					} else {
@@ -142,11 +147,12 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 			// Match classes
 			const classMatch = trimmed.match(/^:CLASS\s+(\w+)/i);
 			if (classMatch) {
+				// SSL supports one class per file, and it extends to end of file
 				const name = classMatch[1];
 				const range = new vscode.Range(i, 0, i, line.length);
 				const selectionRange = new vscode.Range(i, line.indexOf(name), i, line.indexOf(name) + name.length);
 
-				const classSymbol = new vscode.DocumentSymbol(
+				currentClass = new vscode.DocumentSymbol(
 					name,
 					"",
 					vscode.SymbolKind.Class,
@@ -154,8 +160,17 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 					selectionRange
 				);
 
-				symbols.push(classSymbol);
+				symbols.push(currentClass);
+				continue;
 			}
+		}
+
+		// Close any remaining open class at end of file
+		if (currentClass) {
+			currentClass.range = new vscode.Range(
+				currentClass.range.start,
+				new vscode.Position(lines.length - 1, lines[lines.length - 1].length)
+			);
 		}
 
 		return symbols;

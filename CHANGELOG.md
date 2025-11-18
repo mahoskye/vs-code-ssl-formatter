@@ -5,6 +5,32 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2025-11-15
+
+### Added
+
+- **Automatic Line Wrapping**: Comprehensive implementation of automatic line wrapping for long lines
+  - Intelligently wraps lines exceeding the configured `ssl.format.wrapLength` (default: 90 characters)
+  - Preserves logical structure and readability when breaking lines
+  - Proper indentation for continuation lines
+
+### Fixed
+
+- **Comment Formatting**: Enhanced comment preservation during formatting
+  - Fixed preservation of inline comments on the same line as code
+  - Fixed preservation of spacing and indentation inside multi-line comments
+  - Comments now maintain their position and formatting during code transformations
+
+- **Diagnostics Improvements**: More accurate and cleaner diagnostic reporting
+  - Fixed duplicate diagnostics for undeclared variables
+  - Diagnostic ranges now exclude leading whitespace for clearer highlighting
+  - Improved accuracy of diagnostic positioning
+
+- **Symbol Recognition**: Better understanding of SSL language constructs
+  - Fixed CLASS symbol tracking and nesting in document outline
+  - CLASS 'Me' property access now properly recognized without false warnings
+  - Multi-line expression continuation with logical operators (AND, OR, NOT) now correctly identified
+
 ## [1.0.1] - 2025-11-14
 
 ### Fixed
