@@ -924,8 +924,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			}
 
 			if (!inString) {
-				if (char === '(' || char === '{' || char === '[') depth++;
-				else if (char === ')' || char === '}' || char === ']') depth--;
+				if (char === '(' || char === '{' || char === '[') {depth++;}
+				else if (char === ')' || char === '}' || char === ']') {depth--;}
 				else if (char === ',' && depth === 0) {
 					items.push(current.trim());
 					current = '';
