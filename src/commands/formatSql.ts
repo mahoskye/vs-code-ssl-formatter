@@ -292,7 +292,7 @@ function formatCompactStyle(sql: string, keywordCase: string, indentSpaces: numb
 
 	// Break at major clause keywords
 	SQL_CLAUSE_KEYWORDS.forEach(keyword => {
-		if (keyword === "ON") return; // Keep ON on same line as JOIN in compact
+		if (keyword === "ON") {return;} // Keep ON on same line as JOIN in compact
 		const pattern = keyword.replace(/\s+/g, "\\s+");
 		const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
 		sql = sql.replace(clauseRegex, (_match, clause) => {
@@ -303,7 +303,7 @@ function formatCompactStyle(sql: string, keywordCase: string, indentSpaces: numb
 	// Keep AND/OR inline in compact mode
 	const lines = sql.split('\n').map(line => line.trim());
 	return lines.map((line, index) => {
-		if (index === 0) return line;
+		if (index === 0) {return line;}
 		return indent + line;
 	}).join('\n');
 }
@@ -506,7 +506,7 @@ function formatKnrConditions(condition: string, keywordCase: string, indent: str
 	// Add initial indent
 	const lines = result.split('\n');
 	return lines.map((line, index) => {
-		if (index === 0) return indent + line;
+		if (index === 0) {return indent + line;}
 		return line;
 	}).join('\n');
 }

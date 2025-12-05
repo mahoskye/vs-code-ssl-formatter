@@ -10,8 +10,14 @@
         "@typescript-eslint/naming-convention": [
             "warn",
             {
-                "selector": "variableLike",
-                "format": ["camelCase", "UPPER_CASE"]
+                "selector": "variable",
+                "format": ["camelCase", "UPPER_CASE"],
+                "leadingUnderscore": "allow"
+            },
+            {
+                "selector": "parameter",
+                "format": ["camelCase"],
+                "leadingUnderscore": "allow"
             },
             {
                 "selector": "typeLike",
