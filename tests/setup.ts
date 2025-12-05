@@ -14,6 +14,7 @@ import {
 	MockDiagnostic,
 	MockDiagnosticCollection,
 	MockLocation,
+	MockWorkspaceEdit,
 	MockMarkdownString,
 	MockHover,
 	MockEventEmitter,
@@ -39,9 +40,21 @@ const mockVscode = {
 			return path;
 		}
 	},
+	window: {
+		showErrorMessage(message: string): void {
+			// No-op for tests
+		},
+		showWarningMessage(message: string): void {
+			// No-op for tests
+		},
+		showInformationMessage(message: string): void {
+			// No-op for tests
+		}
+	},
 	Range: MockRange,
 	Position: MockPosition,
 	TextEdit: MockTextEdit,
+	WorkspaceEdit: MockWorkspaceEdit,
 	Location: MockLocation,
 	MarkdownString: MockMarkdownString,
 	Hover: MockHover,

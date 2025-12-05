@@ -238,6 +238,34 @@ export class MockLocation {
 	) {}
 }
 
+export class MockWorkspaceEdit {
+	public _edits: Map<MockUri, { range: MockRange; newText: string }[]> = new Map();
+
+	replace(uri: MockUri, range: MockRange, newText: string): void {
+		if (!this._edits.has(uri)) {
+			this._edits.set(uri, []);
+		}
+		this._edits.get(uri)!.push({ range, newText });
+	}
+
+	insert(uri: MockUri, position: MockPosition, newText: string): void {
+		const range = new MockRange(position, position);
+		this.replace(uri, range, newText);
+	}
+
+	delete(uri: MockUri, range: MockRange): void {
+		this.replace(uri, range, '');
+	}
+
+	has(uri: MockUri): boolean {
+		return this._edits.has(uri);
+	}
+
+	entries(): IterableIterator<[MockUri, { range: MockRange; newText: string }[]]> {
+		return this._edits.entries();
+	}
+}
+
 export class MockMarkdownString {
 	private content = '';
 
