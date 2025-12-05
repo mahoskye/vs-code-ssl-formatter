@@ -1,16 +1,16 @@
 import * as vscode from "vscode";
 import {
-    SSL_KEYWORDS,
-    BLOCK_START_KEYWORDS,
-    BLOCK_END_KEYWORDS,
-    BLOCK_MIDDLE_KEYWORDS,
-    CASE_KEYWORDS,
-    PROCEDURE_LEVEL_KEYWORDS,
+	SSL_KEYWORDS,
+	BLOCK_START_KEYWORDS,
+	BLOCK_END_KEYWORDS,
+	BLOCK_MIDDLE_KEYWORDS,
+	CASE_KEYWORDS,
+	PROCEDURE_LEVEL_KEYWORDS,
 	ALL_SQL_FUNCTIONS
 } from "./constants/language";
 import {
-    CONFIG_KEYS,
-    CONFIG_DEFAULTS
+	CONFIG_KEYS,
+	CONFIG_DEFAULTS
 } from "./constants/config";
 import {
 	PATTERNS
@@ -133,7 +133,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const builtinFunctionCase = config.get<string>(CONFIG_KEYS.FORMAT_BUILTIN_FUNCTION_CASE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_BUILTIN_FUNCTION_CASE]);
 		const trimTrailingWhitespace = config.get<boolean>(CONFIG_KEYS.FORMAT_TRIM_TRAILING_WHITESPACE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_TRIM_TRAILING_WHITESPACE]);
 		const configuredFunctions = getConfiguredFunctions(config);
-		
+
 		// Use editor's tab size for calculating visual positions
 		const tabSize = options.tabSize || 4;
 
@@ -445,7 +445,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	private normalizeOperatorSpacing(text: string): string {
 		return normalizeOperatorSpacing(text);
 	}
-	
+
 	/**
 	 * Replace text only outside of string literals
 	 */
@@ -458,10 +458,10 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		// Two-pass approach:
 		// Pass 1: Fix block-level indentation
 		// Pass 2: Fix continuation line alignment based on corrected indentation
-		
+
 		let firstPass = this.normalizeBlockIndentation(text, indentStyle, indentWidth);
 		let secondPass = this.normalizeContinuationIndentation(firstPass, indentStyle, tabSize);
-		
+
 		return secondPass;
 	}
 
@@ -505,25 +505,51 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			const isCommentLine = trimmed.startsWith('/*') || trimmed.startsWith('*');
 
 			// Track multi-line string state only when not inside comments
+			// We need to detect this BEFORE processing for indentation
+			let lineStartsMultiLineString = false;
+			let lineEndsMultiLineString = false;
 			if (!isCommentLine) {
 				if (!inMultiLineString) {
 					const doubleQuoteCount = (line.match(/"/g) || []).length;
 					const singleQuoteCount = (line.match(/'/g) || []).length;
-					
+
 					if (doubleQuoteCount % 2 !== 0) {
 						inMultiLineString = true;
+						lineStartsMultiLineString = true;
 						stringDelimiter = '"';
 					} else if (singleQuoteCount % 2 !== 0) {
 						inMultiLineString = true;
+						lineStartsMultiLineString = true;
 						stringDelimiter = "'";
 					}
 				} else {
 					const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : "'", 'g')) || []).length;
 					if (delimiterCount % 2 !== 0) {
+						// String ends on this line - update grouping depth for brackets after the closing quote
+						// but preserve the original indentation (it's continuation of string content)
 						inMultiLineString = false;
+						lineEndsMultiLineString = true;
+
+						// We need to count any brackets after the string ends
+						// Find portion after the closing delimiter
+						const closingDelim = stringDelimiter;
 						stringDelimiter = "";
+
+						// Extract portion after the last occurrence of the closing quote
+						const lastQuoteIndex = trimmed.lastIndexOf(closingDelim);
+						if (lastQuoteIndex !== -1) {
+							const afterString = trimmed.substring(lastQuoteIndex + 1);
+							const openingBrackets = (afterString.match(/[\(\{\[]/g) || []).length;
+							const closingBrackets = (afterString.match(/[\)\}\]]/g) || []).length;
+							groupingDepth = Math.max(0, groupingDepth + openingBrackets - closingBrackets);
+						}
+
+						// Don't re-indent the line - preserve original indentation
+						return line;
+					} else {
+						// Still inside multi-line string, don't re-indent
+						return line;
 					}
-					return line; // Don't re-indent string content
 				}
 			} else if (inMultiLineComment && trimmed.endsWith(';')) {
 				inMultiLineComment = false;
@@ -562,7 +588,9 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				currentIndentLevel = indentLevel;
 			}
 
-			const sanitized = this.stripInlineStrings(trimmed);
+			// Strip all string content from line for bracket counting
+			// This handles both inline strings and the start of multi-line strings
+			const sanitized = this.stripAllStringContent(trimmed);
 			const groupingClosers = this.countLeadingClosers(sanitized);
 			const groupingOffset = Math.max(0, groupingDepth - groupingClosers);
 
@@ -595,6 +623,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				indentLevel++;
 			}
 
+			// Count grouping brackets only from non-string code portions
 			if (!isCommentLine) {
 				const openingBrackets = (sanitized.match(/[\(\{\[]/g) || []).length;
 				const closingBrackets = (sanitized.match(/[\)\}\]]/g) || []).length;
@@ -635,7 +664,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			if (!inMultiLineString) {
 				const doubleQuoteCount = (line.match(/"/g) || []).length;
 				const singleQuoteCount = (line.match(/'/g) || []).length;
-				
+
 				if (doubleQuoteCount % 2 !== 0) {
 					inMultiLineString = true;
 					stringDelimiter = '"';
@@ -663,28 +692,28 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				const prevLine = lines[index - 1].trim();
 				const prevEndsWithOperator = /[+\-*/]$/.test(prevLine);
 				const currentStartsWithOperator = /^[+\-*/]/.test(trimmed);
-				
+
 				if ((prevEndsWithOperator || currentStartsWithOperator) && !inMultiLineComment) {
 					isContinuation = true;
-					
+
 					// Calculate continuation indent from the line with assignment if not already set
 					if (continuationIndent === 0) {
 						// Look backwards to find the line with the assignment
 						for (let i = index - 1; i >= 0; i--) {
 							const checkLine = lines[i].trim();
 							const assignMatch = lines[i].match(/^(\s*)(\w+)\s*:=\s*(.+)/);
-							
+
 							if (assignMatch) {
 								const baseIndent = assignMatch[1];
 								const varName = assignMatch[2];
 								const valueStart = assignMatch[3];
-								
+
 								// Convert tabs to spaces for accurate position calculation
 								const expandedIndent = baseIndent.replace(/\t/g, ' '.repeat(tabSize));
-								
+
 								// Calculate base position after :=
 								let alignPos = expandedIndent.length + varName.length + ' := '.length;
-								
+
 								// If the value starts with a string quote or other continuation operator,
 								// we want to align with the actual content start
 								// For leading operators on continuation lines, align with the operator
@@ -693,11 +722,11 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 								if (firstNonSpace) {
 									alignPos += firstNonSpace[1].length;
 								}
-								
+
 								continuationIndent = alignPos;
 								break;
 							}
-							
+
 							// Stop looking if we hit a line that doesn't end with continuation
 							if (!/[+\-*/,]$/.test(checkLine) && !/^[+\-*/,]/.test(lines[i + 1]?.trim() || '')) {
 								break;
@@ -846,8 +875,39 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		return original ?? keyword;
 	}
 
-	private stripInlineStrings(line: string): string {
-		return line.replace(/"[^"]*"|'[^']*'/g, "");
+	/**
+	 * Strip all string content from a line for bracket counting.
+	 * Handles both complete inline strings and strings that start but don't end (multi-line string starts).
+	 */
+	private stripAllStringContent(line: string): string {
+		let result = '';
+		let i = 0;
+		let inString = false;
+		let stringChar = '';
+
+		while (i < line.length) {
+			const char = line[i];
+
+			if (!inString) {
+				if (char === '"' || char === "'") {
+					// Start of a string - skip it
+					inString = true;
+					stringChar = char;
+				} else {
+					result += char;
+				}
+			} else {
+				// Inside a string - look for the closing quote
+				if (char === stringChar) {
+					inString = false;
+					stringChar = '';
+				}
+				// Don't add string content to result
+			}
+			i++;
+		}
+
+		return result;
 	}
 
 	private countLeadingClosers(line: string): number {
@@ -897,10 +957,10 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			if (assignmentMatch) {
 				const varName = assignmentMatch[1];
 				const value = assignmentMatch[2];
-			
-			// Capture the original indentation from the line
-			const indentMatch = line.match(/^(\s*)/);
-			const originalIndent = indentMatch ? indentMatch[1] : '';
+
+				// Capture the original indentation from the line
+				const indentMatch = line.match(/^(\s*)/);
+				const originalIndent = indentMatch ? indentMatch[1] : '';
 
 				// Check if it's a string (with or without concatenation)
 				if (value.startsWith('"') || value.startsWith("'")) {
@@ -1082,8 +1142,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			}
 
 			if (!inString) {
-				if (char === '(' || char === '{' || char === '[') {depth++;}
-				else if (char === ')' || char === '}' || char === ']') {depth--;}
+				if (char === '(' || char === '{' || char === '[') { depth++; }
+				else if (char === ')' || char === '}' || char === ']') { depth--; }
 				else if (char === ',' && depth === 0) {
 					items.push(current.trim());
 					current = '';
