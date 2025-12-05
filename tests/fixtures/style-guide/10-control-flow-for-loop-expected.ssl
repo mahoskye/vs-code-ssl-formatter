@@ -6,5 +6,5 @@
 	:FOR i := 1 :TO Len(aItems);
 		nTotal := nTotal + aItems[i];
 	:NEXT;
-:RETURN nTotal;
+	:RETURN nTotal;
 :ENDPROC;

@@ -8,6 +8,9 @@ import {
 import {
     PATTERNS
 } from "./constants/patterns";
+import { ProcedureIndex, ProcedureInfo } from "./utils/procedureIndex";
+import { CONFIG_KEYS, CONFIG_DEFAULTS } from "./constants/config";
+import { ClassIndex } from "./utils/classIndex";
 
 /**
  * SSL Hover Provider
@@ -19,7 +22,10 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 	private keywordDocs: Map<string, string>;
 	private builtInClassDocs: Map<string, { description: string; instantiation: string; commonMethods: string[]; commonProperties: string[] }>;
 
-	constructor() {
+	constructor(
+		private readonly classIndex?: ClassIndex,
+		private readonly procedureIndex?: ProcedureIndex
+	) {
 		this.functionDocs = new Map();
 		this.keywordDocs = new Map();
 		this.builtInClassDocs = new Map();
@@ -34,6 +40,31 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		token: vscode.CancellationToken
 	): vscode.Hover | null {
 		const lineText = document.lineAt(position.line).text;
+
+		const locationContext = this.getLocationContext(document, position);
+
+		if (locationContext.insideComment) {
+			return null;
+		}
+
+		if (locationContext.insideString) {
+			const placeholderHover = this.getSqlPlaceholderHover(document, position);
+			if (placeholderHover) {
+				return placeholderHover;
+			}
+
+			const stringProcHover = this.getUserDefinedProcedureHover(document, position, lineText);
+			if (stringProcHover) {
+				return stringProcHover;
+			}
+
+			const stringClassHover = this.getUserDefinedClassHover(document, position, lineText);
+			if (stringClassHover) {
+				return stringClassHover;
+			}
+
+			return null;
+		}
 
 		// Check if hovering over a procedure name in DoProc or ExecFunction
 		const userProcHover = this.getUserDefinedProcedureHover(document, position, lineText);
@@ -90,10 +121,6 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 				markdown.appendMarkdown(`**Category:** ${funcDoc.category}\n\n`);
 			}
 
-			if (funcDoc.frequency) {
-				markdown.appendMarkdown(`**Usage Frequency:** ${funcDoc.frequency}\n\n`);
-			}
-
 			if (funcDoc.untypedSignature) {
 				markdown.appendMarkdown(`**Untyped Signature:** \`${funcDoc.untypedSignature}\`\n\n`);
 			}
@@ -120,6 +147,90 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 					markdown.appendMarkdown(`**Common Properties:** ${classDoc.commonProperties.map(p => `\`${p}\``).join(', ')}\n\n`);
 				}
 
+				return new vscode.Hover(markdown, range);
+			}
+		}
+
+		return null;
+	}
+
+	private getLocationContext(document: vscode.TextDocument, position: vscode.Position): { insideString: boolean; insideComment: boolean } {
+		let insideString = false;
+		let stringChar: string | null = null;
+		let insideComment = false;
+
+		for (let line = 0; line <= position.line; line++) {
+			const lineText = document.lineAt(line).text;
+			const limit = line === position.line ? position.character : lineText.length;
+
+			for (let i = 0; i < limit; i++) {
+				const char = lineText[i];
+				const nextChar = i + 1 < lineText.length ? lineText[i + 1] : '';
+
+				if (!insideString && !insideComment && char === '/' && nextChar === '*') {
+					insideComment = true;
+					i++;
+					continue;
+				}
+
+				if (!insideString && !insideComment && (char === '"' || char === '\'' || char === '[')) {
+					insideString = true;
+					stringChar = char === '[' ? ']' : char;
+					continue;
+				}
+
+				if (insideString && char === stringChar) {
+					insideString = false;
+					stringChar = null;
+					continue;
+				}
+
+				if (insideComment && char === ';') {
+					insideComment = false;
+				}
+			}
+		}
+
+		return { insideString, insideComment };
+	}
+
+	private getSqlPlaceholderHover(document: vscode.TextDocument, position: vscode.Position): vscode.Hover | null {
+		const lineText = document.lineAt(position.line).text;
+		const charIndex = position.character;
+
+		const namedPlaceholderRegex = /\?([A-Za-z0-9_]+)\?/g;
+		for (const match of lineText.matchAll(namedPlaceholderRegex)) {
+			const start = match.index ?? 0;
+			const end = start + match[0].length;
+			if (charIndex >= start && charIndex <= end) {
+				const parameterName = match[1];
+				const range = new vscode.Range(
+					new vscode.Position(position.line, start),
+					new vscode.Position(position.line, end)
+				);
+				const markdown = new vscode.MarkdownString();
+				markdown.appendMarkdown(`**Named SQL parameter** \`${parameterName}\`\n\n`);
+				markdown.appendMarkdown(`Maps directly to the SSL variable \`${parameterName}\`. Declare and assign it before executing the statement.\n\n`);
+				markdown.appendMarkdown(`See \`docs/sql-parameters.md\` for placeholder conventions.`);
+				return new vscode.Hover(markdown, range);
+			}
+		}
+
+		const currentChar = lineText[charIndex];
+		if (currentChar === '?') {
+			const previousChar = charIndex > 0 ? lineText[charIndex - 1] : '';
+			const nextChar = charIndex + 1 < lineText.length ? lineText[charIndex + 1] : '';
+
+			// Ensure we're not inside a named placeholder (handled above)
+			if (!/[A-Za-z0-9_]/.test(previousChar) && !/[A-Za-z0-9_]/.test(nextChar)) {
+				const range = new vscode.Range(
+					position,
+					new vscode.Position(position.line, charIndex + 1)
+				);
+				const markdown = new vscode.MarkdownString();
+				markdown.appendMarkdown(`**Positional SQL placeholder** \`?\`\n\n`);
+				markdown.appendMarkdown(`Provide its value via the parameters array argument (RunSQL, SQLExecute, etc.). The order of question marks matches the array order supplied to the function.\n\n`);
+				markdown.appendMarkdown(`See \`docs/sql-parameters.md\` for placeholder conventions.`);
 				return new vscode.Hover(markdown, range);
 			}
 		}
@@ -173,31 +284,53 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 
 		const procedureName = stringInfo.content;
 
-		// Handle namespace in ExecFunction (e.g., "NameSpace.ProcedureName")
 		const procParts = procedureName.split('.');
 		const actualProcName = procParts[procParts.length - 1];
 
-		// Find the procedure definition
-		const procInfo = this.findProcedureDefinition(document, actualProcName);
-		if (!procInfo) {
+		const localProcInfo = this.findProcedureDefinition(document, actualProcName);
+		if (localProcInfo) {
+			const markdown = new vscode.MarkdownString();
+			markdown.appendCodeblock(`:PROCEDURE ${localProcInfo.name}${localProcInfo.params}`, "ssl");
+			markdown.appendMarkdown(`\n**User-defined procedure**\n\n`);
+			if (localProcInfo.params) {
+				markdown.appendMarkdown(`**Parameters:** ${localProcInfo.params}\n\n`);
+			}
+			markdown.appendMarkdown(`_Called via ${doProcMatch[1]}_`);
+
+			const range = new vscode.Range(
+				position.line,
+				stringInfo.start + 1,
+				position.line,
+				stringInfo.end - 1
+			);
+
+			return new vscode.Hover(markdown, range);
+		}
+
+		const workspaceProc = this.resolveWorkspaceProcedure(procedureName);
+		if (!workspaceProc) {
 			return null;
 		}
 
-		// Create hover with procedure signature
 		const markdown = new vscode.MarkdownString();
-		markdown.appendCodeblock(`:PROCEDURE ${procInfo.name}${procInfo.params}`, "ssl");
+		const signatureLines = [workspaceProc.declarationText || `:PROCEDURE ${workspaceProc.name};`];
+		if (workspaceProc.parameters && workspaceProc.parameters.length > 0) {
+			signatureLines.push(`:PARAMETERS ${workspaceProc.parameters.join(", ")};`);
+		}
+		markdown.appendCodeblock(signatureLines.join("\n"), "ssl");
 		markdown.appendMarkdown(`\n**User-defined procedure**\n\n`);
-		if (procInfo.params) {
-			markdown.appendMarkdown(`**Parameters:** ${procInfo.params}\n\n`);
+		const relativePath = vscode.workspace.asRelativePath(workspaceProc.uri, false);
+		markdown.appendMarkdown(`Located in \`${relativePath}\`\n\n`);
+		if (workspaceProc.parameters && workspaceProc.parameters.length > 0) {
+			markdown.appendMarkdown(`**Parameters:** ${workspaceProc.parameters.join(", ")}\n\n`);
 		}
 		markdown.appendMarkdown(`_Called via ${doProcMatch[1]}_`);
 
-		// Create range for the procedure name in the string
 		const range = new vscode.Range(
 			position.line,
-			stringInfo.start + 1,  // +1 to skip opening quote
+			stringInfo.start + 1,
 			position.line,
-			stringInfo.end - 1     // -1 to skip closing quote
+			stringInfo.end - 1
 		);
 
 		return new vscode.Hover(markdown, range);
@@ -355,6 +488,18 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		}
 
 		return null;
+	}
+
+	private resolveWorkspaceProcedure(literal: string): ProcedureInfo | undefined {
+		if (!this.procedureIndex) {
+			return undefined;
+		}
+		const config = vscode.workspace.getConfiguration("ssl");
+		const namespaceRoots = config.get<Record<string, string>>(
+			CONFIG_KEYS.DOCUMENT_NAMESPACES,
+			CONFIG_DEFAULTS[CONFIG_KEYS.DOCUMENT_NAMESPACES] as Record<string, string>
+		) || {};
+		return this.procedureIndex.resolveProcedureLiteral(literal, namespaceRoots);
 	}
 
 	/**

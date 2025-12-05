@@ -1,0 +1,15 @@
+:PROCEDURE GenerateReport;
+    :PARAMETERS sReportName, nOrderId;
+    :DECLARE sSQL;
+
+    sSQL := "SELECT * FROM TOrders WHERE OrderID = ?nOrderId?";
+    SQLExecute(sSQL);
+:ENDPROC;
+
+:PROCEDURE GenerateSummary;
+    :PARAMETERS sReportName;
+    :DECLARE sSQL;
+
+    sSQL := "SELECT COUNT(*) FROM TOrders WHERE ReportName = ?sReportName?";
+    SQLExecute(sSQL);
+:ENDPROC;

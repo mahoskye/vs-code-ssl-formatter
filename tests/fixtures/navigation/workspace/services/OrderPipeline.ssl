@@ -1,0 +1,16 @@
+:PROCEDURE ProcessOrder;
+    :PARAMETERS nOrderId;
+    :DECLARE sStatus;
+
+    DoProc("ValidateOrder", { nOrderId });
+    ExecFunction("Reporting.GenerateReport.GenerateSummary", { "Daily", nOrderId });
+    sStatus := "Processed";
+:ENDPROC;
+
+:PROCEDURE ValidateOrder;
+    :PARAMETERS nOrderId;
+    :DECLARE sSQL;
+
+    sSQL := "SELECT OrderID FROM TOrders WHERE OrderID = ?";
+    RunSQL(sSQL, , , { nOrderId });
+:ENDPROC;

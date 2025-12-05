@@ -12,6 +12,7 @@ import {
 import {
     PATTERNS
 } from "./constants/patterns";
+import { ClassIndex, ClassMembers } from "./utils/classIndex";
 
 /**
  * SSL Completion Provider
@@ -24,7 +25,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 	private builtinClasses: vscode.CompletionItem[] = [];
 	private snippets: vscode.CompletionItem[] = [];
 
-	constructor() {
+	constructor(private readonly classIndex?: ClassIndex) {
 		this.initializeKeywords();
 		this.initializeBuiltinFunctions();
 		this.initializeBuiltinClasses();
@@ -235,6 +236,10 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 
 		// User-defined classes
 		if (objectType.type === 'userclass') {
+			const indexedMembers = this.classIndex?.getClassMembers(objectType.className!);
+			if (indexedMembers) {
+				return this.createClassMemberItems(indexedMembers);
+			}
 			return this.getUserDefinedClassMembers(lines, objectType.className!);
 		}
 
@@ -267,7 +272,6 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			const userClassMatch = line.match(new RegExp(`\\b${objectName}\\s*:=\\s*CreateUDObject\\s*\\(\\s*["']([^"']+)["']`, 'i'));
 			if (userClassMatch) {
 				const fullClassName = userClassMatch[1];
-				// Handle namespace: "Namespace.ClassName" -> "ClassName"
 				const classParts = fullClassName.split('.');
 				const className = classParts[classParts.length - 1];
 				return { type: 'userclass', className };
@@ -426,5 +430,21 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		}
 
 		return members;
+	}
+
+	private createClassMemberItems(classInfo: ClassMembers): vscode.CompletionItem[] {
+		const items: vscode.CompletionItem[] = [];
+		classInfo.methods.forEach(method => {
+			const item = new vscode.CompletionItem(method, vscode.CompletionItemKind.Method);
+			item.detail = `Method defined on ${classInfo.className}`;
+			item.insertText = new vscode.SnippetString(`${method}($0)`);
+			items.push(item);
+		});
+		classInfo.properties.forEach(prop => {
+			const item = new vscode.CompletionItem(prop, vscode.CompletionItemKind.Property);
+			item.detail = `Property of ${classInfo.className}`;
+			items.push(item);
+		});
+		return items;
 	}
 }

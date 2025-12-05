@@ -8,6 +8,8 @@ export const DIAGNOSTIC_CODES = {
     UNDEFINED_VARIABLE: "ssl-undefined-variable",
     GLOBAL_VARIABLE_IN_PROCEDURE: "ssl-global-variable-in-procedure",
     INVALID_SQL_PARAM: "ssl-invalid-sql-param",
+    INVALID_EXEC_TARGET: "ssl-invalid-exec-target",
+    INVALID_SQL_PLACEHOLDER_STYLE: "ssl-invalid-sql-placeholder-style",
     BLOCK_DEPTH: "ssl-block-depth",
     MAX_PARAMS: "ssl-max-params",
     HUNGARIAN_NOTATION: "ssl-hungarian-notation",
@@ -37,6 +39,10 @@ export const DIAGNOSTIC_MESSAGES = {
 
     INVALID_SQL_PARAM: (paramName: string) =>
         `SQL parameter '${paramName}' does not reference a valid variable or constant. Use lowercase variable names like '?sResult?' to pass through strings.`,
+    INVALID_EXEC_TARGET: (literal: string, example: string) =>
+        `ExecFunction target "${literal}" is incomplete. Provide script and procedure segments (e.g., ${example}).`,
+    INVALID_SQL_PLACEHOLDER_STYLE: (funcName: string, expected: "named" | "positional") =>
+        `${funcName} expects ${expected === "named" ? "named placeholders like ?sName?" : "positional '?' placeholders"} to match its parameter passing style.`,
 
     BLOCK_DEPTH_EXCEEDED: (depth: number, maxDepth: number) =>
         `Block nesting depth (${depth}) exceeds maximum (${maxDepth})`,

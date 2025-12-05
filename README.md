@@ -4,175 +4,172 @@
 [![Version](https://img.shields.io/visual-studio-marketplace/v/mahoskye.vs-code-ssl-formatter.svg)](https://marketplace.visualstudio.com/items?itemName=mahoskye.vs-code-ssl-formatter)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/mahoskye.vs-code-ssl-formatter.svg)](https://marketplace.visualstudio.com/items?itemName=mahoskye.vs-code-ssl-formatter)
 
-A comprehensive Visual Studio Code extension providing syntax highlighting, code formatting, IntelliSense, and code quality tools for STARLIMS Scripting Language (SSL).
+A comprehensive Visual Studio Code extension that brings first-class language tooling—syntax highlighting, formatting, IntelliSense, diagnostics, and navigation—to STARLIMS Scripting Language (SSL).
 
-## Features
+## Overview
 
-### Syntax Highlighting
+- Built-in formatter keeps SSL code aligned with internal STARLIMS style guidelines.
+- IntelliSense exposes keyword, function, and snippet completions plus parameter hints.
+- Linter and diagnostics catch style, safety, and maintainability issues early.
+- Navigation helpers (definitions, references, call hierarchy, CodeLens) make large codebases approachable.
+- Editor polish such as folding, outline view, breadcrumbs, and auto-closing improve everyday ergonomics.
 
-- **Full Syntax Support**: Comprehensive TextMate grammar for all SSL language constructs including keywords, operators, literals, and comments
-- **Keyword Recognition**: Case-sensitive keyword highlighting (`:IF`, `:WHILE`, `:PROCEDURE`, etc.) with colon prefix
-- **Built-in Functions**: Recognition and highlighting of common SSL functions (SQLExecute, DOPROC, EMPTY, LEN, etc.)
-- **Comment Support**: Proper highlighting of SSL block comments (`/* ... ;`)
-- **String Literals**: Support for double quotes, single quotes, and bracket notation
-- **SQL Highlighting**: Embedded SQL keyword highlighting within string literals
+See [CHANGELOG.md](CHANGELOG.md) for release history and bug-fix transparency.
 
-### Code Folding
+## Installation
 
-Comprehensive folding support for improved code navigation:
+### Visual Studio Marketplace
 
-- **Procedure Blocks**: `:PROCEDURE...;:ENDPROC;`
-- **Loop Structures**: `:FOR...;:NEXT;`, `:WHILE...;:ENDWHILE;`
-- **Conditional Blocks**: `:IF...;:ENDIF;`, `:BEGINCASE...;:ENDCASE;`
-- **Exception Handling**: `:TRY...;:CATCH...;:ENDTRY;`
-- **Region Markers**: `:REGION...;:ENDREGION;` and `/* region...;/* endregion;`
-- **Multi-line Comments**: Collapsible comment blocks
+1. Install [Visual Studio Code](https://code.visualstudio.com/).
+2. Open the Extensions view (`Ctrl+Shift+X` / `Cmd+Shift+X`).
+3. Search for **"STARLIMS Scripting Language"** or `mahoskye.vs-code-ssl-formatter`.
+4. Click **Install** and reload VS Code when prompted.
 
-### Code Formatting
+### Manual Installation
 
-Automatic code formatting according to SSL style guide:
+1. Download the latest `.vsix` package from the [GitHub releases](https://github.com/mahoskye/vs-code-ssl-formatter/releases).
+2. In VS Code open the command palette (`Ctrl+Shift+P` / `Cmd+Shift+P`), run `Extensions: Install from VSIX...`, and select the downloaded file.
+3. Reload VS Code.
 
-- **Format Document** (`Shift+Alt+F`): Format entire file
-- **Format Selection**: Format selected code
-- **Keyword Casing**: Normalize keywords to UPPERCASE (configurable)
-- **Function Casing**: Normalize built-in functions to PascalCase (configurable)
-- **Operator Spacing**: Consistent spacing around operators
-- **Indentation**: Configurable tab or space-based indentation
-- **Line Management**: Trim trailing whitespace, ensure final newline
-- **Format on Save**: Optional automatic formatting when saving
+### From Source
 
-### IntelliSense & Code Completion
+```bash
+git clone https://github.com/mahoskye/vs-code-ssl-formatter.git
+cd vs-code-ssl-formatter
+npm install
+npm run package
+code --install-extension vs-code-ssl-formatter-*.vsix
+```
 
-Smart code completion for faster development:
+## Getting Started
 
-- **Keyword Completion**: All SSL keywords with descriptions
-- **Function Completion**: Built-in functions with parameter hints
-- **Signature Help**: Parameter hints while typing function calls (shows parameter names and types)
-- **Code Snippets**: Templates for common patterns:
-  - Procedure with documentation header
-  - IF/ELSE blocks
-  - FOR/WHILE loops
-  - TRY/CATCH error handling
-  - REGION markers
-  - CASE statements
+1. Open or create a file with one of the [supported extensions](#supported-file-types).
+2. Run `Format Document` (`Shift+Alt+F` / `Shift+Option+F`) to normalize indentation, spacing, and keyword casing.
+3. Use IntelliSense features (`Ctrl+Space`, signature help, hover) to explore built-in keywords and procedures.
+4. Fix diagnostics via the Problems panel or use `Ctrl+.` to apply quick fixes.
+5. Customize behavior under **Settings → Extensions → SSL**.
 
-### Navigation & Code Intelligence
+## Feature Highlights
 
-Powerful navigation features for exploring code:
+### Syntax & Editing Experience
 
-- **Go to Definition** (`F12`): Jump to procedure or variable definition
-- **Find All References** (`Shift+F12`): Find all usages of a symbol
-- **Rename Symbol** (`F2`): Rename variables and procedures across the file
-  - Validates Hungarian notation compliance
-  - Prevents renaming keywords and built-in functions
-- **CodeLens**: Shows reference counts above procedures
-- **Peek Definition** (`Alt+F12`): Preview definition inline
-- **Workspace Symbol Search** (`Ctrl+T`): Search for symbols across entire workspace
-  - Find procedures, classes, and regions in any file
-  - Fast fuzzy search across all SSL files
-- **Document Highlight**: Automatic highlighting of symbol occurrences
-  - Distinguishes read, write, and definition locations
-  - Works across the entire document
-- **Call Hierarchy**: Visual procedure call tree
-  - View incoming calls (which procedures call this one)
-  - View outgoing calls (which procedures this one calls)
-  - Navigate through complex call relationships
-- **Inlay Hints** (Experimental): Parameter names shown inline
-  - Display parameter names for built-in functions
-  - Optional feature, disabled by default
+- Full TextMate grammar for SSL, including keywords with colon prefixes, built-in functions, string literals (double, single, and bracket notation), SQL snippets inside strings, and both single-line and multi-line comments.
+- Folding ranges for procedure blocks, loops, conditional structures, exception handling, regions, and comment blocks to simplify navigation.
+- Hover documentation for keywords, language constructs, Hungarian notation hints, and inline SQL placeholder guidance (`?param?` vs positional `?`).
+- Namespace-aware `Go to Definition`/hover for `DoProc`/`ExecFunction` strings when `ssl.documentNamespaces` is configured.
 
-### Hover Information
+### Formatting & Style Guide
 
-Detailed information on hover:
+- `Format Document` and `Format Selection` commands with consistent indentation (tabs or spaces), operator spacing, trailing whitespace trimming, and enforced final newline.
+- Keyword and built-in function casing normalization (preserve, UPPERCASE, lowercase, PascalCase) with per-feature configuration.
+- Optional format-on-save, wrap length enforcement, and support for formatting only selected code.
+- Inline SQL formatting (optional) reflows `SQLExecute`/`RunSQL` string literals with configurable keyword casing and clause indentation.
 
-- **Keyword Documentation**: Description of SSL keywords
-- **Function Signatures**: Parameter lists and return types
-- **Hungarian Notation Hints**: Type information for properly prefixed variables
+### IntelliSense & Navigation
 
-### Code Quality & Diagnostics
+- Keyword and function completion items with summaries, signature help, and snippet templates for common constructs (procedures, IF/ELSE, loops, TRY/CATCH, regions, CASE).
+- Go to Definition, Peek Definition, Find All References, Rename Symbol, workspace symbol search, and document highlights with read/write distinctions.
+- Call Hierarchy view to inspect incoming/outgoing procedure calls and experimental inlay hints that surface parameter names inline.
+- CodeLens displays reference counts above procedures for quick usage checks.
 
-Real-time code analysis and style enforcement:
+### Diagnostics & Quick Fixes
 
-- **Block Depth Checking**: Warns when nesting exceeds configured limit (default: 4)
-- **Parameter Count**: Flags procedures with too many parameters (default: 8)
-- **Hungarian Notation**: Validates variable naming conventions (s=string, n=numeric, b=boolean, etc.)
-- **SQL Injection Prevention**: Warns about non-parameterized SQL queries
-- **Style Guide Enforcement**: Missing semicolons, nested ternaries, missing OTHERWISE clauses
-- **Configurable Severity**: Choose between error, warning, or info levels
+- Live validation for block depth, procedure parameter count, Hungarian notation adherence, SQL injection risks, missing semicolons, missing OTHERWISE clauses, and other style guide rules.
+- Configurable severity levels (error, warning, info) and strict style-guide mode to convert warnings to errors.
+- Quick fixes for missing semicolons, keyword casing, built-in function casing, missing OTHERWISE clauses, and comment toggling.
 
-### Quick Fixes & Code Actions
+### Editor Enhancements
 
-Automatic fixes for common issues:
+- Outline view, breadcrumbs, bracket matching, and auto-closing pairs tuned to SSL syntax.
+- Comment toggling (`Ctrl+/`) for SSL block and line comments.
+- Breadcrumbs and symbol highlighting to understand scope and structure quickly.
+- Region markers (`:REGION` / `:ENDREGION` or `/* region`) for manual code organization.
 
-- **Add Missing Semicolon**: Automatically add semicolons to statements
-- **Fix Keyword Casing**: Correct keyword casing to match style guide (UPPERCASE)
-- **Add OTHERWISE Clause**: Add missing :OTHERWISE to CASE statements
-- **Lightbulb Menu** (`Ctrl+.`): Quick access to all available fixes
+## Commands
 
-### Editor Features
+| Command | Description |
+| --- | --- |
+| `Format Document` | Formats the active SSL file according to configured style settings. |
+| `Format Selection` | Formats only the highlighted block. |
+| `Toggle Line Comment` / `Toggle Block Comment` | Adds or removes SSL-specific comment markers. |
+| `Go to Definition`, `Find All References`, `Rename Symbol` | Navigation helpers for procedures, variables, and regions. |
+| `Call Hierarchy: Show Incoming/Outgoing Calls` | Visualizes call relationships inside complex procedures. |
 
-- **Outline View**: Hierarchical view of procedures, regions, and variables
-- **Breadcrumbs**: Navigation bar showing current position in code
-- **Symbol Highlighting**: Automatic highlighting of symbol occurrences
-- **Bracket Matching**: Matching pairs for `()`, `[]`, `{}`
-- **Auto-Closing Pairs**: Automatic insertion of closing brackets and quotes
-- **Comment Toggling**: `Ctrl+/` to toggle comments
+Use the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) to access any command directly.
 
 ## Supported File Types
 
-The extension activates for files with the following extensions:
+The extension activates for files ending in:
 
 - `.ssl`
-- `.srvscr` (server scripts)
-- `.ds` (data scripts)
+- `.srvscr`
+- `.ds`
 - `.ssl.txt`
 - `.ds.txt`
 
+To force SSL for other names, set `"files.associations": { "*.xyz": "ssl" }` in VS Code settings.
+
 ## Configuration
 
-The extension provides extensive configuration options. Access settings via `Ctrl+,` (or `Cmd+,` on macOS) and search for "SSL".
+Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few frequently used options:
 
-### General Settings
+### General
 
-- `ssl.strictStyleGuideMode`: Enable stricter enforcement (converts warnings to errors)
-- `ssl.maxNumberOfProblems`: Maximum diagnostics per file (default: 100)
+- `ssl.strictStyleGuideMode`: Elevates all style warnings to errors (default: `false`).
+- `ssl.maxNumberOfProblems`: Limits diagnostics reported per file (default: `100`).
+- `ssl.globals`: Array of variable names that should always be treated as declared globals (default: `[]`).
 
-### Formatting Settings
+### Formatting
 
-- `ssl.format.indentStyle`: `tab` or `space` (default: `tab`)
-- `ssl.format.indentWidth`: Number of tabs/spaces per indent (default: 1)
-- `ssl.format.keywordCase`: `preserve`, `upper`, or `lower` (default: `upper`)
-- `ssl.format.builtinFunctionCase`: `preserve`, `PascalCase`, `lowercase`, or `UPPERCASE` (default: `PascalCase`)
-- `ssl.format.wrapLength`: Maximum line length (default: 90)
-- `ssl.format.formatOnSave`: Auto-format on save (default: false)
-- `ssl.format.trimTrailingWhitespace`: Remove trailing whitespace (default: true)
+- `ssl.format.indentStyle`: `tab` or `space` (default: `tab`).
+- `ssl.format.indentWidth`: Number of tabs/spaces per indent (default: `1`).
+- `ssl.format.keywordCase`: `preserve`, `upper`, or `lower` (default: `upper`).
+- `ssl.format.builtinFunctionCase`: `preserve`, `PascalCase`, `lowercase`, or `UPPERCASE` (default: `PascalCase`).
+- `ssl.format.wrapLength`: Maximum line length before wrapping (default: `90`).
+- `ssl.format.formatOnSave`: Automatically format on save (default: `false`).
+- `ssl.format.trimTrailingWhitespace`: Remove trailing whitespace (default: `true`).
+- `ssl.format.sql.enabled`: Format inline SQL string literals (default: `false`).
+- `ssl.format.sql.keywordCase`: `preserve`, `upper`, or `lower` for SQL keywords (default: `upper`).
+- `ssl.format.sql.indentSpaces`: Spaces to indent formatted SQL clauses (default: `4`).
 
-### Naming Convention Settings
+### Naming & Style
 
-- `ssl.naming.hungarianNotation.enabled`: Enable Hungarian notation validation (default: true)
-- `ssl.naming.hungarianNotation.severity`: `warn`, `error`, or `info` (default: `warn`)
+- `ssl.naming.hungarianNotation.enabled`: Enforce Hungarian notation (default: `true`).
+- `ssl.naming.hungarianNotation.severity`: `warn`, `error`, or `info` (default: `warn`).
+- `ssl.styleGuide.limitBlockDepth`: Maximum nested block depth (default: `4`, `0` disables).
+- `ssl.styleGuide.maxParamsPerProcedure`: Limit on procedure parameters (default: `8`, `0` disables).
 
-### Style Guide Settings
+### Security & Diagnostics
 
-- `ssl.styleGuide.limitBlockDepth`: Maximum nesting level (default: 4, 0=disabled)
-- `ssl.styleGuide.maxParamsPerProcedure`: Maximum parameters (default: 8, 0=disabled)
+- `ssl.security.preventSqlInjection`: Warn about concatenated SQL queries (default: `true`).
+- `ssl.security.requireParameterizedQueries`: Require `?PARAM?` placeholders (default: `true`).
+- Placeholder enforcement: SQL helpers that expect positional arrays (`RunSQL`, `GetDataSet`, etc.) warn if your query uses named `?param?` tokens, while `SQLExecute` warns if you try to pass positional `?` markers.
 
-### Security Settings
+### IntelliSense
 
-- `ssl.security.preventSqlInjection`: Warn about SQL injection risks (default: true)
-- `ssl.security.requireParameterizedQueries`: Require ?PARAM? placeholders (default: true)
+- `ssl.intellisense.enabled`: Master toggle for IntelliSense (default: `true`).
+- `ssl.intellisense.codeLens.enabled`: Show reference counts above procedures (default: `true`).
+- `ssl.intellisense.signatureHelp.enabled`: Show parameter hints while typing (default: `true`).
+- `ssl.intellisense.inlayHints.enabled`: Enable experimental inline parameter hints (default: `false`).
+- `ssl.intellisense.inlayHints.parameterNames`: Show parameter names inline (default: `false`).
 
-### IntelliSense Settings
+### Navigation
 
-- `ssl.intellisense.enabled`: Enable IntelliSense features (default: true)
-- `ssl.intellisense.codeLens.enabled`: Show CodeLens reference counts above procedures (default: true)
-- `ssl.intellisense.signatureHelp.enabled`: Show parameter hints while typing function calls (default: true)
-- `ssl.intellisense.inlayHints.enabled`: Enable inlay hints (experimental, default: false)
-- `ssl.intellisense.inlayHints.parameterNames`: Show parameter names inline (default: false)
+- `ssl.documentNamespaces`: Object mapping namespace prefixes (as they appear in `ExecFunction`/`DoProc` strings) to workspace-relative folders. Example:
+  ```jsonc
+  {
+    "ssl.documentNamespaces": {
+      "Services": "server/services",
+      "API": "src/api"
+    }
+  }
+  ```
+  With this mapping, strings like `ExecFunction("Services.Orders.ProcessOrder")` resolve directly to `server/services/Orders.ssl`.
+  Use the command palette entry **“SSL: Configure Document Namespaces”** to interactively add aliases without hand-editing `.vscode/settings.json`.
 
-### Example Configuration
+### Example `settings.json`
 
-```json
+```jsonc
 {
   "ssl.strictStyleGuideMode": false,
   "ssl.format.formatOnSave": true,
@@ -184,101 +181,12 @@ The extension provides extensive configuration options. Access settings via `Ctr
 }
 ```
 
-## SSL Language Specifics
+## Documentation & Support
 
-The extension correctly handles SSL's unique characteristics:
+- User documentation: this README.
+- Developer documentation: [docs/README.md](docs/README.md) with architecture, CI, and grammar details.
+- Release notes and bug history: [CHANGELOG.md](CHANGELOG.md).
+- SQL placeholder reference: [docs/sql-parameters.md](docs/sql-parameters.md).
+- Issues & feature requests: [GitHub Issues](https://github.com/mahoskye/vs-code-ssl-formatter/issues).
 
-- **One-based Indexing**: Arrays and strings start at index 1
-- **Comment Syntax**: Comments begin with `/*` and end at the next semicolon `;`
-- **Property Access**: Uses colon `:` not dot (e.g., `object:property`)
-- **Boolean Literals**: `.T.` (true) and `.F.` (false)
-- **NIL Literal**: Represents null/undefined values
-- **Assignment**: Primary assignment uses `:=`
-- **String Delimiters**: Supports `"text"`, `'text'`, and `[text]`
-- **Database Parameters**: Named `?PARAM?` or positional `?`
-- **Array Literals**: `{expr1, expr2, expr3}`
-- **Code Blocks**: Lambda-style `{|param1, param2| expression}`
-
-## Installation
-
-### From VS Code Marketplace
-
-1. Open Visual Studio Code
-2. Press `Ctrl+P` (or `Cmd+P` on macOS)
-3. Type `ext install mahoskye.vs-code-ssl-formatter`
-4. Press Enter
-
-### From VSIX File
-
-1. Download the `.vsix` file
-2. Open VS Code
-3. Go to Extensions view (`Ctrl+Shift+X`)
-4. Click the "..." menu at the top
-5. Select "Install from VSIX..."
-6. Choose the downloaded file
-
-## Building from Source
-
-To build and package the extension:
-
-```bash
-# Clone the repository
-git clone https://github.com/mahoskye/vs-code-ssl-formatter.git
-cd vs-code-ssl-formatter
-
-# Install dependencies
-npm install
-
-# Compile TypeScript
-npm run compile
-
-# Package the extension
-npm run package
-```
-
-The packaged `.vsix` file can be installed manually in VS Code.
-
-## Usage Tips
-
-1. **Quick Format**: Press `Shift+Alt+F` to format your entire SSL file
-2. **Code Snippets**: Type `procedure`, `if`, `for`, etc., and press Tab for quick templates
-3. **Outline Navigation**: Use the Outline view (Explorer panel) to navigate large files
-4. **Problem Panel**: View all diagnostics in the Problems panel (`Ctrl+Shift+M`)
-5. **Hover for Help**: Hover over keywords and functions for documentation
-6. **Format on Save**: Enable `ssl.format.formatOnSave` for automatic formatting
-
-## SSL Style Guide
-
-This extension enforces the STARLIMS SSL Style Guide which includes:
-
-- **Hungarian Notation**: Variables prefixed with type indicators (s, n, b, l, d, a, o)
-- **PascalCase**: Procedures and classes
-- **UPPERCASE**: Keywords (`:IF`, `:WHILE`, etc.)
-- **Tab Indentation**: One tab per indent level
-- **90 Character Lines**: Soft wrap at 90 characters
-- **Parameterized SQL**: Use ?PARAM? placeholders to prevent SQL injection
-- **Block Depth Limit**: Maximum 4 levels of nesting
-- **Parameter Limit**: Maximum 8 parameters per procedure
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues or pull requests on [GitHub](https://github.com/mahoskye/vs-code-ssl-formatter).
-
-## License
-
-This extension is licensed under the [MIT License](LICENSE).
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history and updates.
-
-## Support
-
-For issues, feature requests, or questions:
-
-- [GitHub Issues](https://github.com/mahoskye/vs-code-ssl-formatter/issues)
-- [GitHub Repository](https://github.com/mahoskye/vs-code-ssl-formatter)
-
-## Acknowledgments
-
-Based on comprehensive analysis of STARLIMS Scripting Language (SSL) v11 documentation and the STARLIMS SSL Style Guide.
+Contributions are welcome—see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and follow the testing instructions before opening a pull request.

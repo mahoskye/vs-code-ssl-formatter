@@ -35,8 +35,30 @@ export const CASE_KEYWORDS = [
 ];
 
 export const PROCEDURE_LEVEL_KEYWORDS = [
-    "PARAMETERS", "DECLARE", "DEFAULT", "RETURN", "PUBLIC"
+    "PARAMETERS", "DECLARE", "DEFAULT", "PUBLIC"
 ];
+
+export const INLINE_SQL_FUNCTIONS = [
+    "SQLExecute",
+    "GetDataSet",
+    "GetDataSetWithSchemaFromSelect",
+    "GetDataSetXMLFromSelect",
+    "GetNETDataSet"
+];
+
+export const PARAMETERIZED_SQL_FUNCTIONS = [
+    "RunSQL",
+    "LSearch",
+    "LSelect",
+    "LSelect1",
+    "LSelectC",
+    "GetDataSetEx"
+];
+
+export const ALL_SQL_FUNCTIONS = Array.from(new Set([
+    ...INLINE_SQL_FUNCTIONS,
+    ...PARAMETERIZED_SQL_FUNCTIONS
+]));
 
 export const MULTILINE_CONSTRUCT_KEYWORDS = [
     "IF", "ELSE", "WHILE", "FOR", "TO", "STEP", "BEGINCASE", "CASE", "OTHERWISE", "EXITCASE",
@@ -68,14 +90,14 @@ export interface SSLFunction {
 export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
     {
         "name": "SQLExecute",
-        "description": "Executes a SQL command and returns the result as an SSLValue.",
-        "params": "(any commandString, any friendlyName, any rollbackExistingTransaction, any nullAsBlank, any invariantDateColumns, any returnType, any tableName, any includeSchema, any includeHeader)",
+        "description": "Executes a SQL command that uses inline `?param?` placeholders resolved from in-scope variables.",
+        "params": "(string sql, string connectionName)",
         "returns": "any",
-        "signature": "SQLExecute(any commandString, any friendlyName, any rollbackExistingTransaction, any nullAsBlank, any invariantDateColumns, any returnType, any tableName, any includeSchema, any includeHeader)",
+        "signature": "SQLExecute(string sql, string connectionName)",
         "returnType": "any",
         "category": "Database Functions",
         "frequency": "Very High",
-        "untypedSignature": "SQLExecute(commandString, friendlyName, rollbackExistingTransaction, nullAsBlank, invariantDateColumns, returnType, tableName, includeSchema, includeHeader)"
+        "untypedSignature": "SQLExecute(sql, connectionName)"
     },
     {
         "name": "Empty",
@@ -91,13 +113,13 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
     {
         "name": "DoProc",
         "description": "Executes a stored procedure with the provided arguments.",
-        "params": "(any[] args)",
+        "params": "(string procedureName, object[] parameters)",
         "returns": "any",
-        "signature": "DoProc(any[] args)",
+        "signature": "DoProc(string procedureName, object[] parameters)",
         "returnType": "any",
         "category": "Runtime Functions",
         "frequency": "Very High",
-        "untypedSignature": "DoProc(args)"
+        "untypedSignature": "DoProc(procedureName, parameters)"
     },
     {
         "name": "Len",
@@ -189,14 +211,14 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
     },
     {
         "name": "RunSQL",
-        "description": "Executes a SQL command without returning data.",
-        "params": "(string commandString, string friendlyName, any arrayOfValues)",
-        "returns": "boolean",
-        "signature": "RunSQL(string commandString, string friendlyName, any arrayOfValues)",
-        "returnType": "boolean",
+        "description": "Executes a SQL command using positional `?` placeholders whose values come from an array.",
+        "params": "(string sql, string connectionName, boolean returnRecordsAffected, any[] parameters)",
+        "returns": "number",
+        "signature": "RunSQL(string sql, string connectionName, boolean returnRecordsAffected, any[] parameters)",
+        "returnType": "number",
         "category": "Database Functions",
         "frequency": "High",
-        "untypedSignature": "RunSQL(commandString, friendlyName, arrayOfValues)"
+        "untypedSignature": "RunSQL(sql, connectionName, returnRecordsAffected, parameters)"
     },
     {
         "name": "SubStr",

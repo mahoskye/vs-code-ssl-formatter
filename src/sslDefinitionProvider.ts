@@ -1,10 +1,14 @@
 import * as vscode from "vscode";
+import { ProcedureIndex } from "./utils/procedureIndex";
+import { CONFIG_KEYS, CONFIG_DEFAULTS } from "./constants/config";
 
 /**
  * SSL Definition Provider
  * Provides "Go to Definition" functionality for procedures and variables
  */
 export class SSLDefinitionProvider implements vscode.DefinitionProvider {
+
+	constructor(private readonly procedureIndex?: ProcedureIndex) {}
 
 	public provideDefinition(
 		document: vscode.TextDocument,
@@ -14,6 +18,20 @@ export class SSLDefinitionProvider implements vscode.DefinitionProvider {
 		const range = document.getWordRangeAtPosition(position);
 		if (!range) {
 			return null;
+		}
+
+		const lineText = document.lineAt(position.line).text;
+
+		const stringInfo = this.getStringAtPosition(lineText, position.character);
+		if (stringInfo) {
+			const beforeString = lineText.substring(0, stringInfo.start);
+			const callMatch = beforeString.match(/\b(DoProc|ExecFunction)\s*\(\s*$/i);
+			if (callMatch) {
+				const workspaceProc = this.resolveWorkspaceProcedure(stringInfo.content);
+				if (workspaceProc) {
+					return new vscode.Location(workspaceProc.uri, workspaceProc.range);
+				}
+			}
 		}
 
 		const word = document.getText(range);
@@ -80,5 +98,43 @@ export class SSLDefinitionProvider implements vscode.DefinitionProvider {
 		}
 
 		return null;
+	}
+	private getStringAtPosition(lineText: string, charPosition: number): { content: string; start: number; end: number } | null {
+		let inString = false;
+		let stringStart = -1;
+		let quoteChar = '';
+
+		for (let i = 0; i < lineText.length; i++) {
+			const char = lineText[i];
+
+			if (!inString && (char === '"' || char === "'")) {
+				inString = true;
+				stringStart = i;
+				quoteChar = char;
+			} else if (inString && char === quoteChar) {
+				if (charPosition > stringStart && charPosition <= i) {
+					return {
+						content: lineText.substring(stringStart + 1, i),
+						start: stringStart,
+						end: i + 1
+					};
+				}
+				inString = false;
+			}
+		}
+
+		return null;
+	}
+
+	private resolveWorkspaceProcedure(literal: string) {
+		if (!this.procedureIndex) {
+			return undefined;
+		}
+		const config = vscode.workspace.getConfiguration("ssl");
+		const namespaceRoots = config.get<Record<string, string>>(
+			CONFIG_KEYS.DOCUMENT_NAMESPACES,
+			CONFIG_DEFAULTS[CONFIG_KEYS.DOCUMENT_NAMESPACES] as Record<string, string>
+		) || {};
+		return this.procedureIndex.resolveProcedureLiteral(literal, namespaceRoots);
 	}
 }

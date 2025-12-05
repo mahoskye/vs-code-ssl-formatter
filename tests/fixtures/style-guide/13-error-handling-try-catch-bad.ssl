@@ -6,7 +6,7 @@
 	:CATCH;
 	sError := GetLastSSLError();
 	:FINALLY;
-	/* cleanup;
+	/* cleanup (release resources);
 	:ENDTRY;
 :RETURN nResult;
 :ENDPROC;

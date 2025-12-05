@@ -7,5 +7,5 @@
 	:ELSE;
 		nResult := 0;
 	:ENDIF;
-:RETURN nResult;
+	:RETURN nResult;
 :ENDPROC;

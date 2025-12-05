@@ -6,7 +6,8 @@ import {
     BLOCK_END_KEYWORDS,
     BLOCK_MIDDLE_KEYWORDS,
     CASE_KEYWORDS,
-    PROCEDURE_LEVEL_KEYWORDS
+    PROCEDURE_LEVEL_KEYWORDS,
+	ALL_SQL_FUNCTIONS
 } from "./constants/language";
 import {
     CONFIG_KEYS,
@@ -16,6 +17,65 @@ import {
 	PATTERNS
 } from "./constants/patterns";
 import { normalizeOperatorSpacing, replaceOutsideStrings } from "./utils/formatters";
+
+const SQL_CLAUSE_KEYWORDS = [
+	"INNER JOIN",
+	"LEFT JOIN",
+	"RIGHT JOIN",
+	"FULL JOIN",
+	"GROUP BY",
+	"ORDER BY",
+	"UNION ALL",
+	"UNION",
+	"DELETE FROM",
+	"INSERT INTO",
+	"EXCEPT",
+	"INTERSECT",
+	"HAVING",
+	"VALUES",
+	"WHERE",
+	"SET",
+	"FROM",
+	"JOIN",
+	"UPDATE"
+].sort((a, b) => b.length - a.length);
+
+const SQL_GENERAL_KEYWORDS = [
+	"SELECT",
+	"DISTINCT",
+	"TOP",
+	"AS",
+	"ON",
+	"IN",
+	"NOT",
+	"BETWEEN",
+	"LIKE",
+	"IS",
+	"NULL",
+	"INNER",
+	"LEFT",
+	"RIGHT",
+	"FULL",
+	"JOIN",
+	"INSERT",
+	"INTO",
+	"VALUES",
+	"UPDATE",
+	"SET",
+	"DELETE",
+	"FROM",
+	"WHERE",
+	"GROUP",
+	"BY",
+	"ORDER",
+	"HAVING",
+	"UNION",
+	"ALL",
+	"EXCEPT",
+	"INTERSECT",
+	"AND",
+	"OR"
+];
 
 /**
  * SSL Formatting Provider
@@ -86,6 +146,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	formatted = normalizeOperatorSpacing(formatted);
 		formatted = this.normalizeIndentation(formatted, indentStyle, indentWidth, tabSize);
 		formatted = this.normalizeBlankLines(formatted);
+		formatted = this.formatSqlLiterals(formatted, config);
 
 		// Wrap long lines if configured
 		const wrapLength = config.get<number>(CONFIG_KEYS.FORMAT_WRAP_LENGTH, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_WRAP_LENGTH]);
@@ -253,10 +314,41 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 		const lines = text.split('\n');
 		let inMultiLineComment = false;
-		
+		let inMultiLineString = false;
+		let stringDelimiter = '';
+
 		const formattedLines = lines.map(line => {
 			const trimmed = line.trim();
-			
+
+			// Track multi-line string state
+			if (!inMultiLineString) {
+				const doubleQuoteCount = (line.match(/"/g) || []).length;
+				const singleQuoteCount = (line.match(/'/g) || []).length;
+				const bracketOpenCount = (line.match(/\[/g) || []).length;
+				const bracketCloseCount = (line.match(/\]/g) || []).length;
+
+				if (doubleQuoteCount % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = '"';
+				} else if (singleQuoteCount % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = "'";
+				} else if (bracketOpenCount !== bracketCloseCount) {
+					inMultiLineString = true;
+					stringDelimiter = ']';
+				}
+			} else {
+				const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : (stringDelimiter === "'" ? "'" : '\\]'), 'g')) || []).length;
+				if (delimiterCount % 2 !== 0 || (stringDelimiter === ']' && delimiterCount > 0)) {
+					inMultiLineString = false;
+					stringDelimiter = '';
+				}
+			}
+
+			if (inMultiLineString) {
+				return line; // Don't format string content
+			}
+
 			// Track multi-line comment state (SSL uses /* ... ; syntax)
 			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
 				inMultiLineComment = true;
@@ -268,12 +360,12 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				}
 				return line; // Don't format comment content
 			}
-			
+
 			// Skip single-line comments
 			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
 				return line;
 			}
-			
+
 			let result = line;
 			keywords.forEach(keyword => {
 				const pattern = new RegExp(`:${keyword}\\b`, "gi");
@@ -301,10 +393,41 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 		const lines = text.split('\n');
 		let inMultiLineComment = false;
-		
+		let inMultiLineString = false;
+		let stringDelimiter = '';
+
 		const formattedLines = lines.map(line => {
 			const trimmed = line.trim();
-			
+
+			// Track multi-line string state
+			if (!inMultiLineString) {
+				const doubleQuoteCount = (line.match(/"/g) || []).length;
+				const singleQuoteCount = (line.match(/'/g) || []).length;
+				const bracketOpenCount = (line.match(/\[/g) || []).length;
+				const bracketCloseCount = (line.match(/\]/g) || []).length;
+
+				if (doubleQuoteCount % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = '"';
+				} else if (singleQuoteCount % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = "'";
+				} else if (bracketOpenCount !== bracketCloseCount) {
+					inMultiLineString = true;
+					stringDelimiter = ']';
+				}
+			} else {
+				const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : (stringDelimiter === "'" ? "'" : '\\]'), 'g')) || []).length;
+				if (delimiterCount % 2 !== 0 || (stringDelimiter === ']' && delimiterCount > 0)) {
+					inMultiLineString = false;
+					stringDelimiter = '';
+				}
+			}
+
+			if (inMultiLineString) {
+				return line; // Don't format string content
+			}
+
 			// Track multi-line comment state (SSL uses /* ... ; syntax)
 			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
 				inMultiLineComment = true;
@@ -316,12 +439,12 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				}
 				return line; // Don't format comment content
 			}
-			
+
 			// Skip single-line comments
 			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
 				return line;
 			}
-			
+
 			let result = line;
 			functions.forEach(func => {
 				// Only match function names when followed by opening parenthesis
@@ -389,6 +512,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		let inMultiLineString = false;
 		let stringDelimiter = "";
 		let inProcedure = false; // Track if we're inside a procedure
+		let groupingDepth = 0;
 		const indentChar = indentStyle === "tab" ? "\t" : " ".repeat(indentWidth);
 
 		const blockStart = new RegExp(`^\\s*:(${BLOCK_START_KEYWORDS.join('|')})\\b`, 'i');
@@ -467,7 +591,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 			// Procedure-level keywords should stay at column 0
 			const isProcedureLevelKeyword = procedureLevelKeyword.test(trimmed);
-			
+
 			if (isProcedureLevelKeyword) {
 				currentIndentLevel = 0;
 			}
@@ -476,8 +600,17 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				currentIndentLevel = indentLevel;
 			}
 
+			const sanitized = this.stripInlineStrings(trimmed);
+			const groupingClosers = this.countLeadingClosers(sanitized);
+			const groupingOffset = Math.max(0, groupingDepth - groupingClosers);
+
+			let appliedIndentLevel = currentIndentLevel;
+			if (!isProcedureLevelKeyword) {
+				appliedIndentLevel += groupingOffset;
+			}
+
 			// Apply indentation
-			const indented = indentChar.repeat(currentIndentLevel) + trimmed;
+			const indented = indentChar.repeat(appliedIndentLevel) + trimmed;
 
 			// Track PROCEDURE blocks - set indent to 1 for procedure body AFTER formatting the PROCEDURE line
 			if (procedureKeyword.test(trimmed)) {
@@ -499,6 +632,10 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			if (caseKeyword.test(trimmed)) {
 				indentLevel++;
 			}
+
+			const openingBrackets = (sanitized.match(/[\(\{\[]/g) || []).length;
+			const closingBrackets = (sanitized.match(/[\)\}\]]/g) || []).length;
+			groupingDepth = Math.max(0, groupingDepth + openingBrackets - closingBrackets);
 
 			return indented;
 		});
@@ -560,8 +697,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			let isContinuation = false;
 			if (index > 0) {
 				const prevLine = lines[index - 1].trim();
-				const prevEndsWithOperator = /[+\-*/,]$/.test(prevLine);
-				const currentStartsWithOperator = /^[+\-*/,]/.test(trimmed);
+				const prevEndsWithOperator = /[+\-*/]$/.test(prevLine);
+				const currentStartsWithOperator = /^[+\-*/]/.test(trimmed);
 				
 				if ((prevEndsWithOperator || currentStartsWithOperator) && !inMultiLineComment) {
 					isContinuation = true;
@@ -702,6 +839,96 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		return result.join('\n');
 	}
 
+	private formatSqlLiterals(
+		text: string,
+		config: vscode.WorkspaceConfiguration
+	): string {
+		const enabled = config.get<boolean>(CONFIG_KEYS.FORMAT_SQL_ENABLED, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_SQL_ENABLED]);
+		if (!enabled) {
+			return text;
+		}
+
+		const keywordCase = config.get<string>(CONFIG_KEYS.FORMAT_SQL_KEYWORD_CASE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_SQL_KEYWORD_CASE]) || "upper";
+		const indentSpaces = config.get<number>(CONFIG_KEYS.FORMAT_SQL_INDENT_SPACES, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_SQL_INDENT_SPACES]) || 0;
+		const normalizedIndent = Math.max(0, indentSpaces);
+		const functionPattern = ALL_SQL_FUNCTIONS.join("|");
+		if (!functionPattern) {
+			return text;
+		}
+
+		const sqlLiteralRegex = new RegExp(`\\b(${functionPattern})\\s*\\(\\s*("([\\s\\S]*?)")`, "gi");
+		return text.replace(sqlLiteralRegex, (match, functionName, literal, content) => {
+			void functionName;
+			if (typeof literal !== "string" || typeof content !== "string") {
+				return match;
+			}
+			const formattedContent = this.formatSqlContent(content, keywordCase, normalizedIndent);
+			const formattedLiteral = `"${formattedContent}"`;
+			return match.replace(literal, formattedLiteral);
+		});
+	}
+
+	private formatSqlContent(content: string, keywordCase: string, indentSpaces: number): string {
+		let sql = content.replace(/\r\n/g, "\n").trim();
+		if (!sql) {
+			return content.trim();
+		}
+
+		sql = sql.replace(/\s+/g, " ");
+
+		SQL_CLAUSE_KEYWORDS.forEach(keyword => {
+			const pattern = keyword.replace(/\s+/g, "\\s+");
+			const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
+			sql = sql.replace(clauseRegex, (matchText, clause) => {
+				void matchText;
+				return `\n${this.applySqlKeywordCase(keyword, keywordCase, clause)}`;
+			});
+		});
+
+		sql = sql.replace(/\s+(AND|OR)\b/gi, (matchText, clause) => {
+			void matchText;
+			return `\n${this.applySqlKeywordCase(clause, keywordCase, clause)}`;
+		});
+
+		const keywordRegex = new RegExp(`\\b(${SQL_GENERAL_KEYWORDS.join("|")})\\b`, "gi");
+		sql = sql.replace(keywordRegex, match => this.applySqlKeywordCase(match.toUpperCase(), keywordCase, match));
+
+		const indentUnit = indentSpaces > 0 ? " ".repeat(indentSpaces) : "";
+		const doubleIndent = indentUnit + indentUnit;
+
+		const lines = sql.split('\n').map(line => line.trim()).filter((line, index, arr) => !(line === "" && index === arr.length - 1));
+		return lines.map((line, index) => {
+			if (index === 0) {
+				return line;
+			}
+			const upper = line.toUpperCase();
+			if (upper.startsWith("AND") || upper.startsWith("OR")) {
+				return (doubleIndent || indentUnit) + line;
+			}
+			return indentUnit + line;
+		}).join('\n');
+	}
+
+	private applySqlKeywordCase(keyword: string, style: string, original?: string): string {
+		if (style === "lower") {
+			return keyword.toLowerCase();
+		}
+		if (style === "upper") {
+			return keyword.toUpperCase();
+		}
+		return original ?? keyword;
+	}
+
+	private stripInlineStrings(line: string): string {
+		return line.replace(/"[^"]*"|'[^']*'/g, "");
+	}
+
+	private countLeadingClosers(line: string): number {
+		const trimmed = line.trimStart();
+		const match = trimmed.match(/^([)\]\}]+)/);
+		return match ? match[1].length : 0;
+	}
+
 	/**
 	 * Wrap long lines that exceed the specified length
 	 */
@@ -743,12 +970,16 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			if (assignmentMatch) {
 				const varName = assignmentMatch[1];
 				const value = assignmentMatch[2];
+			
+			// Capture the original indentation from the line
+			const indentMatch = line.match(/^(\s*)/);
+			const originalIndent = indentMatch ? indentMatch[1] : '';
 
 				// Check if it's a string (with or without concatenation)
 				if (value.startsWith('"') || value.startsWith("'")) {
 					const wrapped = this.wrapString(varName, value, wrapLength);
 					if (wrapped) {
-						result.push(...wrapped);
+						result.push(...wrapped.map(l => originalIndent + l));
 						continue;
 					}
 				}
@@ -757,7 +988,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				if (/[\(\{]/.test(value)) {
 					const wrapped = this.wrapBracketedList(varName, value, wrapLength);
 					if (wrapped) {
-						result.push(...wrapped);
+						result.push(...wrapped.map(l => originalIndent + l));
 						continue;
 					}
 				}
@@ -766,7 +997,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				if (/\.(?:AND|OR|NOT)\./.test(value)) {
 					const wrapped = this.wrapLogicalExpression(varName, value, wrapLength);
 					if (wrapped) {
-						result.push(...wrapped);
+						result.push(...wrapped.map(l => originalIndent + l));
 						continue;
 					}
 				}
@@ -831,7 +1062,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			return null;
 		}
 
-		// Build wrapped lines without indentation (indentation engine will handle it)
+		// Build wrapped lines without indentation (caller will apply original line's indentation)
 		const wrapped: string[] = [];
 
 		// First line: varName := firstPart +
@@ -1073,7 +1304,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			return null;
 		}
 
-		// Build wrapped lines without indentation (indentation engine will handle it)
+		// Build wrapped lines without indentation (caller will apply original line's indentation)
 		const wrapped: string[] = [];
 
 		// Check if first part starts with a logical operator

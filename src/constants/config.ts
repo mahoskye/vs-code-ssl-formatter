@@ -7,6 +7,7 @@ export const CONFIG_KEYS = {
     // Core settings
     MAX_NUMBER_OF_PROBLEMS: "ssl.maxNumberOfProblems",
     STRICT_STYLE_GUIDE_MODE: "ssl.strictStyleGuideMode",
+    GLOBAL_VARIABLES: "ssl.globals",
 
     // Formatting settings
     FORMAT_INDENT_STYLE: "ssl.format.indentStyle",
@@ -16,6 +17,10 @@ export const CONFIG_KEYS = {
     FORMAT_WRAP_LENGTH: "ssl.format.wrapLength",
     FORMAT_FORMAT_ON_SAVE: "ssl.format.formatOnSave",
     FORMAT_TRIM_TRAILING_WHITESPACE: "ssl.format.trimTrailingWhitespace",
+    FORMAT_SQL_ENABLED: "ssl.format.sql.enabled",
+    FORMAT_SQL_KEYWORD_CASE: "ssl.format.sql.keywordCase",
+    FORMAT_SQL_INDENT_SPACES: "ssl.format.sql.indentSpaces",
+    DOCUMENT_NAMESPACES: "ssl.documentNamespaces",
 
     // Naming settings
     NAMING_HUNGARIAN_ENABLED: "ssl.naming.hungarianNotation.enabled",
@@ -45,6 +50,7 @@ export const CONFIG_KEYS = {
 export const CONFIG_DEFAULTS = {
     [CONFIG_KEYS.MAX_NUMBER_OF_PROBLEMS]: 100,
     [CONFIG_KEYS.STRICT_STYLE_GUIDE_MODE]: false,
+    [CONFIG_KEYS.GLOBAL_VARIABLES]: [],
     [CONFIG_KEYS.FORMAT_INDENT_STYLE]: "tab",
     [CONFIG_KEYS.FORMAT_INDENT_WIDTH]: 1,
     [CONFIG_KEYS.FORMAT_KEYWORD_CASE]: "upper",
@@ -52,6 +58,10 @@ export const CONFIG_DEFAULTS = {
     [CONFIG_KEYS.FORMAT_WRAP_LENGTH]: 90,
     [CONFIG_KEYS.FORMAT_FORMAT_ON_SAVE]: false,
     [CONFIG_KEYS.FORMAT_TRIM_TRAILING_WHITESPACE]: true,
+    [CONFIG_KEYS.FORMAT_SQL_ENABLED]: false,
+    [CONFIG_KEYS.FORMAT_SQL_KEYWORD_CASE]: "upper",
+    [CONFIG_KEYS.FORMAT_SQL_INDENT_SPACES]: 4,
+    [CONFIG_KEYS.DOCUMENT_NAMESPACES]: {},
     [CONFIG_KEYS.NAMING_HUNGARIAN_ENABLED]: true,
     [CONFIG_KEYS.NAMING_HUNGARIAN_SEVERITY]: "warn",
     [CONFIG_KEYS.STYLE_GUIDE_LIMIT_BLOCK_DEPTH]: 4,

@@ -4,5 +4,5 @@
 	sResult := "Hello" + "World";
 	sResult := "Hello" + "World";
 	sResult := "Hello" + " " + "World";
-:RETURN sResult;
+	:RETURN sResult;
 :ENDPROC;

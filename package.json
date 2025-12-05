@@ -2,7 +2,7 @@
     "name": "vs-code-ssl-formatter",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -16,10 +16,16 @@
         "type": "git",
         "url": "https://github.com/mahoskye/vs-code-ssl-formatter.git"
     },
+    "icon": "media/icon.png",
     "bugs": {
         "url": "https://github.com/mahoskye/vs-code-ssl-formatter/issues"
     },
     "homepage": "https://github.com/mahoskye/vs-code-ssl-formatter#readme",
+    "activationEvents": [
+        "onLanguage:ssl",
+        "onCommand:ssl.toggleComment",
+        "onCommand:ssl.configureDocumentNamespaces"
+    ],
     "contributes": {
         "languages": [
             {
@@ -59,6 +65,14 @@
                     "minimum": 10,
                     "maximum": 1000,
                     "description": "Maximum number of diagnostics to report per file"
+                },
+                "ssl.globals": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Variable names that should always be treated as declared globals (Hungarian notation recommended)"
                 },
                 "ssl.format.indentStyle": {
                     "type": "string",
@@ -113,6 +127,36 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Remove trailing whitespace from all lines"
+                },
+                "ssl.format.sql.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Format inline SQL string literals passed to SQLExecute/RunSQL/LSearch when true"
+                },
+                "ssl.format.sql.keywordCase": {
+                    "type": "string",
+                    "enum": [
+                        "preserve",
+                        "upper",
+                        "lower"
+                    ],
+                    "default": "upper",
+                    "description": "Preferred casing for SQL keywords when SQL formatting is enabled"
+                },
+                "ssl.format.sql.indentSpaces": {
+                    "type": "number",
+                    "default": 4,
+                    "minimum": 0,
+                    "maximum": 12,
+                    "description": "Number of spaces to indent formatted SQL clauses (ignored when SQL formatting disabled)"
+                },
+                "ssl.documentNamespaces": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Map namespace prefixes used in ExecFunction/DoProc to workspace-relative folders",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 },
                 "ssl.naming.hungarianNotation.enabled": {
                     "type": "boolean",
@@ -189,7 +233,27 @@
                     "description": "Trace communication with the language server"
                 }
             }
-        }
+        },
+        "commands": [
+            {
+                "command": "ssl.toggleComment",
+                "title": "SSL: Toggle Comment",
+                "category": "SSL"
+            },
+            {
+                "command": "ssl.configureDocumentNamespaces",
+                "title": "SSL: Configure Document Namespaces",
+                "category": "SSL"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "ssl.toggleComment",
+                "key": "ctrl+/",
+                "mac": "cmd+/",
+                "when": "editorTextFocus && editorLangId == ssl"
+            }
+        ]
     },
     "main": "./out/src/extension.js",
     "scripts": {
