@@ -1,0 +1,40 @@
+<svg width="256" height="256" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="200" height="200" fill="#0b1020"></rect>
+
+  <!-- Star -->
+  <polygon points="100,15 121,70 180,75 133,112 147,170 100,140 53,170 67,112 20,75 79,70" fill="#f6c945" stroke="#e0a800" stroke-width="3"></polygon>
+
+  <!-- Flask body -->
+  <path d="M85 40 
+       L115 40 
+       L110 80 
+       L135 150 
+       Q137 155 132 160 
+       L68 160 
+       Q63 155 65 150 
+       L90 80 
+       Z" fill="#f5f7ff" fill-opacity="0.6" stroke="#1f2933" stroke-width="3"></path>
+
+  <!-- Flask neck inner (highlight) -->
+  <rect x="90" y="40" width="20" height="8" fill="#ffffff" fill-opacity="0.8"></rect>
+
+  <!-- Liquid inside the flask -->
+  <path d="M72 138
+       Q90 132 100 134
+       Q110 136 128 130
+       L133 150
+       Q135 155 130 158
+       L70 158
+       Q65 155 67 150
+       Z" fill="#45b4ff" fill-opacity="0.85" stroke="#1b4b6b" stroke-width="2"></path>
+
+  <!-- Bubbles in the liquid -->
+  <circle cx="92" cy="144" r="3" fill="#e6f4ff"></circle>
+  <circle cx="108" cy="140" r="2.5" fill="#e6f4ff"></circle>
+  <circle cx="100" cy="150" r="2" fill="#e6f4ff"></circle>
+
+  <!-- Small shine on the flask -->
+  <path d="M90 85
+       Q84 105 88 125" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-opacity="0.7"></path>
+</svg>
