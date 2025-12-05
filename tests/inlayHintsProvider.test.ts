@@ -84,3 +84,69 @@ describe('SSL Inlay Hints Provider - ExecFunction resolution', () => {
 		expect(labels).to.include('parameters:');
 	});
 });
+
+describe('SSL Inlay Hints Provider - String Exclusion (Bug #39)', () => {
+	it('should not provide hints for function-like patterns inside double-quoted strings', () => {
+		const document = createDocument(`sQuery := "SELECT Len(field) FROM table";`);
+		const range = fullRangeFor(document.lineCount, document.lineAt(document.lineCount - 1).text.length);
+		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
+		// Len() inside the SQL string should not get hints
+		expect(hints).to.have.lengthOf(0);
+	});
+
+	it('should not provide hints for function-like patterns inside single-quoted strings', () => {
+		const document = createDocument(`sQuery := 'SELECT Len(field) FROM table';`);
+		const range = fullRangeFor(document.lineCount, document.lineAt(document.lineCount - 1).text.length);
+		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
+		expect(hints).to.have.lengthOf(0);
+	});
+
+	it('should not provide hints for function-like patterns inside bracket strings', () => {
+		const document = createDocument(`sQuery := [SELECT Len(field) FROM table];`);
+		const range = fullRangeFor(document.lineCount, document.lineAt(document.lineCount - 1).text.length);
+		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
+		expect(hints).to.have.lengthOf(0);
+	});
+
+	it('should provide hints for real function calls but not for patterns in SQL strings', () => {
+		const document = createDocument(`nLength := Len(sValue);
+sQuery := "SELECT COUNT(*), Len(name) FROM users";`);
+		const range = fullRangeFor(document.lineCount, document.lineAt(document.lineCount - 1).text.length);
+		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
+		// Should have exactly 1 hint for the real Len() call
+		expect(hints).to.have.lengthOf(1);
+		expect(hints[0].label).to.equal('value:');
+	});
+
+	it('should handle multiple function-like patterns in a single SQL string', () => {
+		const document = createDocument(`sQuery := "SELECT Len(name), Upper(city), AllTrim(zip) FROM addresses";`);
+		const range = fullRangeFor(document.lineCount, document.lineAt(document.lineCount - 1).text.length);
+		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
+		// None of the SQL functions should get hints
+		expect(hints).to.have.lengthOf(0);
+	});
+
+	it('should correctly handle mixed real calls and SQL strings on the same line', () => {
+		const document = createDocument(`sResult := AllTrim(sInput) + " SELECT Upper(field) FROM table";`);
+		const range = fullRangeFor(document.lineCount, document.lineAt(document.lineCount - 1).text.length);
+		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
+		// Should only have hint for the real AllTrim() call
+		expect(hints).to.have.lengthOf(1);
+		expect(hints[0].label).to.equal('string:');
+	});
+
+	it('should handle DoProc calls with SQL in the parameters correctly', () => {
+		const document = createDocument(`:PROCEDURE Test;
+DoProc("Helper", { "SELECT id FROM table" });
+:ENDPROC;
+
+:PROCEDURE Helper;
+:PARAMETERS sQuery;
+:ENDPROC;`);
+		const range = fullRangeFor(document.lineCount, document.lineAt(document.lineCount - 1).text.length);
+		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
+		// Should have hint for the DoProc parameter
+		const labels = hints.map(h => h.label);
+		expect(labels).to.include('sQuery:');
+	});
+});

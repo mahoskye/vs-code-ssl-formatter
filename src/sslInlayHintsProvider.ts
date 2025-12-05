@@ -410,6 +410,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 	/**
 	 * Find all function calls with balanced parentheses in the text
+	 * Excludes function calls that appear inside string literals
 	 */
 	private findFunctionCalls(text: string): Array<{ name: string; args: string; index: number; fullMatch: string }> {
 		const results: Array<{ name: string; args: string; index: number; fullMatch: string }> = [];
@@ -419,6 +420,12 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		while ((match = functionPattern.exec(text)) !== null) {
 			const functionName = match[1];
 			const startIndex = match.index;
+
+			// Skip if the function call starts inside a string literal
+			if (this.isInsideString(text, startIndex)) {
+				continue;
+			}
+
 			const openParenIndex = match.index + match[0].length - 1; // Position of '('
 
 			// Extract arguments with balanced parentheses
@@ -452,5 +459,27 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		}
 
 		return results;
+	}
+
+	/**
+	 * Check if a position in the text is inside a string literal
+	 */
+	private isInsideString(text: string, position: number): boolean {
+		let inString = false;
+		let stringChar: string | null = null;
+
+		for (let i = 0; i < position; i++) {
+			const char = text[i];
+
+			if (!inString && (char === '"' || char === "'" || char === '[')) {
+				inString = true;
+				stringChar = char === '[' ? ']' : char;
+			} else if (inString && char === stringChar) {
+				inString = false;
+				stringChar = null;
+			}
+		}
+
+		return inString;
 	}
 }
