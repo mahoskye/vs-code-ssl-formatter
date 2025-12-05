@@ -250,6 +250,142 @@ describe('SSL Hover Provider - SQL placeholder hints', () => {
 	});
 });
 
+describe('SSL Hover Provider - Enhanced SQL Parameter Hints (Issues #13, #15)', () => {
+	const hoverProvider = new SSLHoverProvider();
+
+	it('shows parameter index for positional placeholders', () => {
+		const code = `RunSQL("SELECT * FROM Customers WHERE Country = ? AND City = ?", , , { "Germany", "Berlin" });`;
+		const doc = createDocument(code);
+		// Second ? placeholder
+		const secondQuestion = code.indexOf('?', code.indexOf('?') + 1);
+		const position = new MockPosition(0, secondQuestion);
+
+		const hover = hoverProvider.provideHover(doc as any, position as any, null as any);
+		expect(hover).to.not.be.null;
+		if (hover) {
+			const content = hoverText(hover);
+			expect(content).to.contain('Parameter 2');
+		}
+	});
+
+	it('shows value for positional placeholders from RunSQL parameters array', () => {
+		const code = `RunSQL("SELECT * FROM Customers WHERE Country = ?", , , { "Germany" });`;
+		const doc = createDocument(code);
+		const questionPos = code.indexOf('?');
+		const position = new MockPosition(0, questionPos);
+
+		const hover = hoverProvider.provideHover(doc as any, position as any, null as any);
+		expect(hover).to.not.be.null;
+		if (hover) {
+			const content = hoverText(hover);
+			expect(content).to.contain('Value:');
+			expect(content).to.contain('"Germany"');
+		}
+	});
+
+	it('shows value for named placeholder with variable lookup', () => {
+		const code = `:DECLARE sCountry;
+sCountry := "Germany";
+sql := "SELECT * FROM Customers WHERE Country = ?sCountry?";`;
+		const doc = createDocument(code);
+		const paramPos = code.indexOf('?sCountry?') + 2;
+		const position = new MockPosition(2, paramPos - code.lastIndexOf('\n', paramPos) - 1);
+
+		const hover = hoverProvider.provideHover(doc as any, position as any, null as any);
+		expect(hover).to.not.be.null;
+		if (hover) {
+			const content = hoverText(hover);
+			expect(content).to.contain('Named SQL parameter');
+			expect(content).to.contain('sCountry');
+			expect(content).to.contain('Value:');
+			expect(content).to.contain('"Germany"');
+		}
+	});
+
+	it('shows declaration line for named placeholder', () => {
+		const code = `:DECLARE sId;
+sId := 123;
+sql := "SELECT * FROM Users WHERE Id = ?sId?";`;
+		const doc = createDocument(code);
+		const lines = code.split('\n');
+		const lastLine = lines[lines.length - 1];
+		const paramPos = lastLine.indexOf('?sId?') + 2;
+		const position = new MockPosition(2, paramPos);
+
+		const hover = hoverProvider.provideHover(doc as any, position as any, null as any);
+		expect(hover).to.not.be.null;
+		if (hover) {
+			const content = hoverText(hover);
+			expect(content).to.contain('Declared at line 1');
+		}
+	});
+
+	it('shows array element value for indexed named placeholder', () => {
+		const code = `:DECLARE aCountries;
+aCountries := { "Germany", "France", "Spain" };
+sql := "SELECT * FROM Customers WHERE Country = ?aCountries[2]?";`;
+		const doc = createDocument(code);
+		const lines = code.split('\n');
+		const lastLine = lines[lines.length - 1];
+		const paramPos = lastLine.indexOf('?aCountries[2]?') + 2;
+		const position = new MockPosition(2, paramPos);
+
+		const hover = hoverProvider.provideHover(doc as any, position as any, null as any);
+		expect(hover).to.not.be.null;
+		if (hover) {
+			const content = hoverText(hover);
+			expect(content).to.contain('aCountries[2]');
+			expect(content).to.contain('Value:');
+			expect(content).to.contain('"France"');
+		}
+	});
+
+	it('warns when variable not found for named placeholder', () => {
+		const code = `sql := "SELECT * FROM Users WHERE Id = ?nUndeclaredVar?";`;
+		const doc = createDocument(code);
+		const paramPos = code.indexOf('?nUndeclaredVar?') + 2;
+		const position = new MockPosition(0, paramPos);
+
+		const hover = hoverProvider.provideHover(doc as any, position as any, null as any);
+		expect(hover).to.not.be.null;
+		if (hover) {
+			const content = hoverText(hover);
+			expect(content).to.contain('not found');
+		}
+	});
+
+	it('shows LSearch function name for positional placeholder', () => {
+		const code = `LSearch("SELECT * FROM Users WHERE Id = ?", { nUserId });`;
+		const doc = createDocument(code);
+		const questionPos = code.indexOf('?');
+		const position = new MockPosition(0, questionPos);
+
+		const hover = hoverProvider.provideHover(doc as any, position as any, null as any);
+		expect(hover).to.not.be.null;
+		if (hover) {
+			const content = hoverText(hover);
+			expect(content).to.contain('LSearch');
+		}
+	});
+
+	it('warns when more placeholders than parameters', () => {
+		const code = `RunSQL("SELECT * FROM T WHERE A = ? AND B = ? AND C = ?", , , { "x" });`;
+		const doc = createDocument(code);
+		// Third ? placeholder
+		let pos = code.indexOf('?');
+		pos = code.indexOf('?', pos + 1);
+		pos = code.indexOf('?', pos + 1);
+		const position = new MockPosition(0, pos);
+
+		const hover = hoverProvider.provideHover(doc as any, position as any, null as any);
+		expect(hover).to.not.be.null;
+		if (hover) {
+			const content = hoverText(hover);
+			expect(content).to.contain('No matching parameter');
+		}
+	});
+});
+
 describe('SSL Hover Provider - Comment Exclusion (Bug #21)', () => {
 	const hoverProvider = new SSLHoverProvider();
 
