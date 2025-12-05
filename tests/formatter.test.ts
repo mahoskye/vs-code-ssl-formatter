@@ -642,7 +642,8 @@ describe('SSL Formatter - SQL Formatting', () => {
 	it('should format SQLExecute inline literals with clause indentation', () => {
 		const input = 'SQLExecute("select col1, col2 from Patients where id = ?sId? and status = ?sStatus?");';
 		// Canonical compact: columns on same line, hanging AND
-		const expected = 'SQLExecute("SELECT col1, col2\nFROM Patients\nWHERE id = ?sId?\n  AND status = ?sStatus?");\n';
+		// Continuation lines aligned with opening quote (12 spaces for 'SQLExecute("')
+		const expected = 'SQLExecute("SELECT col1, col2\n            FROM Patients\n            WHERE id = ?sId?\n              AND status = ?sStatus?");\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
@@ -653,8 +654,8 @@ describe('SSL Formatter - SQL Formatting', () => {
 
 	it('should format RunSQL literals and preserve placeholders', () => {
 		const input = 'RunSQL("update Foo set bar = ? where baz = ? or flag = ?", , , { sBar, sBaz, sFlag });';
-		// Canonical compact: OR gets 7-space indent for alignment
-		const expected = 'RunSQL("UPDATE Foo SET bar = ?\nWHERE baz = ?\n       OR flag = ?", ,, { sBar, sBaz, sFlag });\n';
+		// Canonical compact: OR gets 7-space indent, continuation lines aligned with opening quote (8 spaces for 'RunSQL("')
+		const expected = 'RunSQL("UPDATE Foo SET bar = ?\n        WHERE baz = ?\n               OR flag = ?", ,, { sBar, sBaz, sFlag });\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
@@ -666,8 +667,8 @@ describe('SSL Formatter - SQL Formatting', () => {
 	it('should respect SQL keyword casing preference', () => {
 		config.update('ssl.format.sql.keywordCase', 'preserve');
 		const input = 'SQLExecute("Select * from Samples where status = ?sStatus?");';
-		// Preserve case: keeps original keyword casing
-		const expected = 'SQLExecute("Select *\nfrom Samples\nwhere status = ?sStatus?");\n';
+		// Preserve case: keeps original keyword casing, continuation lines aligned
+		const expected = 'SQLExecute("Select *\n            from Samples\n            where status = ?sStatus?");\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);

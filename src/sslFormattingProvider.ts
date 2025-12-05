@@ -853,16 +853,91 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			return text;
 		}
 
+		// Use a regex that matches SQL function calls with string literals, including multi-line
+		// [\s\S]*? matches any character including newlines (non-greedy)
 		const sqlLiteralRegex = new RegExp(`\\b(${functionPattern})\\s*\\(\\s*("([\\s\\S]*?)")`, "gi");
-		return text.replace(sqlLiteralRegex, (match, functionName, literal, content) => {
-			void functionName;
+
+		let result = text;
+		let match;
+
+		// We need to process matches from end to start to preserve positions
+		const matches: Array<{
+			fullMatch: string;
+			functionName: string;
+			literal: string;
+			content: string;
+			index: number;
+			quoteColumn: number;
+		}> = [];
+
+		while ((match = sqlLiteralRegex.exec(text)) !== null) {
+			const functionName = match[1];
+			const literal = match[2];
+			const content = match[3];
+
 			if (typeof literal !== "string" || typeof content !== "string") {
-				return match;
+				continue;
 			}
-			const formattedContent = formatSqlWithStyleImpl(content, style || "canonicalCompact", keywordCase, normalizedIndent);
-			const formattedLiteral = `"${formattedContent}"`;
-			return match.replace(literal, formattedLiteral);
-		});
+
+			// Calculate the column position of the opening quote
+			// Find the start of the line containing this match
+			const textBeforeMatch = text.substring(0, match.index);
+			const lastNewlinePos = textBeforeMatch.lastIndexOf('\n');
+			const lineStart = lastNewlinePos === -1 ? 0 : lastNewlinePos + 1;
+			const lineBeforeQuote = text.substring(lineStart, match.index);
+
+			// The quote is after the function name and opening paren
+			const quoteColumn = lineBeforeQuote.length + functionName.length +
+				text.substring(match.index + functionName.length).match(/^\s*\(\s*/)![0].length;
+
+			matches.push({
+				fullMatch: match[0],
+				functionName,
+				literal,
+				content,
+				index: match.index,
+				quoteColumn
+			});
+		}
+
+		// Process matches from end to start to preserve string positions
+		for (let i = matches.length - 1; i >= 0; i--) {
+			const m = matches[i];
+
+			// Format the SQL content
+			const formattedContent = formatSqlWithStyleImpl(
+				m.content,
+				style || "canonicalCompact",
+				keywordCase,
+				normalizedIndent
+			);
+
+			// Apply continuation indent for multi-line formatted SQL
+			const continuationIndent = ' '.repeat(m.quoteColumn + 1);
+			const sqlLines = formattedContent.split('\n');
+
+			let formattedSql: string;
+			if (sqlLines.length === 1) {
+				formattedSql = formattedContent;
+			} else {
+				// First line stays as-is, continuation lines get indented
+				formattedSql = sqlLines[0] + '\n' +
+					sqlLines.slice(1).map(l => continuationIndent + l).join('\n');
+			}
+
+			const formattedLiteral = `"${formattedSql}"`;
+
+			// Replace the literal in the result
+			// Find the position of this literal in the current result
+			const literalStart = result.indexOf(m.literal, m.index);
+			if (literalStart !== -1) {
+				result = result.substring(0, literalStart) +
+					formattedLiteral +
+					result.substring(literalStart + m.literal.length);
+			}
+		}
+
+		return result;
 	}
 
 	private applySqlKeywordCase(keyword: string, style: string, original?: string): string {
@@ -915,7 +990,6 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const match = trimmed.match(/^([)\]\}]+)/);
 		return match ? match[1].length : 0;
 	}
-
 	/**
 	 * Wrap long lines that exceed the specified length
 	 */
@@ -923,6 +997,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const lines = text.split('\n');
 		const result: string[] = [];
 		let inMultiLineComment = false;
+		let inMultiLineString = false;
+		let stringDelimiter = '';
 
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i];
@@ -940,61 +1016,291 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				continue;
 			}
 
+			// Track multi-line string state
+			if (!inMultiLineString) {
+				const doubleQuotes = (line.match(/"/g) || []).length;
+				const singleQuotes = (line.match(/'/g) || []).length;
+				if (doubleQuotes % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = '"';
+				} else if (singleQuotes % 2 !== 0) {
+					inMultiLineString = true;
+					stringDelimiter = "'";
+				}
+			} else {
+				const quotes = (line.match(new RegExp(stringDelimiter, 'g')) || []).length;
+				if (quotes % 2 !== 0) {
+					inMultiLineString = false;
+					stringDelimiter = '';
+				}
+				result.push(line);
+				continue;
+			}
+
 			// Skip lines that don't need wrapping
 			if (line.length <= wrapLength) {
 				result.push(line);
 				continue;
 			}
 
-			// Skip keywords, single-line comments, and empty lines
-			if (!trimmed || trimmed.startsWith(':') || trimmed.includes('/*')) {
+			// Skip single-line comments and empty lines
+			if (!trimmed || trimmed.includes('/*')) {
 				result.push(line);
 				continue;
 			}
 
-			// Try to wrap assignments
+			// Capture the original indentation
+			const indentMatch = line.match(/^(\s*)/);
+			const originalIndent = indentMatch ? indentMatch[1] : '';
+
+			// Try to wrap based on different patterns
+			let wrapped: string[] | null = null;
+
+			// Pattern 1: Assignment with value
 			const assignmentMatch = trimmed.match(/^([a-zA-Z_]\w*)\s*:=\s*(.+);$/);
 			if (assignmentMatch) {
 				const varName = assignmentMatch[1];
 				const value = assignmentMatch[2];
+				wrapped = this.wrapAssignment(varName, value, wrapLength, originalIndent);
+			}
 
-				// Capture the original indentation from the line
-				const indentMatch = line.match(/^(\s*)/);
-				const originalIndent = indentMatch ? indentMatch[1] : '';
-
-				// Check if it's a string (with or without concatenation)
-				if (value.startsWith('"') || value.startsWith("'")) {
-					const wrapped = this.wrapString(varName, value, wrapLength);
-					if (wrapped) {
-						result.push(...wrapped.map(l => originalIndent + l));
-						continue;
-					}
-				}
-
-				// Check if it's a bracketed list (function call, array, etc.)
-				if (/[\(\{]/.test(value)) {
-					const wrapped = this.wrapBracketedList(varName, value, wrapLength);
-					if (wrapped) {
-						result.push(...wrapped.map(l => originalIndent + l));
-						continue;
-					}
-				}
-
-				// Check if it's a logical expression
-				if (/\.(?:AND|OR|NOT)\./.test(value)) {
-					const wrapped = this.wrapLogicalExpression(varName, value, wrapLength);
-					if (wrapped) {
-						result.push(...wrapped.map(l => originalIndent + l));
-						continue;
-					}
+			// Pattern 2: Standalone function call (no assignment)
+			if (!wrapped) {
+				const funcCallMatch = trimmed.match(/^([a-zA-Z_]\w*)\s*\((.+)\)\s*;$/);
+				if (funcCallMatch) {
+					const funcName = funcCallMatch[1];
+					const args = funcCallMatch[2];
+					wrapped = this.wrapFunctionCall(funcName, args, wrapLength, originalIndent);
 				}
 			}
 
-			// If we couldn't wrap it, keep the original line
-			result.push(line);
+			// Pattern 3: Long string concatenation with + on the line
+			if (!wrapped && /\+\s*["']/.test(trimmed) && (trimmed.startsWith('"') || trimmed.startsWith("'"))) {
+				wrapped = this.wrapConcatenatedString(trimmed, wrapLength, originalIndent);
+			}
+
+			// Pattern 4: Line with logical operators .AND. .OR.
+			if (!wrapped && /\.(?:AND|OR|NOT)\./.test(trimmed)) {
+				wrapped = this.wrapAtLogicalOperators(trimmed, wrapLength, originalIndent);
+			}
+
+			if (wrapped && wrapped.length > 0) {
+				// Apply original indentation to all wrapped lines
+				result.push(...wrapped.map(l => originalIndent + l));
+			} else {
+				// If we couldn't wrap it, keep the original line
+				result.push(line);
+			}
 		}
 
 		return result.join('\n');
+	}
+
+	/**
+	 * Wrap an assignment statement
+	 */
+	private wrapAssignment(varName: string, value: string, wrapLength: number, indent: string): string[] | null {
+		let result: string[] | null = null;
+
+		// Check if it's a string
+		if (value.startsWith('"') || value.startsWith("'")) {
+			result = this.wrapString(varName, value, wrapLength);
+			if (result) { return result; }
+		}
+
+		// Check if it's a bracketed list (function call, array, etc.)
+		if (/[\(\{]/.test(value)) {
+			result = this.wrapBracketedList(varName, value, wrapLength);
+			if (result) { return result; }
+		}
+
+		// Check if it's a logical expression
+		if (/\.(?:AND|OR|NOT)\./i.test(value)) {
+			result = this.wrapLogicalExpression(varName, value, wrapLength);
+			if (result) { return result; }
+		}
+
+		return null;
+	}
+	/**
+	 * Wrap a standalone function call
+	 * NOTE: Does NOT add indentation - caller must prepend originalIndent to each returned line
+	 */
+	private wrapFunctionCall(funcName: string, args: string, wrapLength: number, indent: string): string[] | null {
+		const prefix = `${funcName}(`;
+		// Continuation lines align with the character after the opening paren
+		// Since caller adds originalIndent, we just need spaces for the function name and paren
+		const continuationIndent = ' '.repeat(prefix.length);
+
+		// Try to split arguments at commas
+		const argList = this.splitAtTopLevelCommas(args);
+		if (argList.length <= 1) {
+			return null;
+		}
+
+		// Build wrapped lines WITHOUT indentation (caller will add originalIndent)
+		const result: string[] = [];
+		let currentLine = prefix + argList[0];
+
+		for (let i = 1; i < argList.length; i++) {
+			const arg = argList[i];
+			const testLine = currentLine + ', ' + arg.trim();
+
+			// Check against wrapLength accounting for the indent that will be added
+			if (testLine.length + indent.length > wrapLength || i === argList.length - 1) {
+				// Line is too long or last argument, wrap at this point
+				if (i < argList.length - 1) {
+					result.push(currentLine + ',');
+					currentLine = continuationIndent + arg.trim();
+				} else {
+					// Last argument, close the function call
+					if (testLine.length + indent.length <= wrapLength) {
+						result.push(testLine + ');');
+					} else {
+						result.push(currentLine + ',');
+						result.push(continuationIndent + arg.trim() + ');');
+					}
+				}
+			} else {
+				currentLine = testLine;
+			}
+		}
+
+		// If only one result line, return null to keep original
+		if (result.length <= 1) {
+			return null;
+		}
+
+		return result;
+	}
+
+	/**
+	 * Wrap a concatenated string at + operators
+	 */
+	private wrapConcatenatedString(content: string, wrapLength: number, indent: string): string[] | null {
+		// Find + operators outside strings
+		const parts: string[] = [];
+		let current = '';
+		let inString = false;
+		let stringChar = '';
+
+		for (let i = 0; i < content.length; i++) {
+			const char = content[i];
+
+			if (!inString && (char === '"' || char === "'")) {
+				inString = true;
+				stringChar = char;
+				current += char;
+			} else if (inString && char === stringChar) {
+				inString = false;
+				stringChar = '';
+				current += char;
+			} else if (!inString && char === '+') {
+				parts.push(current.trim());
+				current = '';
+			} else {
+				current += char;
+			}
+		}
+		if (current.trim()) {
+			parts.push(current.trim());
+		}
+
+		if (parts.length <= 1) {
+			return null;
+		}
+
+		// Build wrapped lines
+		const result: string[] = [];
+		let currentLine = indent + parts[0];
+		const continuationIndent = indent + '    '; // 4-space continuation
+
+		for (let i = 1; i < parts.length; i++) {
+			const part = parts[i];
+			const testLine = currentLine + ' + ' + part;
+
+			if (testLine.length > wrapLength) {
+				result.push(currentLine + ' +');
+				currentLine = continuationIndent + part;
+			} else {
+				currentLine = testLine;
+			}
+		}
+		result.push(currentLine);
+
+		return result.length > 1 ? result : null;
+	}
+
+	/**
+	 * Wrap at logical operators (.AND., .OR., .NOT.)
+	 */
+	private wrapAtLogicalOperators(content: string, wrapLength: number, indent: string): string[] | null {
+		// Split at .AND. or .OR. operators
+		const parts = content.split(/(?=\.(?:AND|OR)\.)/i);
+
+		if (parts.length <= 1) {
+			return null;
+		}
+
+		const result: string[] = [];
+		let currentLine = indent + parts[0].trimEnd();
+		const continuationIndent = indent + '    '; // 4-space continuation
+
+		for (let i = 1; i < parts.length; i++) {
+			const part = parts[i];
+			const testLine = currentLine + ' ' + part.trim();
+
+			if (testLine.length > wrapLength) {
+				result.push(currentLine);
+				currentLine = continuationIndent + part.trim();
+			} else {
+				currentLine = testLine;
+			}
+		}
+		result.push(currentLine);
+
+		return result.length > 1 ? result : null;
+	}
+
+	/**
+	 * Split a string at top-level commas (not inside brackets or strings)
+	 */
+	private splitAtTopLevelCommas(content: string): string[] {
+		const parts: string[] = [];
+		let current = '';
+		let depth = 0;
+		let inString = false;
+		let stringChar = '';
+
+		for (let i = 0; i < content.length; i++) {
+			const char = content[i];
+
+			if (!inString && (char === '"' || char === "'")) {
+				inString = true;
+				stringChar = char;
+				current += char;
+			} else if (inString && char === stringChar) {
+				inString = false;
+				stringChar = '';
+				current += char;
+			} else if (!inString && (char === '(' || char === '{' || char === '[')) {
+				depth++;
+				current += char;
+			} else if (!inString && (char === ')' || char === '}' || char === ']')) {
+				depth--;
+				current += char;
+			} else if (!inString && depth === 0 && char === ',') {
+				parts.push(current.trim());
+				current = '';
+			} else {
+				current += char;
+			}
+		}
+		if (current.trim()) {
+			parts.push(current.trim());
+		}
+
+		return parts;
 	}
 
 	/**
