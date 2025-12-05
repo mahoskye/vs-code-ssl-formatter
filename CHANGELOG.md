@@ -5,6 +5,48 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-12-05
+
+### Added
+
+#### SQL Formatting (Issue #10)
+- **Format SQL Command** with 5 customizable formatting styles:
+  - `compact` - Single-line clauses with minimal line breaks
+  - `expanded` - Multi-line with vertical column alignment
+  - `hangingOperators` - AND/OR at line start with reduced indent
+  - `knr` - K&R style with parenthesized condition blocks
+  - `knrCompact` - K&R style with compact SELECT lists
+- Context menu integration for quick style selection
+- Configurable default style via `ssl.format.sql.style` setting
+
+#### SQL Parameter Hover Hints (Issues #13, #15)
+- Positional `?` placeholders now show parameter index and resolved value
+- Named `?PARAM?` placeholders show variable value and declaration line
+- Support for indexed array access like `?aCountries[2]?`
+- Detects SQL function (RunSQL, LSearch, SQLExecute, etc.) and extracts parameters
+
+#### UDObject IntelliSense (Issue #18)
+- Built-in UDObject methods: `AddProperty`, `IsProperty`, `AddMethod`, `IsMethod`, `Clone`, `Serialize`, `Deserialize`
+- Built-in `xmltype` property with documentation
+- Scans for properties added via `AddProperty()` calls
+- Scans for methods added via `AddMethod()` calls
+- Proper sorting: built-in members before user-defined
+
+#### Namespace-based File Linking (Issue #16)
+- IntelliSense completions for DoProc/ExecFunction string arguments
+- Current file procedures shown with priority sorting
+- Workspace procedures with qualified namespace names (e.g., `Validation.ValidateInput`)
+
+#### Project Assets
+- New flask/star logo for the extension
+
+### Fixed
+- **#39**: Inlay hints no longer appear inside SQL string literals
+- **#40**: Rename operations now correctly limited to procedure scope
+
+### Changed
+- ESLint configuration updated to allow underscore prefix for unused parameters
+
 ## [1.1.0] - 2025-11-19
 
 ### Added
