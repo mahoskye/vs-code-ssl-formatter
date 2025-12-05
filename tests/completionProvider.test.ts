@@ -1,8 +1,10 @@
 import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import { SSLCompletionProvider } from '../src/sslCompletionProvider';
-import { createDocument, MockPosition } from './helpers/mockVSCode';
+import { createDocument, MockPosition, MockRange } from './helpers/mockVSCode';
 import { ClassIndex, ClassMembers } from '../src/utils/classIndex';
+import { ProcedureIndex, ProcedureInfo } from '../src/utils/procedureIndex';
+import * as vscode from 'vscode';
 
 const createMockClassIndex = (members: ClassMembers | undefined): ClassIndex => ({
 	getClassMembers: (className: string) => {
@@ -12,6 +14,36 @@ const createMockClassIndex = (members: ClassMembers | undefined): ClassIndex => 
 		return undefined;
 	}
 });
+
+class StubProcedureIndex implements ProcedureIndex {
+	private readonly procedures: ProcedureInfo[];
+
+	constructor(procedures: ProcedureInfo[] = []) {
+		this.procedures = procedures;
+	}
+
+	async initialize(): Promise<void> {
+		return;
+	}
+
+	dispose(): void {
+		// no-op
+	}
+
+	getProceduresByName(name: string): ProcedureInfo[] {
+		return this.procedures.filter(p => p.name.toLowerCase() === name.toLowerCase());
+	}
+
+	getAllProcedures(): ProcedureInfo[] {
+		return this.procedures;
+	}
+
+	resolveProcedureLiteral(literal: string): ProcedureInfo | undefined {
+		const parts = literal.split('.');
+		const procName = parts[parts.length - 1];
+		return this.procedures.find(p => p.name.toLowerCase() === procName.toLowerCase());
+	}
+}
 
 describe('SSL Completion Provider - CreateUDObject member filtering', () => {
 	it('returns class members from the workspace index', () => {
@@ -155,5 +187,116 @@ oObj:
 
 		expect(addPropertyItem.sortText).to.match(/^0_/);
 		expect(customPropItem.sortText).to.match(/^1_/);
+	});
+});
+
+describe('SSL Completion Provider - DoProc/ExecFunction procedure completions (Issue #16)', () => {
+	it('returns current file procedures for DoProc completion', () => {
+		const completionProvider = new SSLCompletionProvider();
+		const code = `:PROCEDURE MainProc;
+	DoProc("
+:ENDPROC;
+
+:PROCEDURE HelperProc;
+:ENDPROC;
+
+:PROCEDURE AnotherHelper;
+:ENDPROC;
+`;
+		const doc = createDocument(code);
+		// Position is inside DoProc("
+		const position = new MockPosition(1, 9);
+		const context = { triggerCharacter: '"', triggerKind: 1 } as any;
+
+		const completions = completionProvider.provideCompletionItems(doc as any, position as any, null as any, context) as any[];
+		const labels = completions.map(item => item.label);
+
+		expect(labels).to.include('MainProc');
+		expect(labels).to.include('HelperProc');
+		expect(labels).to.include('AnotherHelper');
+	});
+
+	it('returns current file procedures for ExecFunction completion', () => {
+		const completionProvider = new SSLCompletionProvider();
+		const code = `:PROCEDURE MainProc;
+	result := ExecFunction("
+:ENDPROC;
+
+:PROCEDURE ProcessData;
+:ENDPROC;
+`;
+		const doc = createDocument(code);
+		// Position is inside ExecFunction(" - the line is `\tresult := ExecFunction("`
+		// Tab(0) r(1)e(2)s(3)u(4)l(5)t(6) (7):=(8)(9) (10)E(11)x(12)e(13)c(14)F(15)u(16)n(17)c(18)t(19)i(20)o(21)n(22)((23)"(24)
+		const position = new MockPosition(1, 25);
+		const context = { triggerCharacter: '"', triggerKind: 1 } as any;
+
+		const completions = completionProvider.provideCompletionItems(doc as any, position as any, null as any, context) as any[];
+		const labels = completions.map(item => item.label);
+
+		expect(labels).to.include('MainProc');
+		expect(labels).to.include('ProcessData');
+	});
+
+	it('returns workspace procedures with qualified names', () => {
+		const workspaceProc: ProcedureInfo = {
+			name: 'ValidateInput',
+			uri: vscode.Uri.file('/workspace/utils/Validation.ssl'),
+			range: new MockRange(new MockPosition(5, 0), new MockPosition(5, 13)) as unknown as vscode.Range,
+			fileBaseName: 'validation',
+			scriptKeys: ['utils.validation', 'validation'],
+			declarationText: ':PROCEDURE ValidateInput;',
+			parameters: ['sInput', 'bStrict']
+		};
+
+		const procedureIndex = new StubProcedureIndex([workspaceProc]);
+		const completionProvider = new SSLCompletionProvider(undefined, procedureIndex);
+
+		const code = `:PROCEDURE MainProc;
+	result := ExecFunction("
+:ENDPROC;
+`;
+		const doc = createDocument(code);
+		// Position after ExecFunction(" - see comment in previous test
+		const position = new MockPosition(1, 25);
+		const context = { triggerCharacter: '"', triggerKind: 1 } as any;
+
+		const completions = completionProvider.provideCompletionItems(doc as any, position as any, null as any, context) as any[];
+		const labels = completions.map(item => item.label);
+
+		// Should include workspace procedure with qualified name
+		expect(labels).to.include('Validation.ValidateInput');
+	});
+
+	it('sorts current file procedures before workspace procedures', () => {
+		const workspaceProc: ProcedureInfo = {
+			name: 'ExternalHelper',
+			uri: vscode.Uri.file('/workspace/lib/Helpers.ssl'),
+			range: new MockRange(new MockPosition(0, 0), new MockPosition(0, 14)) as unknown as vscode.Range,
+			fileBaseName: 'helpers',
+			scriptKeys: ['lib.helpers', 'helpers'],
+			declarationText: ':PROCEDURE ExternalHelper;',
+			parameters: []
+		};
+
+		const procedureIndex = new StubProcedureIndex([workspaceProc]);
+		const completionProvider = new SSLCompletionProvider(undefined, procedureIndex);
+
+		const code = `:PROCEDURE LocalProc;
+	DoProc("
+:ENDPROC;
+`;
+		const doc = createDocument(code);
+		const position = new MockPosition(1, 9);
+		const context = { triggerCharacter: '"', triggerKind: 1 } as any;
+
+		const completions = completionProvider.provideCompletionItems(doc as any, position as any, null as any, context) as any[];
+
+		const localItem = completions.find((c: any) => c.label === 'LocalProc');
+		const workspaceItem = completions.find((c: any) => c.label === 'Helpers.ExternalHelper');
+
+		// Local procedures should sort before workspace procedures
+		expect(localItem.sortText).to.match(/^0_/);
+		expect(workspaceItem.sortText).to.match(/^1_/);
 	});
 });

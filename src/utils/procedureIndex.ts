@@ -14,6 +14,7 @@ export interface ProcedureInfo {
 export interface ProcedureIndex extends vscode.Disposable {
 	initialize(): Promise<void>;
 	getProceduresByName(name: string): ProcedureInfo[];
+	getAllProcedures(): ProcedureInfo[];
 	resolveProcedureLiteral(literal: string, namespaceRoots: Record<string, string>): ProcedureInfo | undefined;
 }
 
@@ -66,6 +67,14 @@ export class WorkspaceProcedureIndex implements ProcedureIndex {
 	public getProceduresByName(name: string): ProcedureInfo[] {
 		const key = name.toLowerCase();
 		return this.procedureMap.get(key) ?? [];
+	}
+
+	public getAllProcedures(): ProcedureInfo[] {
+		const allProcs: ProcedureInfo[] = [];
+		for (const procs of this.fileProcedures.values()) {
+			allProcs.push(...procs);
+		}
+		return allProcs;
 	}
 
 	public resolveProcedureLiteral(literal: string, namespaceRoots: Record<string, string>): ProcedureInfo | undefined {

@@ -24,6 +24,10 @@ class StubProcedureIndex implements ProcedureIndex {
 		return this.info ? [this.info] : [];
 	}
 
+	getAllProcedures(): ProcedureInfo[] {
+		return this.info ? [this.info] : [];
+	}
+
 	resolveProcedureLiteral(): ProcedureInfo | undefined {
 		return this.info;
 	}
