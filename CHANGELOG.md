@@ -5,6 +5,22 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-12-05
+
+### Fixed
+
+#### Document Formatter
+- **Multi-line SQL String Indentation**: Fixed incorrect bracket counting when multi-line SQL strings were present
+  - Parentheses inside SQL strings were incorrectly counted as code, causing subsequent lines to be over-indented
+  - Added `stripAllStringContent()` to properly handle partial strings that start but don't end on a line
+  - Lines that end multi-line strings now correctly update bracket depth for code after the closing quote
+
+#### SQL Formatting Styles
+- **Canonical Compact Style**: Rewrote formatting to match documented examples in `sql-formats.md`
+  - SELECT columns now stay on same line (wrap at 80 characters) instead of one per line
+  - Added proper WHERE clause line breaks (was getting merged with ON conditions)
+  - Fixed hanging operators: AND at 2-space indent, OR at 7-space alignment
+
 ## [1.2.0] - 2025-12-05
 
 ### Added
