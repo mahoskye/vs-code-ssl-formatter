@@ -279,6 +279,24 @@ describe('SQL Format Command - Formatting Styles', () => {
 		expect(selectLine).to.exist;
 	});
 
+	it('should format with canonical compact style', () => {
+		const input = 'select u.id, u.name, u.email, count(o.id) as order_count from users u join orders o on o.user_id = u.id where u.active = 1 and (u.deleted_at is null or u.deleted_at > now()) group by u.id, u.name, u.email order by order_count desc';
+		const result = formatSqlWithStyleImpl(input, 'canonicalCompact', 'upper', 4);
+		expect(result).to.match(/\nFROM\s+users u/i);
+		expect(result).to.match(/\nJOIN\s+orders o/i);
+		expect(result).to.match(/\n\s+ON o\.user_id = u\.id/i);
+		expect(result).to.match(/\n\s+AND \(u\.deleted_at IS NULL/i);
+		expect(result).to.match(/ORDER BY order_count DESC/i);
+	});
+
+	it('should format with ORM-friendly style - inline joins and hanging operators', () => {
+		const input = 'select u.id, u.name from users u join orders o on o.user_id = u.id where u.active = 1 and o.total > 0 order by o.total desc';
+		const result = formatSqlWithStyleImpl(input, 'ormFriendly', 'upper', 4);
+		expect(result).to.match(/\nFROM\s+users u JOIN orders o ON o\.user_id = u\.id/i);
+		expect(result).to.match(/\n\s+AND o\.total > 0/i);
+		expect(result).to.match(/ORDER BY o\.total DESC/i);
+	});
+
 	it('should respect keyword case in all styles', () => {
 		const result = formatSqlWithStyleImpl('select id from users', 'compact', 'lower', 4);
 		expect(result).to.include('select');

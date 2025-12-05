@@ -184,6 +184,28 @@ sOutput := sNotConfigured;
 	});
 });
 
+describe('SSL Diagnostic Provider - Custom IntelliSense functions', () => {
+	const config = vscode.workspace.getConfiguration('ssl');
+
+	afterEach(() => {
+		config.update('ssl.intellisense.customFunctions', []);
+	});
+
+	it('treats configured functions as known identifiers', () => {
+		config.update('ssl.intellisense.customFunctions', [
+			{ name: 'CustomFunc', description: 'Project helper', params: '(value)' }
+		]);
+
+		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
+CustomFunc(sValue);
+:ENDPROC;`);
+		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undefined-variable' && diag.message.includes('CustomFunc')
+		);
+		expect(undefinedDiagnostics).to.have.length(0);
+	});
+});
+
 describe('SSL Diagnostic Provider - SQL placeholder style', () => {
 	it('warns when RunSQL uses named placeholders', () => {
 		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
@@ -212,6 +234,39 @@ SQLExecute("SELECT * FROM Foo WHERE ID = ?nId?", "Default");
 :ENDPROC;`);
 		const styleDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-placeholder-style');
 		expect(styleDiagnostics).to.have.length(0);
+	});
+});
+
+describe('SSL Diagnostic Provider - SQL placeholder identifiers', () => {
+	it('recognizes file-level :PARAMETERS as valid identifiers', () => {
+		// File-level :PARAMETERS (script arguments) should be treated as globals
+		const diagnostics = collectDiagnostics(`:PARAMETERS sRunNo, nUserId;
+:DECLARE sSQL;
+sSQL := SqlExecute("SELECT * FROM Runs WHERE RUNNO = ?sRunNo? AND USER_ID = ?nUserId?");`);
+		const invalidParamDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-param');
+		expect(invalidParamDiagnostics).to.have.length(0);
+	});
+
+	it('allows array-indexed named placeholders when base variable is declared', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
+:DECLARE sSQL, nIds;
+sSQL := "SELECT * FROM Foo WHERE ID = ?nIds[1]?";
+RunSQL(sSQL, , , { nIds });
+:ENDPROC;`);
+		const invalidParamDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-param');
+		expect(invalidParamDiagnostics).to.have.length(0);
+	});
+
+	it('skips validation for expression placeholders (array access, function calls, etc.)', () => {
+		// Expression placeholders like ?nMissing[1]?, ?Now()?, ?a+b? are not validated
+		// because ?...? is an interpolation syntax that can contain any SSL expression
+		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
+:DECLARE sSQL;
+sSQL := "SELECT * FROM Foo WHERE ID = ?nMissing[1]? AND Date = ?Now()?";
+RunSQL(sSQL, , , { nMissing });
+:ENDPROC;`);
+		const invalidParamDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-param');
+		expect(invalidParamDiagnostics).to.have.length(0);
 	});
 });
 

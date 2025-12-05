@@ -49,7 +49,7 @@ export const PATTERNS = {
 
     // SQL patterns
     SQL_FUNCTION_CALL: /\b(SQLExecute|RunSQL|LSearch)\s*\(/i,
-    SQL_PARAMETER_PLACEHOLDER: /\?(\w+)\?/g,
+    SQL_PARAMETER_PLACEHOLDER: /\?([A-Za-z0-9_]+(?:\[[^\]]+\])?)\?/g,
     SQL_CONCATENATION: /\+/,
 
     // Object patterns
@@ -117,5 +117,5 @@ export const PATTERNS = {
 
     // Error patterns
     UNDECLARED_VARIABLE: /\b([a-z][a-zA-Z0-9_]*)\b/g,
-    INVALID_SQL_PARAM: /\?(\w+)\?/g
+    INVALID_SQL_PARAM: /\?([A-Za-z0-9_]+(?:\[[^\]]+\])?)\?/g
 } as const;

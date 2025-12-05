@@ -6,10 +6,12 @@ import { CONFIG_KEYS, CONFIG_DEFAULTS } from "../constants/config";
  */
 export type SqlFormattingStyle =
 	| "compact"           // Single-line clauses, compact SELECT
+	| "canonicalCompact"  // Canonical compact + hanging operators (preferred default)
 	| "expanded"          // Multi-line SELECT with vertical columns
 	| "hangingOperators"  // AND/OR at line start with indent
 	| "knr"               // K&R style with parentheses blocks
-	| "knrCompact";       // K&R style with compact SELECT list
+	| "knrCompact"        // K&R style with compact SELECT list
+	| "ormFriendly";      // Inline JOINs, hanging operators, ORM-friendly
 
 /**
  * SQL clause keywords that should start new lines
@@ -56,10 +58,12 @@ const SQL_GENERAL_KEYWORDS = [
  */
 const STYLE_DISPLAY_NAMES: Record<SqlFormattingStyle, string> = {
 	"compact": "Compact - Single-line clauses",
+	"canonicalCompact": "Canonical Compact - Hanging operators + JOIN breaks",
 	"expanded": "Expanded - Vertical columns",
 	"hangingOperators": "Hanging Operators - AND/OR at line start",
 	"knr": "K&R Style - Parenthesized blocks",
-	"knrCompact": "K&R Compact - Parenthesized with compact SELECT"
+	"knrCompact": "K&R Compact - Parenthesized with compact SELECT",
+	"ormFriendly": "No-Newline / ORM Friendly - Inline JOINs"
 };
 
 /**
@@ -80,10 +84,12 @@ export function registerFormatSqlCommand(context: vscode.ExtensionContext): void
 	const formatSqlPickStyleCommand = vscode.commands.registerCommand("ssl.formatSqlPickStyle", async () => {
 		const styles: { label: string; style: SqlFormattingStyle; description: string }[] = [
 			{ label: "$(list-flat) Compact", style: "compact", description: "Single-line clauses, compact SELECT" },
+			{ label: "$(pulse) Canonical Compact", style: "canonicalCompact", description: "Preferred: hanging operators + JOIN breaks" },
 			{ label: "$(list-tree) Expanded", style: "expanded", description: "Multi-line SELECT with vertical columns" },
 			{ label: "$(indent) Hanging Operators", style: "hangingOperators", description: "AND/OR at line start with indent" },
 			{ label: "$(bracket) K&R Style", style: "knr", description: "Parenthesized blocks, one column per line" },
-			{ label: "$(bracket-dot) K&R Compact", style: "knrCompact", description: "Parenthesized blocks, compact SELECT" }
+			{ label: "$(bracket-dot) K&R Compact", style: "knrCompact", description: "Parenthesized blocks, compact SELECT" },
+			{ label: "$(circuit-board) No-Newline / ORM Friendly", style: "ormFriendly", description: "Inline JOINs, hanging operators" }
 		];
 
 		const selected = await vscode.window.showQuickPick(styles, {
@@ -270,6 +276,8 @@ export function formatSqlWithStyleImpl(
 	switch (style) {
 		case "compact":
 			return formatCompactStyle(sql, keywordCase, indentSpaces);
+		case "canonicalCompact":
+			return formatCanonicalCompactStyle(sql, keywordCase, indentSpaces);
 		case "expanded":
 			return formatExpandedStyle(sql, keywordCase, indentSpaces);
 		case "hangingOperators":
@@ -278,6 +286,8 @@ export function formatSqlWithStyleImpl(
 			return formatKnrStyle(sql, keywordCase, indentSpaces, false);
 		case "knrCompact":
 			return formatKnrStyle(sql, keywordCase, indentSpaces, true);
+		case "ormFriendly":
+			return formatOrmFriendlyStyle(sql, keywordCase, indentSpaces);
 		default:
 			return formatCompactStyle(sql, keywordCase, indentSpaces);
 	}
@@ -363,6 +373,51 @@ function formatExpandedStyle(sql: string, keywordCase: string, indentSpaces: num
 }
 
 /**
+ * Canonical Compact Style - Hanging operators + JOIN breaks (default)
+ */
+function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpaces: number): string {
+	const indent = " ".repeat(indentSpaces);
+	let result = sql;
+
+	// Break SELECT list vertically (no parentheses)
+	const selectMatch = result.match(/^(SELECT\s+(?:DISTINCT\s+)?)(.*?)(?=\s+FROM\b)/i);
+	if (selectMatch) {
+		const selectKeyword = applySqlKeywordCase("SELECT", keywordCase, selectMatch[1].trim());
+		const distinctMatch = selectMatch[1].match(/DISTINCT/i);
+		const distinctPart = distinctMatch ? " " + applySqlKeywordCase("DISTINCT", keywordCase, distinctMatch[0]) : "";
+		const columns = parseColumns(selectMatch[2]);
+
+		const formattedSelect = selectKeyword + distinctPart + "\n" +
+			columns.map(col => indent + col).join(",\n");
+
+		result = result.replace(selectMatch[0], formattedSelect + " ");
+	}
+
+	// Break at major clauses
+	["FROM", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "GROUP BY", "ORDER BY"].forEach(keyword => {
+		const pattern = keyword.replace(/\s+/g, "\\s+");
+		const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
+		result = result.replace(clauseRegex, (_match, clause) => {
+			return `\n${applySqlKeywordCase(keyword, keywordCase, clause)}`;
+		});
+	});
+
+	// Move ON conditions to their own indented line after JOIN
+	result = result.replace(/(JOIN[^\n]*?)\s+ON\s+(.+?)(?=\s+(WHERE|GROUP BY|ORDER BY|JOIN|INNER JOIN|LEFT JOIN|RIGHT JOIN|FULL JOIN|$))/gi,
+		(_match, joinPart, condition) => {
+			return `${joinPart}\n  ${applySqlKeywordCase("ON", keywordCase, "ON")} ${condition.trim()}`;
+		}
+	);
+
+	// Hanging operators with two-space indent
+	result = result.replace(/\s+(AND|OR)\b/gi, (_match, op) => {
+		return `\n  ${applySqlKeywordCase(op.toUpperCase(), keywordCase, op)}`;
+	});
+
+	return result.trim();
+}
+
+/**
  * Hanging Operators Style - AND/OR at line start with reduced indent
  * WHERE u.active = 1
  *   AND u.deleted_at IS NULL
@@ -392,6 +447,46 @@ function formatHangingOperatorsStyle(sql: string, keywordCase: string, indentSpa
 	});
 
 	return sql.trim();
+}
+
+/**
+ * ORM-Friendly Style - Inline JOINs, hanging logical operators
+ */
+function formatOrmFriendlyStyle(sql: string, keywordCase: string, indentSpaces: number): string {
+	const indent = " ".repeat(indentSpaces);
+	const hangingIndent = "  ";
+	let result = sql;
+
+	// Format SELECT columns vertically (reuse expanded behavior)
+	const selectMatch = result.match(/^(SELECT\s+(?:DISTINCT\s+)?)(.*?)(?=\s+FROM\b)/i);
+	if (selectMatch) {
+		const selectKeyword = applySqlKeywordCase("SELECT", keywordCase, selectMatch[1].trim());
+		const distinctMatch = selectMatch[1].match(/DISTINCT/i);
+		const distinctPart = distinctMatch ? " " + applySqlKeywordCase("DISTINCT", keywordCase, distinctMatch[0]) : "";
+		const columns = parseColumns(selectMatch[2]);
+
+		const formattedSelect = selectKeyword + distinctPart + "\n" +
+			columns.map(col => indent + col).join(",\n");
+
+		result = result.replace(selectMatch[0], formattedSelect + " ");
+	}
+
+	// Break before major clauses but keep JOIN inline with FROM
+	result = result.replace(/\s+FROM\s+/gi, () => `\n${applySqlKeywordCase("FROM", keywordCase, "FROM")} `);
+	result = result.replace(/\s+WHERE\s+/gi, () => `\n${applySqlKeywordCase("WHERE", keywordCase, "WHERE")} `);
+	result = result.replace(/\s+GROUP BY\s+/gi, () => `\n${applySqlKeywordCase("GROUP BY", keywordCase, "GROUP BY")} `);
+	result = result.replace(/\s+ORDER BY\s+/gi, () => `\n${applySqlKeywordCase("ORDER BY", keywordCase, "ORDER BY")} `);
+
+	// Keep JOIN inline while normalizing case
+	result = result.replace(/\b(INNER JOIN|LEFT JOIN|RIGHT JOIN|FULL JOIN|CROSS JOIN|JOIN)\b/gi,
+		(_match, clause) => applySqlKeywordCase((clause as string).toUpperCase(), keywordCase, clause));
+
+	// Hanging AND/OR in WHERE clauses
+	result = result.replace(/\s+(AND|OR)\b/gi, (_match, op) => `\n${hangingIndent}${applySqlKeywordCase((op as string).toUpperCase(), keywordCase, op)}`);
+
+	// Tidy whitespace
+	const lines = result.split('\n').map(line => line.trimEnd());
+	return lines.join('\n').trim();
 }
 
 /**
