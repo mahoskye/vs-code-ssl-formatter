@@ -157,7 +157,8 @@ describe('SSL Formatter - Builtin Functions', () => {
 	const formatter = new SSLFormattingProvider();
 	const options = createFormattingOptions();
 
-	it('should normalize builtin functions to canonical casing', () => {
+	it('should normalize builtin functions to PascalCase by default', () => {
+		// Default behavior: normalize to canonical PascalCase
 		const tests = [
 			['result := sqlexecute(sql);', 'result := SQLExecute(sql);\n'],
 			['result := SQLEXECUTE(sql);', 'result := SQLExecute(sql);\n'],
@@ -165,8 +166,9 @@ describe('SSL Formatter - Builtin Functions', () => {
 			['result := CREATEUDOBJECT();', 'result := CreateUdObject();\n'],
 			['result := doproc(name);', 'result := DoProc(name);\n'],
 			['result := DOPROC(name);', 'result := DoProc(name);\n'],
-			['result := buildstring(fmt);', 'result := buildstring(fmt);\n'],
 			['result := alltrim(sText);', 'result := AllTrim(sText);\n'],
+			// Array functions use lowercase as their canonical form
+			['result := AADD(arr, val);', 'result := aadd(arr, val);\n'],
 			['result := aadd(arr, val);', 'result := aadd(arr, val);\n']
 		];
 

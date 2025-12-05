@@ -123,14 +123,15 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 
 - `ssl.format.indentStyle`: `tab` or `space` (default: `tab`).
 - `ssl.format.indentWidth`: Number of tabs/spaces per indent (default: `1`).
-- `ssl.format.keywordCase`: `preserve`, `upper`, or `lower` (default: `upper`).
-- `ssl.format.builtinFunctionCase`: `preserve`, `PascalCase`, `lowercase`, or `UPPERCASE` (default: `PascalCase`).
+- `ssl.format.builtinFunctionCase`: `PascalCase` or `preserve` (default: `PascalCase`). Normalizes built-in functions to their canonical casing, or preserves user's choice.
 - `ssl.format.wrapLength`: Maximum line length before wrapping (default: `90`).
 - `ssl.format.formatOnSave`: Automatically format on save (default: `false`).
 - `ssl.format.trimTrailingWhitespace`: Remove trailing whitespace (default: `true`).
 - `ssl.format.sql.enabled`: Format inline SQL string literals (default: `false`).
 - `ssl.format.sql.keywordCase`: `preserve`, `upper`, or `lower` for SQL keywords (default: `upper`).
 - `ssl.format.sql.indentSpaces`: Spaces to indent formatted SQL clauses (default: `4`).
+
+**Note:** SSL keywords (`:IF`, `:WHILE`, `:PROCEDURE`, etc.) are always normalized to UPPERCASE per the SSL style guide. This is not configurable.
 
 ### Naming & Style
 
@@ -173,7 +174,6 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 {
   "ssl.strictStyleGuideMode": false,
   "ssl.format.formatOnSave": true,
-  "ssl.format.keywordCase": "upper",
   "ssl.format.builtinFunctionCase": "PascalCase",
   "ssl.naming.hungarianNotation.enabled": true,
   "ssl.styleGuide.limitBlockDepth": 4,

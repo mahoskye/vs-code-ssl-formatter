@@ -90,26 +90,14 @@
                     "maximum": 8,
                     "description": "Number of tabs or spaces per indent level"
                 },
-                "ssl.format.keywordCase": {
-                    "type": "string",
-                    "enum": [
-                        "preserve",
-                        "upper",
-                        "lower"
-                    ],
-                    "default": "upper",
-                    "description": "Preferred casing for SSL keywords"
-                },
                 "ssl.format.builtinFunctionCase": {
                     "type": "string",
                     "enum": [
                         "preserve",
-                        "PascalCase",
-                        "lowercase",
-                        "UPPERCASE"
+                        "PascalCase"
                     ],
                     "default": "PascalCase",
-                    "description": "Casing for built-in function names"
+                    "description": "Casing for built-in function names. PascalCase normalizes to canonical casing, preserve keeps user's choice."
                 },
                 "ssl.format.wrapLength": {
                     "type": "number",

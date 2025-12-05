@@ -129,7 +129,6 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		// Get configuration settings
 		const indentStyle = config.get<string>(CONFIG_KEYS.FORMAT_INDENT_STYLE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_INDENT_STYLE]);
 		const indentWidth = config.get<number>(CONFIG_KEYS.FORMAT_INDENT_WIDTH, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_INDENT_WIDTH]);
-		const keywordCase = config.get<string>(CONFIG_KEYS.FORMAT_KEYWORD_CASE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_KEYWORD_CASE]);
 		const builtinFunctionCase = config.get<string>(CONFIG_KEYS.FORMAT_BUILTIN_FUNCTION_CASE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_BUILTIN_FUNCTION_CASE]);
 		const trimTrailingWhitespace = config.get<boolean>(CONFIG_KEYS.FORMAT_TRIM_TRAILING_WHITESPACE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_TRIM_TRAILING_WHITESPACE]);
 		
@@ -141,9 +140,9 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 		// Apply formatting rules
 		formatted = this.splitMultipleStatements(formatted);
-		formatted = this.normalizeKeywordCase(formatted, keywordCase);
+		formatted = this.normalizeKeywordCase(formatted); // Always UPPER per style guide
 		formatted = this.normalizeBuiltinFunctionCase(formatted, builtinFunctionCase);
-	formatted = normalizeOperatorSpacing(formatted);
+		formatted = normalizeOperatorSpacing(formatted);
 		formatted = this.normalizeIndentation(formatted, indentStyle, indentWidth, tabSize);
 		formatted = this.normalizeBlankLines(formatted);
 		formatted = this.formatSqlLiterals(formatted, config);
@@ -302,14 +301,11 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	}
 
 	/**
-	 * Normalize keyword casing (e.g., :IF, :WHILE, :PROCEDURE)
-	 * Only processes keywords outside of strings and comments
+	 * Normalize keyword casing to UPPERCASE (e.g., :IF, :WHILE, :PROCEDURE)
+	 * Per SSL style guide, keywords are always UPPERCASE - this is not configurable.
+	 * Only processes keywords outside of strings and comments.
 	 */
-	private normalizeKeywordCase(text: string, caseStyle: string): string {
-		if (caseStyle === "preserve") {
-			return text;
-		}
-
+	private normalizeKeywordCase(text: string): string {
 		const keywords = SSL_KEYWORDS;
 
 		const lines = text.split('\n');
@@ -369,9 +365,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			let result = line;
 			keywords.forEach(keyword => {
 				const pattern = new RegExp(`:${keyword}\\b`, "gi");
-				const replacement = caseStyle === "upper"
-					? `:${keyword.toUpperCase()}`
-					: `:${keyword.toLowerCase()}`;
+				const replacement = `:${keyword.toUpperCase()}`;
 				result = replaceOutsideStrings(result, pattern, replacement);
 			});
 			return result;
@@ -381,8 +375,9 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	}
 
 	/**
-	 * Normalize built-in function casing
-	 * Only processes function names outside of strings
+	 * Normalize built-in function casing to PascalCase (canonical form)
+	 * Only processes function names outside of strings and comments.
+	 * SSL functions are case-insensitive, but PascalCase is the canonical form.
 	 */
 	private normalizeBuiltinFunctionCase(text: string, caseStyle: string): string {
 		if (caseStyle === "preserve") {
@@ -450,22 +445,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				// Only match function names when followed by opening parenthesis
 				// This prevents matching variable names that happen to match function names
 				const pattern = new RegExp(`\\b${func}(?=\\s*\\()`, "gi");
-				let replacement: string;
-
-				switch (caseStyle) {
-					case "PascalCase":
-						replacement = func;
-						break;
-					case "lowercase":
-						replacement = func.toLowerCase();
-						break;
-					case "UPPERCASE":
-						replacement = func.toUpperCase();
-						break;
-					default:
-						replacement = func;
-				}
-
+				// PascalCase uses the canonical name from SSL_BUILTIN_FUNCTIONS
+				const replacement = func;
 				result = replaceOutsideStrings(result, pattern, replacement);
 			});
 			return result;

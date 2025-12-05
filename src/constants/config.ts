@@ -12,7 +12,6 @@ export const CONFIG_KEYS = {
     // Formatting settings
     FORMAT_INDENT_STYLE: "ssl.format.indentStyle",
     FORMAT_INDENT_WIDTH: "ssl.format.indentWidth",
-    FORMAT_KEYWORD_CASE: "ssl.format.keywordCase",
     FORMAT_BUILTIN_FUNCTION_CASE: "ssl.format.builtinFunctionCase",
     FORMAT_WRAP_LENGTH: "ssl.format.wrapLength",
     FORMAT_FORMAT_ON_SAVE: "ssl.format.formatOnSave",
@@ -53,7 +52,6 @@ export const CONFIG_DEFAULTS = {
     [CONFIG_KEYS.GLOBAL_VARIABLES]: [],
     [CONFIG_KEYS.FORMAT_INDENT_STYLE]: "tab",
     [CONFIG_KEYS.FORMAT_INDENT_WIDTH]: 1,
-    [CONFIG_KEYS.FORMAT_KEYWORD_CASE]: "upper",
     [CONFIG_KEYS.FORMAT_BUILTIN_FUNCTION_CASE]: "PascalCase",
     [CONFIG_KEYS.FORMAT_WRAP_LENGTH]: 90,
     [CONFIG_KEYS.FORMAT_FORMAT_ON_SAVE]: false,

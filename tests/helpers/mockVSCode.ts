@@ -432,7 +432,6 @@ export function createSSLConfig(overrides?: Record<string, any>): MockWorkspaceC
 	const defaults = {
 		'ssl.format.indentStyle': 'tab',
 		'ssl.format.indentWidth': 1,
-		'ssl.format.keywordCase': 'upper',
 		'ssl.format.builtinFunctionCase': 'PascalCase',
 		'ssl.format.trimTrailingWhitespace': true,
 		'ssl.format.sql.enabled': false,
