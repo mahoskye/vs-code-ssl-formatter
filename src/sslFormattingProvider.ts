@@ -1176,6 +1176,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 	/**
 	 * Wrap a concatenated string at + operators
+	 * NOTE: Does NOT add indentation - caller must prepend originalIndent to each returned line
 	 */
 	private wrapConcatenatedString(content: string, wrapLength: number, indent: string): string[] | null {
 		// Find + operators outside strings
@@ -1183,6 +1184,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		let current = '';
 		let inString = false;
 		let stringChar = '';
+		const trimmedContent = content.trim();
+		const hasTrailingPlus = trimmedContent.endsWith('+');
 
 		for (let i = 0; i < content.length; i++) {
 			const char = content[i];
@@ -1196,7 +1199,12 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				stringChar = '';
 				current += char;
 			} else if (!inString && char === '+') {
-				parts.push(current.trim());
+				// Only push if we have content (avoids pushing empty if string starts with + or has ++??)
+				// Actually, if we have "A" + "B", finding + pushes "A".
+				// If we have "A" + "B" +, finding last + pushes "B".
+				if (current.trim()) {
+					parts.push(current.trim());
+				}
 				current = '';
 			} else {
 				current += char;
@@ -1206,26 +1214,41 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			parts.push(current.trim());
 		}
 
-		if (parts.length <= 1) {
+		if (parts.length <= 1 && !hasTrailingPlus) {
 			return null;
 		}
 
 		// Build wrapped lines
 		const result: string[] = [];
-		let currentLine = indent + parts[0];
-		const continuationIndent = indent + '    '; // 4-space continuation
+		// Start with first part. Caller adds originalIndent.
+		let currentLine = parts[0];
+		// Standard continuation indent is 4 spaces relative to formatted indent
+		const continuationIndent = '    ';
 
 		for (let i = 1; i < parts.length; i++) {
 			const part = parts[i];
+			// Calculate length including the indent the caller will add
 			const testLine = currentLine + ' + ' + part;
 
-			if (testLine.length > wrapLength) {
+			if (testLine.length + indent.length > wrapLength) {
 				result.push(currentLine + ' +');
 				currentLine = continuationIndent + part;
 			} else {
 				currentLine = testLine;
 			}
 		}
+
+		// Handle trailing plus if it existed in original
+		if (hasTrailingPlus) {
+			const testLine = currentLine + ' +';
+			if (testLine.length + indent.length > wrapLength) {
+				result.push(currentLine); // Push current line without the plus
+				currentLine = continuationIndent + '+'; // Start new line with just the plus
+			} else {
+				currentLine += ' +';
+			}
+		}
+
 		result.push(currentLine);
 
 		return result.length > 1 ? result : null;
