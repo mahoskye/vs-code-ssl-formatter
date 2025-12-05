@@ -139,14 +139,24 @@
                     "maximum": 12,
                     "description": "Number of spaces to indent formatted SQL clauses (ignored when SQL formatting disabled)"
                 },
-                "ssl.format.sql.outputStyle": {
+                "ssl.format.sql.style": {
                     "type": "string",
                     "enum": [
-                        "multiline",
-                        "concatenated"
+                        "compact",
+                        "expanded",
+                        "hangingOperators",
+                        "knr",
+                        "knrCompact"
                     ],
-                    "default": "multiline",
-                    "description": "Output style for formatted SQL: 'multiline' keeps newlines within string, 'concatenated' splits into separate strings joined with +"
+                    "enumDescriptions": [
+                        "Compact - Single-line clauses, AND/OR inline",
+                        "Expanded - Multi-line SELECT with vertical columns",
+                        "Hanging Operators - AND/OR at line start with indent",
+                        "K&R Style - Parenthesized blocks, one column per line",
+                        "K&R Compact - Parenthesized blocks, compact SELECT"
+                    ],
+                    "default": "compact",
+                    "description": "Default SQL formatting style used by the Format SQL command"
                 },
                 "ssl.documentNamespaces": {
                     "type": "object",
@@ -247,6 +257,11 @@
                 "command": "ssl.formatSql",
                 "title": "SSL: Format SQL",
                 "category": "SSL"
+            },
+            {
+                "command": "ssl.formatSqlPickStyle",
+                "title": "SSL: Format SQL (Pick Style)",
+                "category": "SSL"
             }
         ],
         "keybindings": [
@@ -255,6 +270,31 @@
                 "key": "ctrl+/",
                 "mac": "cmd+/",
                 "when": "editorTextFocus && editorLangId == ssl"
+            }
+        ],
+        "menus": {
+            "editor/context": [
+                {
+                    "submenu": "ssl.formatSql",
+                    "group": "1_modification@99",
+                    "when": "editorLangId == ssl"
+                }
+            ],
+            "ssl.formatSql": [
+                {
+                    "command": "ssl.formatSql",
+                    "group": "1_format@1"
+                },
+                {
+                    "command": "ssl.formatSqlPickStyle",
+                    "group": "1_format@2"
+                }
+            ]
+        },
+        "submenus": [
+            {
+                "id": "ssl.formatSql",
+                "label": "Format SQL"
             }
         ]
     },
