@@ -5,6 +5,28 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - 2025-12-05
+
+### Changed
+
+#### Document Formatter - SQL Handling
+- **SQL Formatting Enabled by Default**: `ssl.format.sql.enabled` now defaults to `true`
+- **Multi-line SQL String Support**: SQL strings spanning multiple lines are now properly captured and formatted
+  - Regex now matches across newlines using `[\s\S]*?`
+  - Processes entire text to handle SQL spanning multiple physical lines
+- **Context-Preserving Indentation**: Continuation lines align with the opening quote position
+  - Maintains visual context within SSL code structure
+
+#### Document Formatter - Line Wrapping
+- **Expanded Wrapping Patterns**: Now handles more line types:
+  - Standalone function calls (e.g., `SQLExecute(...)`)
+  - String concatenations with `+` operator
+  - Logical expressions with `.AND.`/`.OR.` operators
+- **Fixed Indentation Preservation**: Wrapped lines now correctly maintain original indentation
+  - Helper functions return unindented lines
+  - Caller applies originalIndent to all wrapped lines
+  - Proper continuation alignment for function arguments
+
 ## [1.2.2] - 2025-12-05
 
 ### Fixed
