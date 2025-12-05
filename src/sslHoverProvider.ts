@@ -1,9 +1,8 @@
 import * as vscode from "vscode";
 import {
     SSL_KEYWORD_DESCRIPTIONS,
-    SSL_BUILTIN_FUNCTIONS,
-    SSL_BUILTIN_CLASSES,
-    SSLFunction
+    SSLFunction,
+    SSLClass
 } from "./constants/language";
 import {
     PATTERNS
@@ -11,6 +10,7 @@ import {
 import { ProcedureIndex, ProcedureInfo } from "./utils/procedureIndex";
 import { CONFIG_KEYS, CONFIG_DEFAULTS } from "./constants/config";
 import { ClassIndex } from "./utils/classIndex";
+import { getConfiguredClasses, getConfiguredFunctions } from "./utils/intellisense";
 
 /**
  * SSL Hover Provider
@@ -29,9 +29,9 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		this.functionDocs = new Map();
 		this.keywordDocs = new Map();
 		this.builtInClassDocs = new Map();
-		this.initializeFunctionDocs();
 		this.initializeKeywordDocs();
-		this.initializeBuiltInClassDocs();
+		const config = vscode.workspace.getConfiguration("ssl");
+		this.refreshDocsFromConfig(config);
 	}
 
 	public provideHover(
@@ -40,6 +40,8 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		token: vscode.CancellationToken
 	): vscode.Hover | null {
 		const lineText = document.lineAt(position.line).text;
+		const config = vscode.workspace.getConfiguration("ssl");
+		this.refreshDocsFromConfig(config);
 
 		const locationContext = this.getLocationContext(document, position);
 
@@ -633,14 +635,16 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		});
 	}
 
-	private initializeFunctionDocs(): void {
-		SSL_BUILTIN_FUNCTIONS.forEach(func => {
+	private initializeFunctionDocs(functions: SSLFunction[]): void {
+		this.functionDocs = new Map();
+		functions.forEach(func => {
 			this.functionDocs.set(func.name.toUpperCase(), func);
 		});
 	}
 
-	private initializeBuiltInClassDocs(): void {
-		SSL_BUILTIN_CLASSES.forEach(cls => {
+	private initializeBuiltInClassDocs(classes: SSLClass[]): void {
+		this.builtInClassDocs = new Map();
+		classes.forEach(cls => {
 			this.builtInClassDocs.set(cls.name.toUpperCase(), {
 				description: cls.description,
 				instantiation: cls.instantiation,
@@ -648,6 +652,14 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 				commonProperties: cls.properties.map(p => `${cls.name.toLowerCase()}:${p}`)
 			});
 		});
+	}
+
+	private refreshDocsFromConfig(config: vscode.WorkspaceConfiguration): void {
+		const functions = getConfiguredFunctions(config);
+		const classes = getConfiguredClasses(config);
+
+		this.initializeFunctionDocs(functions);
+		this.initializeBuiltInClassDocs(classes);
 	}
 
 	/**

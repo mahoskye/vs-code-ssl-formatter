@@ -127,50 +127,28 @@ export function normalizeOperatorSpacing(text: string): string {
         .map((line) => {
             const trimmed = line.trim();
 
-            // Track multi-line string state
-            if (!inMultiLineString) {
-                const doubleQuoteCount = (line.match(/"/g) || []).length;
-                const singleQuoteCount = (line.match(/'/g) || []).length;
-                const bracketOpenCount = (line.match(/\[/g) || []).length;
-                const bracketCloseCount = (line.match(/\]/g) || []).length;
-
-                if (doubleQuoteCount % 2 !== 0) {
-                    inMultiLineString = true;
-                    stringDelimiter = '"';
-                } else if (singleQuoteCount % 2 !== 0) {
-                    inMultiLineString = true;
-                    stringDelimiter = "'";
-                } else if (bracketOpenCount !== bracketCloseCount) {
-                    inMultiLineString = true;
-                    stringDelimiter = ']';
+            // Track block comment start/end using the project's convention (/* ... ;)
+            if (!inBlockComment && trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+                inBlockComment = true;
+            }
+            if (inBlockComment || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+                if (inBlockComment && trimmed.endsWith(';')) {
+                    inBlockComment = false;
                 }
-            } else {
+                return line; // do not modify comment content or let quotes toggle string state
+            }
+
+            // If we're already inside a multi-line string, only look for its end
+            if (inMultiLineString) {
                 const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : (stringDelimiter === "'" ? "'" : '\\]'), 'g')) || []).length;
                 if (delimiterCount % 2 !== 0 || (stringDelimiter === ']' && delimiterCount > 0)) {
                     inMultiLineString = false;
                     stringDelimiter = '';
                 }
-            }
-
-            if (inMultiLineString) {
                 return line; // do not modify string content
             }
 
-            // Track block comment start/end using the project's convention (/* ... ;)
-            if (inBlockComment) {
-                if (trimmed.endsWith(';')) {
-                    inBlockComment = false;
-                }
-                return line; // do not modify comment content
-            }
             if (!trimmed) {
-                return line;
-            }
-            if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
-                inBlockComment = true;
-                return line;
-            }
-            if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
                 return line;
             }
 
@@ -255,6 +233,23 @@ export function normalizeOperatorSpacing(text: string): string {
             // Convert implicit string concatenation to explicit with +
             // Match: string literal followed by whitespace and another string literal
             out = replaceImplicitStringConcatenation(out);
+
+            // Track start of multi-line strings for subsequent lines
+            const doubleQuoteCount = (line.match(/"/g) || []).length;
+            const singleQuoteCount = (line.match(/'/g) || []).length;
+            const bracketOpenCount = (line.match(/\[/g) || []).length;
+            const bracketCloseCount = (line.match(/\]/g) || []).length;
+
+            if (doubleQuoteCount % 2 !== 0) {
+                inMultiLineString = true;
+                stringDelimiter = '"';
+            } else if (singleQuoteCount % 2 !== 0) {
+                inMultiLineString = true;
+                stringDelimiter = "'";
+            } else if (bracketOpenCount !== bracketCloseCount) {
+                inMultiLineString = true;
+                stringDelimiter = ']';
+            }
 
             return out;
         })

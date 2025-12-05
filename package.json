@@ -2,7 +2,7 @@
     "name": "vs-code-ssl-formatter",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.2.0",
+    "version": "1.2.1",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -53,7 +53,7 @@
             }
         ],
         "configuration": {
-            "title": "SSL",
+            "title": "STARLIMS Scripting Language (SSL)",
             "properties": {
                 "ssl.strictStyleGuideMode": {
                     "type": "boolean",
@@ -142,20 +142,24 @@
                 "ssl.format.sql.style": {
                     "type": "string",
                     "enum": [
+                        "canonicalCompact",
                         "compact",
                         "expanded",
                         "hangingOperators",
                         "knr",
-                        "knrCompact"
+                        "knrCompact",
+                        "ormFriendly"
                     ],
                     "enumDescriptions": [
+                        "Canonical Compact - Hanging operators with JOIN breaks (preferred default)",
                         "Compact - Single-line clauses, AND/OR inline",
                         "Expanded - Multi-line SELECT with vertical columns",
                         "Hanging Operators - AND/OR at line start with indent",
                         "K&R Style - Parenthesized blocks, one column per line",
-                        "K&R Compact - Parenthesized blocks, compact SELECT"
+                        "K&R Compact - Parenthesized blocks, compact SELECT",
+                        "No-Newline / ORM Friendly - Inline JOINs, hanging operators"
                     ],
-                    "default": "compact",
+                    "default": "canonicalCompact",
                     "description": "Default SQL formatting style used by the Format SQL command"
                 },
                 "ssl.documentNamespaces": {
@@ -229,6 +233,115 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Show parameter names as inlay hints in function calls"
+                },
+                "ssl.intellisense.inlayHints.showOnActiveLineOnly": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Only show inlay hints on the line where the cursor is positioned"
+                },
+                "ssl.intellisense.completion.enableKeywords": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Include STARLIMS keywords (e.g., :IF, :WHILE) in completion lists"
+                },
+                "ssl.intellisense.completion.enableBuiltinFunctions": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Include built-in functions (SQLExecute, RunSQL, etc.) in completion lists"
+                },
+                "ssl.intellisense.completion.enableBuiltinClasses": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Include built-in classes in completion lists"
+                },
+                "ssl.intellisense.completion.enableSnippets": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Include STARLIMS code snippets (IF/ELSE, PROCEDURE, TRY/CATCH, etc.) in completion lists"
+                },
+                "ssl.intellisense.customFunctions": {
+                    "type": "array",
+                    "default": [],
+                    "markdownDescription": "Add or override functions available to IntelliSense, diagnostics, and formatting. Entries with the same name as built-ins replace their metadata.",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Function name (case-insensitive)"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Short description shown in completion details and hovers"
+                            },
+                            "params": {
+                                "type": "string",
+                                "description": "Parameter list, including parentheses (e.g., \"(value, options)\")"
+                            },
+                            "signature": {
+                                "type": "string",
+                                "description": "Full signature displayed in hovers"
+                            },
+                            "returnType": {
+                                "type": "string",
+                                "description": "Return type label shown in hover documentation"
+                            },
+                            "category": {
+                                "type": "string",
+                                "description": "Category label for the hover (e.g., \"Database Functions\")"
+                            },
+                            "untypedSignature": {
+                                "type": "string",
+                                "description": "Untyped signature variant to show alongside the main signature"
+                            }
+                        }
+                    }
+                },
+                "ssl.intellisense.customClasses": {
+                    "type": "array",
+                    "default": [],
+                    "markdownDescription": "Add or override built-in classes for IntelliSense and member completions. Entries with the same name as built-ins replace their metadata.",
+                    "items": {
+                        "type": "object",
+                        "required": [
+                            "name"
+                        ],
+                        "properties": {
+                            "name": {
+                                "type": "string",
+                                "description": "Class name"
+                            },
+                            "description": {
+                                "type": "string",
+                                "description": "Short description for completions and hovers"
+                            },
+                            "instantiation": {
+                                "type": "string",
+                                "description": "Instantiation example (defaults to Name{})"
+                            },
+                            "usage": {
+                                "type": "string",
+                                "description": "Sample usage shown in hover details"
+                            },
+                            "methods": {
+                                "type": "array",
+                                "description": "Method names exposed for member completion",
+                                "items": {
+                                    "type": "string"
+                                }
+                            },
+                            "properties": {
+                                "type": "array",
+                                "description": "Property names exposed for member completion",
+                                "items": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
                 },
                 "ssl.trace.server": {
                     "type": "string",

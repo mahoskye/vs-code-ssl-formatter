@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
 import {
     SSL_KEYWORDS,
-    SSL_BUILTIN_FUNCTIONS,
-    SSL_BUILTIN_CLASSES,
-    SSL_KEYWORD_DESCRIPTIONS
+    SSL_KEYWORD_DESCRIPTIONS,
+    SSLClass,
+    SSLFunction
 } from "./constants/language";
 import {
     CONFIG_KEYS,
@@ -14,6 +14,7 @@ import {
 } from "./constants/patterns";
 import { ClassIndex, ClassMembers } from "./utils/classIndex";
 import { ProcedureIndex } from "./utils/procedureIndex";
+import { getConfiguredClasses, getConfiguredFunctions } from "./utils/intellisense";
 
 /**
  * SSL Completion Provider
@@ -25,14 +26,16 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 	private builtinFunctions: vscode.CompletionItem[] = [];
 	private builtinClasses: vscode.CompletionItem[] = [];
 	private snippets: vscode.CompletionItem[] = [];
+	private builtinClassMetadata: Map<string, SSLClass> = new Map();
+	private builtinClassNames: Set<string> = new Set();
 
 	constructor(
 		private readonly classIndex?: ClassIndex,
 		private readonly procedureIndex?: ProcedureIndex
 	) {
 		this.initializeKeywords();
-		this.initializeBuiltinFunctions();
-		this.initializeBuiltinClasses();
+		const config = vscode.workspace.getConfiguration("ssl");
+		this.refreshFromConfig(config);
 		this.initializeSnippets();
 	}
 
@@ -43,11 +46,17 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		context: vscode.CompletionContext
 	): vscode.CompletionItem[] {
 		const config = vscode.workspace.getConfiguration("ssl");
+		this.refreshFromConfig(config);
 		const intellisenseEnabled = config.get<boolean>(CONFIG_KEYS.INTELLISENSE_ENABLED, CONFIG_DEFAULTS[CONFIG_KEYS.INTELLISENSE_ENABLED]);
 
 		if (!intellisenseEnabled) {
 			return [];
 		}
+
+		const keywordsEnabled = config.get<boolean>(CONFIG_KEYS.INTELLISENSE_COMPLETION_KEYWORDS_ENABLED, CONFIG_DEFAULTS[CONFIG_KEYS.INTELLISENSE_COMPLETION_KEYWORDS_ENABLED]);
+		const functionsEnabled = config.get<boolean>(CONFIG_KEYS.INTELLISENSE_COMPLETION_FUNCTIONS_ENABLED, CONFIG_DEFAULTS[CONFIG_KEYS.INTELLISENSE_COMPLETION_FUNCTIONS_ENABLED]);
+		const classesEnabled = config.get<boolean>(CONFIG_KEYS.INTELLISENSE_COMPLETION_CLASSES_ENABLED, CONFIG_DEFAULTS[CONFIG_KEYS.INTELLISENSE_COMPLETION_CLASSES_ENABLED]);
+		const snippetsEnabled = config.get<boolean>(CONFIG_KEYS.INTELLISENSE_COMPLETION_SNIPPETS_ENABLED, CONFIG_DEFAULTS[CONFIG_KEYS.INTELLISENSE_COMPLETION_SNIPPETS_ENABLED]);
 
 		const lineText = document.lineAt(position.line).text;
 		const textBeforeCursor = lineText.substring(0, position.character);
@@ -78,16 +87,24 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		const completions: vscode.CompletionItem[] = [];
 
 		// Add keywords
-		completions.push(...this.keywords);
+		if (keywordsEnabled !== false) {
+			completions.push(...this.keywords);
+		}
 
 		// Add built-in functions
-		completions.push(...this.builtinFunctions);
+		if (functionsEnabled !== false) {
+			completions.push(...this.builtinFunctions);
+		}
 
 		// Add built-in classes
-		completions.push(...this.builtinClasses);
+		if (classesEnabled !== false) {
+			completions.push(...this.builtinClasses);
+		}
 
 		// Add snippets
-		completions.push(...this.snippets);
+		if (snippetsEnabled !== false) {
+			completions.push(...this.snippets);
+		}
 
 		return completions;
 	}
@@ -102,17 +119,17 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		});
 	}
 
-	private initializeBuiltinFunctions(): void {
-		this.builtinFunctions = SSL_BUILTIN_FUNCTIONS.map(func => {
+	private initializeBuiltinFunctions(functions: SSLFunction[]): void {
+		this.builtinFunctions = functions.map(func => {
 			const item = new vscode.CompletionItem(func.name, vscode.CompletionItemKind.Function);
-			item.detail = func.description;
+			item.detail = func.description || "Custom function";
 
 			// Use signature if available, otherwise construct from name and params
-			const signature = func.signature || `${func.name}${func.params}`;
+			const signature = func.signature || `${func.name}${func.params || "()"}`;
 			item.insertText = new vscode.SnippetString(`${func.name}($1)`);
 
 			// Build rich documentation with all available metadata
-			let documentation = `**${func.name}**\n\n${func.description}`;
+			let documentation = `**${func.name}**\n\n${func.description || "Custom function"}`;
 
 			if (func.signature) {
 				documentation += `\n\n**Signature:** \`${func.signature}\``;
@@ -139,16 +156,20 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		});
 	}
 
-	private initializeBuiltinClasses(): void {
-		this.builtinClasses = SSL_BUILTIN_CLASSES.map(cls => {
+	private initializeBuiltinClasses(classes: SSLClass[]): void {
+		this.builtinClasses = classes.map(cls => {
 			const item = new vscode.CompletionItem(cls.name, vscode.CompletionItemKind.Class);
 			item.detail = cls.description;
 			item.insertText = new vscode.SnippetString(`${cls.name}{}`);
+			const methods = cls.methods || [];
+			const properties = cls.properties || [];
 			item.documentation = new vscode.MarkdownString(
 				`**${cls.name}** - Built-in class\n\n` +
 				`${cls.description}\n\n` +
 				`**Instantiation:** \`${cls.instantiation}\`\n\n` +
-				`**Example:** \`${cls.usage}\`\n\n` +
+				`${cls.usage ? `**Example:** \`${cls.usage}\`\n\n` : ""}` +
+				`${methods.length ? `**Methods:** ${methods.map(m => `\`${m}()\``).join(", ")}\n\n` : ""}` +
+				`${properties.length ? `**Properties:** ${properties.map(p => `\`${p}\``).join(", ")}\n\n` : ""}` +
 				`Use colon notation for methods and properties (e.g., \`object:method()\`, \`object:property\`)`
 			);
 			return item;
@@ -269,7 +290,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			const builtinMatch = line.match(new RegExp(`\\b${objectName}\\s*:=\\s*(\\w+)\\{\\}`, 'i'));
 			if (builtinMatch) {
 				const className = builtinMatch[1].toUpperCase();
-				if (SSL_BUILTIN_CLASSES.some(cls => cls.name.toUpperCase() === className)) {
+				if (this.builtinClassNames.has(className)) {
 					return { type: 'builtin', className };
 				}
 			}
@@ -297,55 +318,27 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 	 * Get members for built-in classes (Email, SSLRegex)
 	 */
 	private getBuiltinClassMembers(className: string): vscode.CompletionItem[] {
-		const members: vscode.CompletionItem[] = [];
-
-		if (className === 'EMAIL') {
-			// Methods
-			const send = new vscode.CompletionItem('Send', vscode.CompletionItemKind.Method);
-			send.detail = 'Send email';
-			send.insertText = new vscode.SnippetString('Send($0)');
-			members.push(send);
-
-			const addAttachment = new vscode.CompletionItem('AddAttachment', vscode.CompletionItemKind.Method);
-			addAttachment.detail = 'Add attachment to email';
-			addAttachment.insertText = new vscode.SnippetString('AddAttachment($1)');
-			members.push(addAttachment);
-
-			const setRecipient = new vscode.CompletionItem('SetRecipient', vscode.CompletionItemKind.Method);
-			setRecipient.detail = 'Set email recipient';
-			setRecipient.insertText = new vscode.SnippetString('SetRecipient($1)');
-			members.push(setRecipient);
-
-			// Properties
-			['Subject', 'Body', 'From', 'To'].forEach(prop => {
-				const item = new vscode.CompletionItem(prop, vscode.CompletionItemKind.Property);
-				item.detail = `Email ${prop.toLowerCase()}`;
-				members.push(item);
-			});
-		} else if (className === 'SSLREGEX') {
-			// Methods
-			const match = new vscode.CompletionItem('Match', vscode.CompletionItemKind.Method);
-			match.detail = 'Match pattern against text';
-			match.insertText = new vscode.SnippetString('Match($1, $2)');
-			members.push(match);
-
-			const replace = new vscode.CompletionItem('Replace', vscode.CompletionItemKind.Method);
-			replace.detail = 'Replace pattern in text';
-			replace.insertText = new vscode.SnippetString('Replace($1, $2, $3)');
-			members.push(replace);
-
-			const test = new vscode.CompletionItem('Test', vscode.CompletionItemKind.Method);
-			test.detail = 'Test if pattern matches';
-			test.insertText = new vscode.SnippetString('Test($1, $2)');
-			members.push(test);
-
-			// Properties
-			['Pattern', 'IgnoreCase', 'Multiline'].forEach(prop => {
-				const item = new vscode.CompletionItem(prop, vscode.CompletionItemKind.Property);
-				item.detail = `Regex ${prop}`;
-				members.push(item);
-			});
+		const cls = this.builtinClassMetadata.get(className.toUpperCase());
+		if (!cls) {
+			return [];
 		}
+
+		const members: vscode.CompletionItem[] = [];
+		const methods = cls.methods || [];
+		const properties = cls.properties || [];
+
+		methods.forEach(method => {
+			const item = new vscode.CompletionItem(method, vscode.CompletionItemKind.Method);
+			item.detail = `Method defined on ${cls.name}`;
+			item.insertText = new vscode.SnippetString(`${method}($1)`);
+			members.push(item);
+		});
+
+		properties.forEach(prop => {
+			const item = new vscode.CompletionItem(prop, vscode.CompletionItemKind.Property);
+			item.detail = `Property of ${cls.name}`;
+			members.push(item);
+		});
 
 		return members;
 	}
@@ -508,6 +501,17 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 	 */
 	private toPascalCase(str: string): string {
 		return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+	}
+	
+	private refreshFromConfig(config: vscode.WorkspaceConfiguration): void {
+		const functions = getConfiguredFunctions(config);
+		const classes = getConfiguredClasses(config);
+
+		this.initializeBuiltinFunctions(functions);
+		this.initializeBuiltinClasses(classes);
+
+		this.builtinClassMetadata = new Map(classes.map(cls => [cls.name.toUpperCase(), cls]));
+		this.builtinClassNames = new Set(this.builtinClassMetadata.keys());
 	}
 
 	/**

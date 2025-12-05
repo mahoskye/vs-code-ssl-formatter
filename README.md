@@ -130,6 +130,7 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 - `ssl.format.sql.enabled`: Format inline SQL string literals (default: `false`).
 - `ssl.format.sql.keywordCase`: `preserve`, `upper`, or `lower` for SQL keywords (default: `upper`).
 - `ssl.format.sql.indentSpaces`: Spaces to indent formatted SQL clauses (default: `4`).
+- `ssl.format.sql.style`: Default SQL layout for the **Format SQL** command. Options: `canonicalCompact`, `compact`, `expanded`, `hangingOperators`, `knr`, `knrCompact`, `ormFriendly` (default: `canonicalCompact`). See `sql-formats.md` for examples of each style, and change the default in your user/workspace settings.
 
 **Note:** SSL keywords (`:IF`, `:WHILE`, `:PROCEDURE`, etc.) are always normalized to UPPERCASE per the SSL style guide. This is not configurable.
 
@@ -153,6 +154,9 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 - `ssl.intellisense.signatureHelp.enabled`: Show parameter hints while typing (default: `true`).
 - `ssl.intellisense.inlayHints.enabled`: Enable experimental inline parameter hints (default: `false`).
 - `ssl.intellisense.inlayHints.parameterNames`: Show parameter names inline (default: `false`).
+- `ssl.intellisense.completion.enableKeywords` / `.enableBuiltinFunctions` / `.enableBuiltinClasses` / `.enableSnippets`: Toggle individual completion categories (default: `true`).
+- `ssl.intellisense.customFunctions`: Add or override built-in functions for completion, hover details, diagnostics, and formatting (default: `[]`). Each entry supports `name`, `description`, `params`, `signature`, `returnType`, `category`, and `untypedSignature`.
+- `ssl.intellisense.customClasses`: Add or override built-in classes for completion and member lists (default: `[]`). Each entry supports `name`, `description`, `instantiation`, `usage`, `methods`, and `properties`.
 
 ### Navigation
 
@@ -177,7 +181,14 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
   "ssl.format.builtinFunctionCase": "PascalCase",
   "ssl.naming.hungarianNotation.enabled": true,
   "ssl.styleGuide.limitBlockDepth": 4,
-  "ssl.security.preventSqlInjection": true
+  "ssl.security.preventSqlInjection": true,
+  "ssl.globals": ["sUserName"],
+  "ssl.intellisense.customFunctions": [
+    { "name": "MyHelper", "description": "Project helper", "params": "(value)" }
+  ],
+  "ssl.intellisense.customClasses": [
+    { "name": "ApiClient", "methods": ["Get", "Post"], "properties": ["BaseUrl"] }
+  ]
 }
 ```
 

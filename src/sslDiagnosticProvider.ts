@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import {
     SSL_KEYWORDS,
-    SSL_BUILTIN_FUNCTIONS,
     BLOCK_START_KEYWORDS,
     BLOCK_END_KEYWORDS,
     BLOCK_MIDDLE_KEYWORDS,
@@ -23,6 +22,7 @@ import {
 } from "./constants/diagnostics";
 import { hasValidHungarianNotation } from "./constants/hungarian";
 import { Logger } from "./utils/logger";
+import { getConfiguredFunctions } from "./utils/intellisense";
 
 /**
  * SSL Diagnostic Provider
@@ -148,13 +148,22 @@ export class SSLDiagnosticProvider {
 
 			// Validate SQL parameter placeholders BEFORE skipping strings
 			// This catches parameters in query strings, including multi-line strings
+			// Note: ?...? is an interpolation syntax that can contain any expression (variables,
+			// function calls, array access, arithmetic, etc.). We only validate simple identifiers.
 			const paramPlaceholders = line.match(PATTERNS.SQL_PARAMETER_PLACEHOLDER);
 			if (paramPlaceholders && preventSqlInjection) {
 			const declaredIdentifiers = this.getDeclaredIdentifiers(lines, i, configuredGlobals);
 			const declaredIdentifiersLower = new Set(Array.from(declaredIdentifiers, id => id.toLowerCase()));
-			
+
 			paramPlaceholders.forEach(placeholder => {
 				const paramName = placeholder.replace(/\?/g, '');
+
+				// Skip validation for expressions - only validate simple identifiers
+				// Expressions contain: ( ) [ ] + - * / , or spaces
+				if (/[()[\]+\-*\/,\s]/.test(paramName)) {
+					Logger.debug(`Line ${i + 1}: Skipping expression placeholder '${paramName}'`);
+					return;
+				}
 
 				Logger.debug(`Line ${i + 1}: Checking SQL param '${paramName}', declared identifiers: [${Array.from(declaredIdentifiers).join(', ')}]`);
 
@@ -418,8 +427,9 @@ export class SSLDiagnosticProvider {
 					// Filter out known keywords and function names
 					const sslKeywords = new Set(SSL_KEYWORDS.map(k => k.toLowerCase()));
 					
-					// Common SSL functions (lowercase versions)
-					const sslFunctions = new Set(SSL_BUILTIN_FUNCTIONS.map(f => f.name.toLowerCase()));
+					// Common SSL functions (lowercase versions), including user-extended list
+					const configuredFunctions = getConfiguredFunctions(config);
+					const sslFunctions = new Set(configuredFunctions.map(f => f.name.toLowerCase()));
 
 					// Loop counter exceptions
 					const loopCounters = new Set(LOOP_COUNTER_EXCEPTIONS);
@@ -968,6 +978,17 @@ export class SSLDiagnosticProvider {
 				});
 			}
 
+			// Collect file-level :PARAMETERS (script arguments, before any procedure)
+			const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
+			if (paramsMatch) {
+				const params = paramsMatch[1].split(',').map(p => p.trim());
+				params.forEach(paramName => {
+					if (paramName) {
+						globalIdentifiers.add(paramName);
+					}
+				});
+			}
+
 			// Collect global constants (ALL_CAPS variables assigned at file level)
 			if (/^[A-Z_][A-Z0-9_]*\s*:=/.test(line)) {
 				const constMatch = line.match(/^([A-Z_][A-Z0-9_]*)\s*:=/);
@@ -1291,7 +1312,7 @@ export class SSLDiagnosticProvider {
 		if (!sql) {
 			return undefined;
 		}
-		const namedPattern = /\?[A-Za-z0-9_]+\?/g;
+		const namedPattern = /\?[A-Za-z0-9_]+(?:\[[^\]]+\])?\?/g;
 		const hasNamed = namedPattern.test(sql);
 		if (hasNamed) {
 			const cleaned = sql.replace(namedPattern, "");
@@ -1370,6 +1391,17 @@ export class SSLDiagnosticProvider {
 					const cleanName = varName.split(':=')[0].trim();
 					if (cleanName) {
 						globalIdentifiers.add(cleanName);
+					}
+				});
+			}
+
+			// Collect file-level :PARAMETERS (script arguments, before any procedure)
+			const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
+			if (paramsMatch) {
+				const params = paramsMatch[1].split(',').map(p => p.trim());
+				params.forEach(paramName => {
+					if (paramName) {
+						globalIdentifiers.add(paramName);
 					}
 				});
 			}

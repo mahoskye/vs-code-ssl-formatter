@@ -179,6 +179,17 @@ describe('SSL Formatter - Builtin Functions', () => {
 			expect(formatted).to.equal(expected, `Failed to normalize: ${input}`);
 		});
 	});
+
+	it('should still normalize functions when comments contain apostrophes', () => {
+		const input = `/*\nParameter 2: template QC's;\n*/;\n:PROCEDURE Test;\nresult := SqlExecute("select 1");\n:ENDPROC;`;
+		const expected = `/*\nParameter 2: template QC's;\n*/;\n:PROCEDURE Test;\n\tresult := SQLExecute("select 1");\n:ENDPROC;\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Apostrophes inside comments should not block formatting');
+	});
 });
 
 describe('SSL Formatter - Comment Preservation', () => {
@@ -630,7 +641,7 @@ describe('SSL Formatter - SQL Formatting', () => {
 
 	it('should format SQLExecute inline literals with clause indentation', () => {
 		const input = 'SQLExecute("select col1, col2 from Patients where id = ?sId? and status = ?sStatus?");';
-		const expected = 'SQLExecute("SELECT col1, col2\n    FROM Patients\n    WHERE id = ?sId?\n        AND status = ?sStatus?");\n';
+		const expected = 'SQLExecute("SELECT\n    col1,\n    col2\nFROM Patients WHERE id = ?sId?\n  AND status = ?sStatus?");\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
@@ -641,7 +652,7 @@ describe('SSL Formatter - SQL Formatting', () => {
 
 	it('should format RunSQL literals and preserve placeholders', () => {
 		const input = 'RunSQL("update Foo set bar = ? where baz = ? or flag = ?", , , { sBar, sBaz, sFlag });';
-		const expected = 'RunSQL("UPDATE Foo\n    SET bar = ?\n    WHERE baz = ?\n        OR flag = ?", ,, { sBar, sBaz, sFlag });\n';
+		const expected = 'RunSQL("UPDATE Foo SET bar = ? WHERE baz = ?\n  OR flag = ?", ,, { sBar, sBaz, sFlag });\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
@@ -653,7 +664,7 @@ describe('SSL Formatter - SQL Formatting', () => {
 	it('should respect SQL keyword casing preference', () => {
 		config.update('ssl.format.sql.keywordCase', 'preserve');
 		const input = 'SQLExecute("Select * from Samples where status = ?sStatus?");';
-		const expected = 'SQLExecute("Select *\n    from Samples\n    where status = ?sStatus?");\n';
+		const expected = 'SQLExecute("Select\n    *\nfrom Samples where status = ?sStatus?");\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);

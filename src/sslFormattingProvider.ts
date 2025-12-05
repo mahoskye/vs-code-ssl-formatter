@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import {
     SSL_KEYWORDS,
-    SSL_BUILTIN_FUNCTIONS,
     BLOCK_START_KEYWORDS,
     BLOCK_END_KEYWORDS,
     BLOCK_MIDDLE_KEYWORDS,
@@ -17,6 +16,8 @@ import {
 	PATTERNS
 } from "./constants/patterns";
 import { normalizeOperatorSpacing, replaceOutsideStrings } from "./utils/formatters";
+import { formatSqlWithStyleImpl, SqlFormattingStyle } from "./commands/formatSql";
+import { getConfiguredFunctions } from "./utils/intellisense";
 
 const SQL_CLAUSE_KEYWORDS = [
 	"INNER JOIN",
@@ -131,6 +132,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const indentWidth = config.get<number>(CONFIG_KEYS.FORMAT_INDENT_WIDTH, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_INDENT_WIDTH]);
 		const builtinFunctionCase = config.get<string>(CONFIG_KEYS.FORMAT_BUILTIN_FUNCTION_CASE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_BUILTIN_FUNCTION_CASE]);
 		const trimTrailingWhitespace = config.get<boolean>(CONFIG_KEYS.FORMAT_TRIM_TRAILING_WHITESPACE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_TRIM_TRAILING_WHITESPACE]);
+		const configuredFunctions = getConfiguredFunctions(config);
 		
 		// Use editor's tab size for calculating visual positions
 		const tabSize = options.tabSize || 4;
@@ -141,7 +143,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		// Apply formatting rules
 		formatted = this.splitMultipleStatements(formatted);
 		formatted = this.normalizeKeywordCase(formatted); // Always UPPER per style guide
-		formatted = this.normalizeBuiltinFunctionCase(formatted, builtinFunctionCase);
+		formatted = this.normalizeBuiltinFunctionCase(formatted, builtinFunctionCase, configuredFunctions.map(f => f.name));
 		formatted = normalizeOperatorSpacing(formatted);
 		formatted = this.normalizeIndentation(formatted, indentStyle, indentWidth, tabSize);
 		formatted = this.normalizeBlankLines(formatted);
@@ -179,6 +181,17 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const formattedLines = lines.flatMap(line => {
 			const trimmed = line.trim();
 
+			// Track multi-line comment state before string handling
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+			}
+			if (inMultiLineComment || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+				if (inMultiLineComment && trimmed.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				return [line]; // Don't split comment content
+			}
+
 			// Track multi-line string state
 			if (!inMultiLineString) {
 				const doubleQuoteCount = (line.match(/"/g) || []).length;
@@ -198,22 +211,6 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 					stringDelimiter = "";
 				}
 				return [line]; // Don't split string content
-			}
-
-			// Track multi-line comment state
-			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
-				inMultiLineComment = true;
-			}
-			if (inMultiLineComment) {
-				if (trimmed.endsWith(';')) {
-					inMultiLineComment = false;
-				}
-				return [line]; // Don't split comment content
-			}
-
-			// Skip comment lines
-			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
-				return [line];
 			}
 
 			// Skip keywords and empty lines
@@ -316,6 +313,17 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const formattedLines = lines.map(line => {
 			const trimmed = line.trim();
 
+			// Track multi-line comment state before any string detection
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+			}
+			if (inMultiLineComment || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+				if (inMultiLineComment && trimmed.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				return line;
+			}
+
 			// Track multi-line string state
 			if (!inMultiLineString) {
 				const doubleQuoteCount = (line.match(/"/g) || []).length;
@@ -343,23 +351,6 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 			if (inMultiLineString) {
 				return line; // Don't format string content
-			}
-
-			// Track multi-line comment state (SSL uses /* ... ; syntax)
-			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
-				inMultiLineComment = true;
-				return line;
-			}
-			if (inMultiLineComment) {
-				if (trimmed.endsWith(';')) {
-					inMultiLineComment = false;
-				}
-				return line; // Don't format comment content
-			}
-
-			// Skip single-line comments
-			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
-				return line;
 			}
 
 			let result = line;
@@ -379,12 +370,10 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	 * Only processes function names outside of strings and comments.
 	 * SSL functions are case-insensitive, but PascalCase is the canonical form.
 	 */
-	private normalizeBuiltinFunctionCase(text: string, caseStyle: string): string {
+	private normalizeBuiltinFunctionCase(text: string, caseStyle: string, functions: string[]): string {
 		if (caseStyle === "preserve") {
 			return text;
 		}
-
-		const functions = SSL_BUILTIN_FUNCTIONS.map(f => f.name);
 
 		const lines = text.split('\n');
 		let inMultiLineComment = false;
@@ -394,50 +383,25 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const formattedLines = lines.map(line => {
 			const trimmed = line.trim();
 
-			// Track multi-line string state
-			if (!inMultiLineString) {
-				const doubleQuoteCount = (line.match(/"/g) || []).length;
-				const singleQuoteCount = (line.match(/'/g) || []).length;
-				const bracketOpenCount = (line.match(/\[/g) || []).length;
-				const bracketCloseCount = (line.match(/\]/g) || []).length;
-
-				if (doubleQuoteCount % 2 !== 0) {
-					inMultiLineString = true;
-					stringDelimiter = '"';
-				} else if (singleQuoteCount % 2 !== 0) {
-					inMultiLineString = true;
-					stringDelimiter = "'";
-				} else if (bracketOpenCount !== bracketCloseCount) {
-					inMultiLineString = true;
-					stringDelimiter = ']';
+			// Track multi-line comment state before string detection
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+			}
+			if (inMultiLineComment || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+				if (inMultiLineComment && trimmed.endsWith(';')) {
+					inMultiLineComment = false;
 				}
-			} else {
+				return line;
+			}
+
+			// If we're already inside a multi-line string, only check for its end
+			if (inMultiLineString) {
 				const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : (stringDelimiter === "'" ? "'" : '\\]'), 'g')) || []).length;
 				if (delimiterCount % 2 !== 0 || (stringDelimiter === ']' && delimiterCount > 0)) {
 					inMultiLineString = false;
 					stringDelimiter = '';
 				}
-			}
-
-			if (inMultiLineString) {
-				return line; // Don't format string content
-			}
-
-			// Track multi-line comment state (SSL uses /* ... ; syntax)
-			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
-				inMultiLineComment = true;
-				return line;
-			}
-			if (inMultiLineComment) {
-				if (trimmed.endsWith(';')) {
-					inMultiLineComment = false;
-				}
-				return line; // Don't format comment content
-			}
-
-			// Skip single-line comments
-			if (trimmed.startsWith('/*') || trimmed.startsWith('*')) {
-				return line;
+				return line; // Skip formatting while inside string content
 			}
 
 			let result = line;
@@ -449,6 +413,24 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				const replacement = func;
 				result = replaceOutsideStrings(result, pattern, replacement);
 			});
+
+			// Track start of multi-line string for following lines
+			const doubleQuoteCount = (line.match(/"/g) || []).length;
+			const singleQuoteCount = (line.match(/'/g) || []).length;
+			const bracketOpenCount = (line.match(/\[/g) || []).length;
+			const bracketCloseCount = (line.match(/\]/g) || []).length;
+
+			if (doubleQuoteCount % 2 !== 0) {
+				inMultiLineString = true;
+				stringDelimiter = '"';
+			} else if (singleQuoteCount % 2 !== 0) {
+				inMultiLineString = true;
+				stringDelimiter = "'";
+			} else if (bracketOpenCount !== bracketCloseCount) {
+				inMultiLineString = true;
+				stringDelimiter = ']';
+			}
+
 			return result;
 		});
 
@@ -506,40 +488,45 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 		const formatted = lines.map((line, index) => {
 			const trimmed = line.trim();
+			const startsBlockComment = trimmed.startsWith('/*') && !trimmed.endsWith(';');
 
-			// Track multi-line string state
-			if (!inMultiLineString) {
-				const doubleQuoteCount = (line.match(/"/g) || []).length;
-				const singleQuoteCount = (line.match(/'/g) || []).length;
-				
-				if (doubleQuoteCount % 2 !== 0) {
-					inMultiLineString = true;
-					stringDelimiter = '"';
-				} else if (singleQuoteCount % 2 !== 0) {
-					inMultiLineString = true;
-					stringDelimiter = "'";
-				}
-			} else {
-				const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : "'", 'g')) || []).length;
-				if (delimiterCount % 2 !== 0) {
-					inMultiLineString = false;
-					stringDelimiter = "";
-				}
-				return line; // Don't re-indent string content
-			}
-
-			// Track multi-line comment state (SSL uses /* ... ; syntax)
-			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+			// Track multi-line comment boundaries without letting quotes toggle string state
+			if (startsBlockComment) {
 				inMultiLineComment = true;
-				// Multi-line comment start - preserve original formatting
-				return line;
 			}
+
 			if (inMultiLineComment) {
 				if (trimmed.endsWith(';')) {
 					inMultiLineComment = false;
 				}
-				// Multi-line comment continuation/end - preserve original formatting
-				return line;
+				return line; // Preserve multi-line comment content as-is
+			}
+
+			const isCommentLine = trimmed.startsWith('/*') || trimmed.startsWith('*');
+
+			// Track multi-line string state only when not inside comments
+			if (!isCommentLine) {
+				if (!inMultiLineString) {
+					const doubleQuoteCount = (line.match(/"/g) || []).length;
+					const singleQuoteCount = (line.match(/'/g) || []).length;
+					
+					if (doubleQuoteCount % 2 !== 0) {
+						inMultiLineString = true;
+						stringDelimiter = '"';
+					} else if (singleQuoteCount % 2 !== 0) {
+						inMultiLineString = true;
+						stringDelimiter = "'";
+					}
+				} else {
+					const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : "'", 'g')) || []).length;
+					if (delimiterCount % 2 !== 0) {
+						inMultiLineString = false;
+						stringDelimiter = "";
+					}
+					return line; // Don't re-indent string content
+				}
+			} else if (inMultiLineComment && trimmed.endsWith(';')) {
+				inMultiLineComment = false;
 			}
 
 			// Skip empty lines
@@ -547,14 +534,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				return line;
 			}
 
-			// Lines starting with * but not part of a multi-line comment are NOT comment lines
-			// (they're likely continuation of something else), so skip them
-			if (trimmed.startsWith("*")) {
-				return line;
-			}
-
 			// Decrease indent for block end and middle keywords
-			if (blockEnd.test(trimmed) || blockMiddle.test(trimmed)) {
+			if (!isCommentLine && (blockEnd.test(trimmed) || blockMiddle.test(trimmed))) {
 				indentLevel = Math.max(0, indentLevel - 1);
 				// Exit procedure when we hit ENDPROC and reset indent to 0
 				if (endProcKeyword.test(trimmed)) {
@@ -563,7 +544,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			}
 
 			// Decrease indent for :CASE and :OTHERWISE (they're at same level as :BEGINCASE)
-			if (caseKeyword.test(trimmed)) {
+			if (!isCommentLine && caseKeyword.test(trimmed)) {
 				indentLevel = Math.max(0, indentLevel - 1);
 			}
 
@@ -600,23 +581,25 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			}
 
 			// Increase indent after block start keywords (but NOT after PROCEDURE - handled above)
-			if (blockStart.test(trimmed) && !procedureKeyword.test(trimmed)) {
+			if (!isCommentLine && blockStart.test(trimmed) && !procedureKeyword.test(trimmed)) {
 				indentLevel++;
 			}
 
 			// Restore indent after middle keywords
-			if (blockMiddle.test(trimmed)) {
+			if (!isCommentLine && blockMiddle.test(trimmed)) {
 				indentLevel++;
 			}
 
 			// Increase indent after :CASE and :OTHERWISE for their body
-			if (caseKeyword.test(trimmed)) {
+			if (!isCommentLine && caseKeyword.test(trimmed)) {
 				indentLevel++;
 			}
 
-			const openingBrackets = (sanitized.match(/[\(\{\[]/g) || []).length;
-			const closingBrackets = (sanitized.match(/[\)\}\]]/g) || []).length;
-			groupingDepth = Math.max(0, groupingDepth + openingBrackets - closingBrackets);
+			if (!isCommentLine) {
+				const openingBrackets = (sanitized.match(/[\(\{\[]/g) || []).length;
+				const closingBrackets = (sanitized.match(/[\)\}\]]/g) || []).length;
+				groupingDepth = Math.max(0, groupingDepth + openingBrackets - closingBrackets);
+			}
 
 			return indented;
 		});
@@ -636,6 +619,17 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 
 		const formatted = lines.map((line, index) => {
 			const trimmed = line.trim();
+
+			// Handle comment lines before string detection
+			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+				inMultiLineComment = true;
+			}
+			if (inMultiLineComment || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
+				if (inMultiLineComment && trimmed.endsWith(';')) {
+					inMultiLineComment = false;
+				}
+				return line;
+			}
 
 			// Track multi-line string state
 			if (!inMultiLineString) {
@@ -658,19 +652,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				return line; // Don't re-indent string content
 			}
 
-			// Track multi-line comment state
-			if (trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
-				inMultiLineComment = true;
-			}
-			if (inMultiLineComment) {
-				if (trimmed.endsWith(';')) {
-					inMultiLineComment = false;
-				}
-				return line;
-			}
-
 			// Skip empty lines or comment lines
-			if (!trimmed || trimmed.startsWith("/*") || trimmed.startsWith("*")) {
+			if (!trimmed) {
 				return line;
 			}
 
@@ -832,6 +815,10 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const keywordCase = config.get<string>(CONFIG_KEYS.FORMAT_SQL_KEYWORD_CASE, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_SQL_KEYWORD_CASE]) || "upper";
 		const indentSpaces = config.get<number>(CONFIG_KEYS.FORMAT_SQL_INDENT_SPACES, CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_SQL_INDENT_SPACES]) || 0;
 		const normalizedIndent = Math.max(0, indentSpaces);
+		const style = config.get<SqlFormattingStyle>(
+			CONFIG_KEYS.FORMAT_SQL_STYLE,
+			CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_SQL_STYLE] as SqlFormattingStyle
+		);
 		const functionPattern = ALL_SQL_FUNCTIONS.join("|");
 		if (!functionPattern) {
 			return text;
@@ -843,51 +830,10 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			if (typeof literal !== "string" || typeof content !== "string") {
 				return match;
 			}
-			const formattedContent = this.formatSqlContent(content, keywordCase, normalizedIndent);
+			const formattedContent = formatSqlWithStyleImpl(content, style || "canonicalCompact", keywordCase, normalizedIndent);
 			const formattedLiteral = `"${formattedContent}"`;
 			return match.replace(literal, formattedLiteral);
 		});
-	}
-
-	private formatSqlContent(content: string, keywordCase: string, indentSpaces: number): string {
-		let sql = content.replace(/\r\n/g, "\n").trim();
-		if (!sql) {
-			return content.trim();
-		}
-
-		sql = sql.replace(/\s+/g, " ");
-
-		SQL_CLAUSE_KEYWORDS.forEach(keyword => {
-			const pattern = keyword.replace(/\s+/g, "\\s+");
-			const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
-			sql = sql.replace(clauseRegex, (matchText, clause) => {
-				void matchText;
-				return `\n${this.applySqlKeywordCase(keyword, keywordCase, clause)}`;
-			});
-		});
-
-		sql = sql.replace(/\s+(AND|OR)\b/gi, (matchText, clause) => {
-			void matchText;
-			return `\n${this.applySqlKeywordCase(clause, keywordCase, clause)}`;
-		});
-
-		const keywordRegex = new RegExp(`\\b(${SQL_GENERAL_KEYWORDS.join("|")})\\b`, "gi");
-		sql = sql.replace(keywordRegex, match => this.applySqlKeywordCase(match.toUpperCase(), keywordCase, match));
-
-		const indentUnit = indentSpaces > 0 ? " ".repeat(indentSpaces) : "";
-		const doubleIndent = indentUnit + indentUnit;
-
-		const lines = sql.split('\n').map(line => line.trim()).filter((line, index, arr) => !(line === "" && index === arr.length - 1));
-		return lines.map((line, index) => {
-			if (index === 0) {
-				return line;
-			}
-			const upper = line.toUpperCase();
-			if (upper.startsWith("AND") || upper.startsWith("OR")) {
-				return (doubleIndent || indentUnit) + line;
-			}
-			return indentUnit + line;
-		}).join('\n');
 	}
 
 	private applySqlKeywordCase(keyword: string, style: string, original?: string): string {

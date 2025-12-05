@@ -334,8 +334,10 @@ export interface MockFormattingOptions {
 
 export class MockWorkspaceConfiguration {
 	private values: Map<string, any> = new Map();
+	private section: string;
 
-	constructor(defaults?: Record<string, any>) {
+	constructor(defaults?: Record<string, any>, section: string = 'ssl') {
+		this.section = section;
 		if (defaults) {
 			Object.entries(defaults).forEach(([key, value]) => {
 				this.values.set(key, value);
@@ -344,6 +346,12 @@ export class MockWorkspaceConfiguration {
 	}
 
 	get<T>(key: string, defaultValue?: T): T {
+		// Try with section prefix first (e.g., "ssl.format.indentStyle")
+		const fullKey = `${this.section}.${key}`;
+		if (this.values.has(fullKey)) {
+			return this.values.get(fullKey) as T;
+		}
+		// Fall back to direct key lookup
 		if (this.values.has(key)) {
 			return this.values.get(key) as T;
 		}
@@ -355,7 +363,8 @@ export class MockWorkspaceConfiguration {
 	}
 
 	has(key: string): boolean {
-		return this.values.has(key);
+		const fullKey = `${this.section}.${key}`;
+		return this.values.has(fullKey) || this.values.has(key);
 	}
 }
 
@@ -465,6 +474,7 @@ export function createSSLConfig(overrides?: Record<string, any>): MockWorkspaceC
 		'ssl.format.sql.enabled': false,
 		'ssl.format.sql.keywordCase': 'upper',
 		'ssl.format.sql.indentSpaces': 4,
+		'ssl.format.sql.style': 'canonicalCompact',
 		'ssl.globals': [],
 		'ssl.documentNamespaces': {},
 		'ssl.maxNumberOfProblems': 100,
@@ -473,6 +483,16 @@ export function createSSLConfig(overrides?: Record<string, any>): MockWorkspaceC
 		'ssl.naming.hungarianNotation.severity': 'warn',
 		'ssl.styleGuide.limitBlockDepth': 4,
 		'ssl.styleGuide.maxParamsPerProcedure': 8,
+		'ssl.intellisense.enabled': true,
+		'ssl.intellisense.inlayHints.enabled': true,
+		'ssl.intellisense.inlayHints.parameterNames': true,
+		'ssl.intellisense.inlayHints.showOnActiveLineOnly': false,
+		'ssl.intellisense.completion.enableKeywords': true,
+		'ssl.intellisense.completion.enableBuiltinFunctions': true,
+		'ssl.intellisense.completion.enableBuiltinClasses': true,
+		'ssl.intellisense.completion.enableSnippets': true,
+		'ssl.intellisense.customFunctions': [],
+		'ssl.intellisense.customClasses': [],
 		'ssl.security.preventSqlInjection': true,
 		'ssl.security.requireParameterizedQueries': true,
 		...overrides
