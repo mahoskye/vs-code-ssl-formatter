@@ -1,8 +1,18 @@
 import * as vscode from "vscode";
+import { PATTERNS } from "./constants/patterns";
+
+/**
+ * Represents a procedure's scope in the document
+ */
+interface ProcedureScope {
+	name: string;
+	startLine: number;
+	endLine: number;
+}
 
 /**
  * SSL Rename Provider
- * Provides symbol renaming functionality with validation
+ * Provides symbol renaming functionality with validation and scope awareness
  */
 export class SSLRenameProvider implements vscode.RenameProvider {
 
@@ -14,6 +24,11 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 		const range = document.getWordRangeAtPosition(position);
 		if (!range) {
 			return null;
+		}
+
+		// Don't allow renaming inside strings or comments
+		if (this.isInString(document, position) || this.isInComment(document, position.line, position.character)) {
+			throw new Error("Cannot rename inside strings or comments");
 		}
 
 		// Validate that the symbol at this position can be renamed
@@ -66,10 +81,21 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 		const text = document.getText();
 		const lines = text.split("\n");
 
-		// Find all occurrences of the old name
+		// Determine the scope of the symbol being renamed
+		const scope = this.findScopeAtPosition(lines, position.line);
+
+		// Check if this is a procedure name being renamed
+		const isProcedureRename = this.isProcedureName(lines, position.line, oldName);
+
+		// Find all occurrences of the old name within the appropriate scope
 		const wordPattern = new RegExp(`\\b${this.escapeRegex(oldName)}\\b`, "g");
 
 		for (let i = 0; i < lines.length; i++) {
+			// Skip lines outside the scope (unless renaming a procedure itself)
+			if (!isProcedureRename && scope && (i < scope.startLine || i > scope.endLine)) {
+				continue;
+			}
+
 			const line = lines[i];
 			let match: RegExpExecArray | null;
 
@@ -77,13 +103,23 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 			wordPattern.lastIndex = 0;
 
 			while ((match = wordPattern.exec(line)) !== null) {
+				const charPos = match.index;
+
 				// Skip if in comment
-				if (this.isInComment(document, i, match.index)) {
+				if (this.isInComment(document, i, charPos)) {
 					continue;
 				}
 
-				const startPos = new vscode.Position(i, match.index);
-				const endPos = new vscode.Position(i, match.index + oldName.length);
+				// Check if in string literal
+				if (this.isInStringAtPosition(line, charPos)) {
+					// Exception: Allow renaming SQL parameters like ?varName?
+					if (!this.isSqlParameter(line, charPos, oldName)) {
+						continue;
+					}
+				}
+
+				const startPos = new vscode.Position(i, charPos);
+				const endPos = new vscode.Position(i, charPos + oldName.length);
 				const replaceRange = new vscode.Range(startPos, endPos);
 
 				edit.replace(document.uri, replaceRange, newName);
@@ -91,6 +127,109 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 		}
 
 		return edit;
+	}
+
+	/**
+	 * Find all procedure scopes in the document
+	 */
+	private findAllProcedureScopes(lines: string[]): ProcedureScope[] {
+		const scopes: ProcedureScope[] = [];
+		let currentProcedure: { name: string; startLine: number } | null = null;
+
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			const trimmed = line.trim();
+
+			const procMatch = trimmed.match(PATTERNS.PROCEDURE_DEFINITION);
+			if (procMatch) {
+				currentProcedure = { name: procMatch[1], startLine: i };
+			}
+
+			if (PATTERNS.PROCEDURE_END.test(trimmed) && currentProcedure) {
+				scopes.push({
+					name: currentProcedure.name,
+					startLine: currentProcedure.startLine,
+					endLine: i
+				});
+				currentProcedure = null;
+			}
+		}
+
+		return scopes;
+	}
+
+	/**
+	 * Find the scope (procedure) containing the given line
+	 * Returns null if the line is in global scope
+	 */
+	private findScopeAtPosition(lines: string[], lineNumber: number): ProcedureScope | null {
+		const scopes = this.findAllProcedureScopes(lines);
+
+		for (const scope of scopes) {
+			if (lineNumber >= scope.startLine && lineNumber <= scope.endLine) {
+				return scope;
+			}
+		}
+
+		return null; // Global scope
+	}
+
+	/**
+	 * Check if the word at the given line is a procedure name definition
+	 */
+	private isProcedureName(lines: string[], lineNumber: number, word: string): boolean {
+		const line = lines[lineNumber];
+		const match = line.match(PATTERNS.PROCEDURE_DEFINITION);
+		return match !== null && match[1].toLowerCase() === word.toLowerCase();
+	}
+
+	/**
+	 * Check if a position is inside a string literal (single line check)
+	 */
+	private isInStringAtPosition(line: string, charPosition: number): boolean {
+		let inString = false;
+		let stringChar: string | null = null;
+
+		for (let i = 0; i < charPosition; i++) {
+			const char = line[i];
+
+			if (!inString && (char === '"' || char === "'" || char === '[')) {
+				inString = true;
+				stringChar = char === '[' ? ']' : char;
+			} else if (inString && char === stringChar) {
+				inString = false;
+				stringChar = null;
+			}
+		}
+
+		return inString;
+	}
+
+	/**
+	 * Check if a position is inside a string literal (using document position)
+	 */
+	private isInString(document: vscode.TextDocument, position: vscode.Position): boolean {
+		const line = document.lineAt(position.line).text;
+		return this.isInStringAtPosition(line, position.character);
+	}
+
+	/**
+	 * Check if the word at the given position is a SQL parameter placeholder (?varName?)
+	 * SQL parameters should be renamed even when inside string literals
+	 */
+	private isSqlParameter(line: string, charPosition: number, word: string): boolean {
+		// Check if there's a ? immediately before the word
+		if (charPosition === 0 || line[charPosition - 1] !== '?') {
+			return false;
+		}
+
+		// Check if there's a ? immediately after the word
+		const endPosition = charPosition + word.length;
+		if (endPosition >= line.length || line[endPosition] !== '?') {
+			return false;
+		}
+
+		return true;
 	}
 
 	private isKeyword(word: string): boolean {

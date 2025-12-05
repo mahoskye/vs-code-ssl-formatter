@@ -164,7 +164,39 @@ export class MockTextDocument {
 	}
 
 	getWordRangeAtPosition(position: MockPosition): MockRange | undefined {
-		return undefined;
+		const line = this.lineAt(position.line).text;
+		if (!line) {
+			return undefined;
+		}
+
+		const isWordChar = (char: string) => /[A-Za-z0-9_]/.test(char);
+		let start = position.character;
+		let end = position.character;
+
+		if (!isWordChar(line[start])) {
+			if (start > 0 && isWordChar(line[start - 1])) {
+				start -= 1;
+				end -= 1;
+			} else {
+				return undefined;
+			}
+		}
+
+		while (start > 0 && isWordChar(line[start - 1])) {
+			start--;
+		}
+		while (end < line.length && isWordChar(line[end])) {
+			end++;
+		}
+
+		if (start === end) {
+			return undefined;
+		}
+
+		return new MockRange(
+			new MockPosition(position.line, start),
+			new MockPosition(position.line, end)
+		);
 	}
 
 	validateRange(range: MockRange): MockRange {
@@ -198,6 +230,101 @@ export class MockTextEdit {
 		return new MockTextEdit(range, '');
 	}
 }
+
+export class MockLocation {
+	constructor(
+		public uri: MockUri,
+		public range: MockRange
+	) {}
+}
+
+export class MockWorkspaceEdit {
+	public _edits: Map<MockUri, { range: MockRange; newText: string }[]> = new Map();
+
+	replace(uri: MockUri, range: MockRange, newText: string): void {
+		if (!this._edits.has(uri)) {
+			this._edits.set(uri, []);
+		}
+		this._edits.get(uri)!.push({ range, newText });
+	}
+
+	insert(uri: MockUri, position: MockPosition, newText: string): void {
+		const range = new MockRange(position, position);
+		this.replace(uri, range, newText);
+	}
+
+	delete(uri: MockUri, range: MockRange): void {
+		this.replace(uri, range, '');
+	}
+
+	has(uri: MockUri): boolean {
+		return this._edits.has(uri);
+	}
+
+	entries(): IterableIterator<[MockUri, { range: MockRange; newText: string }[]]> {
+		return this._edits.entries();
+	}
+}
+
+export class MockMarkdownString {
+	private content = '';
+
+	appendMarkdown(text: string): void {
+		this.content += text;
+	}
+
+	appendCodeblock(code: string, _language?: string): void {
+		this.content += '\n' + code + '\n';
+	}
+
+	toString(): string {
+		return this.content;
+	}
+}
+
+export class MockHover {
+	constructor(
+		public contents: MockMarkdownString,
+		public range?: MockRange
+	) {}
+}
+
+export class MockEventEmitter<T = void> {
+	private listeners: Array<(e: T) => unknown> = [];
+	public readonly event = (listener: (e: T) => unknown) => {
+		this.listeners.push(listener);
+		return { dispose: () => this.off(listener) };
+	};
+
+	private off(listener: (e: T) => unknown): void {
+		const index = this.listeners.indexOf(listener);
+		if (index >= 0) {
+			this.listeners.splice(index, 1);
+		}
+	}
+
+	fire(data?: T): void {
+		this.listeners.slice().forEach(listener => listener(data as T));
+	}
+
+	dispose(): void {
+		this.listeners = [];
+	}
+}
+
+export class MockInlayHint {
+	public paddingRight?: boolean;
+
+	constructor(
+		public position: MockPosition,
+		public label: string,
+		public kind?: number
+	) {}
+}
+
+export const MockInlayHintKind = {
+	Parameter: 0
+} as const;
 
 export interface MockFormattingOptions {
 	tabSize: number;
@@ -333,9 +460,13 @@ export function createSSLConfig(overrides?: Record<string, any>): MockWorkspaceC
 	const defaults = {
 		'ssl.format.indentStyle': 'tab',
 		'ssl.format.indentWidth': 1,
-		'ssl.format.keywordCase': 'upper',
 		'ssl.format.builtinFunctionCase': 'PascalCase',
 		'ssl.format.trimTrailingWhitespace': true,
+		'ssl.format.sql.enabled': false,
+		'ssl.format.sql.keywordCase': 'upper',
+		'ssl.format.sql.indentSpaces': 4,
+		'ssl.globals': [],
+		'ssl.documentNamespaces': {},
 		'ssl.maxNumberOfProblems': 100,
 		'ssl.strictStyleGuideMode': false,
 		'ssl.naming.hungarianNotation.enabled': true,
@@ -349,3 +480,75 @@ export function createSSLConfig(overrides?: Record<string, any>): MockWorkspaceC
 
 	return new MockWorkspaceConfiguration(defaults);
 }
+
+/**
+ * Mock SymbolKind enum
+ */
+export enum MockSymbolKind {
+	File = 0,
+	Module = 1,
+	Namespace = 2,
+	Package = 3,
+	Class = 4,
+	Method = 5,
+	Property = 6,
+	Field = 7,
+	Constructor = 8,
+	Enum = 9,
+	Interface = 10,
+	Function = 11,
+	Variable = 12,
+	Constant = 13,
+	String = 14,
+	Number = 15,
+	Boolean = 16,
+	Array = 17,
+	Object = 18,
+	Key = 19,
+	Null = 20,
+	EnumMember = 21,
+	Struct = 22,
+	Event = 23,
+	Operator = 24,
+	TypeParameter = 25
+}
+
+/**
+ * Mock DocumentSymbol class
+ */
+export class MockDocumentSymbol {
+	public children: MockDocumentSymbol[] = [];
+
+	constructor(
+		public name: string,
+		public detail: string,
+		public kind: MockSymbolKind,
+		public range: MockRange,
+	public selectionRange: MockRange
+	) {}
+}
+
+export class MockSnippetString {
+	constructor(public value: string) {}
+}
+
+export class MockCompletionItem {
+	public detail?: string;
+	public documentation?: unknown;
+	public insertText?: unknown;
+	public filterText?: string;
+
+	constructor(
+		public label: string,
+		public kind?: number
+	) {}
+}
+
+export const MockCompletionItemKind = {
+	Keyword: 0,
+	Function: 1,
+	Class: 2,
+	Method: 3,
+	Property: 4,
+	Snippet: 5
+} as const;

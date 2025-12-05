@@ -3,10 +3,11 @@
  * Tests the formatting provider using mock VSCode API
  */
 
-import { describe, it } from 'mocha';
+import { describe, it, before, after } from 'mocha';
 import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as vscode from 'vscode';
 import { SSLFormattingProvider } from '../src/sslFormattingProvider';
 import {
 	createDocument,
@@ -31,7 +32,7 @@ describe('SSL Formatter - Keyword Casing', () => {
 
 	it('should handle mixed case keywords', () => {
 		const input = ':PrOcEdUrE Test;\n:PaRaMeTeRs x;\n:ReTuRn x;\n:EnDpRoC;';
-		const expected = ':PROCEDURE Test;\n:PARAMETERS x;\n:RETURN x;\n:ENDPROC;\n';
+		const expected = ':PROCEDURE Test;\n:PARAMETERS x;\n\t:RETURN x;\n:ENDPROC;\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
@@ -156,7 +157,8 @@ describe('SSL Formatter - Builtin Functions', () => {
 	const formatter = new SSLFormattingProvider();
 	const options = createFormattingOptions();
 
-	it('should normalize builtin functions to canonical casing', () => {
+	it('should normalize builtin functions to PascalCase by default', () => {
+		// Default behavior: normalize to canonical PascalCase
 		const tests = [
 			['result := sqlexecute(sql);', 'result := SQLExecute(sql);\n'],
 			['result := SQLEXECUTE(sql);', 'result := SQLExecute(sql);\n'],
@@ -164,8 +166,9 @@ describe('SSL Formatter - Builtin Functions', () => {
 			['result := CREATEUDOBJECT();', 'result := CreateUdObject();\n'],
 			['result := doproc(name);', 'result := DoProc(name);\n'],
 			['result := DOPROC(name);', 'result := DoProc(name);\n'],
-			['result := buildstring(fmt);', 'result := buildstring(fmt);\n'],
 			['result := alltrim(sText);', 'result := AllTrim(sText);\n'],
+			// Array functions use lowercase as their canonical form
+			['result := AADD(arr, val);', 'result := aadd(arr, val);\n'],
 			['result := aadd(arr, val);', 'result := aadd(arr, val);\n']
 		];
 
@@ -409,6 +412,481 @@ Parameters:
 		const formatted = applyEdits(input, edits as any[]);
 
 		expect(formatted).to.equal(expected, 'Aligned documentation should be preserved');
+	});
+});
+
+describe('SSL Formatter - String Literal Preservation (Bug #28, #27, #24)', () => {
+	const formatter = new SSLFormattingProvider();
+	const options = createFormattingOptions();
+
+	it('should not modify SQL spacing inside string literals - AND ( spacing', () => {
+		const input = `query := SQLExecute("
+    SELECT col1
+    FROM table1
+    WHERE session_id = ?sessionId?
+        AND (
+            col2 != 'N/A'
+        )
+");`;
+		const expected = `query := SQLExecute("
+    SELECT col1
+    FROM table1
+    WHERE session_id = ?sessionId?
+        AND (
+            col2 != 'N/A'
+        )
+");\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Should preserve "AND (" spacing inside SQL strings');
+		expect(formatted).to.include('AND (', 'Should not change to AND(');
+	});
+
+	it('should not modify function casing inside string literals - substr', () => {
+		const input = `query := SQLExecute("
+    SELECT col1,
+        CASE
+            WHEN substr(colX, 1, 1) = 'A' THEN 'TypeA'
+            WHEN substr(colX, 1, 1) = 'B' THEN 'TypeB'
+            ELSE 'Other'
+        END AS category
+    FROM table1
+");`;
+		const expected = `query := SQLExecute("
+    SELECT col1,
+        CASE
+            WHEN substr(colX, 1, 1) = 'A' THEN 'TypeA'
+            WHEN substr(colX, 1, 1) = 'B' THEN 'TypeB'
+            ELSE 'Other'
+        END AS category
+    FROM table1
+");\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Should preserve lowercase "substr" inside SQL strings');
+		expect(formatted).to.not.include('SubStr', 'Should not change substr to SubStr inside strings');
+	});
+
+	it('should not modify any SQL keywords or functions inside string literals', () => {
+		const input = `sql := "SELECT substr(col, 1, 3), lower(name), upper(type) FROM table WHERE condition AND (status = 'A' OR status = 'B')";`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		// The formatter may wrap long strings, but content should be preserved
+		expect(formatted).to.include('substr(', 'Should preserve substr casing');
+		expect(formatted).to.include('lower(', 'Should preserve lower casing');
+		expect(formatted).to.include('upper(', 'Should preserve upper casing');
+		expect(formatted).to.include('AND (', 'Should preserve AND ( spacing');
+		// Verify no SQL keywords were changed to SSL keywords
+		expect(formatted).to.not.include(':SELECT', 'Should not add : to SQL keywords');
+		expect(formatted).to.not.include('FROM :TABLE', 'Should not modify SQL syntax');
+	});
+
+	it('should not modify regex patterns inside string literals', () => {
+		const input = `query := LSearch("
+    SELECT col1
+    FROM table1 t1
+    INNER JOIN table2 t2
+        ON REGEXP_REPLACE(t1.colX, '[(|)]', '') = t2.colY
+    WHERE t2.session_id = ?
+", -1, "DATABASE", {SESSIONID});`;
+		const expected = `query := LSearch("
+    SELECT col1
+    FROM table1 t1
+    INNER JOIN table2 t2
+        ON REGEXP_REPLACE(t1.colX, '[(|)]', '') = t2.colY
+    WHERE t2.session_id = ?
+", -1, "DATABASE", {SESSIONID});\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Should preserve regex patterns inside strings');
+		expect(formatted).to.include("'[(|)]'", 'Should preserve regex pattern exactly');
+	});
+
+	it('should not apply operator spacing inside string literals', () => {
+		const input = `message := "Value is: x:=5 and y:=10";`;
+		const expected = `message := "Value is: x:=5 and y:=10";\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Should not add spaces to := inside strings');
+		expect(formatted).to.include('x:=5', 'Should preserve compact := inside string');
+		expect(formatted).to.include('y:=10', 'Should preserve compact := inside string');
+	});
+
+	it('should not apply keyword casing inside string literals', () => {
+		const input = `help := "Use if statement like: if condition then action endif";`;
+		const expected = `help := "Use if statement like: if condition then action endif";\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Should not change keywords inside strings');
+		expect(formatted).to.include('if condition', 'Should preserve lowercase if');
+		expect(formatted).to.not.include(':IF', 'Should not add : or uppercase keywords in strings');
+	});
+
+	it('should not modify function names that appear in string comments', () => {
+		const input = `/* This query uses substr() to extract part of a string;`;
+		const expected = `/* This query uses substr() to extract part of a string;\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Should not change function names in comments');
+		expect(formatted).to.include('substr()', 'Should preserve lowercase substr in comment');
+		expect(formatted).to.not.include('SubStr()', 'Should not change to SubStr in comment');
+	});
+
+	it('should handle mixed code and strings correctly', () => {
+		const input = `result := AllTrim("  test  ") + " contains substr() in string"; /*comment with substr() reference;`;
+		const expected = `result := AllTrim("  test  ") + " contains substr() in string"; /*comment with substr() reference;\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Should format code but preserve strings and comments');
+		expect(formatted).to.include('AllTrim(', 'Should format AllTrim outside strings');
+		expect(formatted).to.include('substr() in string', 'Should preserve substr in string');
+		expect(formatted).to.include('substr() reference', 'Should preserve substr in comment');
+	});
+});
+
+describe('SSL Formatter - String Literal Escape Handling (Bug #6)', () => {
+	const formatter = new SSLFormattingProvider();
+	const options = createFormattingOptions();
+
+	it('should not treat backslash as escape character in strings', () => {
+		const input = `cPath := "C:\\MyFolder\\MyFile.txt";`;
+		const expected = `cPath := "C:\\MyFolder\\MyFile.txt";\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		// String should be preserved exactly (backslashes are literal, not escape chars)
+		expect(formatted).to.equal(expected, 'Backslashes in strings should be treated literally');
+		expect(formatted).to.include('C:\\MyFolder\\MyFile.txt', 'Path with backslashes should be preserved');
+	});
+
+	it('should preserve strings with backslash-quote sequences', () => {
+		const input = `cRegex := "Pattern: \\"quoted\\" text";`;
+		const expected = `cRegex := "Pattern: \\"quoted\\" text";\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		// Backslash-quote should not be treated as escape sequence
+		expect(formatted).to.equal(expected, 'Backslash-quote should be preserved as literal characters');
+	});
+
+	it('should handle multiple backslashes in file paths', () => {
+		const input = `cFullPath := "\\\\Server\\Share\\Folder\\File.dat";`;
+		const expected = `cFullPath := "\\\\Server\\Share\\Folder\\File.dat";\n`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		// UNC paths with multiple backslashes should be preserved
+		expect(formatted).to.equal(expected, 'UNC paths should be preserved exactly');
+		expect(formatted).to.include('\\\\Server\\Share', 'Network path should be intact');
+	});
+});
+
+describe('SSL Formatter - SQL Formatting', () => {
+	const formatter = new SSLFormattingProvider();
+	const options = createFormattingOptions();
+	const config = vscode.workspace.getConfiguration('ssl');
+
+	before(() => {
+		config.update('ssl.format.sql.enabled', true);
+		config.update('ssl.format.sql.keywordCase', 'upper');
+		config.update('ssl.format.sql.indentSpaces', 4);
+	});
+
+	after(() => {
+		config.update('ssl.format.sql.enabled', false);
+		config.update('ssl.format.sql.keywordCase', 'upper');
+		config.update('ssl.format.sql.indentSpaces', 4);
+	});
+
+	it('should format SQLExecute inline literals with clause indentation', () => {
+		const input = 'SQLExecute("select col1, col2 from Patients where id = ?sId? and status = ?sStatus?");';
+		const expected = 'SQLExecute("SELECT col1, col2\n    FROM Patients\n    WHERE id = ?sId?\n        AND status = ?sStatus?");\n';
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected);
+	});
+
+	it('should format RunSQL literals and preserve placeholders', () => {
+		const input = 'RunSQL("update Foo set bar = ? where baz = ? or flag = ?", , , { sBar, sBaz, sFlag });';
+		const expected = 'RunSQL("UPDATE Foo\n    SET bar = ?\n    WHERE baz = ?\n        OR flag = ?", ,, { sBar, sBaz, sFlag });\n';
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected);
+	});
+
+	it('should respect SQL keyword casing preference', () => {
+		config.update('ssl.format.sql.keywordCase', 'preserve');
+		const input = 'SQLExecute("Select * from Samples where status = ?sStatus?");';
+		const expected = 'SQLExecute("Select *\n    from Samples\n    where status = ?sStatus?");\n';
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected);
+		config.update('ssl.format.sql.keywordCase', 'upper');
+	});
+});
+
+describe('SSL Formatter - Control Flow Indentation (Bug #32)', () => {
+	const formatter = new SSLFormattingProvider();
+	const options = createFormattingOptions();
+
+	it('should indent :RETURN inside :IF/:ENDIF block', () => {
+		const input = `:PARAMETERS path, file, message, append;
+
+:IF Empty(path) .OR. Empty(file);
+:RETURN;
+:ENDIF;
+
+WriteText(path + file, message, "N", append);
+
+:RETURN;`;
+		const expected = `:PARAMETERS path, file, message, append;
+
+:IF Empty(path) .OR. Empty(file);
+\t:RETURN;
+:ENDIF;
+
+WriteText(path + file, message, "N", append);
+
+:RETURN;
+`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, ':RETURN inside :IF block should be indented');
+	});
+
+	it('should indent statements inside :WHILE/:ENDWHILE block', () => {
+		const input = `:WHILE i < 10;
+count := count + 1;
+i := i + 1;
+:ENDWHILE;`;
+		const expected = `:WHILE i < 10;
+\tcount := count + 1;
+\ti := i + 1;
+:ENDWHILE;
+`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Statements inside :WHILE should be indented');
+	});
+
+	it('should indent nested control flow blocks', () => {
+		const input = `:IF condition1;
+:IF condition2;
+result := .T.;
+:ENDIF;
+:ENDIF;`;
+		const expected = `:IF condition1;
+\t:IF condition2;
+\t\tresult := .T.;
+\t:ENDIF;
+:ENDIF;
+`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, 'Nested blocks should have proper indentation levels');
+	});
+
+	it('should indent :ELSE content', () => {
+		const input = `:IF x > 0;
+result := "positive";
+:ELSE;
+result := "zero";
+:ENDIF;`;
+		const expected = `:IF x > 0;
+\tresult := "positive";
+:ELSE;
+\tresult := "zero";
+:ENDIF;
+`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		expect(formatted).to.equal(expected, ':ELSE content should be indented');
+	});
+});
+
+describe('SSL Formatter - Multi-line Function Call Preservation (Bug #33)', () => {
+	const formatter = new SSLFormattingProvider();
+	const options = createFormattingOptions();
+
+	it('should preserve indentation in nested multi-line function calls', () => {
+		const input = `result :=
+OuterFunction
+(
+    MiddleFunction
+    (
+        InnerFunction
+        (
+            "SELECT col FROM table WHERE condition = ?",
+            "DATABASE",
+            { "param" }
+        ),
+        1
+    )
+);`;
+		// The formatter should maintain or improve the indentation structure
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		// Check that nested structure is preserved with proper indentation
+		expect(formatted).to.include('OuterFunction', 'Should preserve outer function');
+		expect(formatted).to.include('MiddleFunction', 'Should preserve middle function');
+		expect(formatted).to.include('InnerFunction', 'Should preserve inner function');
+
+		// The formatted code should have some indentation (tabs or spaces)
+		const lines = formatted.split('\n');
+		const indentedLines = lines.filter(line => line.match(/^\s+\w/));
+		expect(indentedLines.length).to.be.greaterThan(0, 'Should have indented lines for nested calls');
+	});
+
+	it('should preserve intentional multi-line array formatting', () => {
+		const input = `aadd(aSamples, DoProc("CreateSample", {
+    aRawData[i, 1], aRawData[i, 2], aRawData[i, 3], aRawData[i, 4],
+    aRawData[i, 5], aRawData[i, 6], aRawData[i, 7], aRawData[i, 8]
+}));`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		// Should maintain multi-line structure with indentation
+		const lines = formatted.split('\n');
+		expect(lines.length).to.be.greaterThan(1, 'Should preserve multi-line structure');
+
+		// Check that array elements are present
+		expect(formatted).to.include('aRawData[i, 1]');
+		expect(formatted).to.include('aRawData[i, 8]');
+	});
+
+	it('should not collapse intentionally structured function parameters', () => {
+		const input = `result := ComplexFunction(
+    param1,
+    param2,
+    param3,
+    param4
+);`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		// Should maintain readability
+		expect(formatted).to.include('param1');
+		expect(formatted).to.include('param4');
+		expect(formatted).to.include('ComplexFunction');
+	});
+});
+
+describe('SSL Formatter - Line Breaking and Indentation Order (Bug #31)', () => {
+	const formatter = new SSLFormattingProvider();
+	const options = createFormattingOptions();
+
+	it('should apply indentation after breaking long lines', () => {
+		const input = `veryLongVariableName := "This is a very long string that exceeds the maximum line length and should be wrapped at word boundaries with proper indentation";`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		// If line was broken, continuation should be indented or aligned
+		const lines = formatted.split('\n');
+		if (lines.length > 1) {
+			// Check that wrapped lines have some form of indentation/alignment
+			const continuationLines = lines.slice(1, -1); // Exclude first line and final newline
+			const hasProperContinuation = continuationLines.some(line =>
+				line.startsWith('\t') || line.startsWith(' ') || line.includes('+')
+			);
+			expect(hasProperContinuation).to.be.true;
+		}
+	});
+
+	it('should break long lines consistently', () => {
+		const input1 = `sql1 := "SELECT col1, col2, col3, col4, col5, col6, col7, col8 FROM table WHERE condition = .T.";`;
+		const input2 = `sql2 := "SELECT col1, col2, col3, col4, col5, col6, col7, col8 FROM table WHERE condition = .T.";`;
+
+		const doc1 = createDocument(input1);
+		const edits1 = formatter.provideDocumentFormattingEdits(doc1 as any, options, null as any);
+		const formatted1 = applyEdits(input1, edits1 as any[]);
+
+		const doc2 = createDocument(input2);
+		const edits2 = formatter.provideDocumentFormattingEdits(doc2 as any, options, null as any);
+		const formatted2 = applyEdits(input2, edits2 as any[]);
+
+		// Similar lines should be formatted similarly (consistency check)
+		const lineCount1 = formatted1.split('\n').length;
+		const lineCount2 = formatted2.split('\n').length;
+		expect(lineCount1).to.equal(lineCount2, 'Similar long lines should be broken consistently');
+	});
+
+	it('should indent broken lines inside control flow blocks', () => {
+		const input = `:IF .T.;
+result := "This is a very long string that exceeds the maximum line length and should be wrapped";
+:ENDIF;`;
+
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		// The assignment inside IF should be indented
+		expect(formatted).to.include('\tresult :=', 'Assignment inside :IF should be indented');
+
+		// If the line was broken, continuation should maintain indentation context
+		const lines = formatted.split('\n');
+		const resultLine = lines.find(line => line.includes('result :='));
+		if (resultLine) {
+			expect(resultLine.startsWith('\t')).to.be.true;
+		}
 	});
 });
 

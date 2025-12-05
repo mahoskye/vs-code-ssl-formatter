@@ -13,8 +13,20 @@ import {
 	MockDiagnosticSeverity,
 	MockDiagnostic,
 	MockDiagnosticCollection,
+	MockLocation,
+	MockWorkspaceEdit,
+	MockMarkdownString,
+	MockHover,
+	MockEventEmitter,
+	MockInlayHint,
+	MockInlayHintKind,
+	MockSymbolKind,
+	MockDocumentSymbol,
 	createSSLConfig,
-	MockWorkspaceConfiguration
+	MockWorkspaceConfiguration,
+	MockSnippetString,
+	MockCompletionItem,
+	MockCompletionItemKind
 } from './helpers/mockVSCode';
 
 // Create the mock vscode module
@@ -23,11 +35,37 @@ const mockVscode = {
 		configuration: createSSLConfig(),
 		getConfiguration(section?: string): MockWorkspaceConfiguration {
 			return this.configuration;
+		},
+		asRelativePath(path: string): string {
+			return path;
+		}
+	},
+	window: {
+		showErrorMessage(message: string): void {
+			// No-op for tests
+		},
+		showWarningMessage(message: string): void {
+			// No-op for tests
+		},
+		showInformationMessage(message: string): void {
+			// No-op for tests
 		}
 	},
 	Range: MockRange,
 	Position: MockPosition,
 	TextEdit: MockTextEdit,
+	WorkspaceEdit: MockWorkspaceEdit,
+	Location: MockLocation,
+	MarkdownString: MockMarkdownString,
+	Hover: MockHover,
+	CompletionItem: MockCompletionItem,
+	CompletionItemKind: MockCompletionItemKind,
+	SnippetString: MockSnippetString,
+	EventEmitter: MockEventEmitter,
+	InlayHint: MockInlayHint,
+	InlayHintKind: MockInlayHintKind,
+	DocumentSymbol: MockDocumentSymbol,
+	SymbolKind: MockSymbolKind,
 	Uri: MockUri,
 	EndOfLine: MockEndOfLine,
 	DiagnosticSeverity: MockDiagnosticSeverity,

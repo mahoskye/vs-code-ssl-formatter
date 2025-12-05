@@ -11,33 +11,59 @@
  */
 
 export function replaceOutsideStrings(line: string, pattern: RegExp, replacement: string): string {
-    const segments: { text: string; inString: boolean }[] = [];
+    const segments: { text: string; inString: boolean; inComment: boolean }[] = [];
     let current = '';
     let inString = false;
+    let inComment = false;
     let stringChar: string | null = null;
 
     for (let i = 0; i < line.length; i++) {
         const char = line[i];
-        // Handle start of string
-        if (!inString && (char === '"' || char === "'")) {
+        const nextChar = i + 1 < line.length ? line[i + 1] : '';
+
+        // Handle start of comment (/* ... syntax)
+        if (!inString && !inComment && char === '/' && nextChar === '*') {
             if (current) {
-                segments.push({ text: current, inString: false });
+                segments.push({ text: current, inString: false, inComment: false });
+                current = '';
+            }
+            inComment = true;
+            current = char + nextChar;
+            i++; // Skip the next character since we've already processed it
+            continue;
+        }
+
+        // Handle start of string (double quote, single quote, or bracket)
+        if (!inString && !inComment && (char === '"' || char === "'" || char === '[')) {
+            if (current) {
+                segments.push({ text: current, inString: false, inComment: false });
                 current = '';
             }
             inString = true;
-            stringChar = char;
+            stringChar = char === '[' ? ']' : char; // For brackets, look for closing ]
             current = char;
             continue;
         }
 
         if (inString) {
             current += char;
-            // String end detection: quote always ends the string (no escape sequences in SSL)
+            // String end detection: matching delimiter ends the string (no escape sequences in SSL)
             if (char === stringChar) {
-                segments.push({ text: current, inString: true });
+                segments.push({ text: current, inString: true, inComment: false });
                 current = '';
                 inString = false;
                 stringChar = null;
+            }
+            continue;
+        }
+
+        if (inComment) {
+            current += char;
+            // Comment end detection: semicolon ends SSL comments
+            if (char === ';') {
+                segments.push({ text: current, inString: false, inComment: true });
+                current = '';
+                inComment = false;
             }
             continue;
         }
@@ -46,11 +72,11 @@ export function replaceOutsideStrings(line: string, pattern: RegExp, replacement
     }
 
     if (current) {
-        segments.push({ text: current, inString });
+        segments.push({ text: current, inString, inComment });
     }
 
     return segments
-        .map((seg) => (seg.inString ? seg.text : seg.text.replace(pattern, replacement)))
+        .map((seg) => (seg.inString || seg.inComment ? seg.text : seg.text.replace(pattern, replacement)))
         .join('');
 }
 
@@ -79,6 +105,8 @@ function replaceImplicitStringConcatenation(line: string): string {
 export function normalizeOperatorSpacing(text: string): string {
     const lines = text.split('\n');
     let inBlockComment = false;
+    let inMultiLineString = false;
+    let stringDelimiter = '';
 
     const multiCharRep: Array<[RegExp, string]> = [
         [/\:\s*=/g, ':='],
@@ -98,6 +126,36 @@ export function normalizeOperatorSpacing(text: string): string {
     return lines
         .map((line) => {
             const trimmed = line.trim();
+
+            // Track multi-line string state
+            if (!inMultiLineString) {
+                const doubleQuoteCount = (line.match(/"/g) || []).length;
+                const singleQuoteCount = (line.match(/'/g) || []).length;
+                const bracketOpenCount = (line.match(/\[/g) || []).length;
+                const bracketCloseCount = (line.match(/\]/g) || []).length;
+
+                if (doubleQuoteCount % 2 !== 0) {
+                    inMultiLineString = true;
+                    stringDelimiter = '"';
+                } else if (singleQuoteCount % 2 !== 0) {
+                    inMultiLineString = true;
+                    stringDelimiter = "'";
+                } else if (bracketOpenCount !== bracketCloseCount) {
+                    inMultiLineString = true;
+                    stringDelimiter = ']';
+                }
+            } else {
+                const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : (stringDelimiter === "'" ? "'" : '\\]'), 'g')) || []).length;
+                if (delimiterCount % 2 !== 0 || (stringDelimiter === ']' && delimiterCount > 0)) {
+                    inMultiLineString = false;
+                    stringDelimiter = '';
+                }
+            }
+
+            if (inMultiLineString) {
+                return line; // do not modify string content
+            }
+
             // Track block comment start/end using the project's convention (/* ... ;)
             if (inBlockComment) {
                 if (trimmed.endsWith(';')) {

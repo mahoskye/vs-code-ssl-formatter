@@ -10,5 +10,5 @@
 	:OTHERWISE;
 		nResult := 0;
 	:ENDCASE;
-:RETURN nResult;
+	:RETURN nResult;
 :ENDPROC;

@@ -2,7 +2,7 @@
     "name": "vs-code-ssl-formatter",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.0.2",
+    "version": "1.1.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -16,10 +16,17 @@
         "type": "git",
         "url": "https://github.com/mahoskye/vs-code-ssl-formatter.git"
     },
+    "icon": "media/icon.png",
     "bugs": {
         "url": "https://github.com/mahoskye/vs-code-ssl-formatter/issues"
     },
     "homepage": "https://github.com/mahoskye/vs-code-ssl-formatter#readme",
+    "activationEvents": [
+        "onLanguage:ssl",
+        "onCommand:ssl.toggleComment",
+        "onCommand:ssl.configureDocumentNamespaces",
+        "onCommand:ssl.formatSql"
+    ],
     "contributes": {
         "languages": [
             {
@@ -60,6 +67,14 @@
                     "maximum": 1000,
                     "description": "Maximum number of diagnostics to report per file"
                 },
+                "ssl.globals": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Variable names that should always be treated as declared globals (Hungarian notation recommended)"
+                },
                 "ssl.format.indentStyle": {
                     "type": "string",
                     "enum": [
@@ -76,26 +91,14 @@
                     "maximum": 8,
                     "description": "Number of tabs or spaces per indent level"
                 },
-                "ssl.format.keywordCase": {
-                    "type": "string",
-                    "enum": [
-                        "preserve",
-                        "upper",
-                        "lower"
-                    ],
-                    "default": "upper",
-                    "description": "Preferred casing for SSL keywords"
-                },
                 "ssl.format.builtinFunctionCase": {
                     "type": "string",
                     "enum": [
                         "preserve",
-                        "PascalCase",
-                        "lowercase",
-                        "UPPERCASE"
+                        "PascalCase"
                     ],
                     "default": "PascalCase",
-                    "description": "Casing for built-in function names"
+                    "description": "Casing for built-in function names. PascalCase normalizes to canonical casing, preserve keeps user's choice."
                 },
                 "ssl.format.wrapLength": {
                     "type": "number",
@@ -113,6 +116,55 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Remove trailing whitespace from all lines"
+                },
+                "ssl.format.sql.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Format inline SQL string literals passed to SQLExecute/RunSQL/LSearch when true"
+                },
+                "ssl.format.sql.keywordCase": {
+                    "type": "string",
+                    "enum": [
+                        "preserve",
+                        "upper",
+                        "lower"
+                    ],
+                    "default": "upper",
+                    "description": "Preferred casing for SQL keywords when SQL formatting is enabled"
+                },
+                "ssl.format.sql.indentSpaces": {
+                    "type": "number",
+                    "default": 4,
+                    "minimum": 0,
+                    "maximum": 12,
+                    "description": "Number of spaces to indent formatted SQL clauses (ignored when SQL formatting disabled)"
+                },
+                "ssl.format.sql.style": {
+                    "type": "string",
+                    "enum": [
+                        "compact",
+                        "expanded",
+                        "hangingOperators",
+                        "knr",
+                        "knrCompact"
+                    ],
+                    "enumDescriptions": [
+                        "Compact - Single-line clauses, AND/OR inline",
+                        "Expanded - Multi-line SELECT with vertical columns",
+                        "Hanging Operators - AND/OR at line start with indent",
+                        "K&R Style - Parenthesized blocks, one column per line",
+                        "K&R Compact - Parenthesized blocks, compact SELECT"
+                    ],
+                    "default": "compact",
+                    "description": "Default SQL formatting style used by the Format SQL command"
+                },
+                "ssl.documentNamespaces": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Map namespace prefixes used in ExecFunction/DoProc to workspace-relative folders",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 },
                 "ssl.naming.hungarianNotation.enabled": {
                     "type": "boolean",
@@ -189,7 +241,62 @@
                     "description": "Trace communication with the language server"
                 }
             }
-        }
+        },
+        "commands": [
+            {
+                "command": "ssl.toggleComment",
+                "title": "SSL: Toggle Comment",
+                "category": "SSL"
+            },
+            {
+                "command": "ssl.configureDocumentNamespaces",
+                "title": "SSL: Configure Document Namespaces",
+                "category": "SSL"
+            },
+            {
+                "command": "ssl.formatSql",
+                "title": "SSL: Format SQL",
+                "category": "SSL"
+            },
+            {
+                "command": "ssl.formatSqlPickStyle",
+                "title": "SSL: Format SQL (Pick Style)",
+                "category": "SSL"
+            }
+        ],
+        "keybindings": [
+            {
+                "command": "ssl.toggleComment",
+                "key": "ctrl+/",
+                "mac": "cmd+/",
+                "when": "editorTextFocus && editorLangId == ssl"
+            }
+        ],
+        "menus": {
+            "editor/context": [
+                {
+                    "submenu": "ssl.formatSql",
+                    "group": "1_modification@99",
+                    "when": "editorLangId == ssl"
+                }
+            ],
+            "ssl.formatSql": [
+                {
+                    "command": "ssl.formatSql",
+                    "group": "1_format@1"
+                },
+                {
+                    "command": "ssl.formatSqlPickStyle",
+                    "group": "1_format@2"
+                }
+            ]
+        },
+        "submenus": [
+            {
+                "id": "ssl.formatSql",
+                "label": "Format SQL"
+            }
+        ]
     },
     "main": "./out/src/extension.js",
     "scripts": {

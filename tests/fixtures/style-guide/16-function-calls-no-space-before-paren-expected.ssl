@@ -4,5 +4,5 @@
 	nResult := Len("test");
 	nResult := Empty("value");
 	nResult := SQLExecute("SELECT *", "query", 0, 0, 0, "", "", "", 0);
-:RETURN nResult;
+	:RETURN nResult;
 :ENDPROC;

@@ -16,6 +16,12 @@ import { SSLDocumentHighlightProvider } from "./sslDocumentHighlightProvider";
 import { SSLCallHierarchyProvider } from "./sslCallHierarchyProvider";
 import { SSLInlayHintsProvider } from "./sslInlayHintsProvider";
 import { Logger } from "./utils/logger";
+import { SSL_DOCUMENT_SELECTORS } from "./utils/documentSelectors";
+import { registerCommentController } from "./sslCommentController";
+import { WorkspaceClassIndex } from "./utils/classIndex";
+import { WorkspaceProcedureIndex } from "./utils/procedureIndex";
+import { registerConfigureNamespacesCommand } from "./commands/configureNamespaces";
+import { registerFormatSqlCommand } from "./commands/formatSql";
 
 /**
  * Activates the SSL extension.
@@ -23,12 +29,23 @@ import { Logger } from "./utils/logger";
  * The extension is activated the first time the command is executed.
  * @param context The extension context provided by VS Code.
  */
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     // Initialize logger
     Logger.initialize(context);
     Logger.info("SSL extension is now active!");
 
-    const documentSelector: vscode.DocumentSelector = { language: "ssl", scheme: "file" };
+    const documentSelector = SSL_DOCUMENT_SELECTORS;
+    registerCommentController(context);
+	registerConfigureNamespacesCommand(context);
+	registerFormatSqlCommand(context);
+
+	const classIndex = new WorkspaceClassIndex();
+	context.subscriptions.push(classIndex);
+	await classIndex.initialize();
+
+	const procedureIndex = new WorkspaceProcedureIndex();
+	context.subscriptions.push(procedureIndex);
+	await procedureIndex.initialize();
 
     // Register the folding range provider for SSL language
     context.subscriptions.push(
@@ -53,14 +70,14 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.languages.registerCompletionItemProvider(
             documentSelector,
-            new SSLCompletionProvider(),
+            new SSLCompletionProvider(classIndex, procedureIndex),
             ":", ".", "(", '"', "'"
         )
     );
 
     // Register hover provider for symbol information
     context.subscriptions.push(
-        vscode.languages.registerHoverProvider(documentSelector, new SSLHoverProvider())
+        vscode.languages.registerHoverProvider(documentSelector, new SSLHoverProvider(classIndex, procedureIndex))
     );
 
     // Register diagnostic provider for code quality checks
@@ -118,12 +135,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Register definition provider for Go to Definition
     context.subscriptions.push(
-        vscode.languages.registerDefinitionProvider(documentSelector, new SSLDefinitionProvider())
+        vscode.languages.registerDefinitionProvider(documentSelector, new SSLDefinitionProvider(procedureIndex))
     );
 
     // Register reference provider for Find All References
     context.subscriptions.push(
-        vscode.languages.registerReferenceProvider(documentSelector, new SSLReferenceProvider())
+        vscode.languages.registerReferenceProvider(documentSelector, new SSLReferenceProvider(procedureIndex))
     );
 
     // Register rename provider for symbol renaming
@@ -180,7 +197,7 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     // Register inlay hints provider for parameter names
-    const inlayHintsProvider = new SSLInlayHintsProvider();
+    const inlayHintsProvider = new SSLInlayHintsProvider(procedureIndex);
     context.subscriptions.push(
         vscode.languages.registerInlayHintsProvider(documentSelector, inlayHintsProvider)
     );

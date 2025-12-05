@@ -6,5 +6,5 @@
 	:WHILE nCounter < 100;
 		nCounter := nCounter + 1;
 	:ENDWHILE;
-:RETURN nCounter;
+	:RETURN nCounter;
 :ENDPROC;

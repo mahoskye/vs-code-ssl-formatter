@@ -6,5 +6,5 @@
 	nResult := 0;
 	nResult := nResult + nValue;
 	nResult := nResult * 2;
-:RETURN nResult;
+	:RETURN nResult;
 :ENDPROC;

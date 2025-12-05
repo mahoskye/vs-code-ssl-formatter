@@ -1,0 +1,17 @@
+:PROCEDURE MainEntry;
+    :PARAMETERS nOrderId, sReportName;
+    :DECLARE sMessage;
+
+    /* Demonstrates a same-file DoProc reference;
+    DoProc("LocalHelper", { sReportName });
+
+    /* Demonstrates namespace-aware ExecFunction references;
+    ExecFunction("Reporting.GenerateReport.GenerateReport", { sReportName, nOrderId });
+    ExecFunction("Services.OrderPipeline.ProcessOrder", { nOrderId });
+:ENDPROC;
+
+:PROCEDURE LocalHelper;
+    :PARAMETERS sInput;
+    sMessage := "Preparing report for " + sInput;
+    UsrMes(sMessage);
+:ENDPROC;

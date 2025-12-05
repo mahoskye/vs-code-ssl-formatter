@@ -1,4 +1,6 @@
 import * as vscode from "vscode";
+import { ProcedureIndex, ProcedureInfo } from "./utils/procedureIndex";
+import { CONFIG_KEYS, CONFIG_DEFAULTS } from "./constants/config";
 
 /**
  * SSL Inlay Hints Provider
@@ -10,7 +12,9 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 	private _onDidChangeInlayHints = new vscode.EventEmitter<void>();
 	public readonly onDidChangeInlayHints = this._onDidChangeInlayHints.event;
 
-	constructor() {
+	constructor(
+		private readonly procedureIndex?: ProcedureIndex
+	) {
 		this.functionSignatures = new Map();
 		this.initializeFunctionSignatures();
 	}
@@ -35,37 +39,38 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 			return [];
 		}
 
-		// Only show hints for the active line
-		const editor = vscode.window.activeTextEditor;
-		if (!editor || editor.document !== document) {
-			return [];
-		}
-
-		const activeLine = editor.selection.active.line;
-		
-		// Only process if the range includes the active line
-		if (activeLine < range.start.line || activeLine > range.end.line) {
-			return [];
-		}
-
-		// Get only the active line text
-		const lineRange = document.lineAt(activeLine).range;
-		const text = document.getText(lineRange);
-		const lineStartOffset = document.offsetAt(lineRange.start);
-
+		const startLine = Math.max(0, range.start.line);
+		const endLine = Math.min(document.lineCount - 1, range.end.line);
 		const hints: vscode.InlayHint[] = [];
 
-		// Find function calls with balanced parentheses
+		for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
+			hints.push(...this.getLineInlayHints(document, lineNumber));
+		}
+
+		return hints;
+	}
+
+	private getLineInlayHints(document: vscode.TextDocument, lineNumber: number): vscode.InlayHint[] {
+		if (lineNumber < 0 || lineNumber >= document.lineCount) {
+			return [];
+		}
+
+		const line = document.lineAt(lineNumber);
+		const text = line.text;
+		if (!text.includes('(')) {
+			return [];
+		}
+
+		const lineStartOffset = document.offsetAt(line.range.start);
+		const hints: vscode.InlayHint[] = [];
 		const functionMatches = this.findFunctionCalls(text);
-		
+
 		for (const match of functionMatches) {
 			const functionName = match.name;
 			const args = match.args;
 			const index = match.index;
 
-			// Special handling for DoProc
 			if (functionName.toUpperCase() === "DOPROC") {
-				// Create a pseudo-match object for compatibility with getDoProcInlayHints
 				const regExpMatch = Object.assign([
 					match.fullMatch,
 					functionName,
@@ -75,53 +80,47 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 					input: text,
 					groups: undefined
 				}) as RegExpExecArray;
-				
+
 				const doProcHints = this.getDoProcInlayHints(document, lineStartOffset, regExpMatch);
 				hints.push(...doProcHints);
 				continue;
 			}
 
-			// Get parameter names for this function
+			if (functionName.toUpperCase() === "EXECFUNCTION") {
+				const execHintMatch = Object.assign([
+					match.fullMatch,
+					functionName,
+					args
+				], {
+					index,
+					input: text,
+					groups: undefined
+				}) as RegExpExecArray;
+				const execHints = this.getExecFunctionInlayHints(document, lineStartOffset, execHintMatch);
+				hints.push(...execHints);
+				continue;
+			}
+
 			const paramNames = this.functionSignatures.get(functionName.toUpperCase());
 			if (!paramNames) {
 				continue;
 			}
 
-			// Parse arguments
 			const argsList = this.parseArguments(args);
-
-			// Create inlay hints for each argument
-			let currentOffset = index + functionName.length + 1; // Position after function name and '('
+			let currentOffset = index + functionName.length + 1;
 
 			for (let i = 0; i < argsList.length && i < paramNames.length; i++) {
-				const arg = argsList[i].trim();
-				if (!arg) {
-					currentOffset += argsList[i].length + 1; // Include comma
-					continue;
-				}
-
-				// Calculate the position in the document using line start offset
 				const absoluteOffset = lineStartOffset + currentOffset;
-				const position = document.positionAt(absoluteOffset);
-
-				// Skip whitespace
-				const lineText = document.lineAt(position.line).text;
-				let charIndex = position.character;
-				while (charIndex < lineText.length && /\s/.test(lineText[charIndex])) {
-					charIndex++;
-				}
-
-				const hintPosition = new vscode.Position(position.line, charIndex);
+				const hintPosition = this.createHintPosition(document, absoluteOffset);
 				const hint = new vscode.InlayHint(
 					hintPosition,
 					`${paramNames[i]}:`,
 					vscode.InlayHintKind.Parameter
 				);
-
 				hint.paddingRight = true;
 				hints.push(hint);
 
-				currentOffset += argsList[i].length + 1; // Move past arg and comma
+				currentOffset += argsList[i].length + 1;
 			}
 		}
 
@@ -137,45 +136,14 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		match: RegExpExecArray
 	): vscode.InlayHint[] {
 		const hints: vscode.InlayHint[] = [];
-		const fullMatch = match[0]; // e.g., "DoProc("ValidateSample", {sSampleId, @sErrorMsg})"
-		const functionName = match[1]; // "DoProc"
-		const args = match[2]; // everything inside the parentheses
-
-		// Parse to get procedure name and extract array contents with proper brace matching
-		// Expected format: DoProc("ProcedureName", {param1, param2, param3})
-		const procNameMatch = args.match(/["']([^"']+)["']/);
-		if (!procNameMatch) {
+		const functionName = match[1];
+		const args = match[2];
+		const callInfo = this.parseProcedureCallArguments(args);
+		if (!callInfo) {
 			return hints;
 		}
 
-		const procedureName = procNameMatch[1];
-
-		// Find the opening brace and extract contents by tracking depth
-		const openBraceIndex = args.indexOf('{');
-		if (openBraceIndex === -1) {
-			return hints;
-		}
-
-		// Extract array contents with proper nested brace handling
-		let arrayContents = '';
-		let depth = 0;
-		let startIndex = openBraceIndex + 1;
-		
-		for (let i = openBraceIndex; i < args.length; i++) {
-			if (args[i] === '{') {
-				depth++;
-			} else if (args[i] === '}') {
-				depth--;
-				if (depth === 0) {
-					arrayContents = args.substring(startIndex, i);
-					break;
-				}
-			}
-		}
-
-		if (!arrayContents && depth !== 0) {
-			return hints; // Unmatched braces
-		}
+		const procedureName = callInfo.literal;
 
 		// Find the procedure parameters
 		const paramNames = this.getProcedureParameters(document, procedureName);
@@ -183,31 +151,15 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 			return hints;
 		}
 
-		// Parse the arguments inside the curly braces
-		const arrayArgs = this.parseArguments(arrayContents);
+		const arrayArgs = callInfo.rawArgs;
 
 		// Calculate offset to the start of array contents
-		let currentOffset = match.index + functionName.length + 1 + openBraceIndex + 1; // After 'DoProc(' + position + '{'
+		let currentOffset = match.index + functionName.length + 1 + callInfo.arrayStartOffset;
 		
 		// Create hints for each argument matching procedure parameters
 		for (let i = 0; i < arrayArgs.length && i < paramNames.length; i++) {
-			const arg = arrayArgs[i].trim();
-			if (!arg) {
-				currentOffset += arrayArgs[i].length + 1;
-				continue;
-			}
-
 			const absoluteOffset = lineStartOffset + currentOffset;
-			const position = document.positionAt(absoluteOffset);
-
-			// Skip whitespace to find actual argument start
-			const lineText = document.lineAt(position.line).text;
-			let charIndex = position.character;
-			while (charIndex < lineText.length && /\s/.test(lineText[charIndex])) {
-				charIndex++;
-			}
-
-			const hintPosition = new vscode.Position(position.line, charIndex);
+			const hintPosition = this.createHintPosition(document, absoluteOffset);
 			const hint = new vscode.InlayHint(
 				hintPosition,
 				`${paramNames[i]}:`,
@@ -223,10 +175,66 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		return hints;
 	}
 
+	private getExecFunctionInlayHints(
+		document: vscode.TextDocument,
+		lineStartOffset: number,
+		match: RegExpExecArray
+	): vscode.InlayHint[] {
+		if (!this.procedureIndex) {
+			return [];
+		}
+		const hints: vscode.InlayHint[] = [];
+		const functionName = match[1];
+		const args = match[2];
+		const callInfo = this.parseProcedureCallArguments(args);
+		if (!callInfo) {
+			return hints;
+		}
+
+		const targetProc = this.resolveWorkspaceProcedure(callInfo.literal);
+		if (!targetProc || !targetProc.parameters.length) {
+			return hints;
+		}
+
+		let currentOffset = match.index + functionName.length + 1 + callInfo.arrayStartOffset;
+		for (let i = 0; i < callInfo.rawArgs.length && i < targetProc.parameters.length; i++) {
+			const absoluteOffset = lineStartOffset + currentOffset;
+			const hintPosition = this.createHintPosition(document, absoluteOffset);
+			const hint = new vscode.InlayHint(
+				hintPosition,
+				`${targetProc.parameters[i]}:`,
+				vscode.InlayHintKind.Parameter
+			);
+			hint.paddingRight = true;
+			hints.push(hint);
+
+			currentOffset += callInfo.rawArgs[i].length + 1;
+		}
+
+		return hints;
+	}
+
 	/**
 	 * Get parameter names for a procedure from its definition
 	 */
 	private getProcedureParameters(document: vscode.TextDocument, procedureName: string): string[] {
+		const local = this.getLocalProcedureParameters(document, procedureName);
+		if (local.length) {
+			return local;
+		}
+
+		if (this.procedureIndex) {
+			const candidates = this.procedureIndex.getProceduresByName(procedureName);
+			const localMatch = candidates.find(info => info.uri.toString() === document.uri.toString());
+			if (localMatch && localMatch.parameters.length) {
+				return localMatch.parameters;
+			}
+		}
+
+		return [];
+	}
+
+	private getLocalProcedureParameters(document: vscode.TextDocument, procedureName: string): string[] {
 		const text = document.getText();
 		const lines = text.split('\n');
 
@@ -264,6 +272,55 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		return [];
 	}
 
+	private parseProcedureCallArguments(args: string): { literal: string; rawArgs: string[]; arrayStartOffset: number } | null {
+		const procNameMatch = args.match(/["']([^"']+)["']/);
+		if (!procNameMatch) {
+			return null;
+		}
+		const procedureLiteral = procNameMatch[1];
+		const openBraceIndex = args.indexOf('{', procNameMatch.index ?? 0);
+		if (openBraceIndex === -1) {
+			return null;
+		}
+
+		let depth = 0;
+		let arrayContents = "";
+		let startIndex = openBraceIndex + 1;
+		for (let i = openBraceIndex; i < args.length; i++) {
+			if (args[i] === '{') {
+				depth++;
+			} else if (args[i] === '}') {
+				depth--;
+				if (depth === 0) {
+					arrayContents = args.substring(startIndex, i);
+					break;
+				}
+			}
+		}
+
+		if (depth !== 0) {
+			return null;
+		}
+
+		return {
+			literal: procedureLiteral,
+			rawArgs: this.parseArguments(arrayContents),
+			arrayStartOffset: openBraceIndex + 1
+		};
+	}
+
+	private resolveWorkspaceProcedure(literal: string): ProcedureInfo | undefined {
+		if (!this.procedureIndex) {
+			return undefined;
+		}
+		const config = vscode.workspace.getConfiguration("ssl");
+		const namespaceRoots = config.get<Record<string, string>>(
+			CONFIG_KEYS.DOCUMENT_NAMESPACES,
+			CONFIG_DEFAULTS[CONFIG_KEYS.DOCUMENT_NAMESPACES] as Record<string, string>
+		) || {};
+		return this.procedureIndex.resolveProcedureLiteral(literal, namespaceRoots);
+	}
+
 	private parseArguments(argsString: string): string[] {
 		const args: string[] = [];
 		let current = "";
@@ -291,9 +348,19 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		return args;
 	}
 
+	private createHintPosition(document: vscode.TextDocument, absoluteOffset: number): vscode.Position {
+		const position = document.positionAt(absoluteOffset);
+		const lineText = document.lineAt(position.line).text;
+		let charIndex = position.character;
+		while (charIndex < lineText.length && /\s/.test(lineText[charIndex])) {
+			charIndex++;
+		}
+		return new vscode.Position(position.line, charIndex);
+	}
+
 	private initializeFunctionSignatures(): void {
 		// Initialize with common SSL function signatures
-		this.functionSignatures.set("SQLEXECUTE", ["query", "dataset", "parameters"]);
+		this.functionSignatures.set("SQLEXECUTE", ["query", "connectionName"]);
 		this.functionSignatures.set("DOPROC", ["procName", "parameters"]);
 		this.functionSignatures.set("EXECFUNCTION", ["funcName", "parameters"]);
 		this.functionSignatures.set("EMPTY", ["value"]);
@@ -317,8 +384,16 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		this.functionSignatures.set("GETSETTING", ["settingName", "defaultValue"]);
 		this.functionSignatures.set("GETUSERDATA", ["key"]);
 		this.functionSignatures.set("SETUSERDATA", ["key", "value"]);
-		this.functionSignatures.set("RUNSQL", ["query", "parameters"]);
-		this.functionSignatures.set("LSEARCH", ["query", "parameters"]);
+		this.functionSignatures.set("RUNSQL", ["query", "connectionName", "returnRecords", "parameters"]);
+		this.functionSignatures.set("LSEARCH", ["query", "maxRows", "connectionName", "parameters"]);
+		this.functionSignatures.set("LSELECT", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("LSELECT1", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("LSELECTC", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("GETDATASET", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("GETDATASETWITHSCHEMAFROMSELECT", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("GETDATASETXMLFROMSELECT", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("GETNETDATASET", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("GETDATASETEX", ["query", "connectionName", "parameters"]);
 		this.functionSignatures.set("ARRAYCALC", ["array", "expression"]);
 		this.functionSignatures.set("BUILDARRAY", ["values"]);
 		this.functionSignatures.set("ARRAYNEW", ["size"]);
@@ -335,6 +410,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 	/**
 	 * Find all function calls with balanced parentheses in the text
+	 * Excludes function calls that appear inside string literals
 	 */
 	private findFunctionCalls(text: string): Array<{ name: string; args: string; index: number; fullMatch: string }> {
 		const results: Array<{ name: string; args: string; index: number; fullMatch: string }> = [];
@@ -344,6 +420,12 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		while ((match = functionPattern.exec(text)) !== null) {
 			const functionName = match[1];
 			const startIndex = match.index;
+
+			// Skip if the function call starts inside a string literal
+			if (this.isInsideString(text, startIndex)) {
+				continue;
+			}
+
 			const openParenIndex = match.index + match[0].length - 1; // Position of '('
 
 			// Extract arguments with balanced parentheses
@@ -377,5 +459,27 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		}
 
 		return results;
+	}
+
+	/**
+	 * Check if a position in the text is inside a string literal
+	 */
+	private isInsideString(text: string, position: number): boolean {
+		let inString = false;
+		let stringChar: string | null = null;
+
+		for (let i = 0; i < position; i++) {
+			const char = text[i];
+
+			if (!inString && (char === '"' || char === "'" || char === '[')) {
+				inString = true;
+				stringChar = char === '[' ? ']' : char;
+			} else if (inString && char === stringChar) {
+				inString = false;
+				stringChar = null;
+			}
+		}
+
+		return inString;
 	}
 }
