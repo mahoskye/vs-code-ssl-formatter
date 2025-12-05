@@ -641,7 +641,8 @@ describe('SSL Formatter - SQL Formatting', () => {
 
 	it('should format SQLExecute inline literals with clause indentation', () => {
 		const input = 'SQLExecute("select col1, col2 from Patients where id = ?sId? and status = ?sStatus?");';
-		const expected = 'SQLExecute("SELECT\n    col1,\n    col2\nFROM Patients WHERE id = ?sId?\n  AND status = ?sStatus?");\n';
+		// Canonical compact: columns on same line, hanging AND
+		const expected = 'SQLExecute("SELECT col1, col2\nFROM Patients\nWHERE id = ?sId?\n  AND status = ?sStatus?");\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
@@ -652,7 +653,8 @@ describe('SSL Formatter - SQL Formatting', () => {
 
 	it('should format RunSQL literals and preserve placeholders', () => {
 		const input = 'RunSQL("update Foo set bar = ? where baz = ? or flag = ?", , , { sBar, sBaz, sFlag });';
-		const expected = 'RunSQL("UPDATE Foo SET bar = ? WHERE baz = ?\n  OR flag = ?", ,, { sBar, sBaz, sFlag });\n';
+		// Canonical compact: OR gets 7-space indent for alignment
+		const expected = 'RunSQL("UPDATE Foo SET bar = ?\nWHERE baz = ?\n       OR flag = ?", ,, { sBar, sBaz, sFlag });\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
@@ -664,7 +666,8 @@ describe('SSL Formatter - SQL Formatting', () => {
 	it('should respect SQL keyword casing preference', () => {
 		config.update('ssl.format.sql.keywordCase', 'preserve');
 		const input = 'SQLExecute("Select * from Samples where status = ?sStatus?");';
-		const expected = 'SQLExecute("Select\n    *\nfrom Samples where status = ?sStatus?");\n';
+		// Preserve case: keeps original keyword casing
+		const expected = 'SQLExecute("Select *\nfrom Samples\nwhere status = ?sStatus?");\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
@@ -909,7 +912,7 @@ describe('SSL Formatter - Style Guide Fixtures', () => {
 
 	// Skip if fixture directory doesn't exist
 	if (!fs.existsSync(fixtureDir)) {
-		it.skip('Fixture directory not found', () => {});
+		it.skip('Fixture directory not found', () => { });
 		return;
 	}
 

@@ -302,7 +302,7 @@ function formatCompactStyle(sql: string, keywordCase: string, indentSpaces: numb
 
 	// Break at major clause keywords
 	SQL_CLAUSE_KEYWORDS.forEach(keyword => {
-		if (keyword === "ON") {return;} // Keep ON on same line as JOIN in compact
+		if (keyword === "ON") { return; } // Keep ON on same line as JOIN in compact
 		const pattern = keyword.replace(/\s+/g, "\\s+");
 		const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
 		sql = sql.replace(clauseRegex, (_match, clause) => {
@@ -313,7 +313,7 @@ function formatCompactStyle(sql: string, keywordCase: string, indentSpaces: numb
 	// Keep AND/OR inline in compact mode
 	const lines = sql.split('\n').map(line => line.trim());
 	return lines.map((line, index) => {
-		if (index === 0) {return line;}
+		if (index === 0) { return line; }
 		return indent + line;
 	}).join('\n');
 }
@@ -374,12 +374,25 @@ function formatExpandedStyle(sql: string, keywordCase: string, indentSpaces: num
 
 /**
  * Canonical Compact Style - Hanging operators + JOIN breaks (default)
+ * 
+ * Format:
+ * SELECT u.id, u.name, u.email,
+ *        COUNT(o.id) AS order_count
+ * FROM users u
+ * JOIN orders o
+ *   ON o.user_id = u.id
+ * WHERE u.active = 1
+ *   AND (u.deleted_at IS NULL
+ *        OR u.deleted_at > NOW())
+ * GROUP BY u.id, u.name, u.email
+ * ORDER BY order_count DESC;
  */
 function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpaces: number): string {
-	const indent = " ".repeat(indentSpaces);
 	let result = sql;
+	const columnAlignIndent = 7; // "SELECT " length for column continuation alignment
+	const hangingIndent = 2; // For ON, AND, OR
 
-	// Break SELECT list vertically (no parentheses)
+	// Format SELECT with columns on same line where possible
 	const selectMatch = result.match(/^(SELECT\s+(?:DISTINCT\s+)?)(.*?)(?=\s+FROM\b)/i);
 	if (selectMatch) {
 		const selectKeyword = applySqlKeywordCase("SELECT", keywordCase, selectMatch[1].trim());
@@ -387,14 +400,42 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 		const distinctPart = distinctMatch ? " " + applySqlKeywordCase("DISTINCT", keywordCase, distinctMatch[0]) : "";
 		const columns = parseColumns(selectMatch[2]);
 
-		const formattedSelect = selectKeyword + distinctPart + "\n" +
-			columns.map(col => indent + col).join(",\n");
+		// Format columns with proper alignment
+		// First columns on same line as SELECT, continuation aligned to 7 spaces
+		const firstLinePrefix = selectKeyword + distinctPart + " ";
+		const continuationPrefix = " ".repeat(columnAlignIndent);
 
-		result = result.replace(selectMatch[0], formattedSelect + " ");
+		// Build column list with wrapping
+		const formattedColumns: string[] = [];
+		let currentLine = firstLinePrefix;
+		const maxLineLength = 80;
+
+		for (let i = 0; i < columns.length; i++) {
+			const col = columns[i];
+			const separator = i < columns.length - 1 ? ", " : "";
+			const addition = col + separator;
+
+			if (currentLine === firstLinePrefix) {
+				// First column always goes on first line
+				currentLine += addition;
+			} else if (currentLine.length + addition.length <= maxLineLength) {
+				// Fits on current line
+				currentLine += addition;
+			} else {
+				// Need to wrap to next line
+				formattedColumns.push(currentLine.trimEnd());
+				currentLine = continuationPrefix + addition;
+			}
+		}
+		if (currentLine.trim()) {
+			formattedColumns.push(currentLine.trimEnd());
+		}
+
+		result = result.replace(selectMatch[0], formattedColumns.join("\n") + " ");
 	}
 
-	// Break at major clauses
-	["FROM", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "GROUP BY", "ORDER BY"].forEach(keyword => {
+	// Break at major clauses - each on its own line with no indent
+	["FROM", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "WHERE", "GROUP BY", "ORDER BY"].forEach(keyword => {
 		const pattern = keyword.replace(/\s+/g, "\\s+");
 		const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
 		result = result.replace(clauseRegex, (_match, clause) => {
@@ -403,15 +444,21 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 	});
 
 	// Move ON conditions to their own indented line after JOIN
-	result = result.replace(/(JOIN[^\n]*?)\s+ON\s+(.+?)(?=\s+(WHERE|GROUP BY|ORDER BY|JOIN|INNER JOIN|LEFT JOIN|RIGHT JOIN|FULL JOIN|$))/gi,
+	result = result.replace(/((?:INNER |LEFT |RIGHT |FULL )?JOIN[^\n]*?)\s+ON\s+(.+?)(?=\n|$)/gi,
 		(_match, joinPart, condition) => {
-			return `${joinPart}\n  ${applySqlKeywordCase("ON", keywordCase, "ON")} ${condition.trim()}`;
+			return `${joinPart}\n${" ".repeat(hangingIndent)}${applySqlKeywordCase("ON", keywordCase, "ON")} ${condition.trim()}`;
 		}
 	);
 
-	// Hanging operators with two-space indent
-	result = result.replace(/\s+(AND|OR)\b/gi, (_match, op) => {
-		return `\n  ${applySqlKeywordCase(op.toUpperCase(), keywordCase, op)}`;
+	// Handle AND/OR with hanging indent (2 spaces)
+	// But for OR within parentheses, align with the clause content
+	result = result.replace(/\s+(AND)\s+/gi, (_match, op) => {
+		return `\n${" ".repeat(hangingIndent)}${applySqlKeywordCase("AND", keywordCase, op)} `;
+	});
+
+	// Handle OR within parentheses - align with clause content (7 spaces)
+	result = result.replace(/\s+(OR)\s+/gi, (_match, op) => {
+		return `\n${" ".repeat(columnAlignIndent)}${applySqlKeywordCase("OR", keywordCase, op)} `;
 	});
 
 	return result.trim();
@@ -535,13 +582,13 @@ function formatKnrStyle(sql: string, keywordCase: string, indentSpaces: number, 
 
 	// Break at major clause keywords (except ON which gets special handling)
 	["FROM", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN",
-	 "GROUP BY", "ORDER BY", "HAVING", "UNION", "UNION ALL"].forEach(keyword => {
-		const pattern = keyword.replace(/\s+/g, "\\s+");
-		const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
-		result = result.replace(clauseRegex, (_match, clause) => {
-			return `\n${applySqlKeywordCase(keyword, keywordCase, clause)}`;
+		"GROUP BY", "ORDER BY", "HAVING", "UNION", "UNION ALL"].forEach(keyword => {
+			const pattern = keyword.replace(/\s+/g, "\\s+");
+			const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
+			result = result.replace(clauseRegex, (_match, clause) => {
+				return `\n${applySqlKeywordCase(keyword, keywordCase, clause)}`;
+			});
 		});
-	});
 
 	// Handle ON with parentheses block
 	result = result.replace(/\s+ON\s+([^)]+?)(?=\s+(?:WHERE|JOIN|INNER|LEFT|RIGHT|FULL|GROUP|ORDER|HAVING|UNION|$))/gi,
@@ -601,7 +648,7 @@ function formatKnrConditions(condition: string, keywordCase: string, indent: str
 	// Add initial indent
 	const lines = result.split('\n');
 	return lines.map((line, index) => {
-		if (index === 0) {return indent + line;}
+		if (index === 0) { return indent + line; }
 		return line;
 	}).join('\n');
 }
