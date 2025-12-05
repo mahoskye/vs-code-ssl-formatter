@@ -408,22 +408,92 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 
 	/**
 	 * Get members for anonymous objects by scanning for property assignments
+	 * Also includes built-in UDObject methods and properties
 	 */
 	private getAnonymousObjectMembers(lines: string[], objectName: string): vscode.CompletionItem[] {
 		const members: vscode.CompletionItem[] = [];
 		const memberNames = new Set<string>();
 
-		// Pattern: objectName:propertyName := value
-		const memberPattern = new RegExp(`\\b${objectName}:(\\w+)\\s*:=`, 'i');
+		// Add built-in UDObject methods
+		const builtinMethods = [
+			{ name: 'AddProperty', params: '(name, value)', description: 'Dynamically add a property to the object' },
+			{ name: 'IsProperty', params: '(name)', description: 'Check if a property exists on the object' },
+			{ name: 'AddMethod', params: '(name, procedureRef)', description: 'Dynamically add a method to the object' },
+			{ name: 'IsMethod', params: '(name)', description: 'Check if a method exists on the object' },
+			{ name: 'Clone', params: '()', description: 'Create a shallow copy of the object' },
+			{ name: 'Serialize', params: '()', description: 'Convert object to string/XML representation' },
+			{ name: 'Deserialize', params: '(data)', description: 'Restore object from serialized data' }
+		];
+
+		for (const method of builtinMethods) {
+			const item = new vscode.CompletionItem(method.name, vscode.CompletionItemKind.Method);
+			item.detail = method.description;
+			item.insertText = new vscode.SnippetString(`${method.name}($1)`);
+			item.documentation = new vscode.MarkdownString(
+				`**${method.name}${method.params}**\n\n${method.description}\n\n*Built-in UDObject method*`
+			);
+			item.sortText = `0_${method.name}`; // Sort built-ins first
+			members.push(item);
+			memberNames.add(method.name.toLowerCase());
+		}
+
+		// Add built-in UDObject property
+		const xmlTypeItem = new vscode.CompletionItem('xmltype', vscode.CompletionItemKind.Property);
+		xmlTypeItem.detail = 'XML type identifier for serialization';
+		xmlTypeItem.documentation = new vscode.MarkdownString(
+			'**xmltype**\n\nXML type identifier used for serialization. Default value: `"sslexpando"`\n\n*Built-in UDObject property*'
+		);
+		xmlTypeItem.sortText = '0_xmltype';
+		members.push(xmlTypeItem);
+		memberNames.add('xmltype');
+
+		// Scan for user-defined properties: objectName:propertyName := value
+		const memberPattern = new RegExp(`\\b${objectName}:(\\w+)\\s*:=`, 'gi');
 
 		for (const line of lines) {
-			const match = line.match(memberPattern);
-			if (match) {
+			let match;
+			while ((match = memberPattern.exec(line)) !== null) {
 				const memberName = match[1];
-				if (!memberNames.has(memberName)) {
-					memberNames.add(memberName);
+				if (!memberNames.has(memberName.toLowerCase())) {
+					memberNames.add(memberName.toLowerCase());
 					const item = new vscode.CompletionItem(memberName, vscode.CompletionItemKind.Property);
-					item.detail = `Property of ${objectName}`;
+					item.detail = `User-defined property of ${objectName}`;
+					item.sortText = `1_${memberName}`; // Sort user-defined after built-ins
+					members.push(item);
+				}
+			}
+		}
+
+		// Scan for AddProperty calls: objectName:AddProperty("propName", value)
+		const addPropertyPattern = new RegExp(`\\b${objectName}:AddProperty\\s*\\(\\s*["']([^"']+)["']`, 'gi');
+
+		for (const line of lines) {
+			let match;
+			while ((match = addPropertyPattern.exec(line)) !== null) {
+				const propName = match[1];
+				if (!memberNames.has(propName.toLowerCase())) {
+					memberNames.add(propName.toLowerCase());
+					const item = new vscode.CompletionItem(propName, vscode.CompletionItemKind.Property);
+					item.detail = `Dynamic property of ${objectName} (via AddProperty)`;
+					item.sortText = `1_${propName}`;
+					members.push(item);
+				}
+			}
+		}
+
+		// Scan for AddMethod calls: objectName:AddMethod("methodName", "procedureRef")
+		const addMethodPattern = new RegExp(`\\b${objectName}:AddMethod\\s*\\(\\s*["']([^"']+)["']`, 'gi');
+
+		for (const line of lines) {
+			let match;
+			while ((match = addMethodPattern.exec(line)) !== null) {
+				const methodName = match[1];
+				if (!memberNames.has(methodName.toLowerCase())) {
+					memberNames.add(methodName.toLowerCase());
+					const item = new vscode.CompletionItem(methodName, vscode.CompletionItemKind.Method);
+					item.detail = `Dynamic method of ${objectName} (via AddMethod)`;
+					item.insertText = new vscode.SnippetString(`${methodName}($1)`);
+					item.sortText = `1_${methodName}`;
 					members.push(item);
 				}
 			}
