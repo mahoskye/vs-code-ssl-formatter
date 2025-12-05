@@ -24,7 +24,8 @@
     "activationEvents": [
         "onLanguage:ssl",
         "onCommand:ssl.toggleComment",
-        "onCommand:ssl.configureDocumentNamespaces"
+        "onCommand:ssl.configureDocumentNamespaces",
+        "onCommand:ssl.formatSql"
     ],
     "contributes": {
         "languages": [
@@ -138,6 +139,15 @@
                     "maximum": 12,
                     "description": "Number of spaces to indent formatted SQL clauses (ignored when SQL formatting disabled)"
                 },
+                "ssl.format.sql.outputStyle": {
+                    "type": "string",
+                    "enum": [
+                        "multiline",
+                        "concatenated"
+                    ],
+                    "default": "multiline",
+                    "description": "Output style for formatted SQL: 'multiline' keeps newlines within string, 'concatenated' splits into separate strings joined with +"
+                },
                 "ssl.documentNamespaces": {
                     "type": "object",
                     "default": {},
@@ -231,6 +241,11 @@
             {
                 "command": "ssl.configureDocumentNamespaces",
                 "title": "SSL: Configure Document Namespaces",
+                "category": "SSL"
+            },
+            {
+                "command": "ssl.formatSql",
+                "title": "SSL: Format SQL",
                 "category": "SSL"
             }
         ],

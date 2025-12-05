@@ -19,6 +19,7 @@ export const CONFIG_KEYS = {
     FORMAT_SQL_ENABLED: "ssl.format.sql.enabled",
     FORMAT_SQL_KEYWORD_CASE: "ssl.format.sql.keywordCase",
     FORMAT_SQL_INDENT_SPACES: "ssl.format.sql.indentSpaces",
+    FORMAT_SQL_OUTPUT_STYLE: "ssl.format.sql.outputStyle",
     DOCUMENT_NAMESPACES: "ssl.documentNamespaces",
 
     // Naming settings
@@ -59,6 +60,7 @@ export const CONFIG_DEFAULTS = {
     [CONFIG_KEYS.FORMAT_SQL_ENABLED]: false,
     [CONFIG_KEYS.FORMAT_SQL_KEYWORD_CASE]: "upper",
     [CONFIG_KEYS.FORMAT_SQL_INDENT_SPACES]: 4,
+    [CONFIG_KEYS.FORMAT_SQL_OUTPUT_STYLE]: "multiline",
     [CONFIG_KEYS.DOCUMENT_NAMESPACES]: {},
     [CONFIG_KEYS.NAMING_HUNGARIAN_ENABLED]: true,
     [CONFIG_KEYS.NAMING_HUNGARIAN_SEVERITY]: "warn",

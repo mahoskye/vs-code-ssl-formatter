@@ -21,6 +21,7 @@ import { registerCommentController } from "./sslCommentController";
 import { WorkspaceClassIndex } from "./utils/classIndex";
 import { WorkspaceProcedureIndex } from "./utils/procedureIndex";
 import { registerConfigureNamespacesCommand } from "./commands/configureNamespaces";
+import { registerFormatSqlCommand } from "./commands/formatSql";
 
 /**
  * Activates the SSL extension.
@@ -36,6 +37,7 @@ export async function activate(context: vscode.ExtensionContext) {
     const documentSelector = SSL_DOCUMENT_SELECTORS;
     registerCommentController(context);
 	registerConfigureNamespacesCommand(context);
+	registerFormatSqlCommand(context);
 
 	const classIndex = new WorkspaceClassIndex();
 	context.subscriptions.push(classIndex);
