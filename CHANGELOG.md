@@ -5,6 +5,20 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.5] - 2025-12-05
+
+### Fixed
+
+#### Document Formatter
+- **Operator Spacing**: Fixed issue where operators near string literals weren't spaced (e.g., `='VALUE'` now formats to `= 'VALUE'`)
+  - Implemented masking strategy to safely format operators without affecting string contents
+- **Unary Operator Spacing**: Fixed incorrect space insertion after unary `!` operator
+  - `! Empty` is now correctly formatted as `!Empty`
+- **Multi-line Comment Spacing**: Fixed bug where blank lines were incorrectly inserted inside multi-line comments
+- **Commented Code Protection**: SQL formatting no longer attempts to format commented-out SQL code
+- **String Literal Protection**: Fixed regression where `substr` was capitalized to `SubStr` inside string literals
+  - enhanced multi-line string state tracking in `normalizeBuiltinFunctionCase`
+
 ## [1.2.4] - 2025-12-05
 
 ### Fixed
