@@ -1,6 +1,6 @@
 /* One statement per line rule;
 :PROCEDURE TestOneStatement;
-:DECLARE nA, nB, nC;
+	:DECLARE nA, nB, nC;
 	nA := 1;
 	nB := 2;
 	nC := 3;

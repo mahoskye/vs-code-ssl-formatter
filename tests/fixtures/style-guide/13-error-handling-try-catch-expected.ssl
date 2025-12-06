@@ -1,6 +1,7 @@
 /* TRY/CATCH/FINALLY structure;
 :PROCEDURE TestTryCatch;
-:DECLARE nResult;
+	:DECLARE nResult;
+
 	:TRY;
 		nResult := SQLExecute("SELECT * FROM table", "query", 0, 0, 0, "", "", "", 0);
 	:CATCH;
@@ -8,5 +9,6 @@
 	:FINALLY;
 		/* cleanup (release resources);
 	:ENDTRY;
+
 	:RETURN nResult;
 :ENDPROC;

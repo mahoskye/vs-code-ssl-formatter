@@ -1,7 +1,8 @@
 /* Test spacing after commas;
 :PROCEDURE TestCommaSpacing;
 :PARAMETERS nA, nB, nC;
-:DECLARE nResult;
+
+	:DECLARE nResult;
 	SQLExecute("SELECT * FROM table WHERE a = ?val1? AND b = ?val2?", "query", 0, 0, 0, "",
 	           "", "", 0);
 	nResult := Max(10, 20, 30);

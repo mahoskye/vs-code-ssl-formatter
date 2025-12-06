@@ -1,6 +1,6 @@
 /* Object property access should not have spaces around colon;
 :PROCEDURE TestObjectAccess;
-:DECLARE oObject;
+	:DECLARE oObject;
 	sValue := oObject:Property;
 	sValue := oObject:Method("arg");
 	nResult := oObject:AnotherProperty;

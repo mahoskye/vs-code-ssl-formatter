@@ -1,7 +1,9 @@
 /* Test case for indentation failures;
 :PROCEDURE TestIndentation;
 :PARAMETERS nValue;
-:DECLARE nResult;
+
+	:DECLARE nResult;
+
 	/* Using spaces instead of tabs - BAD;
 	nResult := 0;
 	nResult := nResult + nValue;

@@ -10,8 +10,15 @@
  * not escape characters. A quote character always ends a string.
  */
 
-export function replaceOutsideStrings(line: string, pattern: RegExp, replacement: string): string {
-    const segments: { text: string; inString: boolean; inComment: boolean }[] = [];
+
+export interface Segment {
+    text: string;
+    inString: boolean;
+    inComment: boolean;
+}
+
+export function parseSegments(line: string): Segment[] {
+    const segments: Segment[] = [];
     let current = '';
     let inString = false;
     let inComment = false;
@@ -35,6 +42,22 @@ export function replaceOutsideStrings(line: string, pattern: RegExp, replacement
 
         // Handle start of string (double quote, single quote, or bracket)
         if (!inString && !inComment && (char === '"' || char === "'" || char === '[')) {
+            // Special check for [ - it might be array access OR string
+            // If it's array access, we treat it as code (not string start)
+            if (char === '[') {
+                // Look backwards for identifier or closing paren/bracket
+                let prevIndex = i - 1;
+                while (prevIndex >= 0 && /\s/.test(line[prevIndex])) {
+                    prevIndex--;
+                }
+                const isArrayAccess = prevIndex >= 0 && /[a-zA-Z0-9_\)\]]/.test(line[prevIndex]);
+
+                if (isArrayAccess) {
+                    current += char;
+                    continue; // Treat as normal code character
+                }
+            }
+
             if (current) {
                 segments.push({ text: current, inString: false, inComment: false });
                 current = '';
@@ -75,10 +98,39 @@ export function replaceOutsideStrings(line: string, pattern: RegExp, replacement
         segments.push({ text: current, inString, inComment });
     }
 
-    return segments
-        .map((seg) => (seg.inString || seg.inComment ? seg.text : seg.text.replace(pattern, replacement)))
-        .join('');
+    return segments;
 }
+
+export function replaceOutsideStrings(line: string, pattern: RegExp, replacement: string): string {
+    const segments = parseSegments(line);
+    const maskedSegments = segments.map((seg, i) => {
+        if (seg.inString || seg.inComment) {
+            return `__MASKED_${i}__`;
+        }
+        return seg.text;
+    });
+
+    const maskedLine = maskedSegments.join('');
+    // If the pattern doesn't match the masked line, return the original segments joined
+    if (!pattern.test(maskedLine)) {
+        return segments.map(s => s.text).join('');
+    }
+
+    // Perform replacement on masked line
+    let result = maskedLine.replace(pattern, replacement);
+
+    // Restore content
+    segments.forEach((seg, i) => {
+        if (seg.inString || seg.inComment) {
+            const placeholder = `__MASKED_${i}__`;
+            // Use global replacement for the placeholder
+            result = result.split(placeholder).join(seg.text);
+        }
+    });
+
+    return result;
+}
+
 
 /**
  * Convert implicit string concatenation to explicit with + operator
@@ -123,135 +175,188 @@ export function normalizeOperatorSpacing(text: string): string {
         [/<\s*>\s*/g, '<>'],
     ];
 
+    // Helper to process code content (clean lines or remainders)
+    const processCode = (code: string): string => {
+        // Fix missing spaces around + operators that are adjacent to strings
+        const segments = parseSegments(code);
+        for (let i = 0; i < segments.length; i++) {
+            const seg = segments[i];
+            if (!seg.inString && !seg.inComment) {
+                // Check for + at start of code segment (preceded by string)
+                if (i > 0 && segments[i - 1].inString) {
+                    if (/^\s*\+/.test(seg.text)) {
+                        seg.text = seg.text.replace(/^\s*\+\s*/, ' + ');
+                    }
+                }
+                // Check for + at end of code segment (followed by string)
+                if (i < segments.length - 1 && segments[i + 1].inString) {
+                    if (/\+\s*$/.test(seg.text)) {
+                        seg.text = seg.text.replace(/\s*\+\s*$/, ' + ');
+                    }
+                }
+            }
+        }
+        let out = segments.map(s => s.text).join('');
+
+        for (const [pat, rep] of multiCharRep) {
+            out = replaceOutsideStrings(out, pat, rep);
+        }
+
+        // Standard replacements
+        out = replaceOutsideStrings(out, /\s*:=\s*/g, ' := ');
+        out = replaceOutsideStrings(out, /\s*\+=\s*/g, ' += ');
+        out = replaceOutsideStrings(out, /\s*-=\s*/g, ' -= ');
+        out = replaceOutsideStrings(out, /\s*\*=\s*/g, ' *= ');
+        out = replaceOutsideStrings(out, /\s*\/=\s*/g, ' /= ');
+        out = replaceOutsideStrings(out, /\s*\^=\s*/g, ' ^= ');
+        out = replaceOutsideStrings(out, /\s*%=\s*/g, ' %= ');
+
+        // Expanded character set for operands to include quotes, brackets, and parameters
+        const operand = `[A-Za-z0-9_\\)\\]\\"\\'\\?]`;
+        const operandStart = `[A-Za-z0-9_\\(\\[\\"\\'\\?\\.]`;
+
+        // Arithmetic
+        out = replaceOutsideStrings(out, new RegExp(`(${operand})\\s*\\+\\s*(${operandStart})`, 'g'), '$1 + $2');
+        out = replaceOutsideStrings(out, new RegExp(`(${operand})\\s*-\\s*(${operandStart})`, 'g'), '$1 - $2');
+        out = replaceOutsideStrings(out, new RegExp(`(${operand})\\s*\\*\\s*(${operandStart})`, 'g'), '$1 * $2');
+        out = replaceOutsideStrings(out, new RegExp(`(${operand})\\s*\\/\\s*(${operandStart})`, 'g'), '$1 / $2');
+
+        out = replaceOutsideStrings(out, /\s*==\s*/g, ' == ');
+        out = replaceOutsideStrings(out, /\s*!=\s*/g, ' != ');
+        out = replaceOutsideStrings(out, /\s*<>\s*/g, ' <> ');
+        out = replaceOutsideStrings(out, /\s*<=\s*/g, ' <= ');
+        out = replaceOutsideStrings(out, /\s*>=\s*/g, ' >= ');
+
+        // Assignment / Equality
+        // Note: SSL uses = for both assignment and equality depending on context,
+        // but we handle := separately. Here we handle = used as operator.
+        out = replaceOutsideStrings(out, new RegExp(`(${operand})\\s*=\\s*(${operandStart})`, 'g'), '$1 = $2');
+
+        out = replaceOutsideStrings(out, /([^<>=])\s*<\s*([^>=])/g, '$1 < $2');
+        out = replaceOutsideStrings(out, /([^<>=])\s*>\s*([^=])/g, '$1 > $2');
+
+        out = replaceOutsideStrings(out, /\s*\.AND\.\s*/gi, ' .AND. ');
+        out = replaceOutsideStrings(out, /\s*\.OR\.\s*/gi, ' .OR. ');
+        out = replaceOutsideStrings(out, /\s*\.NOT\.\s*/gi, ' .NOT. ');
+
+        out = replaceOutsideStrings(out, /([a-zA-Z0-9_\)])\s*!/g, '$1 !');
+        out = replaceOutsideStrings(out, /!\s*([a-zA-Z0-9_\(])/g, '!$1');
+
+        out = replaceOutsideStrings(out, /\s+,/g, ',');
+        out = replaceOutsideStrings(out, /,\s*([^\s,])/g, ', $1');
+        out = out.replace(/,"/g, ', "').replace(/,'/g, ", '");
+
+        out = replaceOutsideStrings(out, /\s+;/g, ';');
+
+        out = replaceOutsideStrings(out, /([a-zA-Z0-9_])\s+\(/g, '$1(');
+
+        out = replaceOutsideStrings(out, /([a-zA-Z0-9_\)])\s*:\s*([a-zA-Z_\(])/g, '$1:$2');
+
+        const keywords = ['TO', 'FOR', 'IF', 'ELSE', 'ELSEIF', 'ENDIF', 'WHILE', 'ENDWHILE',
+            'NEXT', 'STEP', 'CASE', 'BEGINCASE', 'ENDCASE', 'OTHERWISE',
+            'TRY', 'CATCH', 'FINALLY', 'ENDTRY', 'PROCEDURE', 'ENDPROC',
+            'PARAMETERS', 'DECLARE', 'RETURN', 'PUBLIC', 'DEFAULT'];
+        for (const kw of keywords) {
+            const kwPattern = new RegExp(`(\\w):(${kw})\\b`, 'g');
+            out = replaceOutsideStrings(out, kwPattern, `$1 :$2`);
+        }
+
+        // Collapse empty braces
+        out = replaceOutsideStrings(out, /\{\s+\}/g, '{}');
+
+        out = replaceImplicitStringConcatenation(out);
+        return out;
+    };
+
+    // Helper to update multi-line string state based on line content
+    const updateState = (text: string) => {
+        const segments = parseSegments(text);
+        if (segments.length === 0) return;
+
+        const lastSeg = segments[segments.length - 1];
+        if (lastSeg.inString) {
+            inMultiLineString = true;
+            const startChar = lastSeg.text[0];
+            stringDelimiter = startChar === '[' ? ']' : startChar;
+        }
+    };
+
     return lines
         .map((line) => {
-            const trimmed = line.trim();
+            try {
+                const trimmed = line.trim();
 
-            // Track block comment start/end using the project's convention (/* ... ;)
-            if (!inBlockComment && trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
-                inBlockComment = true;
-            }
-            if (inBlockComment || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
-                if (inBlockComment && trimmed.endsWith(';')) {
-                    inBlockComment = false;
+                // Track block comment start/end using the project's convention (/* ... ;)
+                if (!inBlockComment && trimmed.startsWith('/*') && !trimmed.endsWith(';')) {
+                    inBlockComment = true;
                 }
-                return line; // do not modify comment content or let quotes toggle string state
-            }
+                if (inBlockComment || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+                    if (inBlockComment && trimmed.endsWith(';')) {
+                        inBlockComment = false;
+                    }
+                    return line;
+                }
 
-            // If we're already inside a multi-line string, only look for its end
-            if (inMultiLineString) {
-                const delimiterCount = (line.match(new RegExp(stringDelimiter === '"' ? '"' : (stringDelimiter === "'" ? "'" : '\\]'), 'g')) || []).length;
-                if (delimiterCount % 2 !== 0 || (stringDelimiter === ']' && delimiterCount > 0)) {
+                // Handle multi-line string state
+                if (inMultiLineString) {
+                    // Look for the closing delimiter
+                    const closeIdx = line.indexOf(stringDelimiter);
+                    if (closeIdx === -1) {
+                        // Still inside string
+                        return line;
+                    }
+
+                    // Found close: split and process remainder
+                    const preString = line.substring(0, closeIdx + 1);
+                    const remainder = line.substring(closeIdx + 1);
+
+                    // Reset string state
                     inMultiLineString = false;
                     stringDelimiter = '';
-                }
-                return line; // do not modify string content
-            }
 
-            if (!trimmed) {
+                    if (!remainder.trim()) {
+                        return line; // Nothing after string
+                    }
+
+                    // Process remainder as code
+                    let processedRemainder = processCode(remainder);
+
+                    // Manual fix: if remainder starts with +, ensure space before it (since preString was string)
+                    if (/^\s*\+/.test(processedRemainder)) {
+                        processedRemainder = processedRemainder.replace(/^\s*\+\s*/, ' + ');
+                    }
+                    else if (!/^\s/.test(processedRemainder) && processedRemainder.length > 0) {
+                        // pass
+                    }
+
+                    // Update state for next line based on remainder
+                    // Use the processed remainder to determine if we opened a new string
+                    updateState(processedRemainder);
+
+                    const result = preString + processedRemainder;
+                    return result;
+                }
+
+                if (!trimmed) {
+                    return line;
+                }
+
+                // Normal processing
+                let out = processCode(line);
+
+                // Update state
+                updateState(line); // Check original line (or out?) for unclosed string
+                // Better to check 'line' because 'out' has replacements that shouldn't affect structure.
+                // Actually 'processCode' preserves strings. So 'out' is safe.
+                // Using 'line' is safer to avoid issues if I messed up replacements.
+                // But wait, if I use 'line', I might detect a string that 'processCode' removed? (No, doesn't remove).
+                // Use 'line'.
+
+                return out;
+            } catch (error) {
+                console.log(`[DEBUG] Error processing line: "${line}": ${error}`);
                 return line;
             }
-
-            let out = line;
-
-            // Repair obvious broken multi-char operators first, but only outside strings
-            for (const [pat, rep] of multiCharRep) {
-                out = replaceOutsideStrings(out, pat, rep);
-            }
-
-            // Normalize spacing around common operators (done outside strings)
-            out = replaceOutsideStrings(out, /\s*:=\s*/g, ' := ');
-            out = replaceOutsideStrings(out, /\s*\+=\s*/g, ' += ');
-            out = replaceOutsideStrings(out, /\s*-=\s*/g, ' -= ');
-            out = replaceOutsideStrings(out, /\s*\*=\s*/g, ' *= ');
-            out = replaceOutsideStrings(out, /\s*\/=\s*/g, ' /= ');
-            out = replaceOutsideStrings(out, /\s*\^=\s*/g, ' ^= ');
-            out = replaceOutsideStrings(out, /\s*%=\s*/g, ' %= ');
-
-            // Arithmetic operators: add spaces around binary operators
-            // Match: identifier/number/paren followed by operator followed by identifier/number/paren
-            // This avoids matching unary operators like -5 or +5
-            out = replaceOutsideStrings(out, /([A-Za-z0-9_\)])\s*\+\s*([A-Za-z0-9_\(])/g, '$1 + $2');
-            out = replaceOutsideStrings(out, /([A-Za-z0-9_\)])\s*-\s*([A-Za-z0-9_\(])/g, '$1 - $2');
-            out = replaceOutsideStrings(out, /([A-Za-z0-9_\)])\s*\*\s*([A-Za-z0-9_\(])/g, '$1 * $2');
-            out = replaceOutsideStrings(out, /([A-Za-z0-9_\)])\s*\/\s*([A-Za-z0-9_\(])/g, '$1 / $2');
-
-            // Comparison operators: normalize to have spaces on both sides
-            out = replaceOutsideStrings(out, /\s*==\s*/g, ' == ');
-            out = replaceOutsideStrings(out, /\s*!=\s*/g, ' != ');
-            out = replaceOutsideStrings(out, /\s*<>\s*/g, ' <> ');
-            out = replaceOutsideStrings(out, /\s*<=\s*/g, ' <= ');
-            out = replaceOutsideStrings(out, /\s*>=\s*/g, ' >= ');
-
-            // Ensure single-equals are only spaced when they look like assignment/comparison
-            out = replaceOutsideStrings(out, /([A-Za-z0-9_\)])\s*=\s*([A-Za-z0-9_\(])/g, '$1 = $2');
-
-            // Gentle spacing for < and > (avoid touching multi-char tokens already handled)
-            out = replaceOutsideStrings(out, /([^<>=])\s*<\s*([^>=])/g, '$1 < $2');
-            out = replaceOutsideStrings(out, /([^<>=])\s*>\s*([^=])/g, '$1 > $2');
-
-            // Logical operators
-            out = replaceOutsideStrings(out, /\s*\.AND\.\s*/gi, ' .AND. ');
-            out = replaceOutsideStrings(out, /\s*\.OR\.\s*/gi, ' .OR. ');
-            out = replaceOutsideStrings(out, /\s*\.NOT\.\s*/gi, ' .NOT. ');
-
-            // Unary ! operator
-            out = replaceOutsideStrings(out, /([a-zA-Z0-9_\)])\s*!/g, '$1 !');
-            out = replaceOutsideStrings(out, /!\s*([a-zA-Z0-9_\(])/g, '! $1');
-
-            // No space before commas, space after commas
-            out = replaceOutsideStrings(out, /\s+,/g, ',');
-            out = replaceOutsideStrings(out, /,\s*(\S)/g, ', $1');
-            // Handle comma followed by string delimiter (which is in a different segment)
-            out = out.replace(/,"/g, ', "').replace(/,'/g, ", '");
-
-            // No space before semicolons
-            out = replaceOutsideStrings(out, /\s+;/g, ';');
-
-            // No space before opening parenthesis in function calls
-            // Match: identifier followed by spaces and opening paren
-            out = replaceOutsideStrings(out, /([a-zA-Z0-9_])\s+\(/g, '$1(');
-
-            // Object property/method access: no spaces around colon
-            // Match: identifier/paren followed by optional spaces, colon, optional spaces, identifier/paren
-            // This matches: obj:Prop or obj :Prop or obj: Prop or obj : Prop
-            // But NOT: :FOR or :TO (which have space/start before the colon)
-            // The key: we require an identifier character immediately before the space-colon sequence
-            out = replaceOutsideStrings(out, /([a-zA-Z0-9_\)])\s*:\s*([a-zA-Z_\(])/g, '$1:$2');
-
-            // Ensure space before colon-prefixed keywords (like :TO, :FOR, :STEP, etc.)
-            // This corrects cases where the above rule removed space before keywords
-            const keywords = ['TO', 'FOR', 'IF', 'ELSE', 'ELSEIF', 'ENDIF', 'WHILE', 'ENDWHILE',
-                              'NEXT', 'STEP', 'CASE', 'BEGINCASE', 'ENDCASE', 'OTHERWISE',
-                              'TRY', 'CATCH', 'FINALLY', 'ENDTRY', 'PROCEDURE', 'ENDPROC',
-                              'PARAMETERS', 'DECLARE', 'RETURN', 'PUBLIC', 'DEFAULT'];
-            for (const kw of keywords) {
-                const kwPattern = new RegExp(`(\\w):(${kw})\\b`, 'g');
-                out = replaceOutsideStrings(out, kwPattern, `$1 :$2`);
-            }
-
-            // Convert implicit string concatenation to explicit with +
-            // Match: string literal followed by whitespace and another string literal
-            out = replaceImplicitStringConcatenation(out);
-
-            // Track start of multi-line strings for subsequent lines
-            const doubleQuoteCount = (line.match(/"/g) || []).length;
-            const singleQuoteCount = (line.match(/'/g) || []).length;
-            const bracketOpenCount = (line.match(/\[/g) || []).length;
-            const bracketCloseCount = (line.match(/\]/g) || []).length;
-
-            if (doubleQuoteCount % 2 !== 0) {
-                inMultiLineString = true;
-                stringDelimiter = '"';
-            } else if (singleQuoteCount % 2 !== 0) {
-                inMultiLineString = true;
-                stringDelimiter = "'";
-            } else if (bracketOpenCount !== bracketCloseCount) {
-                inMultiLineString = true;
-                stringDelimiter = ']';
-            }
-
-            return out;
         })
         .join('\n');
 }

@@ -1,18 +1,6 @@
 /* Multi-line function call with inconsistent indentation;
 :PROCEDURE FormatCall;
-	result := ComplexFunction(
-		"Arg1",
-		DoProc(
-			"Nested",
-			{
-				sValue,
-				RunSQL(
-					"UPDATE Foo SET Bar = ? WHERE Baz = ?",
-					, ,
-					{ sBar, sBaz }
-				)
-			}
-		),
-		"Tail"
-	);
+	result := ComplexFunction("Arg1",
+	                          DoProc( "Nested", { sValue, RunSQL( "UPDATE Foo SET Bar = ? WHERE Baz = ?",,, { sBar, sBaz } ) } ),
+	                          "Tail");
 :ENDPROC;

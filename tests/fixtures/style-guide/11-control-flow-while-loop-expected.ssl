@@ -1,10 +1,13 @@
 /* WHILE loop structure;
 :PROCEDURE TestWhileLoop;
 :PARAMETERS nStart;
-:DECLARE nCounter;
+
+	:DECLARE nCounter;
 	nCounter := nStart;
+
 	:WHILE nCounter < 100;
 		nCounter := nCounter + 1;
 	:ENDWHILE;
+
 	:RETURN nCounter;
 :ENDPROC;

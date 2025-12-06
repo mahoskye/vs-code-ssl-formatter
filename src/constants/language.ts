@@ -35,7 +35,7 @@ export const CASE_KEYWORDS = [
 ];
 
 export const PROCEDURE_LEVEL_KEYWORDS = [
-    "PARAMETERS", "DECLARE", "DEFAULT", "PUBLIC"
+    "PARAMETERS", "DEFAULT", "PUBLIC"
 ];
 
 export const INLINE_SQL_FUNCTIONS = [
@@ -155,15 +155,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "ExecFunction(name, parameters)"
     },
     {
-        "name": "usrmes",
+        "name": "UsrMes",
         "description": "Displays a user message with two arguments.",
         "params": "(a, b)",
         "returns": "void",
-        "signature": "usrmes(a, b)",
+        "signature": "UsrMes(a, b)",
         "returnType": "void",
         "category": "System Functions",
         "frequency": "High",
-        "untypedSignature": "usrmes(a, b)"
+        "untypedSignature": "UsrMes(a, b)"
     },
     {
         "name": "Upper",
@@ -177,15 +177,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "Upper(source)"
     },
     {
-        "name": "aadd",
+        "name": "AAdd",
         "description": "Adds an element to the end of an array.",
         "params": "(any[] target, any element)",
         "returns": "any",
-        "signature": "aadd(any[] target, any element)",
+        "signature": "AAdd(any[] target, any element)",
         "returnType": "any",
         "category": "Array Functions",
         "frequency": "High",
-        "untypedSignature": "aadd(target, element)"
+        "untypedSignature": "AAdd(target, element)"
     },
     {
         "name": "Chr",
@@ -287,15 +287,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "LSearch(sql, parameters)"
     },
     {
-        "name": "extractcol",
+        "name": "ExtractCol",
         "description": "Extracts a column from a 2D array.",
         "params": "(any[] target, number column)",
         "returns": "any[]",
-        "signature": "extractcol(any[] target, number column)",
+        "signature": "ExtractCol(any[] target, number column)",
         "returnType": "any[]",
         "category": "Array Functions",
         "frequency": "High",
-        "untypedSignature": "extractcol(target, column)"
+        "untypedSignature": "ExtractCol(target, column)"
     },
     {
         "name": "At",
@@ -407,15 +407,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "GetDataset(dataSourceId, parameters, returnType)"
     },
     {
-        "name": "buildstring",
+        "name": "BuildString",
         "description": "Builds a string from array elements with a delimiter.",
         "params": "(any[] target, number start, number count, string delimiter)",
         "returns": "string",
-        "signature": "buildstring(any[] target, number start, number count, string delimiter)",
+        "signature": "BuildString(any[] target, number start, number count, string delimiter)",
         "returnType": "string",
         "category": "Array Functions",
         "frequency": "High",
-        "untypedSignature": "buildstring(target, start, count, delimiter)"
+        "untypedSignature": "BuildString(target, start, count, delimiter)"
     },
     {
         "name": "Str",
@@ -539,15 +539,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "LimsTime()"
     },
     {
-        "name": "buildarray",
+        "name": "BuildArray",
         "description": "Builds an array from a string with delimiters.",
         "params": "(string text, boolean crlfOk, string delimiter, boolean unique, boolean trimSpaces)",
         "returns": "any[]",
-        "signature": "buildarray(string text, boolean crlfOk, string delimiter, boolean unique, boolean trimSpaces)",
+        "signature": "BuildArray(string text, boolean crlfOk, string delimiter, boolean unique, boolean trimSpaces)",
         "returnType": "any[]",
         "category": "Array Functions",
         "frequency": "Moderate",
-        "untypedSignature": "buildarray(text, crlfOk, delimiter, unique, trimSpaces)"
+        "untypedSignature": "BuildArray(text, crlfOk, delimiter, unique, trimSpaces)"
     },
     {
         "name": "BeginLimsTransaction",
@@ -561,26 +561,26 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "BeginLimsTransaction(friendlyName, isoLevel)"
     },
     {
-        "name": "getregion",
+        "name": "GetRegion",
         "description": "Retrieves a region from a string based on delimiters.",
         "params": "(any s, any src, any dst)",
         "returns": "string",
-        "signature": "getregion(any s, any src, any dst)",
+        "signature": "GetRegion(any s, any src, any dst)",
         "returnType": "string",
         "category": "Builtin Functions",
         "frequency": "Moderate",
-        "untypedSignature": "getregion(s, src, dst)"
+        "untypedSignature": "GetRegion(s, src, dst)"
     },
     {
-        "name": "ascan",
+        "name": "AScan",
         "description": "Scans an array for a value and returns its index.",
         "params": "(any[] target, any value, number start, number count)",
         "returns": "number",
-        "signature": "ascan(any[] target, any value, number start, number count)",
+        "signature": "AScan(any[] target, any value, number start, number count)",
         "returnType": "number",
         "category": "Array Functions",
         "frequency": "Moderate",
-        "untypedSignature": "ascan(target, value, start, count)"
+        "untypedSignature": "AScan(target, value, start, count)"
     },
     {
         "name": "LimsSetCounter",
@@ -671,15 +671,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "LimsSqlDisconnect(friendlyName)"
     },
     {
-        "name": "arraycalc",
+        "name": "ArrayCalc",
         "description": "Performs calculations on array elements.",
         "params": "(any[] target, string operation, any value, number start, number count)",
         "returns": "any",
-        "signature": "arraycalc(any[] target, string operation, any value, number start, number count)",
+        "signature": "ArrayCalc(any[] target, string operation, any value, number start, number count)",
         "returnType": "any",
         "category": "Array Functions",
         "frequency": "Moderate",
-        "untypedSignature": "arraycalc(target, operation, value, start, count)"
+        "untypedSignature": "ArrayCalc(target, operation, value, start, count)"
     },
     {
         "name": "ReturnLastSQLError",
@@ -858,15 +858,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "ShowSqlErrors(flag)"
     },
     {
-        "name": "alen",
+        "name": "ALen",
         "description": "Returns the length of an array.",
         "params": "(any[] target)",
         "returns": "number",
-        "signature": "alen(any[] target)",
+        "signature": "ALen(any[] target)",
         "returnType": "number",
         "category": "Array Functions",
         "frequency": "Moderate",
-        "untypedSignature": "alen(target)"
+        "untypedSignature": "ALen(target)"
     },
     {
         "name": "SubmitToBatch",
@@ -935,15 +935,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "PrmCount()"
     },
     {
-        "name": "ascanexact",
+        "name": "AScanExact",
         "description": "Scans array for exact value match.",
         "params": "(any[] target, any value, number start, number count)",
         "returns": "number",
-        "signature": "ascanexact(any[] target, any value, number start, number count)",
+        "signature": "AScanExact(any[] target, any value, number start, number count)",
         "returnType": "number",
         "category": "Array Functions",
         "frequency": "Moderate",
-        "untypedSignature": "ascanexact(target, value, start, count)"
+        "untypedSignature": "AScanExact(target, value, start, count)"
     },
     {
         "name": "Day",
@@ -1001,15 +1001,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "Second(date)"
     },
     {
-        "name": "arraynew",
+        "name": "ArrayNew",
         "description": "Creates a new multi-dimensional array.",
         "params": "(number dim1, number dim2, number dim3)",
         "returns": "any[]",
-        "signature": "arraynew(number dim1, number dim2, number dim3)",
+        "signature": "ArrayNew(number dim1, number dim2, number dim3)",
         "returnType": "any[]",
         "category": "Array Functions",
         "frequency": "Moderate",
-        "untypedSignature": "arraynew(dim1, dim2, dim3)"
+        "untypedSignature": "ArrayNew(dim1, dim2, dim3)"
     },
     {
         "name": "GetDataSetEx",
@@ -1034,15 +1034,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "AddToSession(key, value)"
     },
     {
-        "name": "execudf",
+        "name": "ExecUDF",
         "description": "Executes a user-defined function.",
         "params": "(any[] args, any cacheCode)",
         "returns": "any",
-        "signature": "execudf(any[] args, any cacheCode)",
+        "signature": "ExecUDF(any[] args, any cacheCode)",
         "returnType": "any",
         "category": "Runtime Functions",
         "frequency": "Moderate",
-        "untypedSignature": "execudf(args, cacheCode)"
+        "untypedSignature": "ExecUDF(args, cacheCode)"
     },
     {
         "name": "DToS",
@@ -1096,15 +1096,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "frequency": "Moderate"
     },
     {
-        "name": "lWait",
+        "name": "LWait",
         "description": "Waits for a specified number of seconds.",
         "params": "(number seconds)",
         "returns": "string",
-        "signature": "lWait(number seconds)",
+        "signature": "LWait(number seconds)",
         "returnType": "string",
         "category": "Process Functions",
         "frequency": "Moderate",
-        "untypedSignature": "lWait(seconds)"
+        "untypedSignature": "LWait(seconds)"
     },
     {
         "name": "GetDataSetFromArray",
@@ -1338,26 +1338,26 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "MatFunc(functionName, number)"
     },
     {
-        "name": "aeval",
+        "name": "AEval",
         "description": "Evaluates a code block for each array element.",
         "params": "(any[] target, Function codeBlock, number start, number count)",
         "returns": "any",
-        "signature": "aeval(any[] target, Function codeBlock, number start, number count)",
+        "signature": "AEval(any[] target, Function codeBlock, number start, number count)",
         "returnType": "any",
         "category": "Array Functions",
         "frequency": "Low",
-        "untypedSignature": "aeval(target, codeBlock, start, count)"
+        "untypedSignature": "AEval(target, codeBlock, start, count)"
     },
     {
-        "name": "buildstring2",
+        "name": "BuildString2",
         "description": "Builds string from array with line and column delimiters.",
         "params": "(any[] target, string lineDelimiter, string colDelimiter)",
         "returns": "string",
-        "signature": "buildstring2(any[] target, string lineDelimiter, string colDelimiter)",
+        "signature": "BuildString2(any[] target, string lineDelimiter, string colDelimiter)",
         "returnType": "string",
         "category": "Array Functions",
         "frequency": "Low",
-        "untypedSignature": "buildstring2(target, lineDelimiter, colDelimiter)"
+        "untypedSignature": "BuildString2(target, lineDelimiter, colDelimiter)"
     },
     {
         "name": "LimsNETCast",
@@ -1437,11 +1437,11 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "ToJson(value)"
     },
     {
-        "name": "delarray",
+        "name": "DelArray",
         "description": "Deletes an element from an array.",
         "params": "(any[] target, number index)",
         "returns": "any[]",
-        "signature": "delarray(any[] target, number index)",
+        "signature": "DelArray(any[] target, number index)",
         "returnType": "any[]",
         "category": "Array Functions",
         "frequency": "Low",
@@ -1624,15 +1624,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "DateFormat(newFormat)"
     },
     {
-        "name": "lDir",
+        "name": "LDir",
         "description": "Lists directory contents.",
         "params": "(string filePattern, string attributes)",
         "returns": "any[]",
-        "signature": "lDir(string filePattern, string attributes)",
+        "signature": "LDir(string filePattern, string attributes)",
         "returnType": "any[]",
         "category": "File Functions",
         "frequency": "Low",
-        "untypedSignature": "lDir(filePattern, attributes)"
+        "untypedSignature": "LDir(filePattern, attributes)"
     },
     {
         "name": "StringToDate",
@@ -1866,14 +1866,14 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "ClientStartOfDay(date)"
     },
     {
-        "name": "eval",
+        "name": "Eval",
         "description": "Evaluates an expression.",
         "params": "(params any[] args)",
         "returns": "any",
-        "signature": "eval(params any[] args)",
+        "signature": "Eval(params any[] args)",
         "returnType": "any",
         "frequency": "Low",
-        "untypedSignature": "eval(args)"
+        "untypedSignature": "Eval(args)"
     },
     {
         "name": "ResetApplication",
@@ -1931,15 +1931,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "IsProductionModeOn()"
     },
     {
-        "name": "limsoleconnect",
+        "name": "LimsOleConnect",
         "description": "Connects to LIMS OLE.",
         "params": "(any v)",
         "returns": "any",
-        "signature": "limsoleconnect(any v)",
+        "signature": "LimsOleConnect(any v)",
         "returnType": "any",
         "category": "Builtin Functions",
         "frequency": "Low",
-        "untypedSignature": "limsoleconnect(v)"
+        "untypedSignature": "LimsOleConnect(v)"
     },
     {
         "name": "RunApp",
@@ -1986,15 +1986,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "FromJson(value)"
     },
     {
-        "name": "getinlinecode",
+        "name": "GetInlineCode",
         "description": "Retrieves inline code.",
         "params": "(any s, any[] variables)",
         "returns": "string",
-        "signature": "getinlinecode(any s, any[] variables)",
+        "signature": "GetInlineCode(any s, any[] variables)",
         "returnType": "string",
         "category": "Builtin Functions",
         "frequency": "Low",
-        "untypedSignature": "getinlinecode(s, variables)"
+        "untypedSignature": "GetInlineCode(s, variables)"
     },
     {
         "name": "JDay",
@@ -2019,15 +2019,15 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "SetSqlTimeout(timeout, connection)"
     },
     {
-        "name": "endlimsoleconnect",
+        "name": "EndLimsOleConnect",
         "description": "Ends LIMS OLE connection.",
         "params": "(any v)",
         "returns": "any",
-        "signature": "endlimsoleconnect(any v)",
+        "signature": "EndLimsOleConnect(any v)",
         "returnType": "any",
         "category": "Builtin Functions",
         "frequency": "Low",
-        "untypedSignature": "endlimsoleconnect(v)"
+        "untypedSignature": "EndLimsOleConnect(v)"
     },
     {
         "name": "HtmlEncode",
