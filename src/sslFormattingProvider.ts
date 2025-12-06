@@ -1171,6 +1171,8 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			const next = i + 1 < text.length ? text[i + 1] : '';
 
 			if (inCmt) {
+				// Inside a comment, only look for semicolon to end it
+				// Don't track strings inside comments
 				if (char === ';') {
 					inCmt = false;
 					commentRanges.push({ start: cmtStart, end: i });
@@ -1185,7 +1187,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				continue;
 			}
 
-			// Check content
+			// Check content - only process strings and comments when NOT in either
 			if (char === '"' || char === '\'') {
 				inStr = true;
 				strChar = char;
@@ -1194,6 +1196,16 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				cmtStart = i;
 				i++; // Skip *
 			}
+		}
+
+		// Create a version of text with comments masked (replaced with spaces)
+		// This prevents unclosed strings in comments from affecting the regex matching
+		let maskedText = text;
+		for (let i = commentRanges.length - 1; i >= 0; i--) {
+			const r = commentRanges[i];
+			// Replace comment content with spaces (preserving length for position alignment)
+			const replacement = ' '.repeat(r.end - r.start + 1);
+			maskedText = maskedText.substring(0, r.start) + replacement + maskedText.substring(r.end + 1);
 		}
 
 		let result = text;
@@ -1209,18 +1221,28 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			quoteColumn: number;
 		}> = [];
 
-		while ((match = sqlLiteralRegex.exec(text)) !== null) {
+		// Run regex on masked text to find match positions, but extract content from original text
+		while ((match = sqlLiteralRegex.exec(maskedText)) !== null) {
 			const idx = match.index;
 
-			// Check if match is in any comment range
+			// Skip matches in comment ranges (shouldn't happen with masking, but safety check)
 			const isCommented = commentRanges.some(r => idx >= r.start && idx <= r.end);
 			if (isCommented) {
 				continue;
 			}
 
+			// Extract the actual content from original text using match positions
+			// The match object has positions relative to maskedText, but maskedText has same length as text
 			const functionName = match[1];
-			const literal = match[2];
-			const content = match[3];
+			const matchEnd = idx + match[0].length;
+			const actualMatch = text.substring(idx, matchEnd);
+			// Re-extract literal and content from the actual text
+			const literalMatch = actualMatch.match(/\(\s*("([\s\S]*?)")/);
+			if (!literalMatch) {
+				continue;
+			}
+			const literal = literalMatch[1];
+			const content = literalMatch[2];
 
 			if (typeof literal !== "string" || typeof content !== "string") {
 				continue;
@@ -1270,15 +1292,89 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				normalizedIndent,
 				effectiveWrapLength
 			);
-			const sqlLines = formattedContent.split('\n');
+
+			// Check if the match is followed by string concatenation (+)
+			const nextCharIndex = m.index + m.fullMatch.length;
+			const isConcatenated = /^\s*\+/.test(text.substring(nextCharIndex, nextCharIndex + 20));
+			// If concatenated, force the closing quote to a new line to avoid long lines
+			const finalContent = isConcatenated ? formattedContent + "\n" : formattedContent;
+
+			const sqlLines = finalContent.split('\n');
 
 			let formattedSql: string;
 			if (sqlLines.length === 1) {
-				formattedSql = formattedContent;
+				formattedSql = finalContent;
 			} else {
 				// First line stays as-is, continuation lines get indented
-				formattedSql = sqlLines[0] + '\n' +
-					sqlLines.slice(1).map(l => continuationIndent + l).join('\n');
+				// Also check if any line is too long and needs further wrapping
+				const processedLines: string[] = [sqlLines[0]];
+
+				for (let j = 1; j < sqlLines.length; j++) {
+					const sqlLine = sqlLines[j];
+					const fullLine = continuationIndent + sqlLine;
+
+					if (fullLine.length > wrapLength) {
+						// Try to wrap this line at a comma or before AND/OR
+						const lineIndent = sqlLine.match(/^(\s*)/)?.[1] || '';
+						const lineContent = sqlLine.trim();
+
+						// Check if it's a SELECT list (comma-separated)
+						if (lineContent.toUpperCase().startsWith('SELECT ')) {
+							const selectPart = lineContent.match(/^(SELECT\s+)(.*)/i);
+							if (selectPart) {
+								const columns = this.splitAtTopLevelCommas(selectPart[2]);
+								if (columns.length > 1) {
+									// Split SELECT columns across lines
+									processedLines.push(lineIndent + selectPart[1] + columns[0].trim() + ',');
+									const colIndent = lineIndent + ' '.repeat(selectPart[1].length);
+									for (let k = 1; k < columns.length; k++) {
+										const isLast = k === columns.length - 1;
+										processedLines.push(colIndent + columns[k].trim() + (isLast ? '' : ','));
+									}
+									continue;
+								}
+							}
+						}
+
+						// Check if it's a line with CASE/WHEN/THEN/ELSE that can be split
+						if (/\bWHEN\s+\d/.test(lineContent) && /\bTHEN\b/.test(lineContent)) {
+							// Line has "WHEN X THEN Y ELSE Z END" pattern - split at THEN and ELSE
+							const caseMatch = lineContent.match(/^(.*?\bWHEN\s+\d+\s+THEN)\s+(.+?)\s+(ELSE\s+.+)$/i);
+							if (caseMatch) {
+								// Split into: WHEN X THEN, value, ELSE Z
+								processedLines.push(lineIndent + caseMatch[1].trim());
+								processedLines.push(lineIndent + '    ' + caseMatch[2].trim());
+								processedLines.push(lineIndent + '    ' + caseMatch[3].trim());
+								continue;
+							}
+							// Fallback: just split prefix and WHEN..THEN
+							const simpleCaseMatch = lineContent.match(/^(.*?)\s*(\bWHEN\s+\d+\s+THEN\b.*)$/i);
+							if (simpleCaseMatch && simpleCaseMatch[1].trim()) {
+								processedLines.push(lineIndent + simpleCaseMatch[1].trim());
+								processedLines.push(lineIndent + '    ' + simpleCaseMatch[2].trim());
+								continue;
+							}
+						}
+
+						// Check for long line with = (CASE pattern - break before = (CASE
+						if (/=\s*\(CASE\s*\(/i.test(lineContent)) {
+							const eqCaseMatch = lineContent.match(/^(.+?)\s*(=\s*\(CASE\s*\(.*)$/i);
+							if (eqCaseMatch) {
+								processedLines.push(lineIndent + eqCaseMatch[1].trim());
+								processedLines.push(lineIndent + '    ' + eqCaseMatch[2].trim());
+								continue;
+							}
+						}
+
+						// For other long lines, just add as-is (SQL formatter should have handled it)
+						processedLines.push(sqlLine);
+					} else {
+						processedLines.push(sqlLine);
+					}
+				}
+
+				formattedSql = processedLines[0] + '\n' +
+					processedLines.slice(1).map(l => continuationIndent + l).join('\n');
 			}
 
 			const formattedLiteral = `"${formattedSql}"`;
@@ -1287,9 +1383,77 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			// Find the position of this literal in the current result
 			const literalStart = result.indexOf(m.literal, m.index);
 			if (literalStart !== -1) {
+				const newLiteral = formattedLiteral;
 				result = result.substring(0, literalStart) +
-					formattedLiteral +
+					newLiteral +
 					result.substring(literalStart + m.literal.length);
+
+				// If we detected concatenation, fix the indentation of subsequent lines
+				// to match the continuation indent (replacing tabs or wrong spaces)
+				if (isConcatenated) {
+					// Scan forward from the end of the new literal
+					let currentPos = literalStart + newLiteral.length;
+
+					// Limit scan to avoid going too far (e.g. 10 lines or until ;)
+					let lineCount = 0;
+					const maxLines = 10;
+
+					while (lineCount < maxLines && currentPos < result.length) {
+						const newlinePos = result.indexOf('\n', currentPos);
+						if (newlinePos === -1) break;
+
+						const lineStart = newlinePos + 1;
+						const nextNewline = result.indexOf('\n', lineStart);
+						const lineEnd = nextNewline !== -1 ? nextNewline : result.length;
+						const line = result.substring(lineStart, lineEnd);
+
+						// Stop if we look like we've reached a new statement or end of command
+						// End of command: line contains `;`
+						// We process this line then stop? 
+						// Usually ); is on the last line of args.
+
+						// Check if line is empty or just whitespace
+						if (line.trim().length === 0) {
+							currentPos = lineStart; // Move past empty line? No, move to next
+							if (nextNewline === -1) break;
+							continue;
+						}
+
+						// Fix indentation: Replace leading whitespace with continuationIndent
+						const trimmed = line.trimStart();
+
+						// Also perform basic cleanup on the content of the concatenated line
+						// 1. Replace tabs with space
+						let cleanedContent = trimmed.replace(/\t/g, ' ');
+						// 2. Normalize spaces
+						cleanedContent = cleanedContent.replace(/\s+/g, ' ');
+						// 3. Uppercase common keywords if they appear (simple replace)
+						cleanedContent = cleanedContent.replace(/\bwhere\b/gi, 'WHERE');
+						cleanedContent = cleanedContent.replace(/\band\b/gi, 'AND');
+						cleanedContent = cleanedContent.replace(/\bor\b/gi, 'OR');
+
+						// 4. Force break on AND/OR - with extra indentation (4 spaces)
+						cleanedContent = cleanedContent.replace(/\s+(AND|OR)\b/g, '\n' + continuationIndent + '    ' + '$1');
+
+						// Check if the FIRST word is AND/OR and needs indent
+						let linePrefix = continuationIndent;
+						if (/^(AND|OR)\b/.test(cleanedContent)) {
+							linePrefix += '    ';
+						}
+
+						const newLine = linePrefix + cleanedContent;
+
+						// Apply replacement
+						result = result.substring(0, lineStart) + newLine + result.substring(lineEnd);
+
+						// Update position for next iteration
+						currentPos = lineStart + newLine.length;
+						lineCount++;
+
+						// Check stop condition after processing
+						if (trimmed.includes(';')) break;
+					}
+				}
 			}
 		}
 
@@ -1428,7 +1592,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		 * Wrap a comma-separated list (e.g. :PARAMETERS, :DECLARE)
 		 * Uses balanced wrapping to distribute items evenly
 		 */
-	private wrapList(keyword: string, content: string, wrapLength: number): string[] | null {
+	private wrapList(keyword: string, content: string, wrapLength: number, indent: string = ''): string[] | null {
 		// Handle trailing semicolon for splitting, then add it back to last item
 		const trimmed = content.trim();
 		const hasSemicolon = trimmed.endsWith(';');
@@ -1440,21 +1604,13 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const firstLinePrefix = `${keyword} `;
 		const continuationIndent = ' '.repeat(firstLinePrefix.length); // Visual alignment
 
-		// Calculate total length (items + separators)
-		const totalLength = items.reduce((sum, item) => sum + item.length + 2, 0) - 2; // -2 for last separator
-		const availableWidth = wrapLength - continuationIndent.length;
-		// Note: first line has less space (prefix length usually > indent), or more?
+		// Calculate visual width of indent
+		const indentVisualWidth = this.getVisualLength(indent, 4);
 
-		// If it fits on one line, return (but wrapLongLines checks this before calling? 
-		// No, wrapList is called if pattern matches, wrapLongLines generic check might not trigger if pattern specific logic preferred?)
-		// Actually wrapLongLines calls wrapList only if wrapList returns value.
+		// Effective wrap length after accounting for indent
+		const effectiveWrapLength = wrapLength - indentVisualWidth;
 
-		// Estimate lines needed
-		// Heuristic: Total length / available width
-		// We want balanced lines, so target length per line approx total / lines.
-		const estimatedLines = Math.ceil((firstLinePrefix.length + totalLength) / wrapLength);
-		const targetPerLine = Math.max(availableWidth / 2, (firstLinePrefix.length + totalLength) / (estimatedLines || 1));
-
+		// Simple approach: greedily fill each line, preferring minimum number of lines
 		const wrapped: string[] = [];
 		let currentLine = firstLinePrefix;
 
@@ -1464,35 +1620,22 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			const separator = isLast ? (hasSemicolon ? ';' : '') : ', ';
 			const itemWithSep = item + separator;
 
-			// Logic:
-			// 1. If currently on first line, check against proper wrapLength.
-			// 2. If on continuation line, check against wrapLength AND balanced target.
+			// Check if adding this item would exceed the limit
+			const lineWithNextItem = currentLine + itemWithSep;
 
-			const maxLength = wrapLength;
-			const softLimit = (estimatedLines > 1) ? Math.min(maxLength, Math.max(currentLine.length, targetPerLine)) : maxLength;
-
-			// Decide if we should wrap BEFORE adding this item?
-			// Condition: (current + item > max) OR (current > softLimit AND item > small?)
-			// Simple balanced logic: fill until softLimit passed, but try not to exceed max.
-
-			const fitsOnLine = currentLine.length + itemWithSep.length <= maxLength;
-			const exceedsSoftLimit = currentLine.length + itemWithSep.length > softLimit + 5; // Tolerance
-
-			// Always keep at least one item on first line if starts there
-			const isStartOfLine = currentLine === firstLinePrefix || currentLine === continuationIndent;
-
-			if ((!fitsOnLine || (exceedsSoftLimit && !isStartOfLine)) && currentLine !== firstLinePrefix) {
-				wrapped.push(currentLine);
+			if (lineWithNextItem.length > effectiveWrapLength && currentLine !== firstLinePrefix) {
+				// Wrap: start a new line
+				wrapped.push(currentLine.trimEnd().replace(/, $/, ','));
 				currentLine = continuationIndent + itemWithSep;
 			} else {
-				currentLine += itemWithSep;
+				currentLine = lineWithNextItem;
 			}
 		}
 
 		// Add the last line
 		wrapped.push(currentLine);
 
-		return wrapped;
+		return wrapped.length > 1 ? wrapped : null;
 	}
 
 	/**
@@ -1521,35 +1664,28 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				continue;
 			}
 
-			// Track multi-line string state
-			if (!inMultiLineString) {
-				const doubleQuotes = (line.match(/"/g) || []).length;
-				const singleQuotes = (line.match(/'/g) || []).length;
-				if (doubleQuotes % 2 !== 0) {
-					inMultiLineString = true;
-					stringDelimiter = '"';
-				} else if (singleQuotes % 2 !== 0) {
-					inMultiLineString = true;
-					stringDelimiter = "'";
-				}
-			} else {
-				const quotes = (line.match(new RegExp(stringDelimiter, 'g')) || []).length;
-				if (quotes % 2 !== 0) {
-					inMultiLineString = false;
-					stringDelimiter = '';
-				}
-				result.push(line);
-				continue;
-			}
+			// Note: Multi-line string tracking was removed as it incorrectly skipped valid lines
+			// when SQL string literals start on earlier lines. The pattern-based wrapping 
+			// handles strings properly through regex matching.
 
 			// Skip lines that don't need wrapping
-			if (line.length <= wrapLength) {
+			// Calculate visual length (tabs expand to tabSize spaces)
+			const visualLength = line.split('').reduce((len, char) => {
+				if (char === '\t') {
+					return len + tabSize - (len % tabSize); // Tab stops at next multiple of tabSize
+				}
+				return len + 1;
+			}, 0);
+
+			if (visualLength <= wrapLength) {
 				result.push(line);
 				continue;
 			}
 
+
 			// Skip single-line comments and empty lines
-			if (!trimmed || trimmed.includes('/*')) {
+			// Only skip if line STARTS with /* (block comment), not lines with trailing inline comments
+			if (!trimmed || trimmed.startsWith('/*')) {
 				result.push(line);
 				continue;
 			}
@@ -1595,7 +1731,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			if (!wrapped && listMatch) {
 				const keyword = ':' + listMatch[1]; // Already upper
 				const content = listMatch[2];
-				wrapped = this.wrapList(keyword, content, wrapLength);
+				wrapped = this.wrapList(keyword, content, wrapLength, originalIndent);
 			}
 
 			// Pattern 6: Array literal continuation line (starts with { and ends with }); or })
@@ -1609,6 +1745,138 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				}
 			}
 
+			// Pattern 7: :RETURN statement with array containing long string
+			// e.g., :RETURN {-1, "Very long error message..."};
+			// Also handles trailing inline comments: :RETURN {-1, "msg"}; /*comment
+			if (!wrapped) {
+				const returnMatch = trimmed.match(/^(:RETURN\s*)\{(.+)\}(;.*)?$/i);
+				if (returnMatch) {
+					const keyword = returnMatch[1];
+					const arrayContent = returnMatch[2];
+					const semicolon = returnMatch[3] || '';
+					wrapped = this.wrapReturnArray(keyword, arrayContent, wrapLength, originalIndent, semicolon);
+				}
+			}
+
+			// Pattern 8: Line ending with string + function call (like IIF)
+			// e.g., ...?sQCType?" + IIF(METHODDEVELOPER == "Y", "", " and ss.STATUS = ?Released? ") );
+			if (!wrapped) {
+				// Match lines that have: ..." + FunctionCall(...) );
+				const concatMatch = trimmed.match(/^(.+["\'])\s*\+\s*(\w+\s*\(.+\)\s*\)?;?)$/);
+				if (concatMatch) {
+					const beforePlus = concatMatch[1];
+					const afterPlus = concatMatch[2];
+					// Push directly to result with absolute positioning:
+					// Line 1: originalIndent + beforePlus
+					// Line 2: 27 spaces (column 28) + "+ " + afterPlus
+					result.push(originalIndent + beforePlus);
+
+					const col28Indent = ' '.repeat(27);
+					const plusLine = col28Indent + '+ ' + afterPlus;
+
+					// If the + line is too long, wrap the function arguments
+					if (plusLine.length > wrapLength) {
+						// Try to wrap IIF/function arguments
+						const funcMatch = afterPlus.match(/^(\w+)\s*\((.+)\)\s*(\)?;?)$/);
+						if (funcMatch) {
+							const funcName = funcMatch[1];
+							const args = funcMatch[2];
+							const suffix = funcMatch[3];
+							// Split arguments at top-level commas
+							const argList = this.splitAtTopLevelCommas(args);
+							if (argList.length > 1) {
+								// First line: + FuncName(arg1,
+								result.push(col28Indent + '+ ' + funcName + '(' + argList[0].trim() + ',');
+								// Middle args with hanging indent at column 34
+								const argIndent = ' '.repeat(33);
+								for (let i = 1; i < argList.length - 1; i++) {
+									result.push(argIndent + argList[i].trim() + ',');
+								}
+								// Last arg with closing
+								result.push(argIndent + argList[argList.length - 1].trim() + ')' + suffix);
+								continue;
+							}
+						}
+					}
+					result.push(plusLine);
+					continue; // Skip the generic wrapped handling
+				}
+			}
+
+			// Pattern 9: SQL string ending with trailing function arguments
+			// e.g., ...= ?", "", "DATABASE", {sNewOrdNo, nTESTCODE, lotNo });
+			if (!wrapped) {
+				// Match lines that end with SQL parameter (like ?") then additional args
+				// Look for pattern: ...?" (or similar), then comma-separated args ending in );
+				// Use non-greedy match to find first quote that's followed by ", then args
+				const sqlArgsMatch = trimmed.match(/^(.*\?\s*["\'])\s*,\s*(.+\)\s*;?)$/);
+				if (sqlArgsMatch) {
+					const sqlPart = sqlArgsMatch[1];
+					const argsPart = sqlArgsMatch[2];
+					const fullLine = originalIndent + trimmed;
+
+					// Only wrap if line is too long
+					if (this.getVisualLength(fullLine, 4) > wrapLength) {
+						// Split arguments
+						const args = this.splitAtTopLevelCommas(argsPart.replace(/\);?$/, ''));
+						const suffix = argsPart.match(/(\)\s*;?)$/)?.[1] || ');';
+
+						if (args.length >= 1) {
+							// Line 1: SQL part with comma
+							result.push(originalIndent + sqlPart + ',');
+							// Remaining args at column 34
+							const col34Indent = ' '.repeat(33);
+							for (let i = 0; i < args.length; i++) {
+								const isLast = i === args.length - 1;
+								const argLine = col34Indent + args[i].trim() + (isLast ? suffix : ',');
+								result.push(argLine);
+							}
+							continue;
+						}
+					}
+				}
+			}
+
+			// Pattern 10: SQL FROM clause with comma-separated tables
+			// e.g., FROM results r, spec_analytes sa, specschemas ss, specschemacalcs sc
+			if (!wrapped) {
+				const fromMatch = trimmed.match(/^(FROM\s+)(.+,\s*.+)$/i);
+				if (fromMatch) {
+					const keyword = fromMatch[1];
+					const tableList = fromMatch[2];
+					const fullLine = originalIndent + trimmed;
+
+					// Only wrap if line is too long
+					if (this.getVisualLength(fullLine, 4) > wrapLength) {
+						const tables = this.splitAtTopLevelCommas(tableList);
+						if (tables.length > 1) {
+							// Calculate effective wrap length
+							const indentVisualWidth = this.getVisualLength(originalIndent, 4);
+							const effectiveWrapLength = wrapLength - indentVisualWidth;
+
+							// Greedy fill: put as many tables as fit on each line
+							const continuationIndent = ' '.repeat(keyword.length);
+							const result_lines: string[] = [];
+							let currentLine = keyword + tables[0].trim();
+
+							for (let i = 1; i < tables.length; i++) {
+								const table = tables[i].trim();
+								const lineWithNext = currentLine + ', ' + table;
+
+								if (lineWithNext.length > effectiveWrapLength) {
+									result_lines.push(currentLine + ',');
+									currentLine = continuationIndent + table;
+								} else {
+									currentLine = lineWithNext;
+								}
+							}
+							result_lines.push(currentLine);
+
+							wrapped = result_lines;
+						}
+					}
+				}
+			}
 
 			if (wrapped && wrapped.length > 0) {
 				// Apply original indentation and check for secondary wrapping
@@ -1733,13 +2001,44 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			// Trailing comma style: put comma on previous line
 			const lineWithNextArg = currentLine + ', ' + arg.trim();
 
-			const effectiveLen = lineWithNextArg.length + indent.length;
-			if (effectiveLen > wrapLength) {
+			// Use visual length calculation
+			const visualLen = this.getVisualLength(lineWithNextArg + indent, 4);
+			if (visualLen > wrapLength) {
 				// Wrap
 				result.push(currentLine + ',');
 				currentLine = continuationIndent + arg.trim();
 			} else {
 				currentLine = lineWithNextArg;
+			}
+		}
+
+		// Check if the last line (currentLine) is still too long due to array literal
+		const lastLineVisualLen = this.getVisualLength(indent + currentLine + ');', 4);
+		if (lastLineVisualLen > wrapLength) {
+			// Check if it's an array literal that can be further wrapped
+			const arrayMatch = currentLine.match(/^(\s*)(\{.+\})$/);
+			if (arrayMatch) {
+				const arrayIndent = arrayMatch[1];
+				const arrayContent = arrayMatch[2];
+				// Extract array content (without { and })
+				const contentMatch = arrayContent.match(/^\{(.+)\}$/);
+				if (contentMatch) {
+					const items = this.splitAtTopLevelCommas(contentMatch[1]);
+					if (items.length > 1) {
+						// Wrap the array into balanced lines
+						// Calculate how many items per line to stay under wrapLength
+						const availableWidth = wrapLength - this.getVisualLength(indent + arrayIndent, 4) - 5; // 5 for braces and comma
+
+						// Try to balance: split roughly in half
+						const midpoint = Math.ceil(items.length / 2);
+						const line1Items = items.slice(0, midpoint);
+						const line2Items = items.slice(midpoint);
+
+						result.push(arrayIndent + '{' + line1Items.join(', ') + ',');
+						result.push(arrayIndent + ' ' + line2Items.join(', ') + '});');
+						return result;
+					}
+				}
 			}
 		}
 
@@ -2111,12 +2410,123 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 				}
 			}
 
-			const part = remaining.substring(0, breakPoint).trimEnd();
+			// Keep the trailing space in the first part so concatenation preserves the word boundary
+			const part = remaining.substring(0, breakPoint + 1); // Include the space
 			parts.push(`${quote}${part}${quote}`);
-			remaining = remaining.substring(breakPoint).trimStart();
+			remaining = remaining.substring(breakPoint + 1); // Skip the space we included
 		}
 
 		return parts;
+	}
+
+	/**
+	 * Wrap a :RETURN statement containing an array with long string elements
+	 * e.g., :RETURN {-1, "Very long error message..."};
+	 */
+	private wrapReturnArray(
+		keyword: string,
+		arrayContent: string,
+		wrapLength: number,
+		indent: string,
+		semicolon: string
+	): string[] | null {
+		// Parse array items (comma-separated, respecting strings)
+		const items = this.splitAtTopLevelCommas(arrayContent);
+		if (items.length < 1) {
+			return null;
+		}
+
+		// Calculate effective wrap length for string content
+		// String content should start at column 14 (0-indexed column 13)
+		// Since caller adds originalIndent, we need to calculate spaces to reach column 14
+		// Tab counts as 4 columns, spaces count as 1
+		const indentVisualWidth = indent.split('').reduce((len, char) => {
+			if (char === '\t') {
+				return len + 4 - (len % 4);
+			}
+			return len + 1;
+		}, 0);
+		const targetColumn = 13; // 0-indexed column 13 = visual column 14
+		const continuationSpaces = Math.max(0, targetColumn - indentVisualWidth);
+		const continuationIndent = ' '.repeat(continuationSpaces);
+		const effectiveWrapLength = wrapLength - (targetColumn + 6);
+
+		// Expand any long string items
+		const expandedItems: string[] = [];
+		for (const item of items) {
+			const trimmedItem = item.trim();
+			// Check if it's a long string literal
+			if (trimmedItem.length > effectiveWrapLength &&
+				((trimmedItem.startsWith('"') && trimmedItem.endsWith('"')) ||
+					(trimmedItem.startsWith("'") && trimmedItem.endsWith("'")))) {
+				// Split the long string
+				const splitParts = this.splitLongString(trimmedItem, effectiveWrapLength - 2);
+				if (splitParts.length > 1) {
+					// Join with newline + plus on following line
+					// No extra spaces - continuation indent is applied when processing the lines
+					expandedItems.push(splitParts.join('\n+ '));
+				} else {
+					expandedItems.push(trimmedItem);
+				}
+			} else {
+				expandedItems.push(trimmedItem);
+			}
+		}
+
+		// Reconstruct the :RETURN statement
+		// If any item was expanded (contains newlines), we need multi-line format
+		const hasMultiLine = expandedItems.some(item => item.includes('\n'));
+
+		if (hasMultiLine) {
+			const result: string[] = [];
+
+			if (expandedItems.length === 1) {
+				// Single item :RETURN
+				const lines = (keyword + '{' + expandedItems[0] + '}' + semicolon).split('\n');
+				return lines;
+			}
+
+			// Multiple items - put each on its own line
+			result.push(keyword + '{' + expandedItems[0] + ',');
+			for (let i = 1; i < expandedItems.length - 1; i++) {
+				const itemLines = expandedItems[i].split('\n');
+				for (let j = 0; j < itemLines.length; j++) {
+					if (j === itemLines.length - 1) {
+						result.push(continuationIndent + itemLines[j] + ',');
+					} else {
+						result.push(continuationIndent + itemLines[j]);
+					}
+				}
+			}
+			// Last item
+			const lastItem = expandedItems[expandedItems.length - 1];
+			const lastLines = lastItem.split('\n');
+			for (let j = 0; j < lastLines.length; j++) {
+				if (j === lastLines.length - 1) {
+					result.push(continuationIndent + lastLines[j] + '}' + semicolon);
+				} else {
+					result.push(continuationIndent + lastLines[j]);
+				}
+			}
+
+			return result;
+		}
+
+		// No multi-line items, just check if the whole thing needs wrapping
+		const fullLine = keyword + '{' + expandedItems.join(', ') + '}' + semicolon;
+		if (fullLine.length < wrapLength - indent.length) {
+			return null; // Fits on one line, no wrapping needed
+		}
+
+		// Simple multi-line format
+		const result: string[] = [];
+		result.push(keyword + '{' + expandedItems[0] + ',');
+		for (let i = 1; i < expandedItems.length - 1; i++) {
+			result.push(continuationIndent + expandedItems[i] + ',');
+		}
+		result.push(continuationIndent + expandedItems[expandedItems.length - 1] + '}' + semicolon);
+
+		return result;
 	}
 
 	/**

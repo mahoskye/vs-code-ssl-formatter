@@ -292,15 +292,54 @@ export function formatSqlWithStyleImpl(
 	// Format expressions inside ?...? parameter placeholders
 	// These contain SSL expressions that should have proper operator spacing
 	// e.g., ?MAXCUPNO-1+i? -> ?MAXCUPNO - 1 + i?
+	// Format expressions inside ?...? parameter placeholders
+	// These contain SSL expressions that should have proper operator spacing
+	// e.g., ?MAXCUPNO-1+i? -> ?MAXCUPNO - 1 + i?
+	// We must avoid modifying content inside string literals within the expression e.g. ?'N/A'?
 	sql = sql.replace(/\?([^?]+)\?/g, (_match, expr: string) => {
-		let formatted = expr;
-		// Add spaces around arithmetic operators (+, -, *, /)
-		// Handle + and - carefully to not break unary operators
-		formatted = formatted.replace(/([A-Za-z0-9_\]\)])\s*\+\s*([A-Za-z0-9_\[\(])/g, '$1 + $2');
-		formatted = formatted.replace(/([A-Za-z0-9_\]\)])\s*-\s*([A-Za-z0-9_\[\(])/g, '$1 - $2');
-		formatted = formatted.replace(/([A-Za-z0-9_\]\)])\s*\*\s*([A-Za-z0-9_\[\(])/g, '$1 * $2');
-		formatted = formatted.replace(/([A-Za-z0-9_\]\)])\s*\/\s*([A-Za-z0-9_\[\(])/g, '$1 / $2');
-		return `?${formatted}?`;
+		// Simple tokenizer to splitting by quote
+		const parts: string[] = [];
+		let current = '';
+		let inString = false;
+		let quoteChar = '';
+
+		for (let i = 0; i < expr.length; i++) {
+			const char = expr[i];
+			if (!inString) {
+				if (char === '"' || char === "'") {
+					parts.push(current);
+					current = char;
+					inString = true;
+					quoteChar = char;
+				} else {
+					current += char;
+				}
+			} else {
+				current += char;
+				if (char === quoteChar) {
+					parts.push(current);
+					current = '';
+					inString = false;
+					quoteChar = '';
+				}
+			}
+		}
+		parts.push(current);
+
+		const formattedParts = parts.map(part => {
+			if (part.startsWith('"') || part.startsWith("'")) {
+				return part;
+			}
+			// Apply formatting to code parts
+			let formatted = part;
+			formatted = formatted.replace(/([A-Za-z0-9_\]\)])\s*\+\s*([A-Za-z0-9_\[\(])/g, '$1 + $2');
+			formatted = formatted.replace(/([A-Za-z0-9_\]\)])\s*-\s*([A-Za-z0-9_\[\(])/g, '$1 - $2');
+			formatted = formatted.replace(/([A-Za-z0-9_\]\)])\s*\*\s*([A-Za-z0-9_\[\(])/g, '$1 * $2');
+			formatted = formatted.replace(/([A-Za-z0-9_\]\)])\s*\/\s*([A-Za-z0-9_\[\(])/g, '$1 / $2');
+			return formatted;
+		});
+
+		return `?${formattedParts.join('')}?`;
 	});
 
 
@@ -355,10 +394,10 @@ export function formatSqlWithStyleImpl(
 		return processToken(match, offset, fullText);
 	});
 
-	// Unmask
-	masks.forEach((original, i) => {
-		sql = sql.replace(`__MASK${i}__`, original);
-	});
+	// Unmask in reverse order to handle nested masks (e.g. string inside param)
+	for (let i = masks.length - 1; i >= 0; i--) {
+		sql = sql.replace(`__MASK${i}__`, masks[i]);
+	}
 
 	// Re-apply parameter formatting (spaces inside ?...?)
 	// Since we masked params entirely above, the previous step that formatted expressions inside params 
@@ -517,21 +556,82 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 	const hangingIndent = indentSpaces; // For ON, AND, OR (use configured indent)
 
 	// Format SELECT with columns on same line where possible
-	const selectMatch = result.match(/^(SELECT\s+(?:DISTINCT\s+)?)(.*?)(?=\s+FROM\b)/i);
+	// Use manual scanning to find the FROM clause to avoid stopping at nested FROMs
+	const selectStartMatch = result.match(/^(SELECT\s+(?:DISTINCT\s+)?)/i);
+	let selectMatch: RegExpMatchArray | null = null;
+	let selectListString = "";
+
+	if (selectStartMatch) {
+		const startIdx = selectStartMatch[0].length;
+		let nesting = 0;
+		let inString = false;
+		let stringChar = '';
+		let foundEnd = false;
+		let endIdx = -1;
+
+		for (let i = startIdx; i < result.length; i++) {
+			const char = result[i];
+
+			if (inString) {
+				if (char === stringChar) {
+					inString = false;
+				}
+			} else {
+				if (char === '"' || char === "'") {
+					inString = true;
+					stringChar = char;
+				} else if (char === '(') {
+					nesting++;
+				} else if (char === ')') {
+					nesting--;
+				} else if (nesting === 0) {
+					// Check for FROM keyword
+					if (result.substr(i, 6).toUpperCase() === " FROM ") {
+						// Found it (surrounded by spaces due to earlier normalization)
+						// Check exact boundary? The normalized text has " FROM ".
+						endIdx = i;
+						foundEnd = true;
+						break;
+					}
+					// Also check for newline boundaries if normalization wasn't perfect?
+					// The clean code uses single space.
+				}
+			}
+		}
+
+		if (foundEnd) {
+			selectListString = result.substring(startIdx, endIdx);
+			// Verify it matches structure expected by logic below
+			// selectMatch[0] should be usage range
+			// We construct a fake match object or just reuse logic
+			// Actually, we need to replace the WHOLE select block string.
+			// Original: result.replace(selectMatch[0], ...)
+			// So we need the full string "SELECT ... list"
+			const fullMatchString = result.substring(0, endIdx); // From 0 to FROM start
+
+			// Construct compatible objects
+			selectMatch = [fullMatchString, selectStartMatch[1], selectListString];
+		}
+	}
+
 	if (selectMatch) {
 		const selectKeyword = applySqlKeywordCase("SELECT", keywordCase, selectMatch[1].trim());
 		const distinctMatch = selectMatch[1].match(/DISTINCT/i);
 		const distinctPart = distinctMatch ? " " + applySqlKeywordCase("DISTINCT", keywordCase, distinctMatch[0]) : "";
 		const columns = parseColumns(selectMatch[2]);
+		// console.log removed
 
 		// Format columns with proper alignment
 		// First columns on same line as SELECT, continuation aligned to 7 spaces
 		const firstLinePrefix = selectKeyword + distinctPart + " ";
 		const continuationPrefix = " ".repeat(columnAlignIndent);
 
+
 		// Build column list with wrapping
 		const formattedColumns: string[] = [];
 		let currentLine = firstLinePrefix;
+		// Track visual length separate from string length to handle subqueries that will be split later
+		let currentVisualLength = firstLinePrefix.length;
 		const maxLineLength = 80;
 
 		for (let i = 0; i < columns.length; i++) {
@@ -539,16 +639,55 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 			const separator = i < columns.length - 1 ? ", " : "";
 			const addition = col + separator;
 
+			// Determine effective visual cost of adding this column
+			// If it's a subquery, we treat it as short because it will be split into multiple lines later.
+			// The effective length is just the whitespace prefix + the tail (alias) part.
+			const isSubquery = /\(\s*SELECT\b/i.test(col);
+			let additionVisualLength = addition.length;
+
+			if (isSubquery) {
+				// Estimate tail length: ) + alias. Default to 15 if pattern fails.
+				const tailMatch = col.match(/\)\s*[^)]*$/);
+				const tailLength = tailMatch ? tailMatch[0].length : 15;
+				// The cost added to the CURRENT line is just the "(", but we treat the whole block 
+				// as resetting the visual length for subsequent columns.
+				// Let's check if the START fits.
+				additionVisualLength = 10; // Treat start as short "(SELECT..."
+			}
+
 			if (currentLine === firstLinePrefix) {
 				// First column always goes on first line
 				currentLine += addition;
-			} else if (currentLine.length + addition.length <= maxLineLength) {
+				if (isSubquery) {
+					// Reset visual length for next columns to be based on the subquery tail + indent
+					const tailMatch = col.match(/\)\s*[^)]*$/);
+					const tailLength = tailMatch ? tailMatch[0].length : 15;
+					currentVisualLength = continuationPrefix.length + tailLength;
+				} else {
+					currentVisualLength += addition.length;
+				}
+			} else if (currentVisualLength + additionVisualLength <= maxLineLength) {
 				// Fits on current line
 				currentLine += addition;
+				if (isSubquery) {
+					// Reset visual length for next columns
+					const tailMatch = col.match(/\)\s*[^)]*$/);
+					const tailLength = tailMatch ? tailMatch[0].length : 15;
+					currentVisualLength = continuationPrefix.length + tailLength;
+				} else {
+					currentVisualLength += addition.length;
+				}
 			} else {
 				// Need to wrap to next line
 				formattedColumns.push(currentLine.trimEnd());
 				currentLine = continuationPrefix + addition;
+				if (isSubquery) {
+					const tailMatch = col.match(/\)\s*[^)]*$/);
+					const tailLength = tailMatch ? tailMatch[0].length : 15;
+					currentVisualLength = continuationPrefix.length + tailLength;
+				} else {
+					currentVisualLength = continuationPrefix.length + addition.length;
+				}
 			}
 		}
 		if (currentLine.trim()) {
@@ -562,7 +701,8 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 	const majorClauses = [
 		"UPDATE", "DELETE FROM",
 		"FROM", "JOIN", "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN",
-		"WHERE", "GROUP BY", "ORDER BY", "HAVING", "UNION", "UNION ALL", "EXCEPT", "INTERSECT"
+		"WHERE", "GROUP BY", "ORDER BY", "HAVING", "UNION", "UNION ALL", "EXCEPT", "INTERSECT",
+		"CASE", "WHEN", "ELSE", "END"
 		// Removed SET, INSERT INTO, VALUES from majorClauses to handle them manually
 	];
 
@@ -574,10 +714,41 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 			pattern = `(?<!DELETE\\s+)FROM`;
 		}
 
-		const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
-		result = result.replace(clauseRegex, (_match, clause) => {
-			return `\n${applySqlKeywordCase(keyword, keywordCase, clause)}`;
-		});
+		const isCaseKeyword = ["CASE", "WHEN", "ELSE", "END"].includes(keyword);
+		const prefixSpace = isCaseKeyword ? " ".repeat(indentSpaces) : "";
+
+		if (keyword === "CASE") {
+			// Detect CASE with optional parenthesis prefix (CASE
+			// Preserve spaces before the opening paren if present
+			const clauseRegex = new RegExp(`(\\s*\\(\\s*)(${pattern})\\b`, "gi");
+			result = result.replace(clauseRegex, (_match, prefix, clause) => {
+				// prefix contains space and paren e.g. " ("
+				return `${prefix}\n${applySqlKeywordCase(keyword, keywordCase, clause)}`;
+			});
+
+			// Also handle standard space separator if not handled above
+		}
+
+		// Run standard replacement for all (including CASE if not matched above)
+		if (keyword !== "CASE") {
+			const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
+			result = result.replace(clauseRegex, (_match, clause) => {
+				return `\n${applySqlKeywordCase(keyword, keywordCase, clause)}`;
+			});
+		} else {
+			const caseRegex = new RegExp(`([\\s(]+)(${pattern})\\b`, "gi");
+			result = result.replace(caseRegex, (match, prefix, clause) => {
+				if (prefix.includes('\n')) return match;
+
+				if (prefix.includes('(')) {
+					const lastParenIndex = prefix.lastIndexOf('(');
+					const preParen = prefix.substring(0, lastParenIndex + 1);
+					return `${preParen}\n${applySqlKeywordCase(keyword, keywordCase, clause)}`;
+				} else {
+					return `\n${applySqlKeywordCase(keyword, keywordCase, clause)}`;
+				}
+			});
+		}
 	});
 
 	// Format SET clause assignments - UPDATE table SET ...
@@ -778,24 +949,53 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 		}
 
 		// Check if this line ends with ) (not inline) and we have open parens at end of previous lines
-		// Don't split if the ) is part of an inline paren pair like IN (?x?)
-		const hasContentBeforeCloseParen = /[^(\s]+\)\s*["']?\s*$/.test(trimmedEnd);
-		const isInlineParen = /\([^)]+\)\s*["']?\s*$/.test(trimmedEnd); // like IN (?x?)
+		if (openParenAtEndOfLine > 0) {
+			// Find the first ) that is not part of an inline pair (i.e. not matched by a ( on this line)
+			// We need to mask strings/comments first to avoid false positives
+			let masked = line;
+			masked = masked.replace(/(["'])(?:(?=(\\?))\2[\s\S])*?\1/g, (m) => " ".repeat(m.length)); // Mask strings with spaces
+			masked = masked.replace(/\[[^\]]*\]/g, (m) => " ".repeat(m.length)); // Mask brackets
+			// Simple masking for comments might be dangerous if they span lines? 
+			// But here we are processing line by line.
+			masked = masked.replace(/--.*$/, (m) => " ".repeat(m.length));
+			// Block comments? Regex matching might carry over? formatSql removes them mostly?
+			// Assuming mostly clean SQL at this point.
+			masked = masked.replace(/\/\*[\s\S]*?\*\//g, (m) => " ".repeat(m.length));
 
-		if (openParenAtEndOfLine > 0 && hasContentBeforeCloseParen && !isInlineParen) {
-			// Split the ) to its own line
-			const match = line.match(/^(.+?)(\)\s*["']?\s*)$/);
-			if (match) {
-				processedLines.push(match[1]);
-				processedLines.push(match[2].trim());
+			let balance = 0;
+			let splitIndex = -1;
+
+			// Find split point
+			for (let j = 0; j < masked.length; j++) {
+				const char = masked[j];
+				if (char === '(') balance++;
+				else if (char === ')') {
+					balance--;
+					if (balance < 0) {
+						splitIndex = j;
+						break;
+					}
+				}
+			}
+
+			if (splitIndex !== -1) {
+				// We found a closing paren that closes a previous line's open paren
+				const before = line.substring(0, splitIndex);
+				const after = line.substring(splitIndex);
+
+				// Make sure we aren't leaving an empty line if spacing is weird
+				if (before.trim().length > 0) {
+					processedLines.push(before);
+				}
+				processedLines.push(after.trim());
+
 				openParenAtEndOfLine--;
 				openParenHadContent.pop();
-			} else {
-				processedLines.push(line);
+				continue;
 			}
-		} else {
-			processedLines.push(line);
 		}
+
+		processedLines.push(line);
 	}
 
 	processedResult = processedLines.join('\n');
@@ -804,82 +1004,128 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 	let currentDepth = 0;
 	const subqueryIndent = " ".repeat(indentSpaces); // Matches basic indent
 	// Track whether each level's opening ( had content before it
-	const contentOpenedParens: boolean[] = [];
+	// Stack to track the indentation of open blocks
+	const indentStack: number[] = [];
 
 	const indentedLines = lines.map((line, lineIndex) => {
-		// Count parens on this line to track depth changes
-		let netChange = 0;
-		let inString = false;
-		let stringChar = '';
+		// Mask strings and comments to avoid counting keywords/parens inside them
+		let maskedLine = line;
+		maskedLine = maskedLine.replace(/(["'])(?:(?=(\\?))\2[\s\S])*?\1/g, '""');
+		maskedLine = maskedLine.replace(/\[[^\]]*\]/g, '[]');
+		maskedLine = maskedLine.replace(/\/\*[\s\S]*?\*\//g, '');
+		maskedLine = maskedLine.replace(/--.*$/, '');
 
-		for (let i = 0; i < line.length; i++) {
-			const char = line[i];
-			if (inString) {
-				if (char === stringChar) inString = false;
-			} else {
-				if (char === "'" || char === '"' || char === '[') {
-					inString = true;
-					stringChar = char === '[' ? ']' : char;
-				} else if (char === '(') {
-					netChange++;
-				} else if (char === ')') {
-					netChange--;
-				}
-			}
-		}
+		// Count parens and keywords on this line to track depth changes
+		const openParens = (maskedLine.match(/\(/g) || []).length;
+		const closeParens = (maskedLine.match(/\)/g) || []).length;
+		const caseKeywords = (maskedLine.match(/\bCASE\b/gi) || []).length;
+		const endKeywords = (maskedLine.match(/\bEND\b/gi) || []).length;
+		const netChange = (openParens + caseKeywords) - (closeParens + endKeywords);
 
 		const trimmed = line.trim();
-		const trimmedEnd = line.trimEnd();
 
-		// Track if this line ends with ( and whether it had content
-		if (trimmedEnd.endsWith('(') && !trimmedEnd.match(/\([^)]*\)$/)) {
-			const hasContent = trimmed !== '(';
-			contentOpenedParens.push(hasContent);
-		}
+		// Lines starting with ) or END should use the depth before the closing
+		// Note: effectiveDepth here is 0-based index into indentStack
+		// Level 0 (top) has depth 0. Stack empty.
+		// Level 1 children have depth 1. Stack size 1.
 
-		// Lines starting with ) should use the depth before the closing
 		let effectiveDepth = currentDepth;
-		let closingContentParen = false;
-		if (trimmed.startsWith(')')) {
+		const startsWithParen = trimmed.startsWith(')');
+		const startsWithEnd = /^\b(END|WHEN|ELSE)\b/i.test(trimmed);
+
+		if (startsWithParen || startsWithEnd) {
 			effectiveDepth = Math.max(0, currentDepth - 1);
-			// Check if the matching opener had content
-			if (contentOpenedParens.length > 0) {
-				closingContentParen = contentOpenedParens.pop() || false;
-			}
 		}
 
-		// Apply depth-based indent (4 spaces per nesting level)
-		let indent = "";
-		if (effectiveDepth > 0) {
-			indent = subqueryIndent.repeat(effectiveDepth);
+		// Calculate Base Structure Indent for this line
+		let thisLineIndentString = "";
+		let thisLineIndentCount = 0;
+
+		const canAlignWithStack = (startsWithParen || startsWithEnd) && indentStack.length > effectiveDepth;
+
+		if (canAlignWithStack) {
+			// Closer: align with the opener (parent indent)
+			thisLineIndentCount = indentStack[effectiveDepth];
+			thisLineIndentString = " ".repeat(thisLineIndentCount);
+		} else if (effectiveDepth === 0) {
+			// Top level content or Opener: preserve existing raw indent (handled by regex formatter)
+			const match = line.match(/^(\s*)/);
+			thisLineIndentString = match ? match[1] : "";
+			thisLineIndentCount = thisLineIndentString.length;
+		} else {
+			// Nested: Calculate based on parent in stack
+			// stack[effectiveDepth - 1] is the indent of the parent block
+			// e.g. Depth 1. Use stack[0].
+
+			// Safety check for stack underflow if depth tracking mismatched
+			const parentIndent = indentStack[effectiveDepth - 1] || 0;
+
+			// Content: indent + 4 from parent
+			thisLineIndentCount = parentIndent + indentSpaces;
+
+			thisLineIndentString = " ".repeat(thisLineIndentCount);
 		}
 
-		currentDepth += netChange;
-
-		// Add extra indent for major clauses inside subqueries (depth > 0) 
-		// to ensure visual nesting relative to outer clause
-		let baseIndent = "";
+		// Calculate extra base indent for major clauses INSIDE subqueries
+		let extraIndent = "";
 		const upper = trimmed.toUpperCase();
 		if (effectiveDepth > 0 && (
 			upper.startsWith('SELECT ') ||
 			upper.startsWith('FROM ') ||
 			upper.startsWith('WHERE ') ||
 			upper.startsWith('AND ') ||
-			upper.startsWith('OR ')
+			upper.startsWith('OR ') ||
+			upper.startsWith('CASE') ||
+			upper.startsWith('WHEN ') ||
+			upper.startsWith('ELSE ') ||
+			upper.startsWith('END')
 		)) {
-			// These clauses get extra indent to align inside subquery
-			baseIndent = " ".repeat(indentSpaces);
+			// No, we incorporated parent logic. 
+			// Standard behavior: WHERE aligns with SELECT?
+			// If we just use simple +4 nesting, it's fine.
+			// The original code added "baseIndent" (indentSpaces) for these clauses.
+			// Let's preserve that "visual aligned" style if desired, OR stick to strict hierarchy.
+			// The original code did: return indent + baseIndent + trimmed.
+			// indent was depth*4. baseIndent was 4 if major clause.
+			// So major clauses were depth*4 + 4.
+			// Normal lines were depth*4.
+			// Wait, that means `SELECT` was indented *more* than `col1`? No.
+			// `col1` usually would be `SELECT \n col1`.
+			// `col1` line would have depth 1? 
+			// Let's stick to simple hierarchical indentation first. 
+			// Users complained about CASE indent (lines 700ish).
+			// We aligned them using this logic.
+
+			// If we want `AND` to be indented relative to parent `WHERE`?
+			// Current logic: `AND` is just content. +4.
+			// If `WHERE` is parent (opener?), no `WHERE` doesn't open.
+
+			// Let's add the extra indent for major clauses to match style
+			// But careful: `CASE` is a major clause now.
+			// If `CASE` gets extra, it moves to +8 relative to parent?
+			// Line 700: `CASE`. We want it at 20 (4 more than 16).
+			// If we add extra, it becomes 24.
+			// Let's try without extra first.
 		}
 
-		// Closing parens that match a content-opened paren get hanging indent
-		// to align with the content (like AND NOT EXISTS)
-		// Closing parens for simple ( lines don't get extra indent
-		if (trimmed.startsWith(')') && closingContentParen) {
-			baseIndent = " ".repeat(hangingIndent);
+		// Update Indent Stack for *next* lines
+		// We push the indent determined for *this* line as the base for blocks opening on this line.
+		if (netChange > 0) {
+			for (let i = 0; i < netChange; i++) {
+				indentStack.push(thisLineIndentCount);
+			}
+		} else if (netChange < 0) {
+			for (let i = 0; i < Math.abs(netChange); i++) {
+				indentStack.pop();
+			}
 		}
 
-		// Add depth indent + base indent to existing line content
-		return indent + baseIndent + line;
+		currentDepth += netChange;
+
+		// Ensure non-negative depth
+		if (currentDepth < 0) currentDepth = 0;
+
+		return thisLineIndentString + extraIndent + trimmed;
 	});
 
 	return indentedLines.join('\n').trim();

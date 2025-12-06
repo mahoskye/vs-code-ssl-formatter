@@ -22,8 +22,18 @@ mockVscode.workspace.configuration = mockConfig;
 async function run() {
     const provider = new SSLFormattingProvider();
 
-    const inputPath = path.resolve(process.cwd(), 'QCSAMPLESINSERTIRUN.srvscr');
-    const outputPath = path.resolve(process.cwd(), 'QCSAMPLESINSERTIRUN.expected.srvscr');
+    const args = process.argv.slice(2);
+    if (args.length < 1) {
+        console.error('Usage: ts-node scripts/generate_output.ts <input_file>');
+        process.exit(1);
+    }
+
+    const inputPath = path.resolve(process.cwd(), args[0]);
+    const outputPath = inputPath.replace(/\.srvscr$|\.ssl$|\.ds$/, '.expected$&');
+    // If extension wasn't matched, just append .expected
+    if (outputPath === inputPath) {
+        path.join(path.dirname(inputPath), path.basename(inputPath) + '.expected');
+    }
 
     console.log(`Reading from ${inputPath}`);
     const content = fs.readFileSync(inputPath, 'utf8');
