@@ -35,8 +35,19 @@ export const CASE_KEYWORDS = [
 ];
 
 export const PROCEDURE_LEVEL_KEYWORDS = [
-    "PARAMETERS", "DEFAULT", "PUBLIC"
+    "PARAMETERS", "DEFAULT", "PUBLIC", "DECLARE"
 ];
+
+export const MAJOR_BLOCK_START_KEYWORDS = [
+    "PROCEDURE", "CLASS", "REGION"
+];
+
+export const MAJOR_BLOCK_END_KEYWORDS = [
+    "ENDPROC", "ENDREGION"
+];
+
+export const REGION_START_PATTERN = /^\/\*\s*region/i;
+export const REGION_END_PATTERN = /^\/\*\s*endregion/i;
 
 export const INLINE_SQL_FUNCTIONS = [
     "SQLExecute",
@@ -55,6 +66,11 @@ export const PARAMETERIZED_SQL_FUNCTIONS = [
     "GetDataSetEx"
 ];
 
+export const SQL_CONTEXT_FUNCTIONS = [
+    ...INLINE_SQL_FUNCTIONS,
+    ...PARAMETERIZED_SQL_FUNCTIONS
+];
+
 
 
 export const MULTILINE_CONSTRUCT_KEYWORDS = [
@@ -63,6 +79,19 @@ export const MULTILINE_CONSTRUCT_KEYWORDS = [
     "ENDIF", "ENDWHILE", "NEXT", "ENDCASE", "ENDTRY", "ENDPROC", "ENDREGION",
     "LOOP", "EXITWHILE", "RETURN"
 ];
+
+export const SSL_OPERATORS = [
+    ".AND.", ".OR.", ".NOT."
+];
+
+export const SSL_COMPOUND_OPERATORS = [
+    ":=", "+=", "-=", "*=", "/=", "==", "!=", ">=", "<=", "<>", "^=", "%="
+];
+
+export const SSL_LITERALS = [
+    ".T.", ".F.", "NIL"
+];
+
 
 /**
  * Common loop counter variable names

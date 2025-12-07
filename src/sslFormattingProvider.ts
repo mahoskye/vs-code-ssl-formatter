@@ -62,7 +62,10 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		const config = vscode.workspace.getConfiguration('ssl');
 		const extendedOptions = {
 			...options,
-			'ssl.format.wrapLength': config.get<number>('format.wrapLength', 90)
+			'ssl.format.wrapLength': config.get<number>('format.wrapLength', 90),
+			'ssl.format.sql.enabled': config.get<boolean>('format.sql.enabled', false),
+			'ssl.format.sql.keywordCase': config.get<string>('format.sql.keywordCase', 'upper'),
+			'ssl.format.sql.indentSpaces': config.get<number>('format.sql.indentSpaces', 4)
 		};
 		const formatter = new SSLFormatter(extendedOptions);
 		const formatted = formatter.format(text, initialIndentLevel);

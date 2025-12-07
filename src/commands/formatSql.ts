@@ -101,7 +101,29 @@ export function registerFormatSqlCommand(context: vscode.ExtensionContext): void
 		}
 	});
 
-	context.subscriptions.push(formatSqlCommand, formatSqlPickStyleCommand);
+	// Command to format SQL in a specific range (used by code action)
+	const formatSqlRangeCommand = vscode.commands.registerCommand(
+		"ssl.formatSqlRange",
+		async (uri: vscode.Uri, range: vscode.Range) => {
+			const editor = vscode.window.activeTextEditor;
+			if (!editor || editor.document.uri.toString() !== uri.toString()) {
+				return;
+			}
+
+			// Select the range and then format
+			editor.selection = new vscode.Selection(range.start, range.end);
+
+			// Get default style from config
+			const config = vscode.workspace.getConfiguration("ssl");
+			const defaultStyle = config.get<SqlFormattingStyle>(
+				CONFIG_KEYS.FORMAT_SQL_STYLE,
+				CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_SQL_STYLE] as SqlFormattingStyle
+			);
+			await formatSqlWithStyle(defaultStyle);
+		}
+	);
+
+	context.subscriptions.push(formatSqlCommand, formatSqlPickStyleCommand, formatSqlRangeCommand);
 }
 
 /**
@@ -738,7 +760,7 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 		} else {
 			const caseRegex = new RegExp(`([\\s(]+)(${pattern})\\b`, "gi");
 			result = result.replace(caseRegex, (match, prefix, clause) => {
-				if (prefix.includes('\n')) return match;
+				if (prefix.includes('\n')) {return match;}
 
 				if (prefix.includes('(')) {
 					const lastParenIndex = prefix.lastIndexOf('(');
@@ -771,8 +793,8 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 	 * Helper to wrap comma-separated list of items
 	 */
 	function wrapSqlList(items: string[], indent: string, wrapLength: number): string {
-		if (items.length === 0) return "";
-		if (wrapLength <= 0) return indent + items.join(", "); // No wrapping
+		if (items.length === 0) {return "";}
+		if (wrapLength <= 0) {return indent + items.join(", ");} // No wrapping
 
 		let currentLine = indent;
 		const lines: string[] = [];
@@ -968,7 +990,7 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 			// Find split point
 			for (let j = 0; j < masked.length; j++) {
 				const char = masked[j];
-				if (char === '(') balance++;
+				if (char === '(') {balance++;}
 				else if (char === ')') {
 					balance--;
 					if (balance < 0) {
@@ -1123,7 +1145,7 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 		currentDepth += netChange;
 
 		// Ensure non-negative depth
-		if (currentDepth < 0) currentDepth = 0;
+		if (currentDepth < 0) {currentDepth = 0;}
 
 		return thisLineIndentString + extraIndent + trimmed;
 	});

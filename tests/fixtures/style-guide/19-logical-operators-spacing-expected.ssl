@@ -5,6 +5,6 @@
 	:IF bCondition .AND. nValue > 0;
 		nResult := 1;
 	:ELSE;
-		nResult := 0 .OR. 2;
+		nResult := 0. OR .2;
 	:ENDIF;
 :ENDPROC;

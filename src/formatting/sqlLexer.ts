@@ -19,13 +19,7 @@ export interface SqlToken {
     offset: number;
 }
 
-const SQL_KEYWORDS = new Set([
-    "SELECT", "DISTINCT", "TOP", "AS", "ON", "IN", "NOT", "BETWEEN", "LIKE", "IS", "NULL",
-    "INNER", "LEFT", "RIGHT", "FULL", "CROSS", "JOIN", "INSERT", "INTO", "VALUES",
-    "UPDATE", "SET", "DELETE", "FROM", "WHERE", "GROUP", "BY", "ORDER", "HAVING",
-    "UNION", "ALL", "EXCEPT", "INTERSECT", "AND", "OR", "ASC", "DESC", "LIMIT",
-    "OFFSET", "EXISTS", "CASE", "WHEN", "THEN", "ELSE", "END"
-]);
+import { SQL_KEYWORDS } from '../constants/sql';
 
 export class SqlLexer {
     private input: string;
@@ -73,7 +67,7 @@ export class SqlLexer {
     }
 
     private peek(offset: number = 1): string {
-        if (this.pos + offset >= this.input.length) return "";
+        if (this.pos + offset >= this.input.length) {return "";}
         return this.input[this.pos + offset];
     }
 
@@ -115,7 +109,7 @@ export class SqlLexer {
             const char = this.input[this.pos];
             text += char;
             this.advance();
-            if (char === '/' && text.endsWith('*/')) break;
+            if (char === '/' && text.endsWith('*/')) {break;}
         }
         return { type: SqlTokenType.Whitespace, text, line, column: col, offset: start };
     }
@@ -218,7 +212,7 @@ export class SqlLexer {
             if (c === '(') {
                 pDepth++;
             } else if (c === ')') {
-                if (pDepth > 0) pDepth--;
+                if (pDepth > 0) {pDepth--;}
             }
 
             if (c === '?' && pDepth === 0) {

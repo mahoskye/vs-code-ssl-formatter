@@ -1,3 +1,4 @@
+import { SSL_COMPOUND_OPERATORS, SSL_OPERATORS, SSL_LITERALS } from '../constants/language';
 
 export enum TokenType {
     Whitespace,
@@ -97,7 +98,7 @@ export class Lexer {
     }
 
     private peek(offset: number = 1): string {
-        if (this.pos + offset >= this.input.length) return "";
+        if (this.pos + offset >= this.input.length) {return "";}
         return this.input[this.pos + offset];
     }
 
@@ -107,7 +108,7 @@ export class Lexer {
         // So we look at previous tokens.
         for (let i = tokens.length - 1; i >= 0; i--) {
             if (tokens[i].type === TokenType.Whitespace) {
-                if (tokens[i].text.includes('\n')) return true;
+                if (tokens[i].text.includes('\n')) {return true;}
                 continue;
             }
             return false;
@@ -119,11 +120,11 @@ export class Lexer {
         // Look back for last non-whitespace/comment token
         for (let i = tokens.length - 1; i >= 0; i--) {
             const t = tokens[i];
-            if (t.type === TokenType.Whitespace || t.type === TokenType.Comment) continue;
+            if (t.type === TokenType.Whitespace || t.type === TokenType.Comment) {continue;}
 
             // Term tokens: Identifier, Number, String, ), ]
-            if (t.type === TokenType.Identifier || t.type === TokenType.Number || t.type === TokenType.String) return true;
-            if (t.type === TokenType.Punctuation && (t.text === ')' || t.text === ']')) return true;
+            if (t.type === TokenType.Identifier || t.type === TokenType.Number || t.type === TokenType.String) {return true;}
+            if (t.type === TokenType.Punctuation && (t.text === ')' || t.text === ']')) {return true;}
 
             return false;
         }
@@ -216,7 +217,7 @@ export class Lexer {
 
         while (this.pos < this.input.length) {
             const char = this.input[this.pos];
-            if (char === '\n') break;
+            if (char === '\n') {break;}
             text += char;
             this.advance();
         }
@@ -324,10 +325,10 @@ export class Lexer {
                 const char = this.input[this.pos];
                 text += char;
                 this.advance();
-                if (char === '.') break; // End of .AND.
-                if (!this.isAlpha(char)) break; // Not a word operator
+                if (char === '.') {break;} // End of .AND.
+                if (!this.isAlpha(char)) {break;} // Not a word operator
             }
-            if (text.toUpperCase() === '.AND.' || text.toUpperCase() === '.OR.' || text.toUpperCase() === '.NOT.') {
+            if (SSL_OPERATORS.includes(text.toUpperCase())) {
                 return { type: TokenType.Operator, text, line, column: col, offset: start };
             }
             // Logic for .T. / .F. boolean literals?
@@ -367,16 +368,16 @@ export class Lexer {
             const char = this.input[this.pos];
             text += char;
             this.advance();
-            if (char === '.') break;
-            if (!this.isAlpha(char)) break; // Error case or just text
+            if (char === '.') {break;}
+            if (!this.isAlpha(char)) {break;} // Error case or just text
         }
 
         // Check if valid
         const upper = text.toUpperCase();
-        if (upper === '.T.' || upper === '.F.') {
+        if (SSL_LITERALS.includes(upper)) {
             return { type: TokenType.Keyword, text, line, column: col, offset: start };
         }
-        if (['.AND.', '.OR.', '.NOT.'].includes(upper)) {
+        if (SSL_OPERATORS.includes(upper)) {
             return { type: TokenType.Operator, text, line, column: col, offset: start };
         }
 
@@ -397,7 +398,7 @@ export class Lexer {
         const next = this.pos < this.input.length ? this.input[this.pos] : "";
         const twoChar = char + next;
 
-        if ([":=", "+=", "-=", "*=", "/=", "==", "!=", ">=", "<=", "<>", "^=", "%="].includes(twoChar)) {
+        if (SSL_COMPOUND_OPERATORS.includes(twoChar)) {
             text += next;
             this.advance();
         }

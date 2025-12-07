@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { looksLikeSql } from "./commands/formatSql";
 
 /**
  * SSL Code Action Provider
@@ -7,7 +8,8 @@ import * as vscode from "vscode";
 export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 
 	public static readonly providedCodeActionKinds = [
-		vscode.CodeActionKind.QuickFix
+		vscode.CodeActionKind.QuickFix,
+		vscode.CodeActionKind.Refactor
 	];
 
 	public provideCodeActions(
@@ -41,6 +43,12 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 		const keywordFix = this.createFixKeywordCasingAction(document, line);
 		if (keywordFix) {
 			codeActions.push(keywordFix);
+		}
+
+		// Format SQL code action - detect SQL-like strings
+		const formatSqlAction = this.createFormatSqlAction(document, range);
+		if (formatSqlAction) {
+			codeActions.push(formatSqlAction);
 		}
 
 		return codeActions;
@@ -231,5 +239,92 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 	private getIndentation(line: string): string {
 		const match = line.match(/^(\s*)/);
 		return match ? match[1] : "";
+	}
+
+	/**
+	 * Create a "Format as SQL" code action if cursor is inside a SQL-like string
+	 */
+	private createFormatSqlAction(
+		document: vscode.TextDocument,
+		range: vscode.Range | vscode.Selection
+	): vscode.CodeAction | null {
+		// Find string at cursor position
+		const stringInfo = this.findStringAtPosition(document, range.start);
+		if (!stringInfo) {
+			return null;
+		}
+
+		// Check if content looks like SQL
+		if (!looksLikeSql(stringInfo.content)) {
+			return null;
+		}
+
+		// Create the code action
+		const action = new vscode.CodeAction(
+			"Format as SQL",
+			vscode.CodeActionKind.Refactor
+		);
+
+		// Set up the command to format the SQL
+		action.command = {
+			command: "ssl.formatSql",
+			title: "Format SQL",
+			arguments: []
+		};
+
+		// The command will use the current selection, so we need to select the string first
+		// We'll use a workspace edit to select the range, then the command will format it
+		action.command = {
+			command: "ssl.formatSqlRange",
+			title: "Format SQL",
+			arguments: [document.uri, stringInfo.range]
+		};
+
+		return action;
+	}
+
+	/**
+	 * Find a string literal at the given position
+	 * Returns the string range and content (without quotes)
+	 */
+	private findStringAtPosition(
+		document: vscode.TextDocument,
+		position: vscode.Position
+	): { range: vscode.Range; content: string; quote: string } | null {
+		const line = document.lineAt(position.line);
+		const lineText = line.text;
+		const charIndex = position.character;
+
+		// Find string literals in the line
+		let inString = false;
+		let stringStart = -1;
+		let stringQuote = '';
+
+		for (let i = 0; i < lineText.length; i++) {
+			const char = lineText[i];
+
+			if (!inString && (char === '"' || char === "'")) {
+				inString = true;
+				stringStart = i;
+				stringQuote = char;
+			} else if (inString && char === stringQuote) {
+				// End of string - check if cursor is inside
+				if (charIndex > stringStart && charIndex <= i) {
+					const content = lineText.substring(stringStart + 1, i);
+					const range = new vscode.Range(
+						new vscode.Position(position.line, stringStart),
+						new vscode.Position(position.line, i + 1)
+					);
+					return { range, content, quote: stringQuote };
+				}
+				inString = false;
+				stringStart = -1;
+			}
+		}
+
+		// Handle multi-line strings (cursor might be on a line that's part of a multi-line string)
+		// For now, just check single lines - multi-line string support can be added later
+
+		return null;
 	}
 }
