@@ -155,30 +155,52 @@ export class Parser {
         return root;
     }
 
-    // Helper to check if current token is starting a SQL function call
     private checkSqlContext(tokens: Token[], index: number) {
         // Look back: Identifier (Function Name) -> ( -> String (Current)
         // Check if Function Name is one of the SQL executing functions
         if (index < 2) { return; }
 
-        const prev = tokens[index - 1];
-        const func = tokens[index - 2];
+        let lookbackIndex = index - 1;
+        // Skip whitespace/comments backwards
+        while (lookbackIndex >= 0 && (tokens[lookbackIndex].type === TokenType.Whitespace || tokens[lookbackIndex].type === TokenType.Comment)) {
+            lookbackIndex--;
+        }
 
-        if (prev.text === '(' && func.type === TokenType.Identifier) {
-            if (SQL_CONTEXT_FUNCTIONS.some(f => f.toLowerCase() === func.text.toLowerCase())) {
-                // This string token is likely SQL
-                const token = tokens[index]; // The string token
-                if (token.type === TokenType.String) {
-                    // Extract content (strip quotes)
-                    let content = token.text;
-                    if (content.startsWith('"') || content.startsWith("'")) {
-                        content = content.substring(1, content.length - 1);
-                    } else if (content.startsWith('[')) {
-                        content = content.substring(1, content.length - 1);
+        if (lookbackIndex < 0) { return; }
+        const prev = tokens[lookbackIndex];
+
+        if (prev.text === '(' || prev.text === ',') {
+            // Find the function name
+            // If prev is '(', then [Func] [Whitespace?] [(] [Whitespace?] [String]
+            // If prev is ',', then we are in an argument list. This is harder to check simply by looking back.
+            // Simplified check: if it is '(', look back for identifier.
+
+            if (prev.text === '(') {
+                lookbackIndex--;
+                while (lookbackIndex >= 0 && (tokens[lookbackIndex].type === TokenType.Whitespace || tokens[lookbackIndex].type === TokenType.Comment)) {
+                    lookbackIndex--;
+                }
+
+                if (lookbackIndex >= 0) {
+                    const func = tokens[lookbackIndex];
+                    if (func.type === TokenType.Identifier) {
+                        if (SQL_CONTEXT_FUNCTIONS.some(f => f.toLowerCase() === func.text.toLowerCase())) {
+                            // This string token is likely SQL
+                            const token = tokens[index]; // The string token
+                            if (token.type === TokenType.String) {
+                                // Extract content (strip quotes)
+                                let content = token.text;
+                                if (content.startsWith('"') || content.startsWith("'")) {
+                                    content = content.substring(1, content.length - 1);
+                                } else if (content.startsWith('[')) {
+                                    content = content.substring(1, content.length - 1);
+                                }
+
+                                const sqlLexer = new SqlLexer(content);
+                                token.sqlTokens = sqlLexer.tokenize();
+                            }
+                        }
                     }
-
-                    const sqlLexer = new SqlLexer(content);
-                    token.sqlTokens = sqlLexer.tokenize();
                 }
             }
         }

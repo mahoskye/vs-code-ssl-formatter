@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { SSLFormattingProvider } from '../src/sslFormattingProvider';
-import { createSSLConfig } from '../tests/helpers/mockVSCode';
+import { createSSLConfig, MockUri, MockTextDocument, MockFormattingOptions } from '../tests/helpers/mockVSCode';
 
 // Setup mock environment
 const mockConfig = createSSLConfig({
@@ -17,7 +17,10 @@ const mockConfig = createSSLConfig({
 
 // Mock workspace configuration
 const mockVscode = require('vscode');
-mockVscode.workspace.configuration = mockConfig;
+if (!mockVscode.workspace) {
+    mockVscode.workspace = {};
+}
+mockVscode.workspace.getConfiguration = (section: string) => mockConfig;
 
 async function run() {
     const provider = new SSLFormattingProvider();
@@ -29,30 +32,23 @@ async function run() {
     }
 
     const inputPath = path.resolve(process.cwd(), args[0]);
-    const outputPath = inputPath.replace(/\.srvscr$|\.ssl$|\.ds$/, '.expected$&');
+    let outputPath = inputPath.replace(/\.srvscr$|\.ssl$|\.ds$/, '.expected$&');
     // If extension wasn't matched, just append .expected
     if (outputPath === inputPath) {
-        path.join(path.dirname(inputPath), path.basename(inputPath) + '.expected');
+        outputPath = path.join(path.dirname(inputPath), path.basename(inputPath) + '.expected');
     }
 
     console.log(`Reading from ${inputPath}`);
     const content = fs.readFileSync(inputPath, 'utf8');
 
     // Create mock document
-    const doc = {
-        getText: () => content,
-        positionAt: (offset: number) => {
-            // Simplified positionAt for full range calculation
-            return new mockVscode.Position(0, 0);
-        },
-        uri: mockVscode.Uri.file(inputPath),
-        languageId: 'ssl',
-        lineCount: content.split('\n').length,
-        lineAt: (line: number) => ({ text: content.split('\n')[line] }),
-        offsetAt: (pos: any) => 0 // Dummy
-    };
+    const doc = new MockTextDocument(
+        MockUri.file(inputPath),
+        'ssl',
+        content
+    );
 
-    const options = {
+    const options: MockFormattingOptions = {
         tabSize: 4,
         insertSpaces: false
     };

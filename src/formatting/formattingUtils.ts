@@ -44,7 +44,7 @@ export function splitStringToken(content: string, quote: string, firstLineMax: n
 }
 
 
-export function wrapParameterLine(line: string, keyword: string, currentIndent: string, maxLen: number = 80): string {
+export function wrapParameterLine(line: string, keyword: string, currentIndent: string, maxLen: number = 80, tabSize: number = 4): string {
     // Continuation indent: Align with first parameter (keyword length + space)
     // e.g. :PARAMETERS (11) + space (1) = 12 spaces
     // If keyword starts with :, length includes it.
@@ -62,6 +62,9 @@ export function wrapParameterLine(line: string, keyword: string, currentIndent: 
     let result = '';
     let currentLine = '';
 
+    // Calculate base indent visual length for first line check
+    const baseIndentLen = getVisualLength(currentIndent, tabSize);
+
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i].trim();
         const isFirst = i === 0;
@@ -74,8 +77,11 @@ export function wrapParameterLine(line: string, keyword: string, currentIndent: 
             addition = ', ' + part;
         }
 
-        // Check if adding this would exceed max length
-        if (currentLine.length + addition.length > maxLen && currentLine.length > 0) {
+        // Check if adding this would exceed max length using VISUAL length
+        // For first line (result is empty), include base indent length
+        const effectiveCurrentLen = result.length === 0 ? getVisualLength(currentLine + addition, tabSize) + baseIndentLen : getVisualLength(currentLine + addition, tabSize);
+
+        if (currentLine.length > 0 && effectiveCurrentLen > maxLen) {
             // Wrap: add current line (with comma if not first line) and start new
             result += currentLine + ',\n';
             currentLine = continueIndent + part;

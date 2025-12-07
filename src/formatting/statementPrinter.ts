@@ -28,6 +28,8 @@ export class StatementPrinter {
 
         const baseStack: number[] = [];
         const itemStack: number[] = [];
+        // Track start column for each token to allow context-aware indentation (e.g. SQL relative to Function)
+        const tokenStarts: number[] = new Array(tokens.length).fill(0);
 
         let resetItemNext = false;
         let effectiveIndent = currentLineLen;
@@ -46,6 +48,9 @@ export class StatementPrinter {
                 currentLineLen += spacingAdjustment.len;
             }
 
+            // Record start position of THIS token
+            tokenStarts[i] = currentLineLen;
+
             // 2. Alignment Stack Management (Pop)
             if ([']', '}', ')'].includes(token.text) && baseStack.length > 0) {
                 baseStack.pop();
@@ -58,7 +63,39 @@ export class StatementPrinter {
             }
 
             // 4. Token Formatting & Splitting
-            let formattedToken = this.formatToken(token, currentLineLen);
+            // Calculate special indent for SQL tokens
+            let customIndent = undefined;
+            if (token.sqlTokens && token.sqlTokens.length > 0) {
+                // Rule: min(functionStart + 4, quoteStart + 1)
+                // Check if pattern is Function ( prePrev ) "SQL" (token)
+                // i is token. i-1 is (. i-2 is Function.
+                // Verify: prev is '(', prePrev is Identifier/Keyword
+                // Also handle "LSearch" (no space before paren?) -> Logic handles spacing.
+                // tokenStarts[i] is currentLineLen (quote start).
+                // tokenStarts[i-2] is function start.
+
+                const quoteStart = currentLineLen + 1; // Content starts after opening quote
+                let funcStart = currentLineLen; // Default fallback if no function found
+
+                if (prev && prev.text === '(' && prePrev && (prePrev.type === TokenType.Identifier || prePrev.type === TokenType.Keyword)) {
+                    funcStart = tokenStarts[i - 2];
+                } else {
+                    // Fallback: use quote start relative or some other default?
+                    // If no function, maybe just use quoteStart?
+                    // Or check if it's an assignment? `var := "SQL"`
+                    // If assignment, maybe align with var?
+                    // For now, if no function detected, stick to visual alignment (quoteStart).
+                    funcStart = currentLineLen - 4; // So min becomes quoteStart
+                }
+
+                const indentFromFunc = funcStart + 4;
+                customIndent = Math.min(indentFromFunc, quoteStart);
+
+                // Ensure non-negative
+                customIndent = Math.max(0, customIndent);
+            }
+
+            let formattedToken = this.formatToken(token, currentLineLen, customIndent);
 
             // Handle long string splitting
             if (token.type === TokenType.String && !formattedToken.includes('\n')) {
@@ -83,7 +120,9 @@ export class StatementPrinter {
             }
 
             // 6. Alignment Stack Management (Update/Push)
-            if ((resetItemNext || (prev && ['(', '{', '['].includes(prev.text))) && itemStack.length > 0) {
+            // Update itemStack only on the FIRST item (when prev is Opener).
+            // Do NOT update on commas (resetItemNext), so alignment remains anchored to the first item.
+            if ((prev && ['(', '{', '['].includes(prev.text)) && itemStack.length > 0) {
                 itemStack[itemStack.length - 1] = currentLineLen;
                 resetItemNext = false;
             }
@@ -105,9 +144,9 @@ export class StatementPrinter {
 
 
 
-        if (isParameterStatement && line.length > maxLineLen) {
+        if (isParameterStatement && currentLineLen > maxLineLen) {
             const firstToken = tokens.find(t => t.type === TokenType.Keyword);
-            line = wrapParameterLine(line, firstToken!.text.toUpperCase(), this.getIndent(currentIndentLevel), maxLineLen);
+            line = wrapParameterLine(line, firstToken!.text.toUpperCase(), this.getIndent(currentIndentLevel), maxLineLen, this.options.tabSize);
         }
 
         return line.trimEnd();
@@ -144,8 +183,10 @@ export class StatementPrinter {
             const firstLineMax = maxLineLen - currentLineLen;
 
             let useSplit = false;
-            if (getVisualLength(formattedToken, this.options.tabSize) > subsequentMax) { useSplit = true; }
-            else if (firstLineMax > 15) { useSplit = true; }
+            if (firstLineMax > 0 && subsequentMax > 0) {
+                if (getVisualLength(formattedToken, this.options.tabSize) > subsequentMax) { useSplit = true; }
+                else if (firstLineMax > 15) { useSplit = true; }
+            }
 
             if (useSplit) {
                 return splitStringToken(content, quote, firstLineMax, subsequentMax, ' '.repeat(alignLen));
@@ -162,17 +203,44 @@ export class StatementPrinter {
     private checkEarlyWrap(tokens: Token[], i: number, currentLineLen: number, checkLen: number, maxLineLen: number): boolean {
         const token = tokens[i];
 
-        // Lookahead Case 1: Operator followed by function call
-        if (token.type === TokenType.Operator && i + 2 < tokens.length) {
-            const next1 = tokens[i + 1];
-            const next2 = tokens[i + 2];
-            if ((next1.type === TokenType.Identifier || next1.type === TokenType.Keyword) && next2.text === '(') {
-                let groupLen = checkLen + 1 + next1.text.length + 1;
-                let lookAheadIdx = i + 3;
-                // (Simplified Arg lookahead from original)
-                // This logic was complex in original, simplifying to heuristic: 
-                // If the function call start pushes us over, wrap HERE at the operator/start
-                if (currentLineLen + groupLen > maxLineLen) { return true; }
+        // Lookahead Case 1: Binary Operator (prefer wrap before)
+        // Check if the entire operand (up to next operator/separator) fits
+        // Exception: Assignment operator := should stay with LHS if possible (wrap AFTER)
+        if (token.type === TokenType.Operator && token.text !== ':=' && i + 1 < tokens.length) {
+            let lookAheadLen = checkLen; // Start with operator length
+            let j = i + 1;
+
+            // Scan forward to capture the "operand" unit
+            while (j < tokens.length) {
+                const nextTok = tokens[j];
+                // Stop at separators or next operator (logic handoff)
+                if (nextTok.type === TokenType.Operator || nextTok.text === ',' || nextTok.text === ';') {
+                    break;
+                }
+
+                // Add length (approximate spacing - assuming 1 space or 0)
+                // We can be conservative and assume 0 for punct, 1 for words?
+                // Or use calculateSpacing logic? Too expensive.
+                // Assume worst case (tight) or standard (1 space)?
+                // Simple simplification: Add length. If it's punctuation, usually attached.
+                // If previous was word and this is word, add 1.
+
+                // Simple accumulation
+                lookAheadLen += nextTok.text.length;
+                // Add 1 space allowance for safety/separation if not punct
+                if (nextTok.type !== TokenType.Punctuation) {
+                    lookAheadLen += 1;
+                }
+
+                j++;
+
+                // Optimization: if we already exceed, stop
+                if (currentLineLen + lookAheadLen > maxLineLen) {
+                    return true;
+                }
+
+                // Limit lookahead depth to avoid perf hit on massive lines? 
+                if (j - i > 20) break;
             }
         }
 
@@ -183,17 +251,56 @@ export class StatementPrinter {
             }
         }
 
+        // Lookahead Case 3: Opening Brace/Bracket (prefer wrap before if content + brace exceeds)
+        // If we have "Start", { Content } -> if { Content } exceeds, wrap before {
+        if (token.text === '{' || token.text === '[') {
+            let lookAheadLen = checkLen;
+            let j = i + 1;
+
+            while (j < tokens.length) {
+                const nextTok = tokens[j];
+                // Stop at matching closer or separator?
+                // If simple object { prop }, scan key.
+                // Limit depth.
+
+                // If we hit a separator ',' or matching closer, stop?
+                // If we have { a, b }, and { a } fits but { a, b } doesn't?
+                // We want to wrap before { only if the *primary* chunk exceeds?
+                // Or if the whole unit exceeds?
+                // User case: { sMetadataTemplate } (one item).
+                // Logic: similar to operator, scan until separator/op?
+                // Inside {}, comma is separator.
+                // So stop at comma.
+
+                if (nextTok.text === '}' || nextTok.text === ']' || nextTok.text === ',' || nextTok.text === ';') {
+                    // Include closer length if it's the closer
+                    if (nextTok.text === '}' || nextTok.text === ']') {
+                        lookAheadLen += nextTok.text.length;
+                    }
+                    break;
+                }
+
+                lookAheadLen += nextTok.text.length;
+                if (nextTok.type !== TokenType.Punctuation) { lookAheadLen += 1; }
+
+                j++;
+                if (currentLineLen + lookAheadLen > maxLineLen) { return true; }
+                if (j - i > 20) break;
+            }
+        }
+
         return false;
     }
 
     private isWrappablePoint(token: Token): boolean {
         return token.type === TokenType.Identifier || token.type === TokenType.Keyword ||
             token.type === TokenType.Number || token.type === TokenType.String ||
+            token.type === TokenType.Operator ||
             token.text === '{' || token.text === '[';
     }
 
     private determineWrapPosition(baseStack: number[], itemStack: number[], resetItemNext: boolean, prev: Token | undefined, baseIndentStr: string, maxLineLen: number, effectiveCheckLen: number): number {
-        const useBase = resetItemNext || (prev && ['(', '{', '['].includes(prev.text));
+        const useBase = (prev && ['(', '{', '['].includes(prev.text));
         let alignTo = 0;
 
         if (baseStack.length > 0) {
@@ -224,11 +331,18 @@ export class StatementPrinter {
         }
     }
 
-    private formatToken(token: Token, currentColumn: number = 0): string {
+    private formatToken(token: Token, currentColumn: number = 0, customBaseIndent?: number): string {
+
+
         if (this.options['ssl.format.sql.enabled'] && token.sqlTokens && token.sqlTokens.length > 0) {
-            // Use currentColumn for visual alignment, ignoring base indent string (forces space alignment)
-            // Add 1 to align with content after the opening quote
-            return this.sqlFormatter.formatSqlTokens(token.sqlTokens, token.text.charAt(0), currentColumn + 1, undefined);
+            // Use customBaseIndent if provided, otherwise default to currentColumn + 1 (visual alignment)
+            // The logic was: min(func+4, quote+1). customBaseIndent holds this result.
+            // If customBaseIndent is undefined, fallback to old visual align?
+            // "User requested removing 2 tabs (8 chars)" - this was handled by max(0, col+1-8).
+            // New request overrides this with specific context logic.
+
+            const baseIndent = customBaseIndent !== undefined ? customBaseIndent : Math.max(0, currentColumn + 1 - 8);
+            return this.sqlFormatter.formatSqlTokens(token.sqlTokens, token.text.charAt(0), baseIndent, undefined);
         }
 
         if (token.type === TokenType.Comment) {

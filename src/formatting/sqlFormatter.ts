@@ -56,19 +56,20 @@ export class SqlFormatter {
         // NOTE: if startChar is '[', len is 1. SQLExecute(" is longer.
         // The tests seem to imply baseIndentColumn includes the prefix.
 
-        // Let's just assume we continue from baseIndentColumn
-        // currentLineLen = baseIndentColumn; 
-
-        // Wait, if we stripped the newlines, we just proceed.
-        // But if we DO `needsBreak`, we append `\n` + baseIndent + extra.
-        // So baseIndent should still be valid.
-
-        // Initial check: if we removed \n, we just proceed.
-
-
         let isFirstToken = true;
         // Filter out whitespace tokens
         const tokens = sqlTokens.filter((t: SqlToken) => t.type !== SqlTokenType.Whitespace);
+
+        // Check for complexity to decide on starting newline
+        const isComplex = tokens.some(t => {
+            const up = t.text.toUpperCase();
+            return up === 'FROM' || up === 'WHERE' || up === 'JOIN' || up === 'GROUP' || up === 'ORDER' || up === 'UNION' || up === 'VALUES' || up === 'SET' || (up === 'SELECT' && tokens.length > 5);
+        });
+
+        if (isComplex) {
+            result += '\n' + baseIndent;
+            currentLineLen = baseIndentColumn;
+        }
 
         if (tokens.length === 0) {
             return startChar + closeQuote;
@@ -125,7 +126,7 @@ export class SqlFormatter {
             if (t.text === '(') {
                 if (state.inInsertColumnList && prev && prev.type === SqlTokenType.Identifier) {
                     isInsertParen = true;
-                } else if (prev && prev.text.toUpperCase() === SQL_KW_VALUES) {
+                } else if (prev && (prev.text.toUpperCase() === SQL_KW_VALUES || prev.text.toUpperCase() === SQL_KW_SET)) {
                     isInsertParen = true;
                 }
             }
@@ -135,6 +136,11 @@ export class SqlFormatter {
                 // Add extra indent for INSERT/VALUES lists to "balance" content visually
                 const extraOffset = isInsertParen ? 4 : 0;
 
+                // Check if this paren starts a subquery (next token is SELECT)
+                const next = i + 1 < tokens.length ? tokens[i + 1] : null;
+                const isSubquery = next && next.text.toUpperCase() === 'SELECT';
+                const subqueryOffset = isSubquery ? 4 : 0;
+
                 // Calculate inline closing indent (default)
                 // Base: (depth) * 4. (depth is incremented in pushParen, so current depth is depth+1 conceptually)
                 // But logic was: depth * 4 + stackOffset.
@@ -143,7 +149,7 @@ export class SqlFormatter {
                 const currentStackOffset = state.getCurrentStackOffset();
                 const inlineIndent = (state.parenDepth * 4) + currentStackOffset + (state.lineHasExtraIndent ? 4 : 0);
 
-                state.pushParen(currentIterOffset + extraOffset, inlineIndent);
+                state.pushParen(currentIterOffset + extraOffset + subqueryOffset, inlineIndent);
             }
 
             // Prepare to close paren
@@ -174,8 +180,8 @@ export class SqlFormatter {
                     // PascalCase for functions
                     tokenText = tokenText.charAt(0).toUpperCase() + tokenText.slice(1).toLowerCase();
                 } else {
-                    // Preserve casing for tables/columns (identifiers)
-                    tokenText = tokenText;
+                    // Force lowercase for tables/columns (identifiers)
+                    tokenText = tokenText.toLowerCase();
                 }
             } else if (t.type === SqlTokenType.Placeholder) { // Placeholder
                 // Preserve casing exactly for placeholders
@@ -213,20 +219,7 @@ export class SqlFormatter {
                 }
 
                 // Break AFTER opening paren in VALUES/INSERT/INTO lists
-                if (prev.text === '(' && (currentClause === 'VALUES' || currentClause === 'INTO' || currentClause === 'INSERT')) { // Depth will be > 0 now?
-                    // Prev token was '('.
-                    // State update happens at END of loop?
-                    // Let's check state logic.
-                    // If state update is end of loop, then parenDepth is 0 (from prev line 76).
-                    // If prev was '(', it should have incremented?
-                    // BUT we are in loop `i`. `state` is mutated at end of loop `i`.
-                    // So at start of `i` (here), `state` reflects AFTER `i-1`.
-                    // So `parenDepth` should be 1.
-                    if (state.parenDepth > 0) {
-                        needsBreak = true;
-                        extraIndent = this.options.indentSpaces ? ' '.repeat(this.options.indentSpaces) : this.indentString;
-                    }
-                }
+
 
                 if (t.text === '(' && (currentClause === 'VALUES' || currentClause === 'INTO' || currentClause === 'INSERT') && state.parenDepth === 0) {
                     // Force break before opening paren for cleaner lists
@@ -235,7 +228,7 @@ export class SqlFormatter {
                 }
             } else {
                 // First token special handling if it's ')'
-                if (t.text === ')') {state.parenDepth--;}
+                if (t.text === ')') { state.parenDepth--; }
             }
 
             // Check if WE enforce a break AFTER this token?
@@ -282,6 +275,17 @@ export class SqlFormatter {
                     // we can re-derive or check simple logic.
                     // Simple logic: If we are inInsert, and prev was '(', it's likely the list start.
                     needsBreak = true;
+                } else if (upperText === 'SET' && prev && prev.text === ')') {
+                    // UPDATE ... SET after a possibly complex join/table exp - ensure break
+                    needsBreak = true;
+                } else if (t.text === '(' && prev && prev.text.toUpperCase() === 'SET') {
+                    // UPDATE table SET (col1, col2) = ...
+                    // Break before the '(' to start column list on new line
+                    needsBreak = true;
+                    extraIndent = '    ';
+                } else if (prev && prev.text === '(' && (currentClause === 'SET' || currentClause === 'INSERT' || currentClause === 'VALUES' || currentClause === 'INTO')) {
+                    // Break AFTER opening paren in these lists to verticalize them
+                    needsBreak = true;
                 } else if (breakBeforeKeywords.has(upperText)) {
                     needsBreak = true;
                     if (upperText === SQL_KW_ON) {
@@ -300,13 +304,13 @@ export class SqlFormatter {
                 }
             } else {
                 // First token special handling if it's ')'
-                if (t.text === ')') {state.parenDepth--;}
+                if (t.text === ')') { state.parenDepth--; }
             }
 
 
             // Helper to format identifier
             const formatIdent = (tok: any) => {
-                if (tok.text.startsWith('?') && tok.text.endsWith('?')) {return tok.text;}
+                if (tok.text.startsWith('?') && tok.text.endsWith('?')) { return tok.text; }
                 return tok.text; // Preserve case
             };
 
@@ -405,29 +409,31 @@ export class SqlFormatter {
             isFirstToken = false;
         }
 
-        // End block with newline + base indent + close quote?
-        // Tests expect inline close quote.
+        // End block with newline + base indent + close quote if complex
+        if (isComplex) {
+            result += '\n' + baseIndent;
+        }
         result += closeQuote;
         return result;
     }
 
     private shouldAddSqlSpace(prev: SqlToken, curr: SqlToken): boolean {
         // Space before open paren if prev is Keyword (e.g. AND (, OR (, IN ()
-        if (prev.type === SqlTokenType.Keyword && curr.text === '(') {return true;}
+        if (prev.type === SqlTokenType.Keyword && curr.text === '(') { return true; }
 
         // No space after opening paren
-        if (prev.text === '(') {return false;}
+        if (prev.text === '(') { return false; }
         // No space before closing paren  
-        if (curr.text === ')') {return false;}
+        if (curr.text === ')') { return false; }
         // No space before comma
-        if (curr.text === ',') {return false;}
+        if (curr.text === ',') { return false; }
         // Space after comma
         if (prev.text === ',') {
             // Exception: Unary minus after comma (e.g., , -1) - space after comma but let minus handle itself
             return true;
         }
         // No space around dot (table.column)
-        if (prev.text === '.' || curr.text === '.') {return false;}
+        if (prev.text === '.' || curr.text === '.') { return false; }
         // Space around operators (but single space, not double)
         // Exception: Unary minus/plus after comma should not have space before number
         if (prev.type === SqlTokenType.Operator || curr.type === SqlTokenType.Operator) {
@@ -438,15 +444,15 @@ export class SqlFormatter {
             }
             return true; // Operator
         }
-        // Space between key/ident/num/placeholder
-        // Types: 0=Kw, 1=Ident, 3=Num, 8=Placeholder
-        const isAtom = (t: SqlToken) => t.type === SqlTokenType.Keyword || t.type === SqlTokenType.Identifier || t.type === SqlTokenType.Number || t.type === SqlTokenType.Placeholder;
+        // Space between key/ident/num/placeholder/string
+        // Types: 0=Kw, 1=Ident, 3=Num, 8=Placeholder, 2=String
+        const isAtom = (t: SqlToken) => t.type === SqlTokenType.Keyword || t.type === SqlTokenType.Identifier || t.type === SqlTokenType.Number || t.type === SqlTokenType.Placeholder || t.type === SqlTokenType.String;
 
         // Space between keywords/identifiers/placeholders
-        if (isAtom(prev) && isAtom(curr)) {return true;}
+        if (isAtom(prev) && isAtom(curr)) { return true; }
 
         // Space after closing paren if followed by atom
-        if (prev.text === ')' && isAtom(curr)) {return true;}
+        if (prev.text === ')' && isAtom(curr)) { return true; }
         return false;
     }
 }

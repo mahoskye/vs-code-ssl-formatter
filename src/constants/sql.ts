@@ -30,7 +30,8 @@ export const SQL_KEYWORDS = new Set([
 // Keywords that trigger line breaks BEFORE them in the formatter
 export const SQL_BREAK_BEFORE_KEYWORDS = new Set([
     SQL_KW_FROM, SQL_KW_WHERE, 'INNER', 'LEFT', 'RIGHT', 'FULL', 'CROSS',
-    'ORDER', 'GROUP', 'HAVING', 'UNION', SQL_KW_VALUES, SQL_KW_INTO, SQL_KW_ON
+    'ORDER', 'GROUP', 'HAVING', 'UNION', SQL_KW_VALUES, SQL_KW_INTO, SQL_KW_ON,
+    'CASE', 'WHEN', 'ELSE', 'END'
 ]);
 
 // Join modifiers - if followed by JOIN, don't break before JOIN
@@ -40,5 +41,5 @@ export const SQL_JOIN_MODIFIERS = new Set([
 
 // Keywords that get extra indentation (under WHERE)
 export const SQL_INDENTED_KEYWORDS = new Set([
-    SQL_KW_AND, SQL_KW_OR, SQL_KW_ON
+    SQL_KW_AND, SQL_KW_OR, SQL_KW_ON, 'WHEN', 'ELSE'
 ]);
