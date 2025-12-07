@@ -162,6 +162,19 @@
                     "default": "canonicalCompact",
                     "description": "Default SQL formatting style used by the Format SQL command"
                 },
+                "ssl.format.sql.concatOperator": {
+                    "type": "string",
+                    "enum": [
+                        "||",
+                        "+"
+                    ],
+                    "enumDescriptions": [
+                        "Oracle/PostgreSQL style concatenation (||)",
+                        "SQL Server style concatenation (+)"
+                    ],
+                    "default": "||",
+                    "description": "SQL string concatenation operator used when breaking long string literals"
+                },
                 "ssl.documentNamespaces": {
                     "type": "object",
                     "default": {},

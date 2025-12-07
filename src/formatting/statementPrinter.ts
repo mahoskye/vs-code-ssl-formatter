@@ -33,6 +33,9 @@ export class StatementPrinter {
 
         let resetItemNext = false;
         let effectiveIndent = currentLineLen;
+        // Track wrap indent within a parameter block (same comma-separated item)
+        // Only reset on comma at the top bracket level
+        let parameterWrapIndent: number | undefined = undefined;
 
         const maxLineLen = (this.options['ssl.format.wrapLength'] as number) || 90;
 
@@ -57,9 +60,13 @@ export class StatementPrinter {
                 itemStack.pop();
             }
 
-            // 3. Reset Item Logic
+            // 3. Reset Item Logic - reset wrap lock on comma at outer level only
             if (prev && prev.text === ',') {
                 resetItemNext = true;
+                // Reset wrap indent when moving to a new parameter at TOP level only
+                if (baseStack.length === 0) {
+                    parameterWrapIndent = undefined;
+                }
             }
 
             // 4. Token Formatting & Splitting
@@ -97,9 +104,14 @@ export class StatementPrinter {
 
             let formattedToken = this.formatToken(token, currentLineLen, customIndent);
 
-            // Handle long string splitting
+            // Handle long string splitting - use locked indent if available
             if (token.type === TokenType.String && !formattedToken.includes('\n')) {
-                const splitResult = this.processStringToken(formattedToken, currentLineLen, maxLineLen);
+                const splitResult = this.processStringToken(formattedToken, currentLineLen, maxLineLen, parameterWrapIndent);
+                // If string was split (has newlines) and no lock yet, set the lock
+                if (splitResult.includes('\n') && parameterWrapIndent === undefined) {
+                    // Lock to current position (first token after split continues here)
+                    parameterWrapIndent = currentLineLen;
+                }
                 formattedToken = splitResult;
             }
 
@@ -110,7 +122,20 @@ export class StatementPrinter {
 
             if ((currentLineLen + checkLen > maxLineLen || shouldWrapEarly) && i > 0 && !isParameterStatement && !isFunctionCall) {
                 if (this.isWrappablePoint(token)) {
-                    const indentCols = this.determineWrapPosition(baseStack, itemStack, resetItemNext, prev, baseIndentStr, maxLineLen, checkLen);
+                    // Use locked parameter wrap indent if set, otherwise calculate and lock it
+                    // Don't lock on opening brackets - they start new contexts
+                    const isOpener = ['(', '{', '['].includes(token.text);
+                    let indentCols: number;
+
+                    if (parameterWrapIndent !== undefined && !isOpener) {
+                        indentCols = parameterWrapIndent;
+                    } else {
+                        indentCols = this.determineWrapPosition(baseStack, itemStack, resetItemNext, prev, baseIndentStr, maxLineLen, checkLen);
+                        // Only lock for non-opener tokens
+                        if (!isOpener) {
+                            parameterWrapIndent = indentCols;
+                        }
+                    }
                     const continuationIndent = ' '.repeat(indentCols);
 
                     line = line.trimEnd() + "\n" + continuationIndent;
@@ -172,12 +197,13 @@ export class StatementPrinter {
         return { text: "", len: 0 };
     }
 
-    private processStringToken(formattedToken: string, currentLineLen: number, maxLineLen: number): string {
+    private processStringToken(formattedToken: string, currentLineLen: number, maxLineLen: number, lockedIndent?: number): string {
         let content = formattedToken.substring(1, formattedToken.length - 1);
         const quote = formattedToken.startsWith('"') ? '"' : "'";
 
         if (currentLineLen + getVisualLength(formattedToken, this.options.tabSize) > maxLineLen) {
-            const alignLen = currentLineLen;
+            // Use locked indent if available, otherwise use current position
+            const alignLen = lockedIndent !== undefined ? lockedIndent : currentLineLen;
             const operatorLen = 2;
             const subsequentMax = maxLineLen - alignLen - operatorLen;
             const firstLineMax = maxLineLen - currentLineLen;
@@ -251,41 +277,32 @@ export class StatementPrinter {
             }
         }
 
-        // Lookahead Case 3: Opening Brace/Bracket (prefer wrap before if content + brace exceeds)
-        // If we have "Start", { Content } -> if { Content } exceeds, wrap before {
+        // Lookahead Case 3: Opening Brace/Bracket (prefer wrap before if entire block exceeds)
+        // If we have "Func", { Content } -> if { Content } exceeds line limit, wrap before {
         if (token.text === '{' || token.text === '[') {
-            let lookAheadLen = checkLen;
+            let lookAheadLen = checkLen; // Start with opener length
             let j = i + 1;
+            let depth = 1; // Track nesting depth
+            const closer = token.text === '{' ? '}' : ']';
 
-            while (j < tokens.length) {
+            while (j < tokens.length && depth > 0) {
                 const nextTok = tokens[j];
-                // Stop at matching closer or separator?
-                // If simple object { prop }, scan key.
-                // Limit depth.
 
-                // If we hit a separator ',' or matching closer, stop?
-                // If we have { a, b }, and { a } fits but { a, b } doesn't?
-                // We want to wrap before { only if the *primary* chunk exceeds?
-                // Or if the whole unit exceeds?
-                // User case: { sMetadataTemplate } (one item).
-                // Logic: similar to operator, scan until separator/op?
-                // Inside {}, comma is separator.
-                // So stop at comma.
-
-                if (nextTok.text === '}' || nextTok.text === ']' || nextTok.text === ',' || nextTok.text === ';') {
-                    // Include closer length if it's the closer
-                    if (nextTok.text === '}' || nextTok.text === ']') {
-                        lookAheadLen += nextTok.text.length;
-                    }
-                    break;
-                }
+                // Track depth for nested brackets
+                if (nextTok.text === '{' || nextTok.text === '[') { depth++; }
+                else if (nextTok.text === '}' || nextTok.text === ']') { depth--; }
 
                 lookAheadLen += nextTok.text.length;
+                // Add spacing approximation
                 if (nextTok.type !== TokenType.Punctuation) { lookAheadLen += 1; }
 
                 j++;
+
+                // If total exceeds limit, wrap before opener
                 if (currentLineLen + lookAheadLen > maxLineLen) { return true; }
-                if (j - i > 20) break;
+
+                // Safety limit
+                if (j - i > 50) break;
             }
         }
 
@@ -309,7 +326,10 @@ export class StatementPrinter {
             alignTo = getVisualLength(baseIndentStr, this.options.tabSize) + 8;
         }
 
-        if (alignTo + effectiveCheckLen > maxLineLen) {
+        // Cap alignment to prevent excessive indentation (e.g., deep nesting)
+        // Only use fixed maxAlignTo, not variable token length, to ensure consistent alignment
+        const maxAlignTo = 40;
+        if (alignTo > maxAlignTo) {
             const standardIndent = getVisualLength(baseIndentStr, this.options.tabSize) + 8;
             if (standardIndent < alignTo) {
                 return standardIndent;

@@ -70,7 +70,7 @@
           "match": "(?i)\\b(SQLExecute|DOPROC|EXECFUNCTION|EMPTY|LEN|USRMES|CHR|AADD|ALLTRIM|AT|NOW|TODAY)\\b"
         },
         {
-          "name": "support.function.builtin.common.ssl", 
+          "name": "support.function.builtin.common.ssl",
           "match": "(?i)\\b(CREATEUDOBJECT|BUILDSTRING|ASCAN|ALEN|ARRAYCALC|BUILDARRAY|DIRECTORY|CREATEGUID|BUILDSTRINGFORIN|ASCANEXACT|DAY|ARRAYNEW|BRANCH|DATEADD|DATEDIFF|ABS)\\b"
         },
         {
@@ -162,6 +162,10 @@
         {
           "name": "keyword.other.database-parameter.ssl",
           "match": "\\?[^?]*\\?"
+        },
+        {
+          "name": "support.function.odbc-escape.ssl",
+          "match": "\\{fn\\s+[^}]+\\}"
         }
       ]
     },
@@ -188,6 +192,10 @@
               "name": "keyword.other.database-parameter.ssl"
             }
           }
+        },
+        {
+          "name": "support.function.odbc-escape.ssl",
+          "match": "\\{fn\\s+[^}]+\\}"
         }
       ]
     },

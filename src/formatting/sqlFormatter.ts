@@ -15,6 +15,7 @@ export interface SqlFormattingOptions {
     keywordCase?: 'upper' | 'lower' | 'title' | 'preserve';
     indentSpaces?: number;
     style?: string;
+    concatOperator?: '||' | '+';
 }
 
 export class SqlFormatter {
@@ -75,6 +76,70 @@ export class SqlFormatter {
             return startChar + closeQuote;
         }
 
+        // Pre-process VALUES/INSERT lists for balanced formatting
+        // Find parenthesized lists after VALUES or INSERT INTO table(
+        const processedRanges = new Map<number, string>(); // Map from '(' index to formatted content
+
+        for (let i = 0; i < tokens.length; i++) {
+            const t = tokens[i];
+
+            // Detect VALUES ( or INSERT INTO table (
+            if (t.text === '(') {
+                const prev = i > 0 ? tokens[i - 1] : null;
+                const prevUpper = prev ? prev.text.toUpperCase() : '';
+
+                // Check if this is a VALUES list or INSERT column list
+                const isValuesList = prevUpper === 'VALUES';
+                const isInsertColumnList = prev && prev.type === SqlTokenType.Identifier &&
+                    i >= 2 && tokens[i - 2].text.toUpperCase() === 'INTO';
+
+                if (isValuesList || isInsertColumnList) {
+                    // Check if this is a subquery (starts with SELECT) - don't pre-process those
+                    const nextToken = i + 1 < tokens.length ? tokens[i + 1] : null;
+                    if (nextToken && nextToken.text.toUpperCase() === 'SELECT') {
+                        continue; // Skip subqueries, let normal formatting handle them
+                    }
+
+                    // Collect items until matching ')'
+                    const items: string[] = [];
+                    let currentItem = '';
+                    let depth = 1;
+                    let j = i + 1;
+
+                    while (j < tokens.length && depth > 0) {
+                        const tok = tokens[j];
+                        if (tok.text === '(') depth++;
+                        else if (tok.text === ')') {
+                            depth--;
+                            if (depth === 0) break;
+                        }
+
+                        if (tok.text === ',' && depth === 1) {
+                            // End of item
+                            if (currentItem.trim()) items.push(currentItem.trim());
+                            currentItem = '';
+                        } else {
+                            // Add to current item with spacing
+                            if (currentItem && tok.type !== SqlTokenType.Punctuation &&
+                                !currentItem.endsWith('(')) {
+                                currentItem += ' ';
+                            }
+                            currentItem += tok.text;
+                        }
+                        j++;
+                    }
+                    if (currentItem.trim()) items.push(currentItem.trim());
+
+                    if (items.length > 0) {
+                        // Calculate indent for items (paren depth * 4 + some offset)
+                        const itemIndent = baseIndent + '    '; // One level deeper
+                        const formatted = this.formatBalancedList(items, itemIndent, maxLineLen);
+                        processedRanges.set(i, formatted);
+                    }
+                }
+            }
+        }
+
         // Initialize state
         const state = new SqlFormattingState();
         let currentClause = '';
@@ -82,6 +147,33 @@ export class SqlFormatter {
         for (let i = 0; i < tokens.length; i++) {
             const t = tokens[i];
             const upperText = t.text.toUpperCase();
+
+            // Check if this is a pre-processed VALUES/INSERT list
+            if (processedRanges.has(i)) {
+                const formattedList = processedRanges.get(i)!;
+
+                // Output the opening paren with line break
+                const prev = i > 0 ? tokens[i - 1] : null;
+                if (prev && this.shouldAddSqlSpace(prev, t)) {
+                    result += ' ';
+                }
+                result += '(\n' + baseIndent + '    ' + formattedList + '\n' + baseIndent + ')';
+
+                // Skip tokens until matching ')'
+                let depth = 1;
+                i++;
+                while (i < tokens.length && depth > 0) {
+                    if (tokens[i].text === '(') depth++;
+                    else if (tokens[i].text === ')') depth--;
+                    i++;
+                }
+                i--; // Adjust for loop increment
+
+                // Update line length (we're on the ')' line now)
+                currentLineLen = baseIndentColumn + 1;
+                isFirstToken = false;
+                continue;
+            }
 
             // Track clause
             if (t.type === SqlTokenType.Keyword) {
@@ -133,23 +225,23 @@ export class SqlFormatter {
 
             // Handle paren stack
             if (t.text === '(') {
-                // Add extra indent for INSERT/VALUES lists to "balance" content visually
-                const extraOffset = isInsertParen ? 4 : 0;
+                // Add extra indent for INSERT/VALUES/SET lists to "balance" content visually
+                let extraOffset = isInsertParen ? 4 : 0;
 
-                // Check if this paren starts a subquery (next token is SELECT)
-                const next = i + 1 < tokens.length ? tokens[i + 1] : null;
-                const isSubquery = next && next.text.toUpperCase() === 'SELECT';
-                const subqueryOffset = isSubquery ? 4 : 0;
-
-                // Calculate inline closing indent (default)
-                // Base: (depth) * 4. (depth is incremented in pushParen, so current depth is depth+1 conceptually)
-                // But logic was: depth * 4 + stackOffset.
-                // Let's replicate exact logic using state methods.
+                // Check if this is a tuple subquery: = (SELECT ...) pattern
+                // Only the = ( pattern needs extra indent, not FROM ( or IN (
+                const prevToken = i > 0 ? tokens[i - 1] : null;
+                const nextToken = i + 1 < tokens.length ? tokens[i + 1] : null;
+                if (prevToken && prevToken.text === '=' &&
+                    nextToken && nextToken.text.toUpperCase() === SQL_KW_SELECT) {
+                    extraOffset = 4; // Tuple subqueries need their content indented
+                }
 
                 const currentStackOffset = state.getCurrentStackOffset();
-                const inlineIndent = (state.parenDepth * 4) + currentStackOffset + (state.lineHasExtraIndent ? 4 : 0);
+                // Include extraOffset in closing indent so ) aligns with where ( content starts
+                const inlineIndent = (state.parenDepth * 4) + currentStackOffset + extraOffset + (state.lineHasExtraIndent ? 4 : 0);
 
-                state.pushParen(currentIterOffset + extraOffset + subqueryOffset, inlineIndent);
+                state.pushParen(currentIterOffset + extraOffset, inlineIndent);
             }
 
             // Prepare to close paren
@@ -254,6 +346,7 @@ export class SqlFormatter {
                 } else if (prev && prev.text.toUpperCase() === SQL_KW_SET) {
                     needsBreak = true;
                 } else if (upperText === SQL_KW_SELECT && prev && prev.text === '(') {
+                    // Subquery SELECT - break to new line, indent from paren stack
                     needsBreak = true;
                 } else if (upperText === SQL_KW_SELECT && state.inInsert && prev && prev.text === ')') {
                     // INSERT INTO table (...) SELECT ... - break before SELECT
@@ -415,6 +508,139 @@ export class SqlFormatter {
         }
         result += closeQuote;
         return result;
+    }
+
+    /**
+     * Format a comma-separated list with simple remaining-space algorithm.
+     * Tracks remaining space on line, breaks when adding token would go negative.
+     */
+    private formatBalancedList(items: string[], indent: string, maxLen: number): string {
+        if (items.length === 0) return '';
+
+        const indentLen = indent.length;
+        const availableLen = maxLen - indentLen;
+
+        // If all items fit on one line
+        const totalLen = items.join(', ').length;
+        if (totalLen <= availableLen) {
+            return items.join(', ');
+        }
+
+        const lines: string[] = [];
+        let currentLine = '';
+        let remaining = availableLen;
+
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const isFirst = currentLine.length === 0;
+            const addLen = isFirst ? item.length : item.length + 2; // +2 for ", "
+
+            if (remaining - addLen >= 0) {
+                // Fits on current line
+                currentLine += isFirst ? item : ', ' + item;
+                remaining -= addLen;
+            } else {
+                // Doesn't fit - check if token itself exceeds available
+                if (item.length > availableLen) {
+                    // Oversized token: finish current line first
+                    if (currentLine) {
+                        lines.push(currentLine);
+                        currentLine = '';
+                    }
+
+                    // Check if it's a string literal that can be broken
+                    const isString = (item.startsWith("'") && item.endsWith("'")) ||
+                        (item.startsWith('"') && item.endsWith('"'));
+
+                    if (isString && item.length > 2) {
+                        // Break the string using concat operator
+                        const concatOp = this.options.concatOperator || '||';
+                        const quote = item[0];
+                        const content = item.slice(1, -1); // Remove quotes
+
+                        // Calculate how much content fits per line
+                        // Account for: quote + content + quote + space + concatOp + space = 6 extra chars
+                        const overheadPerLine = 6; // ' ... ' ||
+                        const contentPerLine = availableLen - overheadPerLine;
+
+                        if (contentPerLine > 10) {
+                            // Break content into chunks at symbol boundaries
+                            const chunks: string[] = [];
+                            let pos = 0;
+
+                            while (pos < content.length) {
+                                if (pos + contentPerLine >= content.length) {
+                                    // Last chunk - take the rest
+                                    chunks.push(content.slice(pos));
+                                    break;
+                                }
+
+                                // Find best break point near contentPerLine
+                                // Look for symbol boundaries: comma, space, semicolon, colon, pipe, etc.
+                                const searchStart = Math.max(0, pos + contentPerLine - 15);
+                                const searchEnd = pos + contentPerLine;
+                                const segment = content.slice(searchStart, searchEnd);
+
+                                // Find last symbol in segment (prefer comma, then space, then other)
+                                let breakOffset = -1;
+                                const symbolPriority = [',', ' ', ';', ':', '|', '-', '_'];
+
+                                for (const sym of symbolPriority) {
+                                    const idx = segment.lastIndexOf(sym);
+                                    if (idx >= 0) {
+                                        breakOffset = searchStart + idx + 1; // Break AFTER the symbol
+                                        break;
+                                    }
+                                }
+
+                                if (breakOffset <= pos) {
+                                    // No symbol found, fall back to hard break
+                                    breakOffset = pos + contentPerLine;
+                                }
+
+                                chunks.push(content.slice(pos, breakOffset));
+                                pos = breakOffset;
+                            }
+
+                            // Build concatenated string - single item with internal newlines
+                            // Put concat operator at START of next line (user preference)
+                            const brokenParts = chunks.map((chunk, idx) => {
+                                if (idx === 0) {
+                                    return quote + chunk + quote; // First chunk, no prefix
+                                }
+                                return concatOp + ' ' + quote + chunk + quote; // Prefix with concat op
+                            });
+
+                            // Join broken parts as single item (newline only, no comma)
+                            lines.push(brokenParts.join('\n' + indent));
+                        } else {
+                            // Not enough space to break meaningfully
+                            lines.push(item);
+                        }
+                    } else {
+                        // Non-string oversized token, just put on its own line
+                        lines.push(item);
+                    }
+
+                    // Start fresh line after oversized item
+                    remaining = availableLen;
+                } else {
+                    // Token fits on a new line, wrap to new line
+                    if (currentLine) {
+                        lines.push(currentLine);
+                    }
+                    currentLine = item;
+                    remaining = availableLen - item.length;
+                }
+            }
+        }
+
+        // Don't forget the last line
+        if (currentLine) {
+            lines.push(currentLine);
+        }
+
+        return lines.join(',\n' + indent);
     }
 
     private shouldAddSqlSpace(prev: SqlToken, curr: SqlToken): boolean {

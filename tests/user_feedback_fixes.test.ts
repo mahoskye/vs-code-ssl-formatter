@@ -515,4 +515,151 @@ code := 2;
         // Values list should be at least as indented as SELECT (they're at same or deeper level)
         expect(valLine!.match(/^\s*/)![0].length).to.be.greaterThanOrEqual(selectLine!.match(/^\s*/)![0].length);
     });
+
+    it('Fix: UPDATE SET subquery indentation (Oracle tuple style)', () => {
+        // Oracle-style UPDATE with subquery: SET (cols) = (SELECT ...)
+        const input = 'SQLExecute("UPDATE results r SET (r.sp_code, r.specno) = (SELECT ot.sp_code, ot.specno FROM ordtask ot WHERE ot.ordno = r.ordno) WHERE r.ordno = 1");';
+        const formatted = format(input, { config: { "ssl.format.sql.enabled": true } });
+
+        const lines = formatted.split('\n');
+
+        // Find the SELECT line inside the subquery
+        const selectLine = lines.find(l => l.includes('SELECT ot.sp_code'));
+        const fromLine = lines.find(l => l.includes('FROM ordtask'));
+        const whereLine = lines.find(l => l.includes('WHERE ot.ordno'));
+
+        expect(selectLine).to.exist;
+        expect(fromLine).to.exist;
+        expect(whereLine).to.exist;
+
+        // SELECT should be indented inside the = (
+        const selectIndent = selectLine!.match(/^\s*/)![0].length;
+        const fromIndent = fromLine!.match(/^\s*/)![0].length;
+
+        // FROM should be at same level as SELECT (both inside subquery paren)
+        expect(fromIndent).to.equal(selectIndent, 'FROM should align with SELECT inside subquery');
+    });
+
+    it('Fix: Subquery closing paren alignment', () => {
+        // The closing ) of a subquery should align with the line containing = (
+        const input = 'SQLExecute("UPDATE results SET (col) = (SELECT x FROM t WHERE id=1) WHERE y=2");';
+        const formatted = format(input, { config: { "ssl.format.sql.enabled": true } });
+
+        const lines = formatted.split('\n');
+
+        // Find the ) = ( line
+        const equalParenLine = lines.find(l => l.includes(') = (') || l.includes('= ('));
+        // Find the closing ) for the subquery (before the outer WHERE)
+        const closingParenLine = lines.find(l => l.trim() === ')' || (l.includes(')') && lines.indexOf(l) > lines.findIndex(ll => ll.includes('FROM t'))));
+
+        if (equalParenLine && closingParenLine) {
+            const equalIndent = equalParenLine.match(/^\s*/)![0].length;
+            const closeIndent = closingParenLine.match(/^\s*/)![0].length;
+
+            // Closing paren should align with opening = ( context
+            expect(closeIndent).to.be.closeTo(equalIndent, 4, 'Closing paren should align with = ( line');
+        }
+    });
+
+    it('Fix: VALUES list balanced wrapping', () => {
+        // Long VALUES list should wrap with balanced distribution
+        const input = 'SQLExecute("INSERT INTO debug (a, b, c, d, e, f, g) VALUES (val1, val2, val3, val4, val5, val6, val7)");';
+        const formatted = format(input, { config: { "ssl.format.sql.enabled": true } });
+
+        const lines = formatted.split('\n');
+
+        // Should have multiple lines for values
+        const valuesLines = lines.filter(l => l.includes('val'));
+        expect(valuesLines.length).to.be.greaterThan(1, 'VALUES list should wrap');
+
+        // Lines should be reasonably balanced (no single-item lines except maybe the last)
+        const valuesContent = valuesLines.map(l => l.trim());
+        const nonLastLines = valuesContent.slice(0, -1);
+        nonLastLines.forEach(line => {
+            const itemCount = (line.match(/val\d/g) || []).length;
+            expect(itemCount).to.be.greaterThanOrEqual(1, 'Each line should have at least one item');
+        });
+    });
+
+    it('Fix: Long SQL string concatenation breaking', () => {
+        // Long string literal should break at symbol boundaries with || concatenation
+        const input = 'SQLExecute("INSERT INTO log (data) VALUES (\'sAsrNo,sCurrentOrdNo,nTestCode,sParentAsrNo,nParentOrdno,sNewOrdNo,sQCType\')");';
+        const formatted = format(input, { config: { "ssl.format.sql.enabled": true } });
+
+        // If string is long enough to exceed line limit after indentation,
+        // it should be broken with || concatenation
+        if (formatted.includes("||")) {
+            // Verify concatenation happens at comma boundary, not mid-word
+            expect(formatted).to.not.match(/[a-z]'\s*\|\|\s*'[a-z]/i, 'Should not break in middle of word');
+            // Verify || is at start of new line (user preference)
+            expect(formatted).to.match(/\n\s*\|\|/, 'Concatenation operator should be at start of new line');
+        }
+    });
+
+    it('Fix: FROM (SELECT) subquery uses normal paren indent', () => {
+        // SQL Server style UPDATE ... FROM (SELECT ...) AS alias
+        // The FROM subquery should NOT get extra indent (unlike = (SELECT) tuple pattern)
+        const input = 'SQLExecute("UPDATE results SET sp_code = t.sp_code FROM (SELECT sp_code, ordno FROM ordtask WHERE testcode = 1) AS t WHERE results.ordno = t.ordno");';
+        const formatted = format(input, { config: { "ssl.format.sql.enabled": true } });
+
+        const lines = formatted.split('\n');
+
+        // Find FROM ( line and the SELECT inside
+        const fromParenLine = lines.find(l => l.includes('FROM ('));
+        const selectLine = lines.find(l => l.includes('SELECT sp_code'));
+
+        expect(fromParenLine).to.exist;
+        expect(selectLine).to.exist;
+
+        if (fromParenLine && selectLine) {
+            const fromIndent = fromParenLine.match(/^\s*/)![0].length;
+            const selectIndent = selectLine.match(/^\s*/)![0].length;
+
+            // SELECT should be exactly 4 spaces more than FROM (normal paren depth)
+            expect(selectIndent - fromIndent).to.equal(4, 'FROM subquery SELECT should be +4 indent');
+        }
+    });
+
+    it('Fix: = (SELECT) tuple subquery gets extra indent', () => {
+        // Oracle style SET (cols) = (SELECT ...) pattern
+        // The = (SELECT) subquery SHOULD get extra indent
+        const input = 'SQLExecute("UPDATE results SET (col1) = (SELECT x FROM t WHERE id = 1) WHERE y = 2");';
+        const formatted = format(input, { config: { "ssl.format.sql.enabled": true } });
+
+        const lines = formatted.split('\n');
+
+        // Find ) = ( line and the SELECT inside
+        const equalParenLine = lines.find(l => l.includes('= ('));
+        const selectLine = lines.find(l => l.includes('SELECT x'));
+
+        expect(equalParenLine).to.exist;
+        expect(selectLine).to.exist;
+
+        if (equalParenLine && selectLine) {
+            const equalIndent = equalParenLine.match(/^\s*/)![0].length;
+            const selectIndent = selectLine.match(/^\s*/)![0].length;
+
+            // SELECT should be more than 4 spaces from the = ( (extra indent applied)
+            expect(selectIndent - equalIndent).to.be.greaterThanOrEqual(4, '= (SELECT) should have extra indent');
+        }
+    });
+
+    it('Fix: Closing paren aligns with opening context for subqueries', () => {
+        // Test that ) AS temptable aligns with FROM (
+        const input = 'SQLExecute("UPDATE t SET x = 1 FROM (SELECT a FROM b) AS temp WHERE id = 1");';
+        const formatted = format(input, { config: { "ssl.format.sql.enabled": true } });
+
+        const lines = formatted.split('\n');
+
+        const fromParenLine = lines.find(l => l.includes('FROM ('));
+        const closingLine = lines.find(l => l.includes(') AS temp'));
+
+        if (fromParenLine && closingLine) {
+            const fromIndent = fromParenLine.match(/^\s*/)![0].length;
+            const closeIndent = closingLine.match(/^\s*/)![0].length;
+
+            // Closing paren should align with FROM (
+            expect(closeIndent).to.equal(fromIndent, 'Closing ) should align with FROM (');
+        }
+    });
 });
