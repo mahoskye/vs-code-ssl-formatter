@@ -55,10 +55,7 @@ export const PARAMETERIZED_SQL_FUNCTIONS = [
     "GetDataSetEx"
 ];
 
-export const ALL_SQL_FUNCTIONS = Array.from(new Set([
-    ...INLINE_SQL_FUNCTIONS,
-    ...PARAMETERIZED_SQL_FUNCTIONS
-]));
+
 
 export const MULTILINE_CONSTRUCT_KEYWORDS = [
     "IF", "ELSE", "WHILE", "FOR", "TO", "STEP", "BEGINCASE", "CASE", "OTHERWISE", "EXITCASE",
@@ -2208,3 +2205,9 @@ export const SSL_KEYWORD_DESCRIPTIONS: Record<string, string> = {
     "ERROR": "Mark error handling point",
     "LABEL": "Define a label for GOTO"
 };
+
+export const ALL_SQL_FUNCTIONS = Array.from(new Set([
+    ...INLINE_SQL_FUNCTIONS,
+    ...PARAMETERIZED_SQL_FUNCTIONS,
+    ...SSL_BUILTIN_FUNCTIONS.map(f => f.name)
+]));

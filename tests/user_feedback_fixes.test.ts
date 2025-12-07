@@ -466,9 +466,6 @@ code := 2;
         // OR the lines should not be excessively long.
         // Let's check max line length of the SQL parts.
         const maxLen = Math.max(...lines.map(l => l.length));
-        if (maxLen > 90) {
-            console.log("Formatted long INSERT:\n" + formatted);
-        }
         expect(maxLen).to.be.lessThan(90, "Line length exceeded 90 chars"); // Stricter verification
 
         // Also check that we definitely have multiple lines for the content if it was wrapped
