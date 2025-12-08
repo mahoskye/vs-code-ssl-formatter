@@ -1,27 +1,20 @@
 import * as vscode from "vscode";
 import {
-	SSL_KEYWORDS,
-	SSL_KEYWORD_DESCRIPTIONS,
-	SSLClass,
-	SSLFunction
+    SSL_KEYWORDS,
+    SSL_KEYWORD_DESCRIPTIONS,
+    SSLClass,
+    SSLFunction
 } from "./constants/language";
 import {
-	CONFIG_KEYS,
-	CONFIG_DEFAULTS
+    CONFIG_KEYS,
+    CONFIG_DEFAULTS
 } from "./constants/config";
 import {
-	PATTERNS
+    PATTERNS
 } from "./constants/patterns";
 import { ClassIndex, ClassMembers } from "./utils/classIndex";
 import { ProcedureIndex } from "./utils/procedureIndex";
 import { getConfiguredClasses, getConfiguredFunctions } from "./utils/intellisense";
-
-interface DocumentAnalysis {
-	variableTypes: Map<string, { type: 'builtin' | 'userclass' | 'anonymous', className?: string }>;
-	localProcedures: Set<string>;
-	anonymousMembers: Map<string, { methods: Set<string>, properties: Set<string> }>;
-	userClasses: Map<string, ClassMembers>;
-}
 
 /**
  * SSL Completion Provider
@@ -68,25 +61,23 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		const lineText = document.lineAt(position.line).text;
 		const textBeforeCursor = lineText.substring(0, position.character);
 
-		// Single-pass analysis of document
-		const analysis = this.analyzeDocument(document);
-
-		// Check if we're inside a DoProc or ExecFunction call
-		const doProcMatch = textBeforeCursor.match(PATTERNS.DOPROC.COMPLETION);
-		const execFunctionMatch = textBeforeCursor.match(PATTERNS.EXEC_FUNCTION.COMPLETION);
+		// Check if we're inside a DoProc or ExecFunction call suggesting procedure names
+		const doProcMatch = textBeforeCursor.match(PATTERNS.DOPROC_COMPLETION);
+		const execFunctionMatch = textBeforeCursor.match(PATTERNS.EXEC_FUNCTION_COMPLETION);
 		if (doProcMatch || execFunctionMatch) {
 			const partialInput = doProcMatch ? doProcMatch[1] : (execFunctionMatch ? execFunctionMatch[1] : '');
-			return this.getProcedureCompletions(document, analysis, partialInput);
+			return this.getProcedureCompletions(document, partialInput);
 		}
 
 		// Check if this is an object member completion (after ':')
 		if (context.triggerCharacter === ':') {
 			const textBeforeColon = lineText.substring(0, position.character - 1);
-			const objectMatch = textBeforeColon.match(/(\w+)\s*$/);
 
+			// Get the object variable name before the colon
+			const objectMatch = textBeforeColon.match(/(\w+)\s*$/);
 			if (objectMatch) {
 				const objectName = objectMatch[1];
-				const memberCompletions = this.getObjectMemberCompletions(objectName, analysis);
+				const memberCompletions = this.getObjectMemberCompletions(document, objectName);
 				if (memberCompletions.length > 0) {
 					return memberCompletions;
 				}
@@ -95,145 +86,27 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 
 		const completions: vscode.CompletionItem[] = [];
 
+		// Add keywords
 		if (keywordsEnabled !== false) {
 			completions.push(...this.keywords);
 		}
+
+		// Add built-in functions
 		if (functionsEnabled !== false) {
 			completions.push(...this.builtinFunctions);
 		}
+
+		// Add built-in classes
 		if (classesEnabled !== false) {
 			completions.push(...this.builtinClasses);
 		}
+
+		// Add snippets
 		if (snippetsEnabled !== false) {
 			completions.push(...this.snippets);
 		}
 
 		return completions;
-	}
-
-	/**
-	 * Single-pass analysis of the document to extract types, members, and procedures.
-	 */
-	private analyzeDocument(document: vscode.TextDocument): DocumentAnalysis {
-		const text = document.getText();
-		const analysis: DocumentAnalysis = {
-			variableTypes: new Map(),
-			localProcedures: new Set(),
-			anonymousMembers: new Map(),
-			userClasses: new Map()
-		};
-
-		const lines = text.split(/\r?\n/);
-		let currentClass: string | null = null;
-		let inCommentBlock = false;
-
-		for (const line of lines) {
-			const trimmed = line.trim();
-			if (!trimmed) continue;
-
-			// Handle comments
-			if (inCommentBlock) {
-				if (trimmed.endsWith('*/') || trimmed.includes('*/')) {
-					inCommentBlock = false;
-				}
-				continue; // Improve: handle code after */ on same line? Assume strict block for now
-			}
-			if (trimmed.startsWith('/*')) {
-				if (!trimmed.endsWith('*/') && !trimmed.includes('*/')) {
-					inCommentBlock = true;
-				}
-				// If it ends on same line, it's a one-line block comment, continue parsing?
-				// For simplicity, skip line if it starts with comment block
-				continue;
-			}
-			if (trimmed.startsWith('//')) {
-				continue;
-			}
-
-			// Remove inline comments for parsing
-			const codeLine = line.split('//')[0].split('/*')[0]; // Simple strip
-
-			// 1. Procedure Definition
-			const procMatch = codeLine.match(/^\s*:PROCEDURE\s+(\w+)/i);
-			if (procMatch) {
-				analysis.localProcedures.add(procMatch[1]);
-				if (currentClass) {
-					// Method of current class
-					const method = procMatch[1];
-					if (!analysis.userClasses.has(currentClass)) {
-						analysis.userClasses.set(currentClass, { className: currentClass, methods: [], properties: [] });
-					}
-					analysis.userClasses.get(currentClass)!.methods.push(method);
-				}
-			}
-
-			// 2. Class Definition
-			const classMatch = codeLine.match(/^\s*:CLASS\s+(\w+)/i);
-			if (classMatch) {
-				currentClass = classMatch[1];
-				continue;
-			}
-			if (/^\s*:ENDCLASS/i.test(codeLine)) {
-				currentClass = null;
-			}
-
-			// 3. Variable Instantiation / Assignment
-			// Builtin: var := Class{}
-			const builtinMatch = codeLine.match(/(\w+)\s*:=\s*(\w+)\s*\{\s*\}/);
-			if (builtinMatch) {
-				const [_, varName, className] = builtinMatch;
-				if (this.builtinClassNames.has(className.toUpperCase())) {
-					analysis.variableTypes.set(varName, { type: 'builtin', className: className.toUpperCase() });
-				}
-			}
-
-			// User Class: var := CreateUDObject("Class")
-			const userClassMatch = codeLine.match(/(\w+)\s*:=\s*CreateUDObject\s*\(\s*["']([^"']+)["']/i);
-			if (userClassMatch) {
-				const [_, varName, fullClassName] = userClassMatch;
-				const className = fullClassName.split('.').pop()!;
-				analysis.variableTypes.set(varName, { type: 'userclass', className });
-			}
-
-			// Anonymous: var := CreateUDObject()
-			const anonMatch = codeLine.match(/(\w+)\s*:=\s*CreateUDObject\s*\(\s*\)/i);
-			if (anonMatch) {
-				analysis.variableTypes.set(anonMatch[1], { type: 'anonymous' });
-			}
-
-			// 4. Object Member Assignment / Dynamic Add
-			// obj:prop := val
-			const propAssignMatch = codeLine.match(/(\w+):(\w+)\s*:=/);
-			if (propAssignMatch) {
-				const [_, objName, propName] = propAssignMatch;
-				this.addAnonymousMember(analysis, objName, 'property', propName);
-			}
-
-			// obj:AddProperty("prop")
-			const addPropMatch = codeLine.match(/(\w+):AddProperty\s*\(\s*["']([^"']+)["']/i);
-			if (addPropMatch) {
-				this.addAnonymousMember(analysis, addPropMatch[1], 'property', addPropMatch[2]);
-			}
-
-			// obj:AddMethod("method")
-			const addMethodMatch = codeLine.match(/(\w+):AddMethod\s*\(\s*["']([^"']+)["']/i);
-			if (addMethodMatch) {
-				this.addAnonymousMember(analysis, addMethodMatch[1], 'method', addMethodMatch[2]);
-			}
-		}
-		return analysis;
-	}
-
-	private addAnonymousMember(analysis: DocumentAnalysis, objName: string, type: 'method' | 'property', name: string) {
-		if (!analysis.anonymousMembers.has(objName)) {
-			analysis.anonymousMembers.set(objName, { methods: new Set(), properties: new Set() });
-		}
-		const members = analysis.anonymousMembers.get(objName)!;
-		if (type === 'method') {
-			members.methods.add(name);
-		} else {
-			members.properties.add(name);
-		}
 	}
 
 	private initializeKeywords(): void {
@@ -250,22 +123,30 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		this.builtinFunctions = functions.map(func => {
 			const item = new vscode.CompletionItem(func.name, vscode.CompletionItemKind.Function);
 			item.detail = func.description || "Custom function";
+
+			// Use signature if available, otherwise construct from name and params
 			const signature = func.signature || `${func.name}${func.params || "()"}`;
 			item.insertText = new vscode.SnippetString(`${func.name}($1)`);
 
+			// Build rich documentation with all available metadata
 			let documentation = `**${func.name}**\n\n${func.description || "Custom function"}`;
+
 			if (func.signature) {
 				documentation += `\n\n**Signature:** \`${func.signature}\``;
 			}
+
 			if (func.returnType) {
 				documentation += `\n\n**Returns:** \`${func.returnType}\``;
 			}
+
 			if (func.category) {
 				documentation += `\n\n**Category:** ${func.category}`;
 			}
+
 			if (func.frequency) {
 				documentation += `\n\n**Usage:** ${func.frequency}`;
 			}
+
 			if (func.untypedSignature) {
 				documentation += `\n\n**Untyped:** \`${func.untypedSignature}\``;
 			}
@@ -296,76 +177,146 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 	}
 
 	private initializeSnippets(): void {
-		// Basic snippets (implementation unchanged from original, just collapsed here for brevity in logic review)
-		// ... (Re-implementing fully to ensure no data loss)
+		// IF/ELSE snippet
 		const ifSnippet = new vscode.CompletionItem("if", vscode.CompletionItemKind.Snippet);
 		ifSnippet.insertText = new vscode.SnippetString(":IF ${1:condition};\n\t$0\n:ENDIF;");
 		ifSnippet.detail = "IF statement";
+		ifSnippet.documentation = "Create an IF conditional block";
 
+		// IF/ELSE/ENDIF snippet
 		const ifElseSnippet = new vscode.CompletionItem("ifelse", vscode.CompletionItemKind.Snippet);
 		ifElseSnippet.insertText = new vscode.SnippetString(":IF ${1:condition};\n\t$2\n:ELSE;\n\t$3\n:ENDIF;");
 		ifElseSnippet.detail = "IF/ELSE statement";
+		ifElseSnippet.documentation = "Create an IF/ELSE conditional block";
 
+		// FOR loop snippet
 		const forSnippet = new vscode.CompletionItem("for", vscode.CompletionItemKind.Snippet);
 		forSnippet.insertText = new vscode.SnippetString(":FOR ${1:i} := ${2:1};\n:TO ${3:10};\n:STEP ${4:1};\n\t$0\n:NEXT;");
 		forSnippet.detail = "FOR loop";
+		forSnippet.documentation = "Create a FOR loop";
 
+		// WHILE loop snippet
 		const whileSnippet = new vscode.CompletionItem("while", vscode.CompletionItemKind.Snippet);
 		whileSnippet.insertText = new vscode.SnippetString(":WHILE ${1:condition};\n\t$0\n:ENDWHILE;");
 		whileSnippet.detail = "WHILE loop";
+		whileSnippet.documentation = "Create a WHILE loop";
 
+		// PROCEDURE snippet
 		const procSnippet = new vscode.CompletionItem("procedure", vscode.CompletionItemKind.Snippet);
 		procSnippet.insertText = new vscode.SnippetString(
 			"/************************************************************\nDescription.. : ${1:Brief description}\nParameters... : ${2:Parameters}\nReturns...... : ${3:Return value}\nAuthor....... : ${4:Initials}\nDate......... : ${5:YYYY-MM-DD}\n************************************************************/\n:PROCEDURE ${6:ProcedureName};\n:PARAMETERS ${7:params};\n:DEFAULT ${8:param}, ${9:value};\n\n\t$0\n\n:RETURN ${10:result};\n:ENDPROC;"
 		);
 		procSnippet.detail = "PROCEDURE with header";
+		procSnippet.documentation = "Create a procedure with documentation header";
 
+		// TRY/CATCH snippet
 		const trySnippet = new vscode.CompletionItem("try", vscode.CompletionItemKind.Snippet);
 		trySnippet.insertText = new vscode.SnippetString(":TRY;\n\t$1\n:CATCH;\n\t$2\n:ENDTRY;");
 		trySnippet.detail = "TRY/CATCH block";
+		trySnippet.documentation = "Create a TRY/CATCH error handling block";
 
+		// REGION snippet
 		const regionSnippet = new vscode.CompletionItem("region", vscode.CompletionItemKind.Snippet);
 		regionSnippet.insertText = new vscode.SnippetString(":REGION ${1:Region Name};\n\t$0\n:ENDREGION;");
 		regionSnippet.detail = "REGION block";
+		regionSnippet.documentation = "Create a region for code organization";
 
+		// CASE snippet
 		const caseSnippet = new vscode.CompletionItem("case", vscode.CompletionItemKind.Snippet);
 		caseSnippet.insertText = new vscode.SnippetString(":BEGINCASE;\n:CASE ${1:condition1};\n\t$2\n:CASE ${3:condition2};\n\t$4\n:OTHERWISE;\n\t$5\n:ENDCASE;");
 		caseSnippet.detail = "CASE statement";
+		caseSnippet.documentation = "Create a CASE statement";
 
-		this.snippets = [ifSnippet, ifElseSnippet, forSnippet, whileSnippet, procSnippet, trySnippet, regionSnippet, caseSnippet];
+		this.snippets = [
+			ifSnippet,
+			ifElseSnippet,
+			forSnippet,
+			whileSnippet,
+			procSnippet,
+			trySnippet,
+			regionSnippet,
+			caseSnippet
+		];
 	}
 
+	/**
+	 * Get member completions for an object based on its type
+	 */
 	private getObjectMemberCompletions(
-		objectName: string,
-		analysis: DocumentAnalysis
+		document: vscode.TextDocument,
+		objectName: string
 	): vscode.CompletionItem[] {
-		// Check analyzed local types first
-		if (analysis.variableTypes.has(objectName)) {
-			const typeInfo = analysis.variableTypes.get(objectName)!;
-			if (typeInfo.type === 'builtin') {
-				return this.getBuiltinClassMembers(typeInfo.className!);
+		const text = document.getText();
+		const lines = text.split('\n');
+
+		// Find the object's instantiation to determine its type
+		const objectType = this.findObjectType(lines, objectName);
+
+		if (!objectType) {
+			return [];
+		}
+
+		// Built-in classes
+		if (objectType.type === 'builtin') {
+			return this.getBuiltinClassMembers(objectType.className!);
+		}
+
+		// User-defined classes
+		if (objectType.type === 'userclass') {
+			const indexedMembers = this.classIndex?.getClassMembers(objectType.className!);
+			if (indexedMembers) {
+				return this.createClassMemberItems(indexedMembers);
 			}
-			if (typeInfo.type === 'userclass') {
-				// Check if local class definition exists first
-				if (analysis.userClasses.has(typeInfo.className!)) {
-					const members = analysis.userClasses.get(typeInfo.className!)!;
-					return this.createClassMemberItems(members);
-				}
-				// Fallback to index
-				const indexedMembers = this.classIndex?.getClassMembers(typeInfo.className!);
-				if (indexedMembers) {
-					return this.createClassMemberItems(indexedMembers);
-				}
-				// Fallback to dynamic scan? No, analysis would have caught it if it was local.
-			}
-			if (typeInfo.type === 'anonymous') {
-				return this.getAnonymousObjectMembers(objectName, analysis);
-			}
+			return this.getUserDefinedClassMembers(lines, objectType.className!);
+		}
+
+		// Anonymous objects - scan for property assignments
+		if (objectType.type === 'anonymous') {
+			return this.getAnonymousObjectMembers(lines, objectName);
 		}
 
 		return [];
 	}
 
+	/**
+	 * Determine the type of an object by finding its instantiation
+	 */
+	private findObjectType(
+		lines: string[],
+		objectName: string
+	): { type: 'builtin' | 'userclass' | 'anonymous'; className?: string } | null {
+		for (const line of lines) {
+			// Check for built-in class instantiation: oEmail := Email{}
+			const builtinMatch = line.match(new RegExp(`\\b${objectName}\\s*:=\\s*(\\w+)\\{\\}`, 'i'));
+			if (builtinMatch) {
+				const className = builtinMatch[1].toUpperCase();
+				if (this.builtinClassNames.has(className)) {
+					return { type: 'builtin', className };
+				}
+			}
+
+			// Check for user-defined class: oHandler := CreateUDObject("ClassName")
+			const userClassMatch = line.match(new RegExp(`\\b${objectName}\\s*:=\\s*CreateUDObject\\s*\\(\\s*["']([^"']+)["']`, 'i'));
+			if (userClassMatch) {
+				const fullClassName = userClassMatch[1];
+				const classParts = fullClassName.split('.');
+				const className = classParts[classParts.length - 1];
+				return { type: 'userclass', className };
+			}
+
+			// Check for anonymous object: oVar := CreateUDObject()
+			const anonymousMatch = line.match(new RegExp(`\\b${objectName}\\s*:=\\s*CreateUDObject\\s*\\(\\s*\\)`, 'i'));
+			if (anonymousMatch) {
+				return { type: 'anonymous' };
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * Get members for built-in classes (Email, SSLRegex)
+	 */
 	private getBuiltinClassMembers(className: string): vscode.CompletionItem[] {
 		const cls = this.builtinClassMetadata.get(className.toUpperCase());
 		if (!cls) {
@@ -373,51 +324,106 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		}
 
 		const members: vscode.CompletionItem[] = [];
-		(cls.methods || []).forEach(method => {
+		const methods = cls.methods || [];
+		const properties = cls.properties || [];
+
+		methods.forEach(method => {
 			const item = new vscode.CompletionItem(method, vscode.CompletionItemKind.Method);
 			item.detail = `Method defined on ${cls.name}`;
 			item.insertText = new vscode.SnippetString(`${method}($1)`);
 			members.push(item);
 		});
-		(cls.properties || []).forEach(prop => {
+
+		properties.forEach(prop => {
 			const item = new vscode.CompletionItem(prop, vscode.CompletionItemKind.Property);
 			item.detail = `Property of ${cls.name}`;
 			members.push(item);
 		});
+
 		return members;
 	}
 
-	private getProcedureCompletions(document: vscode.TextDocument, analysis: DocumentAnalysis, partialInput: string = ''): vscode.CompletionItem[] {
-		const completions: vscode.CompletionItem[] = [];
-		const addedKeys = new Set<string>();
+	/**
+	 * Get members for user-defined classes by scanning the class definition
+	 */
+	private getUserDefinedClassMembers(lines: string[], className: string): vscode.CompletionItem[] {
+		const members: vscode.CompletionItem[] = [];
+		const classPattern = new RegExp(`^\\s*:CLASS\\s+${className}\\b`, 'i');
 
-		// Local procedures (from analysis)
-		for (const procName of analysis.localProcedures) {
-			const key = procName.toLowerCase();
-			if (!addedKeys.has(key)) {
-				addedKeys.add(key);
-				const item = new vscode.CompletionItem(procName, vscode.CompletionItemKind.Function);
-				item.detail = 'Procedure (current file)';
-				item.insertText = procName;
-				item.sortText = `0_${procName}`;
-				completions.push(item);
+		let inClass = false;
+		for (const line of lines) {
+			if (classPattern.test(line)) {
+				inClass = true;
+				continue;
+			}
+
+			if (inClass) {
+				// Look for property/method definitions (simplified - just look for :PROCEDURE or variable patterns)
+				const procMatch = line.match(/^\s*:PROCEDURE\s+(\w+)/i);
+				if (procMatch) {
+					const method = new vscode.CompletionItem(procMatch[1], vscode.CompletionItemKind.Method);
+					method.detail = 'User-defined method';
+					members.push(method);
+				}
+
+				// Exit class when we hit another :CLASS or end of likely class content
+				if (/^\s*:(CLASS|PROCEDURE\s+\w+.*\s+:ENDPROC)/i.test(line) && !procMatch) {
+					break;
+				}
 			}
 		}
 
-		// Workspace procedures
+		return members;
+	}
+
+	/**
+	 * Get procedure completions from the current document and workspace
+	 * Supports namespace-based completions for ExecFunction/DoProc
+	 */
+	private getProcedureCompletions(document: vscode.TextDocument, partialInput: string = ''): vscode.CompletionItem[] {
+		const completions: vscode.CompletionItem[] = [];
+		const addedKeys = new Set<string>();
+		const text = document.getText();
+		const lines = text.split('\n');
+
+		// Pattern to match :PROCEDURE ProcedureName
+		const procedurePattern = /^\s*:PROCEDURE\s+(\w+)/i;
+
+		// Add procedures from current document (highest priority)
+		for (const line of lines) {
+			const match = line.match(procedurePattern);
+			if (match) {
+				const procName = match[1];
+				const key = procName.toLowerCase();
+				if (!addedKeys.has(key)) {
+					addedKeys.add(key);
+					const item = new vscode.CompletionItem(procName, vscode.CompletionItemKind.Function);
+					item.detail = 'Procedure (current file)';
+					item.insertText = procName;
+					item.sortText = `0_${procName}`; // Sort current file procedures first
+					completions.push(item);
+				}
+			}
+		}
+
+		// Add procedures from workspace index
 		if (this.procedureIndex) {
-			const allProcedures = this.procedureIndex.getAllProcedures();
+			const allProcedures = this.getWorkspaceProcedures();
 			const currentFileUri = document.uri.toString();
 
 			for (const proc of allProcedures) {
+				// Skip procedures from current file (already added above)
 				if (proc.uri.toString() === currentFileUri) {
 					continue;
 				}
 
+				// Build the namespace-qualified name
 				const qualifiedNames = this.buildQualifiedNames(proc);
+
 				for (const qualifiedName of qualifiedNames) {
 					const key = qualifiedName.toLowerCase();
 					if (!addedKeys.has(key)) {
+						// Filter based on partial input if provided
 						if (partialInput && !key.startsWith(partialInput.toLowerCase())) {
 							continue;
 						}
@@ -426,13 +432,15 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 						const item = new vscode.CompletionItem(qualifiedName, vscode.CompletionItemKind.Function);
 						item.detail = `Procedure in ${proc.fileBaseName}.ssl`;
 						item.insertText = qualifiedName;
-						item.sortText = `1_${qualifiedName}`;
+						item.sortText = `1_${qualifiedName}`; // Sort after current file procedures
 
+						// Add documentation with file location and parameters
 						let doc = `**${proc.name}**\n\nLocated in: \`${proc.fileBaseName}.ssl\``;
 						if (proc.parameters && proc.parameters.length > 0) {
 							doc += `\n\n**Parameters:** ${proc.parameters.join(', ')}`;
 						}
 						item.documentation = new vscode.MarkdownString(doc);
+
 						completions.push(item);
 					}
 				}
@@ -442,15 +450,41 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		return completions;
 	}
 
+	/**
+	 * Get all procedures from the workspace index
+	 */
+	private getWorkspaceProcedures(): Array<{
+		name: string;
+		uri: vscode.Uri;
+		fileBaseName: string;
+		scriptKeys: string[];
+		parameters: string[];
+	}> {
+		if (!this.procedureIndex) {
+			return [];
+		}
+
+		return this.procedureIndex.getAllProcedures();
+	}
+
+	/**
+	 * Build qualified namespace names for a procedure
+	 * Returns multiple variations: "File.Procedure", "Dir.File.Procedure", etc.
+	 */
 	private buildQualifiedNames(proc: {
 		name: string;
 		fileBaseName: string;
 		scriptKeys: string[];
 	}): string[] {
 		const names: string[] = [];
+
+		// Add simple "File.Procedure" format
 		names.push(`${this.toPascalCase(proc.fileBaseName)}.${proc.name}`);
+
+		// Add variations from script keys
 		for (const key of proc.scriptKeys) {
 			if (key.includes('.')) {
+				// Convert path separators to dots and capitalize each segment
 				const segments = key.split('.').map(s => this.toPascalCase(s));
 				const qualifiedName = `${segments.join('.')}.${proc.name}`;
 				if (!names.includes(qualifiedName)) {
@@ -458,77 +492,119 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 				}
 			}
 		}
+
 		return names;
 	}
 
+	/**
+	 * Convert a string to PascalCase
+	 */
 	private toPascalCase(str: string): string {
 		return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 	}
-
+	
 	private refreshFromConfig(config: vscode.WorkspaceConfiguration): void {
 		const functions = getConfiguredFunctions(config);
 		const classes = getConfiguredClasses(config);
+
 		this.initializeBuiltinFunctions(functions);
 		this.initializeBuiltinClasses(classes);
+
 		this.builtinClassMetadata = new Map(classes.map(cls => [cls.name.toUpperCase(), cls]));
 		this.builtinClassNames = new Set(this.builtinClassMetadata.keys());
 	}
 
-	private getAnonymousObjectMembers(objectName: string, analysis: DocumentAnalysis): vscode.CompletionItem[] {
+	/**
+	 * Get members for anonymous objects by scanning for property assignments
+	 * Also includes built-in UDObject methods and properties
+	 */
+	private getAnonymousObjectMembers(lines: string[], objectName: string): vscode.CompletionItem[] {
 		const members: vscode.CompletionItem[] = [];
 		const memberNames = new Set<string>();
 
-		// Built-in UDObject members
+		// Add built-in UDObject methods
 		const builtinMethods = [
-			{ name: 'AddProperty', params: '(name, value)', description: 'Dynamically add a property' },
-			{ name: 'IsProperty', params: '(name)', description: 'Check if a property exists' },
-			{ name: 'AddMethod', params: '(name, procedureRef)', description: 'Dynamically add a method' },
-			{ name: 'IsMethod', params: '(name)', description: 'Check if a method exists' },
-			{ name: 'Clone', params: '()', description: 'Create a shallow copy' },
-			{ name: 'Serialize', params: '()', description: 'Convert to string/XML' },
-			{ name: 'Deserialize', params: '(data)', description: 'Restore from serialized data' }
+			{ name: 'AddProperty', params: '(name, value)', description: 'Dynamically add a property to the object' },
+			{ name: 'IsProperty', params: '(name)', description: 'Check if a property exists on the object' },
+			{ name: 'AddMethod', params: '(name, procedureRef)', description: 'Dynamically add a method to the object' },
+			{ name: 'IsMethod', params: '(name)', description: 'Check if a method exists on the object' },
+			{ name: 'Clone', params: '()', description: 'Create a shallow copy of the object' },
+			{ name: 'Serialize', params: '()', description: 'Convert object to string/XML representation' },
+			{ name: 'Deserialize', params: '(data)', description: 'Restore object from serialized data' }
 		];
 
 		for (const method of builtinMethods) {
 			const item = new vscode.CompletionItem(method.name, vscode.CompletionItemKind.Method);
 			item.detail = method.description;
 			item.insertText = new vscode.SnippetString(`${method.name}($1)`);
-			item.documentation = new vscode.MarkdownString(`**${method.name}**\n\n${method.description}\n\n*Built-in UDObject method*`);
-			item.sortText = `0_${method.name}`;
+			item.documentation = new vscode.MarkdownString(
+				`**${method.name}${method.params}**\n\n${method.description}\n\n*Built-in UDObject method*`
+			);
+			item.sortText = `0_${method.name}`; // Sort built-ins first
 			members.push(item);
 			memberNames.add(method.name.toLowerCase());
 		}
 
+		// Add built-in UDObject property
 		const xmlTypeItem = new vscode.CompletionItem('xmltype', vscode.CompletionItemKind.Property);
-		xmlTypeItem.detail = 'XML type identifier';
+		xmlTypeItem.detail = 'XML type identifier for serialization';
+		xmlTypeItem.documentation = new vscode.MarkdownString(
+			'**xmltype**\n\nXML type identifier used for serialization. Default value: `"sslexpando"`\n\n*Built-in UDObject property*'
+		);
 		xmlTypeItem.sortText = '0_xmltype';
 		members.push(xmlTypeItem);
 		memberNames.add('xmltype');
 
-		// Dynamic members from analysis
-		if (analysis.anonymousMembers.has(objectName)) {
-			const dynamic = analysis.anonymousMembers.get(objectName)!;
+		// Scan for user-defined properties: objectName:propertyName := value
+		const memberPattern = new RegExp(`\\b${objectName}:(\\w+)\\s*:=`, 'gi');
 
-			dynamic.properties.forEach(prop => {
-				if (!memberNames.has(prop.toLowerCase())) {
-					memberNames.add(prop.toLowerCase());
-					const item = new vscode.CompletionItem(prop, vscode.CompletionItemKind.Property);
+		for (const line of lines) {
+			let match;
+			while ((match = memberPattern.exec(line)) !== null) {
+				const memberName = match[1];
+				if (!memberNames.has(memberName.toLowerCase())) {
+					memberNames.add(memberName.toLowerCase());
+					const item = new vscode.CompletionItem(memberName, vscode.CompletionItemKind.Property);
 					item.detail = `User-defined property of ${objectName}`;
-					item.sortText = `1_${prop}`;
+					item.sortText = `1_${memberName}`; // Sort user-defined after built-ins
 					members.push(item);
 				}
-			});
+			}
+		}
 
-			dynamic.methods.forEach(method => {
-				if (!memberNames.has(method.toLowerCase())) {
-					memberNames.add(method.toLowerCase());
-					const item = new vscode.CompletionItem(method, vscode.CompletionItemKind.Method);
-					item.detail = `User-defined method of ${objectName}`;
-					item.insertText = new vscode.SnippetString(`${method}($1)`);
-					item.sortText = `1_${method}`;
+		// Scan for AddProperty calls: objectName:AddProperty("propName", value)
+		const addPropertyPattern = new RegExp(`\\b${objectName}:AddProperty\\s*\\(\\s*["']([^"']+)["']`, 'gi');
+
+		for (const line of lines) {
+			let match;
+			while ((match = addPropertyPattern.exec(line)) !== null) {
+				const propName = match[1];
+				if (!memberNames.has(propName.toLowerCase())) {
+					memberNames.add(propName.toLowerCase());
+					const item = new vscode.CompletionItem(propName, vscode.CompletionItemKind.Property);
+					item.detail = `Dynamic property of ${objectName} (via AddProperty)`;
+					item.sortText = `1_${propName}`;
 					members.push(item);
 				}
-			});
+			}
+		}
+
+		// Scan for AddMethod calls: objectName:AddMethod("methodName", "procedureRef")
+		const addMethodPattern = new RegExp(`\\b${objectName}:AddMethod\\s*\\(\\s*["']([^"']+)["']`, 'gi');
+
+		for (const line of lines) {
+			let match;
+			while ((match = addMethodPattern.exec(line)) !== null) {
+				const methodName = match[1];
+				if (!memberNames.has(methodName.toLowerCase())) {
+					memberNames.add(methodName.toLowerCase());
+					const item = new vscode.CompletionItem(methodName, vscode.CompletionItemKind.Method);
+					item.detail = `Dynamic method of ${objectName} (via AddMethod)`;
+					item.insertText = new vscode.SnippetString(`${methodName}($1)`);
+					item.sortText = `1_${methodName}`;
+					members.push(item);
+				}
+			}
 		}
 
 		return members;

@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { ProcedureIndex, ProcedureInfo } from "./utils/procedureIndex";
 import { CONFIG_KEYS, CONFIG_DEFAULTS } from "./constants/config";
-import { SSL_BUILTIN_FUNCTIONS } from "./constants/language";
 
 /**
  * SSL Inlay Hints Provider
@@ -81,57 +80,64 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		const functionMatches = this.findFunctionCalls(text);
 
 		for (const match of functionMatches) {
-			const functionName = match.name.toUpperCase();
-			const matchObj: RegExpExecArray = Object.assign([match.fullMatch, match.name, match.args], {
-				index: match.index,
-				input: text,
-				groups: undefined
-			}) as any;
+			const functionName = match.name;
+			const args = match.args;
+			const index = match.index;
 
+			if (functionName.toUpperCase() === "DOPROC") {
+				const regExpMatch = Object.assign([
+					match.fullMatch,
+					functionName,
+					args
+				], {
+					index: index,
+					input: text,
+					groups: undefined
+				}) as RegExpExecArray;
 
-			if (functionName === "DOPROC") {
-				hints.push(...this.getDoProcInlayHints(document, lineStartOffset, matchObj));
-			} else if (functionName === "EXECFUNCTION") {
-				hints.push(...this.getExecFunctionInlayHints(document, lineStartOffset, matchObj));
-			} else {
-				hints.push(...this.getStandardFunctionHints(document, lineStartOffset, match));
+				const doProcHints = this.getDoProcInlayHints(document, lineStartOffset, regExpMatch);
+				hints.push(...doProcHints);
+				continue;
+			}
+
+			if (functionName.toUpperCase() === "EXECFUNCTION") {
+				const execHintMatch = Object.assign([
+					match.fullMatch,
+					functionName,
+					args
+				], {
+					index,
+					input: text,
+					groups: undefined
+				}) as RegExpExecArray;
+				const execHints = this.getExecFunctionInlayHints(document, lineStartOffset, execHintMatch);
+				hints.push(...execHints);
+				continue;
+			}
+
+			const paramNames = this.functionSignatures.get(functionName.toUpperCase());
+			if (!paramNames) {
+				continue;
+			}
+
+			const argsList = this.parseArguments(args);
+			let currentOffset = index + functionName.length + 1;
+
+			for (let i = 0; i < argsList.length && i < paramNames.length; i++) {
+				const absoluteOffset = lineStartOffset + currentOffset;
+				const hintPosition = this.createHintPosition(document, absoluteOffset);
+				const hint = new vscode.InlayHint(
+					hintPosition,
+					`${paramNames[i]}:`,
+					vscode.InlayHintKind.Parameter
+				);
+				hint.paddingRight = true;
+				hints.push(hint);
+
+				currentOffset += argsList[i].length + 1;
 			}
 		}
 
-		return hints;
-	}
-
-	private getStandardFunctionHints(
-		document: vscode.TextDocument,
-		lineStartOffset: number,
-		match: { name: string; args: string; index: number }
-	): vscode.InlayHint[] {
-		const hints: vscode.InlayHint[] = [];
-		const functionName = match.name;
-		const paramNames = this.functionSignatures.get(functionName.toUpperCase());
-
-		if (!paramNames) {
-			return hints;
-		}
-
-		const argsList = this.parseArguments(match.args);
-		let currentOffset = match.index + functionName.length + 1; // Start after 'Name('
-
-		for (let i = 0; i < argsList.length && i < paramNames.length; i++) {
-			const absoluteOffset = lineStartOffset + currentOffset;
-			const hintPosition = this.createHintPosition(document, absoluteOffset);
-			const hint = new vscode.InlayHint(
-				hintPosition,
-				`${paramNames[i]}:`,
-				vscode.InlayHintKind.Parameter
-			);
-			hint.paddingRight = true;
-			hints.push(hint);
-
-			// Calculate length of argument including potential whitespace preserved in argsList if specific parsing used
-			// The original implementation used argsList[i].length + 1
-			currentOffset += argsList[i].length + 1;
-		}
 		return hints;
 	}
 
@@ -163,7 +169,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 		// Calculate offset to the start of array contents
 		let currentOffset = match.index + functionName.length + 1 + callInfo.arrayStartOffset;
-
+		
 		// Create hints for each argument matching procedure parameters
 		for (let i = 0; i < arrayArgs.length && i < paramNames.length; i++) {
 			const absoluteOffset = lineStartOffset + currentOffset;
@@ -367,129 +373,127 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 	}
 
 	private initializeFunctionSignatures(): void {
-		// Initialize with function signatures from language constants
-		for (const func of SSL_BUILTIN_FUNCTIONS) {
-			const params = this.extractParameterNames(func.params);
-			if (params && params.length > 0) {
-				this.functionSignatures.set(func.name.toUpperCase(), params);
-			} else {
-				// Handle parameter-less functions explicitly if needed, or just set empty array
-				this.functionSignatures.set(func.name.toUpperCase(), []);
-			}
-		}
-	}
-
-	private extractParameterNames(paramsString: string): string[] {
-		if (!paramsString || paramsString.trim() === '()') {
-			return [];
-		}
-
-		// Remove parentheses
-		const content = paramsString.replace(/^\(|\)$/g, '');
-
-		// Split by comma
-		const params = content.split(',');
-
-		return params.map(param => {
-			param = param.trim();
-			// Format is usually "type name", we want "name"
-			// Handle array types like "any[] args" correctly
-			// Just take the last word after splitting by space
-			const parts = param.split(/\s+/);
-			return parts[parts.length - 1];
-		});
+		// Initialize with common SSL function signatures
+		this.functionSignatures.set("SQLEXECUTE", ["query", "connectionName"]);
+		this.functionSignatures.set("DOPROC", ["procName", "parameters"]);
+		this.functionSignatures.set("EXECFUNCTION", ["funcName", "parameters"]);
+		this.functionSignatures.set("EMPTY", ["value"]);
+		this.functionSignatures.set("LEN", ["value"]);
+		this.functionSignatures.set("USRMES", ["message1", "message2"]);
+		this.functionSignatures.set("CHR", ["code"]);
+		this.functionSignatures.set("AADD", ["array", "element"]);
+		this.functionSignatures.set("ALLTRIM", ["string"]);
+		this.functionSignatures.set("AT", ["needle", "haystack", "occurrence"]);
+		this.functionSignatures.set("CREATEUDOBJECT", ["className", "parameters"]);
+		this.functionSignatures.set("BUILDSTRING", ["format", "values"]);
+		this.functionSignatures.set("ASCAN", ["array", "value", "startIndex", "count"]);
+		this.functionSignatures.set("ALEN", ["array", "dimension"]);
+		this.functionSignatures.set("LEFT", ["string", "count"]);
+		this.functionSignatures.set("RIGHT", ["string", "count"]);
+		this.functionSignatures.set("SUBSTR", ["string", "start", "length"]);
+		this.functionSignatures.set("UPPER", ["string"]);
+		this.functionSignatures.set("LOWER", ["string"]);
+		this.functionSignatures.set("VAL", ["string"]);
+		this.functionSignatures.set("CTOD", ["dateString"]);
+		this.functionSignatures.set("GETSETTING", ["settingName", "defaultValue"]);
+		this.functionSignatures.set("GETUSERDATA", ["key"]);
+		this.functionSignatures.set("SETUSERDATA", ["key", "value"]);
+		this.functionSignatures.set("RUNSQL", ["query", "connectionName", "returnRecords", "parameters"]);
+		this.functionSignatures.set("LSEARCH", ["query", "maxRows", "connectionName", "parameters"]);
+		this.functionSignatures.set("LSELECT", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("LSELECT1", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("LSELECTC", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("GETDATASET", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("GETDATASETWITHSCHEMAFROMSELECT", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("GETDATASETXMLFROMSELECT", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("GETNETDATASET", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("GETDATASETEX", ["query", "connectionName", "parameters"]);
+		this.functionSignatures.set("ARRAYCALC", ["array", "expression"]);
+		this.functionSignatures.set("BUILDARRAY", ["values"]);
+		this.functionSignatures.set("ARRAYNEW", ["size"]);
+		this.functionSignatures.set("DIRECTORY", ["path", "mask"]);
+		this.functionSignatures.set("CREATEGUID", []);
+		this.functionSignatures.set("DATEADD", ["date", "interval", "units"]);
+		this.functionSignatures.set("DATEDIFF", ["startDate", "endDate", "units"]);
+		this.functionSignatures.set("STRTRAN", ["string", "search", "replace"]);
+		this.functionSignatures.set("STR", ["value", "length", "decimals"]);
+		this.functionSignatures.set("NOW", []);
+		this.functionSignatures.set("TODAY", []);
+		this.functionSignatures.set("GETLASTSSLERROR", []);
 	}
 
 	/**
 	 * Find all function calls with balanced parentheses in the text
-	 * Uses a single pass state machine to handle string literals and parentheses correctly
+	 * Excludes function calls that appear inside string literals
 	 */
 	private findFunctionCalls(text: string): Array<{ name: string; args: string; index: number; fullMatch: string }> {
 		const results: Array<{ name: string; args: string; index: number; fullMatch: string }> = [];
+		const functionPattern = /\b([A-Za-z_]\w*)\s*\(/g;
+		let match: RegExpExecArray | null;
 
-		let state: 'CODE' | 'STRING' | 'PARAMS' = 'CODE';
-		let stringChar: string | null = null; // ' or " or ] (for [ string)
-		let currentToken = '';
-		let tokenStart = -1;
-		let paramsStart = -1;
-		let parenDepth = 0;
+		while ((match = functionPattern.exec(text)) !== null) {
+			const functionName = match[1];
+			const startIndex = match.index;
 
-		for (let i = 0; i < text.length; i++) {
-			const char = text[i];
-
-			if (state === 'STRING') {
-				if (char === stringChar) {
-					state = parenDepth > 0 ? 'PARAMS' : 'CODE';
-					stringChar = null;
-				}
+			// Skip if the function call starts inside a string literal
+			if (this.isInsideString(text, startIndex)) {
 				continue;
 			}
 
-			// Check for string start
-			if (char === '"' || char === "'") {
-				state = 'STRING';
-				stringChar = char;
-				continue;
-			}
-			// SSL strings can be [ ... ]
-			if (char === '[') {
-				if (state === 'PARAMS') {
-					// Inside params, brackets might be array or string. 
-					// The original logic handled [ as string start. 
-					state = 'STRING';
-					stringChar = ']';
-					continue;
+			const openParenIndex = match.index + match[0].length - 1; // Position of '('
+
+			// Extract arguments with balanced parentheses
+			let depth = 1;
+			let i = openParenIndex + 1;
+			let args = '';
+
+			while (i < text.length && depth > 0) {
+				if (text[i] === '(') {
+					depth++;
+				} else if (text[i] === ')') {
+					depth--;
+					if (depth === 0) {
+						break; // Found matching closing paren
+					}
 				}
+				args += text[i];
+				i++;
 			}
 
-			if (state === 'CODE') {
-				if (/[A-Za-z_0-9]/.test(char)) {
-					if (currentToken === '') {
-						tokenStart = i;
-					}
-					currentToken += char;
-				} else if (char === '(') {
-					if (currentToken !== '') {
-						// Found FunctionName(
-						const firstChar = currentToken[0];
-						if (/[A-Za-z_]/.test(firstChar)) {
-							state = 'PARAMS';
-							paramsStart = i + 1;
-							parenDepth = 1;
-						} else {
-							currentToken = '';
-						}
-					}
-				} else if (/\s/.test(char)) {
-					// allowed space between name and (
-				} else {
-					currentToken = '';
-				}
-			} else if (state === 'PARAMS') {
-				if (char === '(') {
-					parenDepth++;
-				} else if (char === ')') {
-					parenDepth--;
-					if (parenDepth === 0) {
-						// Found end of function call
-						const args = text.substring(paramsStart, i);
-						const fullMatch = text.substring(tokenStart, i + 1);
-						results.push({
-							name: currentToken,
-							args: args,
-							index: tokenStart,
-							fullMatch: fullMatch
-						});
-
-						// Reset to CODE
-						state = 'CODE';
-						currentToken = '';
-						paramsStart = -1;
-					}
-				}
+			if (depth === 0) {
+				// Successfully matched
+				const fullMatch = text.substring(startIndex, i + 1);
+				results.push({
+					name: functionName,
+					args: args,
+					index: startIndex,
+					fullMatch: fullMatch
+				});
 			}
 		}
 
 		return results;
+	}
+
+	/**
+	 * Check if a position in the text is inside a string literal
+	 */
+	private isInsideString(text: string, position: number): boolean {
+		let inString = false;
+		let stringChar: string | null = null;
+
+		for (let i = 0; i < position; i++) {
+			const char = text[i];
+
+			if (!inString && (char === '"' || char === "'" || char === '[')) {
+				inString = true;
+				stringChar = char === '[' ? ']' : char;
+			} else if (inString && char === stringChar) {
+				inString = false;
+				stringChar = null;
+			}
+		}
+
+		return inString;
 	}
 }

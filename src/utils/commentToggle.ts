@@ -1,5 +1,3 @@
-import { PATTERNS } from "../constants/patterns";
-
 interface ToggleResult {
 	lines: string[];
 	action: "commented" | "uncommented";
@@ -8,7 +6,7 @@ interface ToggleResult {
 const INLINE_PREFIX = "/*";
 
 function getIndent(line: string): string {
-	const match = line.match(/^(\s*)/);
+	const match = line.match(/^\s*/);
 	return match ? match[0] : "";
 }
 
@@ -18,50 +16,23 @@ function isBlockComment(lines: string[]): boolean {
 	}
 	const first = lines[0].trim();
 	const last = lines[lines.length - 1].trim();
-
-	// Check if first line starts with /* and last line ends with ;
-	return PATTERNS.COMMENT.MULTILINE_START.test(first) && PATTERNS.COMMENT.MULTILINE_END.test(last);
+	return first === "/*" && last === ";";
 }
 
 function isInlineComment(line: string): boolean {
-	return PATTERNS.COMMENT.MULTILINE_START.test(line.trimStart());
+	return line.trimStart().startsWith(INLINE_PREFIX);
 }
 
 function removeInlineComment(line: string): string {
 	const indent = getIndent(line);
 	const trimmed = line.trimStart();
-
-	if (!isInlineComment(line)) {
+	if (!trimmed.startsWith(INLINE_PREFIX)) {
 		return line;
 	}
-
-	let remainder = trimmed.replace(PATTERNS.COMMENT.MULTILINE_START, "");
-
-	// Remove optional space after /*
+	let remainder = trimmed.slice(INLINE_PREFIX.length);
 	if (remainder.startsWith(" ")) {
 		remainder = remainder.slice(1);
 	}
-
-	// Remove trailing semicolon if present (inline comments often end with ;)
-	// But be careful not to remove needed semicolons for code.
-	// However, the toggle logic usually adds ' ;' at the end.
-	// Let's strip the specific ' ;' or just rely on user intent?
-	// The previous implementation stripped checks for end semicolon.
-	// "commented += " ;" in addInlineComment.
-	// So distinct from " /* text ;" -> "text"
-
-	// Reverse of addInlineComment:
-	// It adds /* at start and ; at end.
-
-	// Try to remove trailing ;
-	if (remainder.endsWith(";")) {
-		remainder = remainder.slice(0, -1);
-	}
-	// Try to remove trailing space before ;
-	if (remainder.endsWith(" ")) {
-		remainder = remainder.slice(0, -1);
-	}
-
 	return indent + remainder;
 }
 
@@ -69,16 +40,15 @@ function addInlineComment(line: string): string {
 	const indent = getIndent(line);
 	const content = line.slice(indent.length);
 	const trimmed = content.trimEnd();
-
+	const trailingWhitespace = content.slice(trimmed.length);
 	if (!trimmed) {
-		// Empty line case
-		return `${indent}/* ;`;
+		return `${indent}/* ;${trailingWhitespace}`;
 	}
-
 	let commented = `${indent}/* ${trimmed}`;
 	if (!trimmed.endsWith(";")) {
 		commented += " ;";
 	}
+	commented += trailingWhitespace;
 	return commented;
 }
 
@@ -97,12 +67,9 @@ export function toggleCommentLines(lines: string[]): ToggleResult {
 		return { lines: lines.slice(1, -1), action: "uncommented" };
 	}
 
-	// Check if all non-empty lines are inline comments
-	const nonEmptyLines = lines.filter(l => l.trim().length > 0);
-	const allInline = nonEmptyLines.length > 0 && nonEmptyLines.every(isInlineComment);
-
+	const allInline = lines.every(isInlineComment);
 	if (allInline) {
-		return { lines: lines.map(line => isInlineComment(line) ? removeInlineComment(line) : line), action: "uncommented" };
+		return { lines: lines.map(removeInlineComment), action: "uncommented" };
 	}
 
 	if (lines.length === 1) {

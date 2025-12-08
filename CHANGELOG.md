@@ -31,15 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - SQL `UPDATE` and `INSERT` statement indentation
   - Logical operator spacing matches
 
-#### Code Quality / Refactoring
-- **SQL Formatter**: Extracted helper methods for casing, preprocessing, and table.column handling.
-- **Statement Printer**: Extracted `SPECIAL_FUNCTIONS` constant, `isSpecialFunctionFirstParam`, `calculateSqlIndent`, and `handleOperatorSpacing` helpers.
-- **Whitespace Manager**: Extracted `normalizeKeyword` helper for repeated text normalization.
-- **SQL Context**: Replaced hardcoded SQL function names with dynamic regex using `SQL_CONTEXT_FUNCTIONS` constant.
-- **Parser**: Extracted `handleBlockStart`, `handleBlockEnd`, `handleBlockMiddle`, and `isStatementContinuation` helpers.
-- **Lexer**: Removed dead code and improved string tokenization.
-- **Formatter**: Split `visit` method into smaller visitor methods.
-
 
 ## [1.2.5] - 2025-12-05
 

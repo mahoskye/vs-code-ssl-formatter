@@ -36,16 +36,16 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const documentSelector = SSL_DOCUMENT_SELECTORS;
     registerCommentController(context);
-    registerConfigureNamespacesCommand(context);
-    registerFormatSqlCommand(context);
+	registerConfigureNamespacesCommand(context);
+	registerFormatSqlCommand(context);
 
-    const classIndex = new WorkspaceClassIndex();
-    context.subscriptions.push(classIndex);
-    await classIndex.initialize();
+	const classIndex = new WorkspaceClassIndex();
+	context.subscriptions.push(classIndex);
+	await classIndex.initialize();
 
-    const procedureIndex = new WorkspaceProcedureIndex();
-    context.subscriptions.push(procedureIndex);
-    await procedureIndex.initialize();
+	const procedureIndex = new WorkspaceProcedureIndex();
+	context.subscriptions.push(procedureIndex);
+	await procedureIndex.initialize();
 
     // Register the folding range provider for SSL language
     context.subscriptions.push(
@@ -104,7 +104,7 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.workspace.onDidCloseTextDocument(document => {
             if (document.languageId === "ssl") {
-                diagnosticProvider.clear();
+                diagnosticProvider.clear(document);
             }
         })
     );
@@ -148,14 +148,14 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.languages.registerRenameProvider(documentSelector, new SSLRenameProvider())
     );
 
-    // Signature help
-    context.subscriptions.push(
-        vscode.languages.registerSignatureHelpProvider(
-            documentSelector,
-            new SSLSignatureHelpProvider(procedureIndex),
-            "(", ","
-        )
-    );
+    // Signature help disabled - using inlay hints instead for less invasive parameter documentation
+    // context.subscriptions.push(
+    //     vscode.languages.registerSignatureHelpProvider(
+    //         documentSelector,
+    //         new SSLSignatureHelpProvider(),
+    //         "(", ","
+    //     )
+    // );
 
     // Register CodeLens provider for reference counts
     const codeLensProvider = new SSLCodeLensProvider();
@@ -183,7 +183,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Register workspace symbol provider for global search (Ctrl+T)
     context.subscriptions.push(
-        vscode.languages.registerWorkspaceSymbolProvider(new SSLWorkspaceSymbolProvider(procedureIndex, classIndex))
+        vscode.languages.registerWorkspaceSymbolProvider(new SSLWorkspaceSymbolProvider())
     );
 
     // Register document highlight provider for symbol occurrence highlighting

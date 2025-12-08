@@ -1,41 +1,33 @@
 import * as vscode from 'vscode';
 
 /**
- * Log levels for the SSL extension configuration
+ * Log levels for the SSL extension
  */
-enum ConfigLogLevel {
-    Off,
-    Info,
-    Debug
+export enum LogLevel {
+    OFF = 0,
+    ERROR = 1,
+    WARN = 2,
+    INFO = 3,
+    DEBUG = 4
 }
 
 /**
  * Logger utility for the SSL extension
- * Wraps VS Code's native LogOutputChannel with config-based filtering
+ * Provides structured logging with configurable log levels
  */
 export class Logger {
-    private static outputChannel: vscode.LogOutputChannel | null = null;
-    private static configLevel: ConfigLogLevel = ConfigLogLevel.Off;
+    private static outputChannel: vscode.OutputChannel | null = null;
+    private static logLevel: LogLevel = LogLevel.OFF;
 
     /**
-     * Initialize the logger with a LogOutputChannel
+     * Initialize the logger with an output channel
      */
     static initialize(context: vscode.ExtensionContext): void {
         if (!this.outputChannel) {
-            // Create a LogOutputChannel (requires VS Code 1.66+)
-            this.outputChannel = vscode.window.createOutputChannel('SSL Extension', { log: true });
+            this.outputChannel = vscode.window.createOutputChannel('SSL Extension');
             context.subscriptions.push(this.outputChannel);
         }
         this.updateLogLevel();
-
-        // Listen for configuration changes to update log level dynamically
-        context.subscriptions.push(
-            vscode.workspace.onDidChangeConfiguration(e => {
-                if (e.affectsConfiguration('ssl.trace.server')) {
-                    this.updateLogLevel();
-                }
-            })
-        );
     }
 
     /**
@@ -47,14 +39,14 @@ export class Logger {
 
         switch (traceLevel) {
             case 'verbose':
-                this.configLevel = ConfigLogLevel.Debug;
+                this.logLevel = LogLevel.DEBUG;
                 break;
             case 'messages':
-                this.configLevel = ConfigLogLevel.Info;
+                this.logLevel = LogLevel.INFO;
                 break;
             case 'off':
             default:
-                this.configLevel = ConfigLogLevel.Off;
+                this.logLevel = LogLevel.OFF;
                 break;
         }
     }
@@ -63,47 +55,44 @@ export class Logger {
      * Log a debug message
      */
     static debug(message: string, ...args: any[]): void {
-        if (this.configLevel >= ConfigLogLevel.Debug) {
-            this.outputChannel?.debug(this.formatMessage(message, args));
-        }
+        this.log(LogLevel.DEBUG, message, ...args);
     }
 
     /**
      * Log an info message
      */
     static info(message: string, ...args: any[]): void {
-        if (this.configLevel >= ConfigLogLevel.Info) {
-            this.outputChannel?.info(this.formatMessage(message, args));
-        }
+        this.log(LogLevel.INFO, message, ...args);
     }
 
     /**
      * Log a warning message
      */
     static warn(message: string, ...args: any[]): void {
-        if (this.configLevel >= ConfigLogLevel.Info) {
-            this.outputChannel?.warn(this.formatMessage(message, args));
-        }
+        this.log(LogLevel.WARN, message, ...args);
     }
 
     /**
      * Log an error message
      */
-    static error(message: string | Error, ...args: any[]): void {
-        if (this.configLevel >= ConfigLogLevel.Info) {
-            this.outputChannel?.error(this.formatMessage(message, args));
-        }
+    static error(message: string, ...args: any[]): void {
+        this.log(LogLevel.ERROR, message, ...args);
     }
 
     /**
-     * Format message with args
+     * Internal log method
      */
-    private static formatMessage(message: string | Error, args: any[]): string {
-        const msgStr = message instanceof Error ? message.message : message;
-        if (args.length > 0) {
-            return `${msgStr} ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')}`;
+    private static log(level: LogLevel, message: string, ...args: any[]): void {
+        if (level > this.logLevel || !this.outputChannel) {
+            return;
         }
-        return msgStr;
+
+        const timestamp = new Date().toISOString();
+        const levelName = LogLevel[level];
+        const formattedArgs = args.length > 0 ? ` ${JSON.stringify(args)}` : '';
+        const logMessage = `[${timestamp}] [${levelName}] ${message}${formattedArgs}`;
+
+        this.outputChannel.appendLine(logMessage);
     }
 
     /**

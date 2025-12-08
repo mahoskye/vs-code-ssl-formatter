@@ -1,17 +1,13 @@
 import * as vscode from "vscode";
-import { PATTERNS } from "../constants/patterns";
 
 export interface ClassMembers {
 	className: string;
 	methods: string[];
 	properties: string[];
-	range?: vscode.Range;
-	uri?: vscode.Uri;
 }
 
 export interface ClassIndex {
 	getClassMembers(className: string): ClassMembers | undefined;
-	getAllClasses(): ClassMembers[];
 }
 
 interface ParsedClassInfo extends ClassMembers {
@@ -93,20 +89,6 @@ export class WorkspaceClassIndex implements ClassIndex, vscode.Disposable {
 		};
 	}
 
-	public getAllClasses(): ClassMembers[] {
-		const result: ClassMembers[] = [];
-		for (const list of this.fileClassMap.values()) {
-			for (const item of list) {
-				// reconstruct full info. URI is computed from fileKey.
-				result.push({
-					...item,
-					uri: vscode.Uri.parse(item.fileKey)
-				});
-			}
-		}
-		return result;
-	}
-
 	private async updateFromUri(uri: vscode.Uri): Promise<void> {
 		try {
 			const document = await vscode.workspace.openTextDocument(uri);
@@ -120,7 +102,7 @@ export class WorkspaceClassIndex implements ClassIndex, vscode.Disposable {
 
 	private updateDocument(document: vscode.TextDocument): void {
 		const fileKey = document.uri.toString();
-		const parsed = parseClassesFromText(document.getText(), document).map(cls => ({
+		const parsed = parseClassesFromText(document.getText()).map(cls => ({
 			...cls,
 			fileKey
 		}));
@@ -138,45 +120,31 @@ export class WorkspaceClassIndex implements ClassIndex, vscode.Disposable {
 	}
 }
 
-export function parseClassesFromText(text: string, document?: vscode.TextDocument): ClassMembers[] {
+export function parseClassesFromText(text: string): ClassMembers[] {
 	const lines = text.split(/\r?\n/);
 	const classes: ClassMembers[] = [];
 	let current: ClassMembers | null = null;
-	let currentStartLine = 0;
 
-	const flushCurrent = (endLineFn: number) => {
+	const flushCurrent = () => {
 		if (current) {
 			current.methods = Array.from(new Set(current.methods));
 			current.properties = Array.from(new Set(current.properties));
-			if (document) {
-				// If we have doc, we make range.
-				// Assuming class ends at start of next class or EOF.
-				// endLineFn is index of line that caused flush (e.g. next class decl).
-				// Range is startLine to endLineFn - 1
-				const endLine = Math.max(currentStartLine, endLineFn - 1);
-				// Need character pos? 0 to line length.
-				// We don't have line length readily without doc.
-				current.range = new vscode.Range(currentStartLine, 0, endLine, 0);
-			}
 			classes.push(current);
 			current = null;
 		}
 	};
 
-	for (let i = 0; i < lines.length; i++) {
-		const rawLine = lines[i];
+	for (const rawLine of lines) {
 		const line = rawLine.trim();
 
-		// Use centralized pattern for CLASS
-		const classMatch = line.match(PATTERNS.CLASS.DEFINITION);
+		const classMatch = line.match(/^:CLASS\s+(\w+)/i);
 		if (classMatch) {
-			flushCurrent(i);
+			flushCurrent();
 			current = {
 				className: classMatch[1],
 				methods: [],
 				properties: []
 			};
-			currentStartLine = i;
 			continue;
 		}
 
@@ -184,17 +152,18 @@ export function parseClassesFromText(text: string, document?: vscode.TextDocumen
 			continue;
 		}
 
-		// Use centralized pattern for PROCEDURE
-		const procedureMatch = line.match(PATTERNS.PROCEDURE.DEFINITION);
+		// Start of a new class closes the previous one
+		if (/^:CLASS\b/i.test(line)) {
+			flushCurrent();
+			continue;
+		}
+
+		const procedureMatch = line.match(/^:PROCEDURE\s+(\w+)/i);
 		if (procedureMatch) {
 			current.methods.push(procedureMatch[1]);
 			continue;
 		}
 
-		// Handles both :DECLARE and :PUBLIC (combined logic)
-		// PATTERNS doesn't have a combined one, so we keep this specific regex or compose it.
-		// "DECLARE_STATEMENT": /^\s*:DECLARE\s+(.+?);/i
-		// We'll stick to the custom regex for this specific mixed use case to avoid complexity
 		const declareMatch = line.match(/^:(DECLARE|PUBLIC)\s+(.+?);/i);
 		if (declareMatch) {
 			const identifiers = declareMatch[2]
@@ -205,6 +174,6 @@ export function parseClassesFromText(text: string, document?: vscode.TextDocumen
 		}
 	}
 
-	flushCurrent(lines.length);
+	flushCurrent();
 	return classes;
 }

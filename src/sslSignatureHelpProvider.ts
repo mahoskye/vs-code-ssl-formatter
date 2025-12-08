@@ -1,7 +1,4 @@
 import * as vscode from "vscode";
-import { getConfiguredFunctions } from "./utils/intellisense";
-import { ProcedureIndex } from "./utils/procedureIndex";
-import { CONFIG_KEYS, CONFIG_DEFAULTS } from "./constants/config";
 
 interface FunctionSignature {
 	label: string;
@@ -12,21 +9,14 @@ interface FunctionSignature {
 /**
  * SSL Signature Help Provider
  * Provides parameter hints while typing function calls
- * Refactored to use ProcedureIndex and centralized function definitions.
  */
 export class SSLSignatureHelpProvider implements vscode.SignatureHelpProvider {
 
-	private functionSignatures: Map<string, FunctionSignature> = new Map();
+	private functionSignatures: Map<string, FunctionSignature>;
 
-	constructor(private readonly procedureIndex?: ProcedureIndex) {
+	constructor() {
+		this.functionSignatures = new Map();
 		this.initializeFunctionSignatures();
-
-		// Listen for config changes to reload signatures
-		vscode.workspace.onDidChangeConfiguration(e => {
-			if (e.affectsConfiguration("ssl.intellisense")) {
-				this.initializeFunctionSignatures();
-			}
-		});
 	}
 
 	public provideSignatureHelp(
@@ -35,234 +25,396 @@ export class SSLSignatureHelpProvider implements vscode.SignatureHelpProvider {
 		token: vscode.CancellationToken,
 		context: vscode.SignatureHelpContext
 	): vscode.SignatureHelp | null {
-		// Fast path: Identify if we are in a function call
-		// We scan backwards from cursor to find opening parenthesis.
-		const lineText = document.lineAt(position.line).text;
-		const offset = position.character;
+		const line = document.lineAt(position.line).text;
+		const beforeCursor = line.substring(0, position.character);
 
-		const callInfo = this.findFunctionCall(lineText, offset);
-		if (!callInfo) {
+		// Find the function call we're in
+		const functionCall = this.findFunctionCall(beforeCursor);
+		if (!functionCall) {
 			return null;
 		}
 
-		const funcName = callInfo.name;
-		const paramIndex = callInfo.parameterIndex;
+		// Special handling for DoProc - check if we're inside the array parameter
+		if (functionCall.name.toUpperCase() === "DOPROC") {
+			// Check if we're inside the curly braces (array parameter)
+			const arrayMatch = beforeCursor.match(/DoProc\s*\(\s*["']([^"']+)["']\s*,\s*\{([^}]*)/i);
+			if (arrayMatch) {
+				const procedureName = arrayMatch[1];
+				const insideArray = arrayMatch[2];
+				
+				// Count which parameter we're on inside the array
+				let arrayParamIndex = 0;
+				let depth = 0;
+				for (let i = 0; i < insideArray.length; i++) {
+					if (insideArray[i] === '{') {
+						depth++;
+					} else if (insideArray[i] === '}') {
+						depth--;
+					} else if (insideArray[i] === ',' && depth === 0) {
+						arrayParamIndex++;
+					}
+				}
+				
+				// Get the procedure's signature
+				const procedureSignature = this.getProcedureSignature(document, beforeCursor);
+				if (procedureSignature) {
+					const signatureHelp = new vscode.SignatureHelp();
+					const signatureInfo = new vscode.SignatureInformation(
+						`DoProc("${procedureName}", {${procedureSignature.parameters.join(', ')}})`,
+						procedureSignature.documentation
+					);
 
-		// Special handling for DoProc/ExecFunction ("ProcName", ...)
-		// Check if first arg is a string literal containing the procedure name
-		if ((funcName.toUpperCase() === "DOPROC" || funcName.toUpperCase() === "EXECFUNCTION") && paramIndex > 0) {
-			// If we are past the first argument, we might be providing help for the *target procedure's* parameters.
-			// DoProc("TargetProc", {ArrayArgs}) ?? 
-			// Wait, DoProc takes array of args usually: DoProc("Proc", {arg1, arg2})
-			// Or variadic? SSL_BUILTIN_FUNCTIONS says DoProc(args) usually takes array.
+					procedureSignature.parameters.forEach(param => {
+						signatureInfo.parameters.push(new vscode.ParameterInformation(param));
+					});
 
-			// Previous code logic:
-			// DoProc("Name", { param1, param2 })
-			// Logic:
-			// 1. Extract "Name" from first arg.
-			// 2. Determine if we are inside the array { ... } (which is usually the second arg or so, depending on implementation).
+					signatureHelp.signatures = [signatureInfo];
+					signatureHelp.activeSignature = 0;
+					signatureHelp.activeParameter = arrayParamIndex;
 
-			// Let's refine parsing for DoProc context.
-			// We need to know if we are inside the `{ ... }` array of arguments.
-
-			const arrayContext = this.getDoProcArrayContext(lineText, offset);
-			if (arrayContext) {
-				// We are inside { ... } which is an argument to DoProc("TargetName", ...)
-				const targetProc = this.resolveProcedure(arrayContext.procName);
-				if (targetProc) {
-					return this.createSignatureHelp(targetProc, arrayContext.paramIndex, true);
+					return signatureHelp;
 				}
 			}
 		}
 
-		// Regular Function Call
-		// Check built-ins first
-		const builtIn = this.functionSignatures.get(funcName.toUpperCase());
-		if (builtIn) {
-			return this.createSignatureHelpFromDefinition(builtIn, paramIndex);
+		const signature = this.functionSignatures.get(functionCall.name.toUpperCase());
+		if (!signature) {
+			return null;
 		}
 
-		// Check Procedure Index for user-defined procedures called directly (if supported by language)
-		// Does SSL support `MyProc(...)`? Usually yes if in same file or included.
-		// Assuming direct calls are possible.
-		if (this.procedureIndex) {
-			const procs = this.procedureIndex.getProceduresByName(funcName);
-			if (procs.length > 0) {
-				// Pick best match? Usually just one or first.
-				// Ideally we check import visibility but for now first match is good.
-				const proc = procs[0];
-				const sig = this.convertProcedureInfoToSignature(proc);
-				return this.createSignatureHelpFromDefinition(sig, paramIndex);
-			}
-		}
+		const signatureHelp = new vscode.SignatureHelp();
+		const signatureInfo = new vscode.SignatureInformation(signature.label, signature.documentation);
 
-		return null;
-	}
-
-	private initializeFunctionSignatures(): void {
-		this.functionSignatures.clear();
-		const config = vscode.workspace.getConfiguration("ssl");
-		const allFunctions = getConfiguredFunctions(config);
-
-		allFunctions.forEach(func => {
-			// Parse params string "(p1, p2)" into array
-			const paramStr = func.params.replace(/^\(|\)$/g, ""); // Remove parens
-			const parameters = paramStr.split(",").map(p => p.trim()).filter(p => p.length > 0);
-
-			this.functionSignatures.set(func.name.toUpperCase(), {
-				label: func.signature || `${func.name}${func.params}`,
-				parameters: parameters,
-				documentation: func.description
-			});
+		// Add parameter information
+		signature.parameters.forEach(param => {
+			signatureInfo.parameters.push(new vscode.ParameterInformation(param));
 		});
+
+		signatureHelp.signatures = [signatureInfo];
+		signatureHelp.activeSignature = 0;
+		signatureHelp.activeParameter = functionCall.parameterIndex;
+
+		return signatureHelp;
 	}
 
-	private findFunctionCall(text: string, offset: number): { name: string; parameterIndex: number } | null {
-		// Robust backward search for '('
-		// Must handle nested parens '()' and strings/comments (simple check)
+	private findFunctionCall(text: string): { name: string; parameterIndex: number } | null {
+		// Find the last open parenthesis
+		let depth = 0;
+		let functionStart = -1;
 
-		let balance = 0;
-		let braceBalance = 0;
-		let paramCount = 0;
-
-		for (let i = offset - 1; i >= 0; i--) {
-			const char = text[i];
-
-			if (char === ')') {
-				balance++;
-			} else if (char === '}') {
-				braceBalance++;
-			} else if (char === '{') {
-				braceBalance--;
-			} else if (char === '(') {
-				if (balance > 0) {
-					balance--;
-				} else {
-					// Found the opening parenthesis of OUR call
-					// Extract name
-					const prefix = text.substring(0, i).trimRight();
-					const match = /([a-zA-Z_][a-zA-Z0-9_]*)$/.exec(prefix);
-					if (match) {
-						return { name: match[1], parameterIndex: paramCount };
-					}
-					return null; // found ( but no name? e.g. "if ("
+		for (let i = text.length - 1; i >= 0; i--) {
+			if (text[i] === ")") {
+				depth++;
+			} else if (text[i] === "(") {
+				if (depth === 0) {
+					functionStart = i;
+					break;
 				}
-			} else if (char === ',') {
-				if (balance === 0 && braceBalance === 0) { // Only count commas at current level
-					paramCount++;
-				}
+				depth--;
 			}
 		}
-		return null;
-	}
 
-	private getDoProcArrayContext(text: string, offset: number): { procName: string; paramIndex: number } | null {
-		// Looking for pattern: DoProc ( "Name" , { ... cursor ... } )
-		// We know we are inside DoProc (checked by caller partially).
-		// But we need to be sure we are inside the array `{ ... }`.
-
-		// Scan backwards.
-		// Expect to find `{` before we find `DoProc`.
-		let braceBalance = 0;
-		let paramIndex = 0;
-
-		for (let i = offset - 1; i >= 0; i--) {
-			const char = text[i];
-
-			if (char === '}') {
-				braceBalance++;
-			} else if (char === '{') {
-				if (braceBalance > 0) {
-					braceBalance--;
-				} else {
-					// Found the opening `{`
-					// Now verify this `{` is an argument to `DoProc("Name",`
-					// Scan back further
-					const beforeBrace = text.substring(0, i).trimRight();
-					// Expect comma, then string literal, then ( then DoProc
-					// This regex is a bit expensive but robust enough for local context
-					// Matches: DoProc\s*\(\s*["']([^"']+)["']\s*,\s*$
-					const match = /DoProc\s*\(\s*["']([^"']+)["']\s*,\s*$/i.exec(beforeBrace);
-					if (match) {
-						return { procName: match[1], paramIndex: paramIndex };
-					}
-					return null;
-				}
-			}
-			else if (char === ',') {
-				if (braceBalance === 0) {
-					paramIndex++;
-				}
-			}
-		}
-		return null;
-	}
-
-	private resolveProcedure(name: string): FunctionSignature | null {
-		if (!this.procedureIndex) {
+		if (functionStart === -1) {
 			return null;
 		}
 
-		// 1. Resolve using Index (handles namespaces if we added logic, but simpler here)
-		// Using "resolveProcedureLiteral" logic without namespace root map for now?
-		// Or better, just getProceduresByName if simple name.
-		// sslSignatureHelpProvider previously had complex scanning.
-		// resolveProcedureLiteral needs config.
-
-		const config = vscode.workspace.getConfiguration("ssl");
-		const namespaceRoots = config.get<Record<string, string>>(
-			CONFIG_KEYS.DOCUMENT_NAMESPACES,
-			CONFIG_DEFAULTS[CONFIG_KEYS.DOCUMENT_NAMESPACES] as Record<string, string>
-		) || {};
-
-		const procInfo = this.procedureIndex.resolveProcedureLiteral(name, namespaceRoots);
-
-		if (procInfo) {
-			return this.convertProcedureInfoToSignature(procInfo);
+		// Find the function name before the parenthesis
+		const beforeParen = text.substring(0, functionStart).trim();
+		const match = beforeParen.match(/([a-zA-Z_][a-zA-Z0-9_]*)\s*$/);
+		if (!match) {
+			return null;
 		}
 
-		// Fallback: simple name lookup
-		const simpleMatch = this.procedureIndex.getProceduresByName(name);
-		if (simpleMatch.length > 0) {
-			return this.convertProcedureInfoToSignature(simpleMatch[0]);
+		const functionName = match[1];
+
+		// Count the parameter index by counting commas
+		// Track both parentheses and curly braces depth to avoid counting commas inside arrays
+		const insideParen = text.substring(functionStart + 1);
+		let parameterIndex = 0;
+		let parenDepth = 0;
+		let braceDepth = 0;
+
+		for (let i = 0; i < insideParen.length; i++) {
+			if (insideParen[i] === "(") {
+				parenDepth++;
+			} else if (insideParen[i] === ")") {
+				parenDepth--;
+			} else if (insideParen[i] === "{") {
+				braceDepth++;
+			} else if (insideParen[i] === "}") {
+				braceDepth--;
+			} else if (insideParen[i] === "," && parenDepth === 0 && braceDepth === 0) {
+				parameterIndex++;
+			}
 		}
 
-		return null;
+		return { name: functionName, parameterIndex };
 	}
 
-	private convertProcedureInfoToSignature(proc: { parameters: string[]; name: string; declarationText: string }): FunctionSignature {
+	/**
+	 * Get signature for a procedure called via DoProc
+	 */
+	private getProcedureSignature(document: vscode.TextDocument, textBeforeCursor: string): FunctionSignature | null {
+		// Extract the procedure name from DoProc("ProcedureName", ...)
+		const procNameMatch = textBeforeCursor.match(/DoProc\s*\(\s*["']([^"']+)["']/i);
+		if (!procNameMatch) {
+			return null;
+		}
+
+		const procedureName = procNameMatch[1];
+		const text = document.getText();
+		const lines = text.split('\n');
+
+		// Find the procedure definition
+		const procedurePattern = new RegExp(`^\\s*:PROCEDURE\\s+${procedureName}\\b`, 'i');
+		let procedureLineIndex = -1;
+
+		for (let i = 0; i < lines.length; i++) {
+			if (procedurePattern.test(lines[i])) {
+				procedureLineIndex = i;
+				break;
+			}
+		}
+
+		if (procedureLineIndex === -1) {
+			return null;
+		}
+
+		// Look for :PARAMETERS line after :PROCEDURE
+		const parameters: string[] = [];
+		let documentation = `User-defined procedure: ${procedureName}`;
+
+		for (let i = procedureLineIndex + 1; i < Math.min(procedureLineIndex + 20, lines.length); i++) {
+			const line = lines[i].trim();
+
+			// Check for :PARAMETERS
+			const paramsMatch = line.match(/^:PARAMETERS\s+(.+?);/i);
+			if (paramsMatch) {
+				const paramList = paramsMatch[1].split(',').map(p => p.trim());
+				parameters.push(...paramList);
+				break;
+			}
+
+			// Stop at next procedure or other block keyword
+			if (/^:(PROCEDURE|ENDPROC|DECLARE)\b/i.test(line)) {
+				break;
+			}
+
+			// Extract documentation from comments
+			if (line.startsWith('/*') && !line.endsWith(';')) {
+				// Start of multi-line comment
+				let commentText = '';
+				for (let j = i; j < Math.min(i + 10, lines.length); j++) {
+					const commentLine = lines[j].trim();
+					if (commentLine.endsWith(';')) {
+						break;
+					}
+					if (commentLine.startsWith('*') && !commentLine.startsWith('/*')) {
+						commentText += commentLine.substring(1).trim() + ' ';
+					}
+				}
+				if (commentText) {
+					documentation = commentText.trim();
+				}
+			}
+		}
+
+		// Build signature label
+		const paramString = parameters.length > 0 ? parameters.join(', ') : '';
+		const label = `${procedureName}(${paramString})`;
+
 		return {
-			label: `${proc.name}(${proc.parameters.join(", ")})`,
-			parameters: proc.parameters, // these are formatted like "param" or "type param"? usually just names in SSL :PARAMETERS
-			documentation: `User-defined procedure in ${proc.name}` // We could fetch more doc if available in ProcedureInfo
+			label,
+			parameters,
+			documentation
 		};
 	}
 
-	private createSignatureHelpFromDefinition(def: FunctionSignature, currentParam: number): vscode.SignatureHelp {
-		const sigInfo = new vscode.SignatureInformation(def.label, def.documentation);
-		sigInfo.parameters = def.parameters.map(p => new vscode.ParameterInformation(p));
+	private initializeFunctionSignatures(): void {
+		this.functionSignatures.set("SQLEXECUTE", {
+			label: "SQLExecute(query, dataset, parameters)",
+			parameters: ["query: string", "dataset: string", "parameters: array"],
+			documentation: "Execute a SQL query and return results in a dataset"
+		});
 
-		const help = new vscode.SignatureHelp();
-		help.signatures = [sigInfo];
-		help.activeSignature = 0;
-		help.activeParameter = currentParam;
-		return help;
-	}
+		this.functionSignatures.set("DOPROC", {
+			label: "DoProc(procName, parameters)",
+			parameters: ["procName: string", "parameters: array"],
+			documentation: "Call a procedure by name with parameters"
+		});
 
-	private createSignatureHelp(sig: FunctionSignature, currentParam: number, isDoProc: boolean): vscode.SignatureHelp {
-		// Re-format label for DoProc context? 
-		// DoProc("Name", { p1, p2 })
-		// The signature help should probably show the *target* signature.
+		this.functionSignatures.set("EXECFUNCTION", {
+			label: "ExecFunction(funcName, parameters)",
+			parameters: ["funcName: string", "parameters: array"],
+			documentation: "Execute a function dynamically by name"
+		});
 
-		const help = new vscode.SignatureHelp();
-		const label = isDoProc ? `(In DoProc) ${sig.label}` : sig.label;
+		this.functionSignatures.set("EMPTY", {
+			label: "Empty(value)",
+			parameters: ["value: any"],
+			documentation: "Check if a value is empty, null, or zero"
+		});
 
-		const sigInfo = new vscode.SignatureInformation(label, sig.documentation);
-		sigInfo.parameters = sig.parameters.map(p => new vscode.ParameterInformation(p));
+		this.functionSignatures.set("LEN", {
+			label: "Len(value)",
+			parameters: ["value: string|array"],
+			documentation: "Get the length of a string or array"
+		});
 
-		help.signatures = [sigInfo];
-		help.activeSignature = 0;
-		help.activeParameter = currentParam;
-		return help;
+		this.functionSignatures.set("USRMES", {
+			label: "UsrMes(message1, message2)",
+			parameters: ["message1: any", "message2: any"],
+			documentation: "Display a message to the user"
+		});
+
+		this.functionSignatures.set("CHR", {
+			label: "Chr(code)",
+			parameters: ["code: number"],
+			documentation: "Convert ASCII code to character"
+		});
+
+		this.functionSignatures.set("AADD", {
+			label: "AAdd(array, element)",
+			parameters: ["array: array", "element: any"],
+			documentation: "Add an element to an array"
+		});
+
+		this.functionSignatures.set("ALLTRIM", {
+			label: "AllTrim(string)",
+			parameters: ["string: string"],
+			documentation: "Remove leading and trailing whitespace from string"
+		});
+
+		this.functionSignatures.set("AT", {
+			label: "At(needle, haystack, occurrence)",
+			parameters: ["needle: string", "haystack: string", "occurrence: number"],
+			documentation: "Find the position of substring in string (1-based index)"
+		});
+
+		this.functionSignatures.set("CREATEUDOBJECT", {
+			label: "CreateUdObject(className, parameters)",
+			parameters: ["className: string", "parameters: array"],
+			documentation: "Create a UDO (User Defined Object) instance"
+		});
+
+		this.functionSignatures.set("BUILDSTRING", {
+			label: "BuildString(format, values)",
+			parameters: ["format: string", "values: array"],
+			documentation: "Build a formatted string from template and values"
+		});
+
+		this.functionSignatures.set("ASCAN", {
+			label: "AScan(array, value, startIndex, count)",
+			parameters: ["array: array", "value: any", "startIndex: number", "count: number"],
+			documentation: "Search for a value in an array, returns 1-based index or 0 if not found"
+		});
+
+		this.functionSignatures.set("ALEN", {
+			label: "ALen(array, dimension)",
+			parameters: ["array: array", "dimension: number"],
+			documentation: "Get the length of an array (optionally for specific dimension)"
+		});
+
+		this.functionSignatures.set("LEFT", {
+			label: "Left(string, count)",
+			parameters: ["string: string", "count: number"],
+			documentation: "Get leftmost characters from string"
+		});
+
+		this.functionSignatures.set("RIGHT", {
+			label: "Right(string, count)",
+			parameters: ["string: string", "count: number"],
+			documentation: "Get rightmost characters from string"
+		});
+
+		this.functionSignatures.set("SUBSTR", {
+			label: "SubStr(string, start, length)",
+			parameters: ["string: string", "start: number", "length: number"],
+			documentation: "Extract substring from string (1-based index)"
+		});
+
+		this.functionSignatures.set("UPPER", {
+			label: "Upper(string)",
+			parameters: ["string: string"],
+			documentation: "Convert string to uppercase"
+		});
+
+		this.functionSignatures.set("LOWER", {
+			label: "Lower(string)",
+			parameters: ["string: string"],
+			documentation: "Convert string to lowercase"
+		});
+
+		this.functionSignatures.set("VAL", {
+			label: "Val(string)",
+			parameters: ["string: string"],
+			documentation: "Convert string to numeric value"
+		});
+
+		this.functionSignatures.set("CTOD", {
+			label: "CtoD(dateString)",
+			parameters: ["dateString: string"],
+			documentation: "Convert string to date"
+		});
+
+		this.functionSignatures.set("GETSETTING", {
+			label: "GetSetting(settingName, defaultValue)",
+			parameters: ["settingName: string", "defaultValue: any"],
+			documentation: "Get a system setting value"
+		});
+
+		this.functionSignatures.set("GETUSERDATA", {
+			label: "GetUserData(key)",
+			parameters: ["key: string"],
+			documentation: "Get user-specific data value"
+		});
+
+		this.functionSignatures.set("SETUSERDATA", {
+			label: "SetUserData(key, value)",
+			parameters: ["key: string", "value: any"],
+			documentation: "Set user-specific data value"
+		});
+
+		this.functionSignatures.set("RUNSQL", {
+			label: "RunSQL(query, parameters)",
+			parameters: ["query: string", "parameters: array"],
+			documentation: "Execute a SQL modification query (INSERT, UPDATE, DELETE)"
+		});
+
+		this.functionSignatures.set("LSEARCH", {
+			label: "LSearch(query, parameters)",
+			parameters: ["query: string", "parameters: array"],
+			documentation: "Execute a SQL query and return the first value"
+		});
+
+		this.functionSignatures.set("ARRAYNEW", {
+			label: "ArrayNew(size)",
+			parameters: ["size: number"],
+			documentation: "Create a new array with the specified size"
+		});
+
+		this.functionSignatures.set("STR", {
+			label: "Str(value, length, decimals)",
+			parameters: ["value: number", "length: number", "decimals: number"],
+			documentation: "Convert a numeric value to a string with optional formatting"
+		});
+
+		this.functionSignatures.set("NOW", {
+			label: "Now()",
+			parameters: [],
+			documentation: "Get the current date and time"
+		});
+
+		this.functionSignatures.set("TODAY", {
+			label: "Today()",
+			parameters: [],
+			documentation: "Get the current date (without time)"
+		});
+
+		this.functionSignatures.set("GETLASTSSLERROR", {
+			label: "GetLastSSLError()",
+			parameters: [],
+			documentation: "Get the last SSL error message"
+		});
 	}
 }

@@ -24,44 +24,22 @@ export function registerCommentController(context: vscode.ExtensionContext) {
 
 function buildOperations(document: vscode.TextDocument, selections: readonly vscode.Selection[]): CommentOperation[] {
 	const operations: CommentOperation[] = [];
-
-	// Create a set of processed lines to avoid processing the same block multiple times
-	// if user has multiple cursors in the same block
-	const processedLines = new Set<number>();
-
 	for (const selection of selections) {
-		// Get touched lines
-		let startLine = selection.start.line;
-		let endLine = selection.end.line;
-
-		// If selection ends at character 0 of next line, exclude that line
-		if (!selection.isEmpty && selection.end.character === 0 && endLine > startLine) {
-			endLine--;
-		}
-
-		if (processedLines.has(startLine)) {
+		const rangeLines = getLineRange(document, selection);
+		if (!rangeLines) {
 			continue;
 		}
-
-		// Attempt to expand to full comment block
-		const expanded = findEnclosingCommentBlock(document, startLine, endLine);
-
-		// Mark lines as processed
-		for (let i = expanded.startLine; i <= expanded.endLine; i++) {
-			processedLines.add(i);
-		}
-
+		const { startLine, endLine } = rangeLines;
 		const lines: string[] = [];
-		for (let line = expanded.startLine; line <= expanded.endLine; line++) {
+		for (let line = startLine; line <= endLine; line++) {
 			lines.push(document.lineAt(line).text);
 		}
-
+		if (!lines.length) {
+			continue;
+		}
 		const toggled = toggleCommentLines(lines);
-
-		// Calculate range including the full length of the last line
-		const start = new vscode.Position(expanded.startLine, 0);
-		const end = new vscode.Position(expanded.endLine, document.lineAt(expanded.endLine).text.length);
-
+		const start = new vscode.Position(startLine, 0);
+		const end = new vscode.Position(endLine, document.lineAt(endLine).text.length);
 		operations.push({
 			range: new vscode.Range(start, end),
 			text: toggled.lines.join("\n")
@@ -70,65 +48,32 @@ function buildOperations(document: vscode.TextDocument, selections: readonly vsc
 	return operations;
 }
 
-/**
- * Robustly find enclosing comment block (/* ... ;)
- * Scans upwards for /* and downwards for ;
- */
-function findEnclosingCommentBlock(document: vscode.TextDocument, startLine: number, endLine: number): { startLine: number; endLine: number } {
-	let newStart = startLine;
-	let newEnd = endLine;
-	const SCAN_LIMIT = 100; // lines
-
-	// Helper to check line content
-	const isCommentStart = (line: number) => document.lineAt(line).text.trim().startsWith("/*");
-	const isBlockEnd = (line: number) => document.lineAt(line).text.trim().endsWith(";");
-
-	// 1. Scan Upwards for Start (if current start isn't one)
-	if (!isCommentStart(newStart)) {
-		for (let i = 1; i <= SCAN_LIMIT; i++) {
-			const candidate = startLine - i;
-			if (candidate < 0) {
-				break;
-			}
-
-			// If we hit a semicolon (end of previous block or statement), stop scanning up
-			if (isBlockEnd(candidate)) {
-				break;
-			}
-
-			if (isCommentStart(candidate)) {
-				newStart = candidate;
-				break;
-			}
-		}
+function getLineRange(document: vscode.TextDocument, selection: vscode.Selection) {
+	let startLine = Math.min(selection.start.line, selection.end.line);
+	let endLine = Math.max(selection.start.line, selection.end.line);
+	if (!selection.isEmpty && selection.end.character === 0 && selection.end.line > selection.start.line) {
+		endLine -= 1;
 	}
-
-	// 2. Scan Downwards for End (if current end isn't one)
-	if (!isBlockEnd(newEnd)) {
-		for (let i = 1; i <= SCAN_LIMIT; i++) {
-			const candidate = endLine + i;
-			if (candidate >= document.lineCount) {
-				break;
-			}
-
-			// If we hit a comment start (start of next block), stop scanning down
-			if (isCommentStart(candidate)) {
-				break;
-			}
-
-			if (isBlockEnd(candidate)) {
-				newEnd = candidate;
-				break;
-			}
-		}
+	if (startLine < 0 || startLine >= document.lineCount) {
+		return undefined;
 	}
-
-	// 3. Validation:
-	// Only return the expanded range IF it forms a valid comment block (Starts with /* and ends with ;)
-	// Otherwise return original range (treat as code to be commented out)
-	if (isCommentStart(newStart) && isBlockEnd(newEnd)) {
-		return { startLine: newStart, endLine: newEnd };
+	if (endLine < startLine) {
+		endLine = startLine;
 	}
+	const expanded = expandBlockRange(document, startLine, endLine);
+	return expanded;
+}
 
-	return { startLine, endLine };
+function expandBlockRange(document: vscode.TextDocument, startLine: number, endLine: number) {
+	let start = startLine;
+	let end = endLine;
+	const isBlockStart = (line: number) => document.lineAt(line).text.trim() === "/*";
+	const isBlockEnd = (line: number) => document.lineAt(line).text.trim() === ";";
+	if (!isBlockStart(start) && start > 0 && document.lineAt(start - 1).text.trim() === "/*") {
+		start -= 1;
+	}
+	if (!isBlockEnd(end) && end + 1 < document.lineCount && document.lineAt(end + 1).text.trim() === ";") {
+		end += 1;
+	}
+	return { startLine: start, endLine: end };
 }
