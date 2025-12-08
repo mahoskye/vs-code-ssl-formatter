@@ -801,7 +801,7 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentStr
 		const distinctMatch = selectMatch[1].match(/DISTINCT/i);
 		const distinctPart = distinctMatch ? " " + applySqlKeywordCase("DISTINCT", keywordCase, distinctMatch[0]) : "";
 		const columns = parseColumns(selectMatch[2]);
-		// console.log removed
+
 
 		// Format columns with proper alignment
 		// First columns on same line as SELECT, continuation aligned to 7 spaces
