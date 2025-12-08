@@ -66,8 +66,6 @@ export class Lexer {
                 tokens.push(this.readString());
             } else if (char === '[') {
                 // Context sensitive: String literal or Array Access?
-                // If follows a Term (Identifier, ), ], String, Number), it's Array Access (Punctuation)
-                // Else it's String Literal
                 if (this.isArrayAccessContext(tokens)) {
                     tokens.push(this.readPunctuation());
                 } else {
@@ -76,7 +74,7 @@ export class Lexer {
             } else if (this.isDigit(char)) {
                 tokens.push(this.readNumber());
             } else if (this.isIdentifierStart(char)) {
-                tokens.push(this.readIdentifierOrWordOperator());
+                tokens.push(this.readIdentifier());
             } else if (this.isOperatorChar(char)) {
                 tokens.push(this.readOperator());
             } else if (this.isPunctuation(char)) {
@@ -204,12 +202,7 @@ export class Lexer {
     }
 
     private readLineComment(): Token {
-        // Starts with * and goes to end of line?
-        // Actually SSL style guide says: 
-        // "code_comments: style: SSL_comments # /* comment; format"
-        // But older SSL supports '*' at start of line as comment?
-        // The regex implementation checked for `trimmed.startsWith('*')`.
-        // Let's assume typical line comment behavior for '*'
+        // Line comments starting with *
         const start = this.pos;
         const line = this.line;
         const col = this.column;
@@ -236,26 +229,27 @@ export class Lexer {
         this.advance();
 
         const closeQuote = quote === '[' ? ']' : quote;
+        let isEscaped = false;
 
         while (this.pos < this.input.length) {
             const char = this.input[this.pos];
             text += char;
             this.advance();
 
+            if (isEscaped) {
+                isEscaped = false;
+                continue;
+            }
+
+            if (char === '\\' && quote !== '[') {
+                // Brackets generally don't use backslash escapes in this context? 
+                // Assuming standard quotes support escaping.
+                isEscaped = true;
+                continue;
+            }
+
             if (char === closeQuote) {
-                // If it's a bracket string (literal), we are good.
-                // If it's quotes, no escape sequences in standard SSL strings?
-                // Style guide says: "escape_sequences: true".
-                // But usually standard lexers handle escapes.
-                // For now, let's just minimal check.
-                // Actually, if char is escaped?
-                // If previous char was '\', then this quote might be escaped.
-                if (text.length >= 2 && text[text.length - 2] === '\\') {
-                    // Escaped?
-                    // Continue...
-                } else {
-                    break;
-                }
+                break;
             }
         }
 
@@ -294,7 +288,6 @@ export class Lexer {
         // Check if : followed by Alpha
         // Exception: If preceded by Identifier, it's likely Member Access (e.g. obj:Method or ns:Var)
         // unless it's a known pattern? No, usually keywords start statements.
-        // However, we must be careful about inline keywords if they exist.
         // SSL keywords are mostly control flow (:IF, :ELSE).
         // They rarely follow an identifier directly without punctuation.
         // E.g. "IF cond :THEN" (does not exist).
@@ -329,38 +322,11 @@ export class Lexer {
         return { type: TokenType.Keyword, text, line, column: col, offset: start };
     }
 
-    private readIdentifierOrWordOperator(): Token {
+    private readIdentifier(): Token {
         const start = this.pos;
         const line = this.line;
         const col = this.column;
         let text = "";
-
-        // Check for .AND. .OR. .NOT. .T. .F.
-        if (this.input[this.pos] === '.') {
-            while (this.pos < this.input.length) {
-                const char = this.input[this.pos];
-                text += char;
-                this.advance();
-                if (char === '.') { break; } // End of .AND.
-                if (!this.isAlpha(char)) { break; } // Not a word operator
-            }
-            if (SSL_OPERATORS.includes(text.toUpperCase())) {
-                return { type: TokenType.Operator, text, line, column: col, offset: start };
-            }
-            // Logic for .T. / .F. boolean literals?
-            // Treated as keywords or identifiers?
-            // Lexer treats them as identifiers usually or we can have specific types.
-        }
-
-        // Normal identifier
-        // Reset if we tried the dot logic and failed?
-        // Actually typical identifiers don't start with dot. 
-        // Wait, did I call this method if char was '.'? I need to check `isIdentifierStart`.
-        // My `isIdentifierStart` does NOT include `.`.
-
-        // Correct logic:
-        // Identifiers start with Alpha or _
-        // Operators might be .AND.
 
         while (this.pos < this.input.length && this.isIdentifierPart(this.input[this.pos])) {
             text += this.input[this.pos];
@@ -390,10 +356,10 @@ export class Lexer {
 
         // Check if valid
         const upper = text.toUpperCase();
-        if (SSL_LITERALS.includes(upper)) {
+        if ((SSL_LITERALS as readonly string[]).includes(upper)) {
             return { type: TokenType.Keyword, text, line, column: col, offset: start };
         }
-        if (SSL_OPERATORS.includes(upper)) {
+        if ((SSL_OPERATORS as readonly string[]).includes(upper)) {
             return { type: TokenType.Operator, text, line, column: col, offset: start };
         }
 
@@ -414,7 +380,7 @@ export class Lexer {
         const next = this.pos < this.input.length ? this.input[this.pos] : "";
         const twoChar = char + next;
 
-        if (SSL_COMPOUND_OPERATORS.includes(twoChar)) {
+        if ((SSL_COMPOUND_OPERATORS as readonly string[]).includes(twoChar)) {
             text += next;
             this.advance();
         }

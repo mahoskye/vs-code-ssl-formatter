@@ -160,7 +160,7 @@ export class SqlLexer {
             text += this.input[this.pos];
             this.advance();
         }
-        const type = SQL_KEYWORDS.has(text.toUpperCase()) ? SqlTokenType.Keyword : SqlTokenType.Identifier;
+        const type = SQL_KEYWORDS.has(text.toUpperCase() as any) ? SqlTokenType.Keyword : SqlTokenType.Identifier;
         return { type, text, line, column: col, offset: start };
     }
 

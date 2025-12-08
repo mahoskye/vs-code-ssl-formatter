@@ -1,8 +1,5 @@
 import { SqlToken, SqlTokenType } from './sqlLexer';
-import {
-    SQL_KW_UPDATE, SQL_KW_WHERE, SQL_KW_SET, SQL_KW_INSERT,
-    SQL_KW_SELECT, SQL_KW_VALUES, SQL_KW_FROM
-} from '../constants/sql';
+import { SQL } from "../constants/sql";
 
 export interface ParenContext {
     isMultiline: boolean;
@@ -33,13 +30,13 @@ export class SqlFormattingState {
         const upperText = token.text.toUpperCase();
 
         if (token.type === SqlTokenType.Keyword) {
-            if (upperText === SQL_KW_UPDATE) { this.afterUpdate = true; }
-            if (upperText === SQL_KW_WHERE) { this.inWhereClause = true; this.afterSet = false; }
-            if (upperText === SQL_KW_SET) { this.afterUpdate = false; this.afterSet = true; }
-            if (upperText === SQL_KW_INSERT) { this.inInsert = true; this.inInsertColumnList = true; }
-            if (upperText === SQL_KW_SELECT) { this.inSelectColumns = true; this.inInsertColumnList = false; }
-            if (upperText === SQL_KW_VALUES) { this.inInsertColumnList = false; }
-            if (upperText === SQL_KW_FROM && this.inSelectColumns) { this.inSelectColumns = false; }
+            if (upperText === SQL.KEYWORDS.UPDATE) { this.afterUpdate = true; }
+            if (upperText === SQL.KEYWORDS.WHERE) { this.inWhereClause = true; this.afterSet = false; }
+            if (upperText === SQL.KEYWORDS.SET) { this.afterUpdate = false; this.afterSet = true; }
+            if (upperText === SQL.KEYWORDS.INSERT) { this.inInsert = true; this.inInsertColumnList = true; }
+            if (upperText === SQL.KEYWORDS.SELECT) { this.inSelectColumns = true; this.inInsertColumnList = false; }
+            if (upperText === SQL.KEYWORDS.VALUES) { this.inInsertColumnList = false; }
+            if (upperText === SQL.KEYWORDS.FROM && this.inSelectColumns) { this.inSelectColumns = false; }
         }
     }
 

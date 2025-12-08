@@ -39,77 +39,99 @@ export class SSLFormatter {
         const parser = new Parser(tokens);
         const root = parser.parse();
 
-        // Recursively print nodes
+        // Reset state
         this.output = [];
         this.currentIndentLevel = initialIndentLevel;
 
-        // Track previous node for vertical whitespace logic
-        this.visit(root, undefined);
+        // Start processing
+        this.visitNode(root, undefined);
 
         // Join lines
         return this.output.join('\n').trim() + '\n';
     }
 
-    private visit(node: Node, prevSibling?: Node) {
-        if (node.type === NodeType.Program) {
-            let prev: Node | undefined = undefined;
-            for (const child of node.children) {
-                if (prev) {
-                    const lines = this.whitespaceManager.getVerticalWhitespace(prev, child);
-                    if (lines === -1) {
-                        // Trailing inline comment - append to previous line
-                        const comment = this.statementPrinter.printStatement(child, this.currentIndentLevel);
-                        if (this.output.length > 0) {
-                            this.output[this.output.length - 1] += ' ' + comment;
-                        }
-                        prev = child;
-                        continue;
-                    }
-                    for (let i = 0; i < lines; i++) { this.output.push(""); }
-                }
-                this.visit(child, prev);
-                prev = child;
-            }
-        } else if (node.type === NodeType.Block) {
-            this.currentIndentLevel++;
-            let prev: Node | undefined = undefined;
-            for (const child of node.children) {
-                // Check for vertical whitespace before child
-                if (prev) {
-                    const lines = this.whitespaceManager.getVerticalWhitespace(prev, child);
-                    if (lines === -1) {
-                        // Trailing inline comment - append to previous line
-                        const comment = this.statementPrinter.printStatement(child, this.currentIndentLevel);
-                        if (this.output.length > 0) {
-                            this.output[this.output.length - 1] += ' ' + comment;
-                        }
-                        prev = child;
-                        continue;
-                    }
-                    for (let i = 0; i < lines; i++) { this.output.push(""); }
-                }
-                this.visit(child, prev);
-                prev = child;
-            }
-            this.currentIndentLevel--;
-        } else if (node.type === NodeType.Statement || node.type === NodeType.Comment || node.type === NodeType.RegionStart || node.type === NodeType.RegionEnd) {
-            // Temporary dedent for PARAMETERS and ENDCASE which are often inside the block they define/close
-            let indentLevel = this.currentIndentLevel;
-            const firstToken = node.tokens.find(t => t.type !== TokenType.Whitespace && t.type !== TokenType.Comment);
-            if (firstToken) {
-                const text = firstToken.text.toUpperCase().replace(/^:/, ''); // Handle legacy colon
-                // PARAMETERS is semantically part of the procedure definition but syntactically a child
-                if (text === 'PARAMETERS') {
-                    indentLevel = Math.max(0, indentLevel - 1);
-                }
-            }
-
-            const line = this.statementPrinter.printStatement(node, indentLevel);
-            this.output.push(this.indentString.repeat(indentLevel) + line);
+    private visitNode(node: Node, prevSibling?: Node) {
+        switch (node.type) {
+            case NodeType.Program:
+                this.visitProgram(node);
+                break;
+            case NodeType.Block:
+                this.visitBlock(node);
+                break;
+            case NodeType.Statement:
+            case NodeType.Comment:
+            case NodeType.RegionStart:
+            case NodeType.RegionEnd:
+                this.visitStatement(node);
+                break;
+            default:
+                // Handle unknowns or unexpected types gracefully if needed
+                break;
         }
     }
 
-    private getIndent(): string {
-        return this.indentString.repeat(this.currentIndentLevel);
+    private visitProgram(node: Node) {
+        let prev: Node | undefined = undefined;
+        for (const child of node.children) {
+            if (this.handleVerticalWhitespace(prev, child)) {
+                prev = child;
+                continue;
+            }
+            this.visitNode(child, prev);
+            prev = child;
+        }
+    }
+
+    private visitBlock(node: Node) {
+        this.currentIndentLevel++;
+        let prev: Node | undefined = undefined;
+        for (const child of node.children) {
+            if (this.handleVerticalWhitespace(prev, child)) {
+                prev = child;
+                continue;
+            }
+            this.visitNode(child, prev);
+            prev = child;
+        }
+        this.currentIndentLevel--;
+    }
+
+    private visitStatement(node: Node) {
+        let indentLevel = this.currentIndentLevel;
+
+        // Temporary dedent for PARAMETERS which are syntactically children but visually top-level in procedure
+        const firstToken = node.tokens.find(t => t.type !== TokenType.Whitespace && t.type !== TokenType.Comment);
+        if (firstToken) {
+            const text = firstToken.text.toUpperCase().replace(/^:/, ''); // Handle legacy colon
+            if (text === 'PARAMETERS') {
+                indentLevel = Math.max(0, indentLevel - 1);
+            }
+        }
+
+        const line = this.statementPrinter.printStatement(node, indentLevel);
+        const indentedLine = this.indentString.repeat(indentLevel) + line;
+        this.output.push(indentedLine);
+    }
+
+    /**
+     * Handles vertical whitespace between nodes.
+     * Returns true if the current node was merged into the previous line (e.g. inline comment)
+     * and should be skipped for normal printing.
+     */
+    private handleVerticalWhitespace(prev: Node | undefined, current: Node): boolean {
+        if (!prev) return false;
+
+        const lines = this.whitespaceManager.getVerticalWhitespace(prev, current);
+        if (lines === -1) {
+            // Trailing inline comment - append to previous line
+            const comment = this.statementPrinter.printStatement(current, this.currentIndentLevel);
+            if (this.output.length > 0) {
+                this.output[this.output.length - 1] += ' ' + comment;
+            }
+            return true; // Signal to skip standard visiting for this node
+        } else {
+            for (let i = 0; i < lines; i++) { this.output.push(""); }
+            return false;
+        }
     }
 }
