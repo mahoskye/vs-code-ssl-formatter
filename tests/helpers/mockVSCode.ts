@@ -24,10 +24,18 @@ export class MockPosition {
 }
 
 export class MockRange {
-	constructor(
-		public start: MockPosition,
-		public end: MockPosition
-	) { }
+	constructor(start: MockPosition | number, end: MockPosition | number, endLine?: number, endChar?: number) {
+		if (typeof start === 'number' && typeof end === 'number' && typeof endLine === 'number' && typeof endChar === 'number') {
+			this.start = new MockPosition(start, end);
+			this.end = new MockPosition(endLine, endChar);
+		} else {
+			this.start = start as MockPosition;
+			this.end = end as MockPosition;
+		}
+	}
+
+	public start: MockPosition;
+	public end: MockPosition;
 
 	contains(positionOrRange: MockPosition | MockRange): boolean {
 		if (positionOrRange instanceof MockPosition) {

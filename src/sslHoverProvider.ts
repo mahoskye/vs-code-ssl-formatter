@@ -261,7 +261,7 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 	}
 
 	private getSqlPlaceholderHover(document: vscode.TextDocument, position: vscode.Position, lineText: string): vscode.Hover | null {
-		// Named Placeholders ?Var?
+		// 1. Named Placeholders ?Var?
 		const namedRegex = /\?([A-Za-z0-9_]+)(\[[^\]]+\])?\?/g;
 		let match;
 		while ((match = namedRegex.exec(lineText)) !== null) {
@@ -280,13 +280,78 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 					if (varInfo.value) {
 						md.appendMarkdown(`**Value:** \`${varInfo.value}\`\n\n`);
 					}
-					md.appendMarkdown(`Defined on line ${varInfo.line + 1}`);
+					md.appendMarkdown(`Declared at line ${varInfo.line + 1}`);
 				} else {
 					md.appendMarkdown(`_(Variable not found in local scope)_`);
 				}
 				return new vscode.Hover(md, new vscode.Range(position.line, start, position.line, end));
 			}
 		}
+
+		// 2. Positional Placeholders ?
+		// We need to count which '?' this is to give context (e.g. "Parameter 1")
+		// This requires scanning the line up to the cursor to count '?'
+		// but excluding named parameters we just checked.
+
+		// Simple regex for bare '?' (not surrounded by ?...?)
+		// Actually, ?Var? consumes the ? so if we are here, we might be on a bare ?
+		// But let's be careful not to match inside ?...? if the regex above didn't catch it for some reason (it should have).
+
+		// Let's iterate all '?' and checks types
+		const queryCharIndex = position.character;
+		if (lineText[queryCharIndex] === '?') {
+			// Check if it is part of a named param
+			// Check immediate surroundings
+			const prevChar = queryCharIndex > 0 ? lineText[queryCharIndex - 1] : '';
+			const nextChar = queryCharIndex < lineText.length - 1 ? lineText[queryCharIndex + 1] : '';
+
+			// If looks like ?Var or Var?, it is named.
+			// Ideally we reuse the regex logic or scan cleaner.
+			// Let's just check if we are inside a ?...? range found by the regex above.
+			// We can't reuse the loop easily without refactoring, so let's do a quick pre-check.
+			let isNamed = false;
+			let m;
+			// Reset regex
+			namedRegex.lastIndex = 0;
+			while ((m = namedRegex.exec(lineText)) !== null) {
+				if (queryCharIndex >= m.index && queryCharIndex < m.index + m[0].length) {
+					isNamed = true;
+					break;
+				}
+			}
+
+			if (!isNamed) {
+				// It is a positional param. Count index.
+				let paramIndex = 1;
+				for (let i = 0; i < queryCharIndex; i++) {
+					if (lineText[i] === '?') {
+						// Is this one named?
+						let thisIsNamed = false;
+						namedRegex.lastIndex = 0;
+						while ((m = namedRegex.exec(lineText)) !== null) {
+							if (i >= m.index && i < m.index + m[0].length) {
+								thisIsNamed = true;
+								break;
+							}
+						}
+						if (!thisIsNamed) {
+							paramIndex++;
+						}
+					}
+				}
+
+				const md = new vscode.MarkdownString();
+				md.appendMarkdown(`**Positional SQL placeholder**\n\n`);
+				md.appendMarkdown(`Parameter ${paramIndex}`);
+
+				// Try to find value from RunSQL/LSearch context if possible
+				// (This would require parsing the arguments of the wrapping function)
+				// For now, basic info is better than nothing.
+
+				return new vscode.Hover(md, new vscode.Range(position.line, queryCharIndex, position.line, queryCharIndex + 1));
+			}
+		}
+
 		return null;
 	}
 

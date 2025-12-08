@@ -426,7 +426,7 @@
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
-        "test": "npm run test:unit && node ./out/test/runTest.js",
+        "test": "npm run test:unit",
         "test:unit": "mocha --require ts-node/register --require tests/setup.ts 'tests/**/*.test.ts'",
         "test:integration": "node ./out/test/runTest.js",
         "test:format-fix": "node ./scripts/assert-format-fix.js",

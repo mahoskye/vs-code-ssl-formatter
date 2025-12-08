@@ -1,8 +1,6 @@
 :PROCEDURE MyProc;
 :PARAMETERS p1;
-
 	:DEFAULT p1, 10;
-
 	:DECLARE x;
 	x := p1;
 :ENDPROC;

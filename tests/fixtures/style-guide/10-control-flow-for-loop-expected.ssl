@@ -1,13 +1,12 @@
 /* FOR loop structure;
+
 :PROCEDURE TestForLoop;
 :PARAMETERS aItems;
-
 	:DECLARE nIndex, nTotal;
 	nTotal := 0;
 
 	:FOR i := 1 :TO Len(aItems);
 		nTotal := nTotal + aItems[i];
 	:NEXT;
-
 	:RETURN nTotal;
 :ENDPROC;

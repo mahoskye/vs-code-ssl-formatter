@@ -1,4 +1,5 @@
 /* String concatenation should use explicit + operator;
+
 :PROCEDURE TestStringConcat;
 	:DECLARE sResult;
 	sResult := "Hello" + "World";

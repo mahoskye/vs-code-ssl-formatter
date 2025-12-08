@@ -101,12 +101,11 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 				if (occ.scopeName === scanResult.sourceScope && occ.type === 'CODE') {
 					shouldRename = true;
 				}
+
 			} else {
 				// Global Variable / Unknown
-				// Rename global occurrences?
-				// "Global" in SSL is usually Public or outside procs.
-				// Match if occurrence is also global?
-				if (!occ.scopeName && occ.type === 'CODE') {
+				// Rename everywhere (assuming no shadowing for simplicity, or we'd need complex check)
+				if (occ.type === 'CODE') {
 					shouldRename = true;
 				}
 			}
@@ -234,6 +233,10 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 				currentScopeName = null;
 			}
 		}
+
+		// Debug Log
+		// console.log(`Scan Result for ${targetName}:`, JSON.stringify(occurrences, null, 2));
+		// console.log(`Source Scope: ${sourceScope}, SourceIsProc: ${sourceIsProcedure}`);
 
 		return { occurrences, sourceScope, sourceIsProcedure };
 	}

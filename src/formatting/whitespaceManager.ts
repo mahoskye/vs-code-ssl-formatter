@@ -55,7 +55,8 @@ export class WhitespaceManager {
 
         // Add blank line after control block end
         if (this.isControlEnd(prevToken)) {
-            if (!this.isBlockMiddle(currToken) && !this.isCaseKeyword(currToken) && !this.isControlEnd(currToken)) {
+            // Don't add blank if: next node has no token, or followed by block middle/case/control end/major block end
+            if (currToken && !this.isBlockMiddle(currToken) && !this.isCaseKeyword(currToken) && !this.isControlEnd(currToken) && !this.isMajorBlockEnd(currToken)) {
                 return 1;
             }
         }

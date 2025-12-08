@@ -1,4 +1,5 @@
 /* Multi-line function call with inconsistent indentation;
+
 :PROCEDURE FormatCall;
 	result := ComplexFunction("Arg1",
                            DoProc("Nested",

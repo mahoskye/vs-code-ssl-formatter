@@ -6,5 +6,6 @@ import type { DocumentSelector } from "vscode";
  * to ensure features work in all contexts like diff editors and remote workspaces.
  */
 export const SSL_DOCUMENT_SELECTORS: DocumentSelector = [
-	{ language: "ssl" }
+	{ language: "ssl", scheme: "file" },
+	{ language: "ssl", scheme: "untitled" }
 ];

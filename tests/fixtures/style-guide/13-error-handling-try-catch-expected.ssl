@@ -1,4 +1,5 @@
 /* TRY/CATCH/FINALLY structure;
+
 :PROCEDURE TestTryCatch;
 	:DECLARE nResult;
 
@@ -7,8 +8,8 @@
 	:CATCH;
 		sError := GetLastSSLError();
 	:FINALLY;
+
 		/* cleanup (release resources);
 	:ENDTRY;
-
 	:RETURN nResult;
 :ENDPROC;

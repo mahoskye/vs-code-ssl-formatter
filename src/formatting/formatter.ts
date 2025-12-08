@@ -109,8 +109,11 @@ export class SSLFormatter {
         }
 
         const line = this.statementPrinter.printStatement(node, indentLevel);
-        const indentedLine = this.indentString.repeat(indentLevel) + line;
-        this.output.push(indentedLine);
+        // Only add to output if there's actual content - prevents whitespace-only lines
+        if (line.trim()) {
+            const indentedLine = this.indentString.repeat(indentLevel) + line;
+            this.output.push(indentedLine.trimEnd());
+        }
     }
 
     /**
@@ -130,7 +133,9 @@ export class SSLFormatter {
             }
             return true; // Signal to skip standard visiting for this node
         } else {
-            for (let i = 0; i < lines; i++) { this.output.push(""); }
+            for (let i = 0; i < lines; i++) {
+                this.output.push("");
+            }
             return false;
         }
     }

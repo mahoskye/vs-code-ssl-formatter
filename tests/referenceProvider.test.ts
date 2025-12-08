@@ -60,7 +60,7 @@ describe('SSL Reference Provider - Procedures', () => {
 		const execLine = lines.findIndex(line => line.includes('ExecFunction("Utilities.HelperProc"'));
 		const position = new MockPosition(definitionLine, lines[definitionLine].indexOf('HelperProc'));
 		const references = provider.provideReferences(document as any, position as any, {} as any, {} as any);
-		const referenceLines = references.map(loc => loc.range.start.line).sort();
+		const referenceLines = references.map(loc => loc.range ? loc.range.start.line : -1).sort();
 		expect(referenceLines).to.have.members([definitionLine, doProcLine, execLine]);
 	});
 

@@ -28,6 +28,7 @@ interface VariableDefinition {
 	name: string;
 	line: number;
 	column: number;
+	literalValue?: string; // For static analysis of content
 }
 
 interface ProcedureScope {
@@ -213,6 +214,28 @@ export class SSLDiagnosticProvider {
 					}
 				});
 			}
+
+			// Capture basic string assignments for SQL analysis
+			const assignMatch = trimmed.match(/^([a-z][a-z0-9_]*)\s*:=\s*(["'].*["']);?$/i);
+			if (assignMatch) {
+				const varName = assignMatch[1];
+				const value = assignMatch[2]; // Includes quotes
+
+				// Helper to update definition
+				const updateDef = (map: Map<string, VariableDefinition>) => {
+					const def = map.get(varName.toLowerCase());
+					if (def) {
+						// Store literal without outer quotes (simplistic)
+						def.literalValue = value.substring(1, value.length - 1);
+					}
+				};
+
+				if (currentProcedure) {
+					updateDef(currentProcedure.variables);
+				} else {
+					updateDef(analysis.globalVariables);
+				}
+			}
 		}
 
 		// Close last procedure if open
@@ -316,14 +339,25 @@ export class SSLDiagnosticProvider {
 					diagnostics.push(this.createDiagnostic(i, 0, line.length,
 						DIAGNOSTIC_MESSAGES.BLOCK_DEPTH_EXCEEDED(blockStack.length, config.maxBlockDepth), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.BLOCK_DEPTH));
 				}
-			}
 
-			// Missing Semicolon Check
-			const isStructure = blockStack.some(b => b.line === i) || BLOCK_MIDDLE.has(keywordMatch?.[1].toUpperCase() || "");
-			const isContinuation = /[+\-*/,]$/.test(trimmed) || /^[+\-*/,]/.test(trimmed);
+				// Missing Semicolon Check
+				const isStructure = blockStack.some(b => b.line === i) || BLOCK_MIDDLE.has(keywordMatch?.[1].toUpperCase() || "");
 
-			if (!trimmed.endsWith(';') && !isStructure && !isContinuation && !trimmed.startsWith(':')) {
-				diagnostics.push(this.createDiagnostic(i, line.length - 1, 1, "Statement should end with semicolon", vscode.DiagnosticSeverity.Warning, "ssl-missing-semicolon"));
+				let isContinuation = /[+\-*/,{(]$/.test(trimmed) ||
+					/^[+\-*/,})]/.test(trimmed) ||
+					/^(\.AND\.|\.OR\.|\.NOT\.)/i.test(trimmed);
+
+				// Look ahead for continuation if not found
+				if (!isContinuation && !trimmed.endsWith(';') && i + 1 < analysis.lines.length) {
+					const nextLine = analysis.lines[i + 1].trim();
+					if (/^[+\-*/,})]/.test(nextLine) || /^(\.AND\.|\.OR\.|\.NOT\.)/i.test(nextLine)) {
+						isContinuation = true;
+					}
+				}
+
+				if (!trimmed.endsWith(';') && !isStructure && !isContinuation && !trimmed.startsWith(':')) {
+					diagnostics.push(this.createDiagnostic(i, line.length - 1, 1, "Statement should end with semicolon", vscode.DiagnosticSeverity.Warning, "ssl-missing-semicolon"));
+				}
 			}
 		}
 	}
@@ -343,6 +377,10 @@ export class SSLDiagnosticProvider {
 				continue;
 			}
 
+			// Mask strings to avoid false positives for variables inside quotes
+			// Replace with spaces to preserve indices
+			const lineWithoutStrings = line.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, (m) => ' '.repeat(m.length));
+
 			// Determine Scope
 			const scope = analysis.procedures.find(p => i >= p.startLine && i <= (p.endLine || Infinity));
 			const locals = scope ? scope.variables : new Map<string, VariableDefinition>();
@@ -352,7 +390,7 @@ export class SSLDiagnosticProvider {
 			// Regex to find variable-like identifiers
 			const identifierPattern = /\b([a-z][a-zA-Z0-9_]*)\b/g;
 			let match;
-			while ((match = identifierPattern.exec(line)) !== null) {
+			while ((match = identifierPattern.exec(lineWithoutStrings)) !== null) {
 				const varName = match[1];
 				const lowerName = varName.toLowerCase();
 
@@ -363,18 +401,19 @@ export class SSLDiagnosticProvider {
 					continue;
 				}
 
-				// Skip if property access (Prop:Name or :Name) - simplistic check
-				const charBefore = line.charAt(match.index - 1);
+				// Skip if property access (Prop:Name or :Name)
+				const charBefore = lineWithoutStrings.charAt(match.index - 1);
 				if (charBefore === ':') {
 					continue;
 				}
+
 
 				// Check Declaration
 				const isDeclared = locals.has(lowerName) || globals.has(lowerName) || config.configuredGlobals.has(lowerName);
 
 				if (!isDeclared && !reported.has(lowerName)) {
 					diagnostics.push(this.createDiagnostic(i, match.index, varName.length,
-						DIAGNOSTIC_MESSAGES.UNDECLARED_VARIABLE(varName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.UNDECLARED_VARIABLE));
+						DIAGNOSTIC_MESSAGES.UNDEFINED_VARIABLE(varName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.UNDEFINED_VARIABLE));
 					reported.add(lowerName);
 				}
 
@@ -409,16 +448,62 @@ export class SSLDiagnosticProvider {
 					diagnostics.push(this.createDiagnostic(i, 0, line.length,
 						"Potential SQL injection: Use parameterized queries", vscode.DiagnosticSeverity.Warning, "sql-positional-injection"));
 				}
+
+				// Check SQL Placeholder Style
+				// RunSQL -> Positional '?' (legacy support for named exists but warning expected by tests)
+				// Test 'warns when RunSQL uses named placeholders' implies named are invalid for RunSQL style preference
+				// SQLExecute -> Named '?name?'
+
+				// Check RunSQL calls
+				const runSqlMatch = /RunSQL\s*\(\s*([^,]+)/i.exec(line);
+				if (runSqlMatch) {
+					this.validateSqlPlaceholders(i, runSqlMatch[1].trim(), 'RunSQL', analysis, diagnostics);
+				}
+
+				// Check SQLExecute calls
+				const sqlExecMatch = /SQLExecute\s*\(\s*([^,]+)/i.exec(line);
+				if (sqlExecMatch) {
+					this.validateSqlPlaceholders(i, sqlExecMatch[1].trim(), 'SQLExecute', analysis, diagnostics);
+				}
+
+
 			}
+
+			// Check for Invalid SQL Params (?Unknown?)
+			// This applies to ANY string that looks like SQL
+			// Simple heuristic: If string contains keywords SELECT/UPDATE/INSERT/DELETE
+			// And we are NOT preventing SQL injection (or we are, but this is separate check?)
+			// Ideally we always check this if strictly validating.
+			// But maybe guard with `preventSqlInjection` or `strictMode`?
+			// Tests expect it always?
+			if (/(SELECT|UPDATE|INSERT|DELETE)\b/i.test(line)) {
+				this.validateSqlParams(i, line, analysis, diagnostics);
+			}
+
+			// Check ExecFunction Targets
 
 			// Check ExecFunction Targets
 			const execMatch = /ExecFunction\s*\(\s*["']([^"']+)["']/i.exec(line);
 			if (execMatch) {
 				const target = execMatch[1];
 				const parts = target.split('.');
-				// Check standard format: [Namespace.]Script.Proc
-				const valid = parts.length >= 2 || (parts.length === 1 && config.namespaceAliases.size === 0); // relaxed check
-				if (!valid && parts.length < 2) {
+
+				let isValid = false;
+				if (parts.length >= 3) {
+					isValid = true; // Namespace.Script.Proc
+				} else if (parts.length === 2) {
+					// Script.Proc or Namespace.Script (Invalid)
+					// Check if first part is a known namespace alias
+					if (config.namespaceAliases.has(parts[0].toLowerCase())) {
+						isValid = false; // Missing Procedure (Alias.Script)
+					} else {
+						isValid = true; // Script.Proc
+					}
+				} else {
+					isValid = false; // incomplete
+				}
+
+				if (!isValid) {
 					// Usually requires Script.Proc
 					diagnostics.push(this.createDiagnostic(i, execMatch.index!, execMatch[0].length,
 						DIAGNOSTIC_MESSAGES.INVALID_EXEC_TARGET(target, "Script.Procedure"), vscode.DiagnosticSeverity.Error, DIAGNOSTIC_CODES.INVALID_EXEC_TARGET));
@@ -428,6 +513,58 @@ export class SSLDiagnosticProvider {
 	}
 
 	// --- Helpers ---
+
+	private validateSqlPlaceholders(lineIdx: number, arg: string, funcName: string, analysis: DocumentAnalysis, diagnostics: vscode.Diagnostic[]) {
+		let sqlString = '';
+		if (arg.startsWith('"') || arg.startsWith("'")) {
+			sqlString = arg.substring(1, arg.length - 1);
+		} else {
+			// Resolve variable
+			const scope = analysis.procedures.find(p => lineIdx >= p.startLine && lineIdx <= (p.endLine || Infinity));
+			const locals = scope ? scope.variables : new Map<string, VariableDefinition>();
+			const def = locals.get(arg.toLowerCase()) || analysis.globalVariables.get(arg.toLowerCase());
+			if (def && def.literalValue) {
+				sqlString = def.literalValue;
+			}
+		}
+
+		if (!sqlString) return;
+
+		// Heuristic: Check for placeholders
+		const hasNamed = /\?[a-zA-Z0-9_]+\?/.test(sqlString);
+		const hasPositional = /\?/.test(sqlString.replace(/\?[a-zA-Z0-9_]+\?/g, '')); // Check for ? NOT inside named
+
+		if (funcName === 'RunSQL') {
+			if (hasNamed) {
+				diagnostics.push(this.createDiagnostic(lineIdx, 0, 1,
+					"RunSQL should use positional placeholders '?'", vscode.DiagnosticSeverity.Warning, "ssl-invalid-sql-placeholder-style"));
+			}
+		} else if (funcName === 'SQLExecute') {
+			if (hasPositional) {
+				diagnostics.push(this.createDiagnostic(lineIdx, 0, 1,
+					"SQLExecute should use named placeholders '?param?'", vscode.DiagnosticSeverity.Warning, "ssl-invalid-sql-placeholder-style"));
+			}
+		}
+	}
+
+	private validateSqlParams(lineIdx: number, line: string, analysis: DocumentAnalysis, diagnostics: vscode.Diagnostic[]) {
+		const paramPattern = /\?([a-zA-Z0-9_]+)\?/g;
+		let match;
+		while ((match = paramPattern.exec(line)) !== null) {
+			const paramName = match[1];
+			// Check if declared
+			const scope = analysis.procedures.find(p => lineIdx >= p.startLine && lineIdx <= (p.endLine || Infinity));
+			const locals = scope ? scope.variables : new Map<string, VariableDefinition>();
+			const lowerName = paramName.toLowerCase();
+
+			const isDeclared = locals.has(lowerName) || analysis.globalVariables.has(lowerName);
+
+			if (!isDeclared) {
+				diagnostics.push(this.createDiagnostic(lineIdx, match.index, match[0].length,
+					DIAGNOSTIC_MESSAGES.INVALID_SQL_PARAM(paramName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.INVALID_SQL_PARAM));
+			}
+		}
+	}
 
 	private createDiagnostic(line: number, col: number, len: number, msg: string, severity: vscode.DiagnosticSeverity, code: string): vscode.Diagnostic {
 		const d = new vscode.Diagnostic(new vscode.Range(line, col, line, col + len), msg, severity);

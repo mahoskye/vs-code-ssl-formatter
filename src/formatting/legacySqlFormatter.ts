@@ -911,9 +911,17 @@ export function formatAsConcatenatedString(sql: string, quoteChar: string): stri
     }
 
     // Concatenate lines
+    // Concatenate lines
     return lines.map((line, index) => {
-        const prefix = index === 0 ? quoteChar : '"'; // Assuming quoted concat uses "
-        const suffix = index === lines.length - 1 ? closeQuote : '" +';
-        return `${prefix}${line}${suffix}`;
+        const prefix = quoteChar;
+        const isLast = index === lines.length - 1;
+        let content = line;
+
+        if (!isLast && !content.endsWith(' ')) {
+            content += ' ';
+        }
+
+        const suffix = isLast ? closeQuote : `${closeQuote} +`;
+        return `${prefix}${content}${suffix}`;
     }).join('\n');
 }

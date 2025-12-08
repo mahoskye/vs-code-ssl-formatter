@@ -1,4 +1,5 @@
 /* Built-in functions should be PascalCase;
+
 :PROCEDURE TestBuiltinFunctions;
 	:DECLARE sResult;
 	sResult := AllTrim("  test  ");

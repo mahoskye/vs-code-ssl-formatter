@@ -22,7 +22,7 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 		const stack: vscode.DocumentSymbol[] = [];
 
 		for (let i = 0; i < lines.length; i++) {
-			if (token.isCancellationRequested) {
+			if (token?.isCancellationRequested) {
 				return [];
 			}
 

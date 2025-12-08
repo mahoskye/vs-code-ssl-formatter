@@ -4,8 +4,11 @@ This is a block comment with many symbols: !@#$%^&*()_+-=[]{}
 It also contains long lines that might be tempted to be wrapped by a formatter because they are very long and include punctuation and + = - = : = symbols
 Also includes code-like fragments: a:=1 b == 2 c = 3
 ;
+
 /* Single-line block comment with colon and equals := : =;
+
 /* This is a line-style comment (star at line start) with symbols: := + = - = * =;
+
 /*
 Multiline comment with internal semicolons these semicolons should not end the comment until the terminating line which ends with a semicolon
 Symbols: ++ -- == != <= >= := : =

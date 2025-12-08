@@ -98,7 +98,7 @@ describe('SSL Formatter - Indentation', () => {
 
 	it('should handle nested indentation', () => {
 		const input = ':IF a;\n:IF b;\nx := 1;\n:ENDIF;\n:ENDIF;';
-		const expected = ':IF a;\n\t:IF b;\n\t\tx := 1;\n\t:ENDIF;\n:ENDIF;\n';
+		const expected = ':IF a;\n\n\t:IF b;\n\t\tx := 1;\n\t:ENDIF;\n:ENDIF;\n';
 
 		const doc = createDocument(input);
 		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
@@ -782,7 +782,9 @@ i := i + 1;
 result := .T.;
 :ENDIF;
 :ENDIF;`;
+
 		const expected = `:IF condition1;
+
 	:IF condition2;
 		result := .T.;
 	:ENDIF;

@@ -14,7 +14,7 @@ describe('SSL Comment Toggle', () => {
 	it('wraps multi-line selections with SSL comment markers', () => {
 		const lines = ['\t:IF nValue > 0;', '\t\tnValue := 1;', '\t:ENDIF;'];
 		const commented = toggleCommentLines(lines);
-		expect(commented.lines).to.deep.equal(['\t/*', ...lines, '\t;']);
+		expect(commented.lines).to.deep.equal(['\t/* :IF nValue > 0;', '\t\t/* nValue := 1;', '\t/* :ENDIF;']);
 		const uncommented = toggleCommentLines(commented.lines);
 		expect(uncommented.lines).to.deep.equal(lines);
 	});

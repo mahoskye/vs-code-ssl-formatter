@@ -23,7 +23,7 @@ DoProc("HelperProc", {sValue, nCount});
 		const range = fullRangeFor(document.lineCount, document.lineAt(document.lineCount - 1).text.length);
 		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
 		const labels = hints.map(hint => hint.label).filter(Boolean) as string[];
-		expect(labels).to.include('string:');
+		expect(labels).to.include('source:');
 		expect(labels).to.include('sValue:');
 		expect(labels).to.include('nCount:');
 	});
@@ -78,14 +78,13 @@ describe('SSL Inlay Hints Provider - ExecFunction resolution', () => {
 	});
 
 	it('keeps positional hint labels for builtins even when arguments are omitted', () => {
-		const document = createDocument(`RunSQL(sSQL, , , { nOrderId });`);
+		const document = createDocument(`RunSQL(sSQL, , { nOrderId });`);
 		const range = fullRangeFor(document.lineCount, document.lineAt(document.lineCount - 1).text.length);
 		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
 		const labels = hints.map(hint => hint.label).filter(Boolean) as string[];
-		expect(labels).to.include('query:');
-		expect(labels).to.include('connectionName:');
-		expect(labels).to.include('returnRecords:');
-		expect(labels).to.include('parameters:');
+		expect(labels).to.include('commandString:');
+		expect(labels).to.include('friendlyName:');
+		expect(labels).to.include('arrayOfValues:');
 	});
 });
 
@@ -119,7 +118,7 @@ sQuery := "SELECT COUNT(*), Len(name) FROM users";`);
 		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
 		// Should have exactly 1 hint for the real Len() call
 		expect(hints).to.have.lengthOf(1);
-		expect(hints[0].label).to.equal('value:');
+		expect(hints[0].label).to.equal('source:');
 	});
 
 	it('should handle multiple function-like patterns in a single SQL string', () => {
@@ -136,7 +135,7 @@ sQuery := "SELECT COUNT(*), Len(name) FROM users";`);
 		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
 		// Should only have hint for the real AllTrim() call
 		expect(hints).to.have.lengthOf(1);
-		expect(hints[0].label).to.equal('string:');
+		expect(hints[0].label).to.equal('source:');
 	});
 
 	it('should handle DoProc calls with SQL in the parameters correctly', () => {

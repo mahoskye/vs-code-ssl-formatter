@@ -20,7 +20,19 @@ function isBlockComment(lines: string[]): boolean {
 	const last = lines[lines.length - 1].trim();
 
 	// Check if first line starts with /* and last line ends with ;
-	return PATTERNS.COMMENT.MULTILINE_START.test(first) && PATTERNS.COMMENT.MULTILINE_END.test(last);
+	if (!PATTERNS.COMMENT.MULTILINE_START.test(first) || !PATTERNS.COMMENT.MULTILINE_END.test(last)) {
+		return false;
+	}
+
+	// For a valid multi-line block comment, no intermediate line should end with ;
+	// (because ; terminates the comment in SSL)
+	for (let i = 0; i < lines.length - 1; i++) {
+		if (PATTERNS.COMMENT.MULTILINE_END.test(lines[i].trim())) {
+			return false;
+		}
+	}
+
+	return true;
 }
 
 function isInlineComment(line: string): boolean {
@@ -53,13 +65,10 @@ function removeInlineComment(line: string): string {
 	// Reverse of addInlineComment:
 	// It adds /* at start and ; at end.
 
-	// Try to remove trailing ;
-	if (remainder.endsWith(";")) {
-		remainder = remainder.slice(0, -1);
-	}
-	// Try to remove trailing space before ;
-	if (remainder.endsWith(" ")) {
-		remainder = remainder.slice(0, -1);
+	// Only remove trailing " ;" (space + semicolon) which is what addInlineComment adds
+	// This preserves original semicolons that didn't have the space
+	if (remainder.endsWith(" ;")) {
+		remainder = remainder.slice(0, -2);
 	}
 
 	return indent + remainder;
@@ -103,6 +112,19 @@ export function toggleCommentLines(lines: string[]): ToggleResult {
 
 	if (allInline) {
 		return { lines: lines.map(line => isInlineComment(line) ? removeInlineComment(line) : line), action: "uncommented" };
+	}
+
+	// Check for semicolons to avoid broken block comments
+	if (lines.some(l => l.includes(';'))) {
+		const action = "commented"; // Assume we are commenting unless we detect line comments to remove?
+		// Wait, if we are here, we passed "allInline" check (which handles uncommenting)
+		// So we are likely commenting.
+		// But what if mixed?
+		// Simplify: just apply line comments to all lines.
+		return {
+			lines: lines.map(line => addInlineComment(line)),
+			action: action
+		};
 	}
 
 	if (lines.length === 1) {
