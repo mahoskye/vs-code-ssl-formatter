@@ -7,7 +7,7 @@ This directory contains comprehensive test fixtures for the STARLIMS SSL Style G
 
 ## Test Coverage
 
-**Total Fixtures:** 21 test rules across 10 categories
+**Total Fixtures:** 27 test rules across 14 categories
 
 ### Categories
 
@@ -53,6 +53,20 @@ This directory contains comprehensive test fixtures for the STARLIMS SSL Style G
 
 #### String Operations (1 test)
 - **21-string-concatenation-explicit-plus** - Use explicit `+` operator for string concatenation
+
+#### Classes (1 test)
+- **23-classes-structure** - Class definition structure and member indentation
+
+#### Documentation (1 test)
+- **24-documentation-header** - Standard procedure documentation header format
+
+#### Module Structure (2 tests)
+- **25-module-structure** - Directives order (Parameters -> Defaults -> Declarations)
+- **26-declarations-formatting** - Formatting of declaration keywords and lists
+
+#### SQL (2 tests)
+- **27-sql-formatting-select** - Formatting of SELECT statements in SQLExecute
+- **28-sql-formatting-update** - Formatting of UPDATE statements in RunSQL
 
 ## Testing
 

@@ -1,0 +1,3 @@
+:PROCEDURE SqlTest;
+sSql := SQLExecute("select a,b,c from table where x=? and y=? order by z", "Query1", 0, 0, 0, "", "", "", 0);
+:ENDPROC;

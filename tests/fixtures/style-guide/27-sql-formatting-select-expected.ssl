@@ -1,0 +1,10 @@
+:PROCEDURE SqlTest;
+:PARAMETERS x, y;
+	sSql := SQLExecute("
+				SELECT a, b, c
+				FROM table
+				WHERE x = ?x?
+					AND y = ?y?
+				ORDER BY z
+			");
+:ENDPROC;

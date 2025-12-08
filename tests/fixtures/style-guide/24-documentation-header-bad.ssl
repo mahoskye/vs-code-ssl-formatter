@@ -1,0 +1,7 @@
+/*
+* Procedure: MyProc
+* Description: Does something
+* Parameters: x - indent check
+;
+:PROCEDURE MyProc;
+:ENDPROC;

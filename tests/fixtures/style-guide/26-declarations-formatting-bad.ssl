@@ -1,0 +1,6 @@
+:PROCEDURE MyProc;
+:DECLARE x, y, z;
+:declare a,b,c;
+:public g_Var1,g_Var2;
+:default p1,10;
+:ENDPROC;

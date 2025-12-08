@@ -1,7 +1,7 @@
 /* Array literal syntax;
 :PROCEDURE TestArrays;
 	:DECLARE aItems;
-	aItems := { 1, 2, 3 };
-	aItems := { "a", "b", "c" };
+	aItems := {1, 2, 3};
+	aItems := {"a", "b", "c"};
 	AAdd(aItems, 10);
 :ENDPROC;

@@ -920,6 +920,8 @@ describe('SSL Formatter - Style Guide Fixtures', () => {
 
 	const fixtureDir = path.join(__dirname, 'fixtures', 'style-guide');
 
+
+
 	// Skip if fixture directory doesn't exist
 	if (!fs.existsSync(fixtureDir)) {
 		it.skip('Fixture directory not found', () => { });
@@ -930,34 +932,69 @@ describe('SSL Formatter - Style Guide Fixtures', () => {
 		.filter(f => f.endsWith('-bad.ssl'))
 		.map(f => f.replace('-bad.ssl', ''));
 
-	fixtures.forEach(fixtureName => {
-		it(`should format ${fixtureName} correctly`, () => {
-			const badPath = path.join(fixtureDir, `${fixtureName}-bad.ssl`);
-			const expectedPath = path.join(fixtureDir, `${fixtureName}-expected.ssl`);
+	const sqlFixtures = fixtures.filter(f => f.includes('sql-formatting'));
+	const standardFixtures = fixtures.filter(f => !f.includes('sql-formatting'));
 
-			if (!fs.existsSync(badPath) || !fs.existsSync(expectedPath)) {
-				return; // Skip if files don't exist
-			}
+	// Run standard fixtures (default config)
+	describe('Standard Fixtures', () => {
+		before(() => {
+			const config = vscode.workspace.getConfiguration('ssl');
+			config.update('ssl.format.sql.enabled', false);
+		});
 
-			const input = fs.readFileSync(badPath, 'utf-8');
-			const expected = fs.readFileSync(expectedPath, 'utf-8');
-
-			// Actually call the formatter!
-			const doc = createDocument(input);
-			const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
-			const formatted = applyEdits(input, edits as any[]);
-
-			// Normalize line endings for cross-platform compatibility
-			const normalizeLineEndings = (str: string) => str.replace(/\r\n/g, '\n');
-
-			// Compare actual output to expected output
-			expect(normalizeLineEndings(formatted)).to.equal(normalizeLineEndings(expected),
-				`Formatter output for ${fixtureName} doesn't match expected.\n` +
-				`Input file: ${badPath}\n` +
-				`Expected file: ${expectedPath}`
-			);
+		standardFixtures.forEach(fixtureName => {
+			it(`should format ${fixtureName} correctly`, () => {
+				runFixtureTest(fixtureName);
+			});
 		});
 	});
+
+	// Run SQL fixtures (SQL formatting enabled)
+	describe('SQL Formatting Fixtures', () => {
+		before(() => {
+			const config = vscode.workspace.getConfiguration('ssl');
+			config.update('ssl.format.sql.enabled', true);
+			config.update('ssl.format.sql.indentSpaces', 4);
+		});
+
+		after(() => {
+			const config = vscode.workspace.getConfiguration('ssl');
+			config.update('ssl.format.sql.enabled', false);
+		});
+
+		sqlFixtures.forEach(fixtureName => {
+			it(`should format ${fixtureName} correctly`, () => {
+				runFixtureTest(fixtureName);
+			});
+		});
+	});
+
+	function runFixtureTest(fixtureName: string) {
+		const badPath = path.join(fixtureDir, `${fixtureName}-bad.ssl`);
+		const expectedPath = path.join(fixtureDir, `${fixtureName}-expected.ssl`);
+
+		if (!fs.existsSync(badPath) || !fs.existsSync(expectedPath)) {
+			return; // Skip if files don't exist
+		}
+
+		const input = fs.readFileSync(badPath, 'utf-8');
+		const expected = fs.readFileSync(expectedPath, 'utf-8');
+
+		// Actually call the formatter!
+		const doc = createDocument(input);
+		const edits = formatter.provideDocumentFormattingEdits(doc as any, options, null as any);
+		const formatted = applyEdits(input, edits as any[]);
+
+		// Normalize line endings for cross-platform compatibility
+		const normalizeLineEndings = (str: string) => str.replace(/\r\n/g, '\n');
+
+		// Compare actual output to expected output
+		expect(normalizeLineEndings(formatted)).to.equal(normalizeLineEndings(expected),
+			`Formatter output for ${fixtureName} doesn't match expected.\n` +
+			`Input file: ${badPath}\n` +
+			`Expected file: ${expectedPath}`
+		);
+	}
 
 	it('should have found test fixtures', () => {
 		expect(fixtures.length).to.be.greaterThan(0, 'Should have found at least one test fixture');

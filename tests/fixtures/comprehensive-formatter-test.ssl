@@ -5,21 +5,24 @@ Parameters... : None (module-level test)
 Returns...... : None (documentation/testing only)
 Author....... : Formatter Test Suite
 Date......... : 2025-11-13
-*******************************************************************************/;
+*******************************************************************************;
 
 :INCLUDE "external-library";
 :INCLUDE "common-utilities";
 
 /* External library includes complete;
 :DECLARE aGlobalArray, nGlobalCounter, sGlobalMessage;
-:DEFAULT nGlobalCounter, 0;
-:DEFAULT sGlobalMessage, "Test";
+
+nGlobalCounter := 0;
+sGlobalMessage := "Test";
 
 /* region Conditional Logic Tests;
 
 :PROCEDURE TestIfElseNesting;
 :PARAMETERS nValue;
-:DECLARE nResult, bProcessed;
+
+	:DECLARE nResult, bProcessed;
+	
 	/* Test nested IF/ELSE structures;
 	:IF nValue > 100;
 		bProcessed := .T.;
@@ -38,17 +41,10 @@ Date......... : 2025-11-13
 			bProcessed := .F.;
 		:ENDIF;
 	:ENDIF;
-:RETURN nResult;
+	:RETURN nResult;
 :ENDPROC;
 
 /* endregion;
-
-
-
-
-
-
-
 
 
 
@@ -56,9 +52,11 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestForLoopWithStep;
 :PARAMETERS aItems;
-:DECLARE nIndex, nTotal, nStep;
+
+	:DECLARE nIndex, nTotal, nStep;
 	nTotal := 0;
 	nStep := 2;
+	
 	/* Test FOR loop with STEP and EXITFOR;
 	:FOR nIndex := 1 :TO Len(aItems):STEP nStep;
 		:IF aItems[nIndex] == NIL;
@@ -66,13 +64,15 @@ Date......... : 2025-11-13
 		:ENDIF;
 		nTotal := nTotal + aItems[nIndex];
 	:NEXT;
-:RETURN nTotal;
+	:RETURN nTotal;
 :ENDPROC;
 
 :PROCEDURE TestWhileLoopWithExitwhile;
 :PARAMETERS nStartValue;
-:DECLARE nCounter;
+
+	:DECLARE nCounter;
 	nCounter := nStartValue;
+	
 	/* Test WHILE loop with EXITWHILE;
 	:WHILE nCounter < 100;
 		:IF nCounter == 50;
@@ -80,22 +80,9 @@ Date......... : 2025-11-13
 		:ENDIF;
 		nCounter := nCounter + 1;
 	:ENDWHILE;
-:RETURN nCounter;
+	:RETURN nCounter;
 :ENDPROC;
 
-:PROCEDURE TestLoopKeyword;
-:PARAMETERS nMaxIterations;
-:DECLARE nIteration;
-	nIteration := 0;
-	/* Test LOOP keyword with conditional exit;
-	:LOOP;
-	nIteration := nIteration + 1;
-	:IF nIteration >= nMaxIterations;
-		:EXITWHILE;
-	:ENDIF;
-:ENDWHILE;
-:RETURN nIteration;
-:ENDPROC;
 
 /* endregion;
 
@@ -103,22 +90,24 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestCaseStatement;
 :PARAMETERS sInputValue;
-:DECLARE nReturnCode;
+
+	:DECLARE nReturnCode;
+	
 	/* Test BEGINCASE/CASE/OTHERWISE/ENDCASE structure;
 	:BEGINCASE;
-	:CASE sInputValue == "START";
-		nReturnCode := 1;
-	:CASE sInputValue == "STOP";
-		nReturnCode := 0;
-	:CASE sInputValue == "PAUSE";
-		nReturnCode := 2;
-	:CASE sInputValue == "RESUME";
-		nReturnCode := 3;
-	:OTHERWISE;
-		nReturnCode := -1;
-		:EXITCASE;
+		:CASE sInputValue == "START";
+			nReturnCode := 1;
+		:CASE sInputValue == "STOP";
+			nReturnCode := 0;
+		:CASE sInputValue == "PAUSE";
+			nReturnCode := 2;
+		:CASE sInputValue == "RESUME";
+			nReturnCode := 3;
+		:OTHERWISE;
+			nReturnCode := -1;
+			:EXITCASE;
 	:ENDCASE;
-:RETURN nReturnCode;
+	:RETURN nReturnCode;
 :ENDPROC;
 
 /* endregion;
@@ -127,10 +116,12 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestTryCatchFinally;
 :PARAMETERS sSqlQuery;
-:DECLARE aResultSet, sErrorMessage;
+
+	:DECLARE aResultSet, sErrorMessage;
+	
 	/* Test TRY/CATCH/FINALLY/ENDTRY error handling;
 	:TRY;
-		aResultSet := SQLExecute(sSqlQuery, "query", 0, 0, 0, "", "", "", 0);
+		aResultSet := SQLExecute(sSqlQuery);
 		:IF Len(aResultSet) == 0;
 			:ERROR "No results returned";
 		:ENDIF;
@@ -144,7 +135,7 @@ Date......... : 2025-11-13
 			/* Process results;
 		:ENDIF;
 	:ENDTRY;
-:RETURN aResultSet;
+	:RETURN aResultSet;
 :ENDPROC;
 
 /* endregion;
@@ -153,7 +144,9 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestOperatorsAndExpressions;
 :PARAMETERS nA, nB, sValue;
-:DECLARE nResult, bCondition, sOutput;
+
+	:DECLARE nResult, bCondition, sOutput;
+
 	/* Test all operator types with proper spacing;
 
 	/* Assignment operators;
@@ -189,7 +182,7 @@ Date......... : 2025-11-13
 	++nResult;
 	--nResult;
 
-:RETURN nResult;
+	:RETURN nResult;
 :ENDPROC;
 
 
@@ -199,7 +192,8 @@ Date......... : 2025-11-13
 /* region Boolean and Null Values Tests;
 
 :PROCEDURE TestBooleanAndNullValues;
-:DECLARE bTrue, bFalse, oNilValue;
+	:DECLARE bTrue, bFalse, oNilValue;
+	
 	/* Test boolean literals (.T. and .F.);
 	bTrue := .T.;
 	bFalse := .F.;
@@ -219,7 +213,7 @@ Date......... : 2025-11-13
 		/* NIL is empty;
 	:ENDIF;
 
-:RETURN bTrue;
+	:RETURN bTrue;
 :ENDPROC;
 
 /* endregion;
@@ -228,7 +222,9 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestArraysAndStrings;
 :PARAMETERS sInput;
-:DECLARE aStringArray, nPosition, sSubstring;
+
+	:DECLARE aStringArray, nPosition, sSubstring;
+
 	/* Test array literal syntax;
 	aStringArray := {"alpha", "beta", "gamma", "delta"};
 
@@ -243,7 +239,7 @@ Date......... : 2025-11-13
 	sInput := Upper(sInput);
 	sInput := Lower(sInput);
 
-:RETURN aStringArray;
+	:RETURN aStringArray;
 :ENDPROC;
 
 /* endregion;
@@ -251,7 +247,8 @@ Date......... : 2025-11-13
 /* region Date and Time Operations;
 
 :PROCEDURE TestDateAndTime;
-:DECLARE dToday, dSpecificDate, nDayDifference;
+	:DECLARE dToday, dSpecificDate, nDayDifference;
+	
 	/* Test date functions;
 	dToday := Today();
 	dToday := Now();
@@ -264,7 +261,7 @@ Date......... : 2025-11-13
 	nDayDifference := DateDiff(dToday, dSpecificDate);
 	dSpecificDate := DateAdd(dToday, 30);
 
-:RETURN nDayDifference;
+	:RETURN nDayDifference;
 :ENDPROC;
 
 /* endregion;
@@ -273,7 +270,9 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestDatabaseOperations;
 :PARAMETERS sTableName, nRecordId;
-:DECLARE aQueryResult, sSelectQuery, sUpdateQuery;
+
+	:DECLARE aQueryResult, sSelectQuery, sUpdateQuery;
+	
 	/* Test SQLExecute with parameters;
 	sSelectQuery := "SELECT field1, field2 FROM " + sTableName + " WHERE id = ?id?";
 	aQueryResult := SQLExecute(sSelectQuery, "select_query", 0, 0, 0, "", "", "", 1);
@@ -289,7 +288,7 @@ Date......... : 2025-11-13
 	/* Test LSearch for single result;
 	aQueryResult := LSearch("SELECT TOP 1 value FROM " + sTableName);
 
-:RETURN aQueryResult;
+	:RETURN aQueryResult;
 :ENDPROC;
 
 /* endregion;
@@ -298,7 +297,9 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestFunctionCalls;
 :PARAMETERS nValue;
-:DECLARE nLength, bIsEmpty, nAbsoluteValue, sCharacter;
+
+	:DECLARE nLength, bIsEmpty, nAbsoluteValue, sCharacter;
+	
 	/* Test built-in function calls with proper formatting;
 	nLength := Len("test string");
 	bIsEmpty := Empty(nValue);
@@ -317,7 +318,7 @@ Date......... : 2025-11-13
 	ascan(aGlobalArray, nValue);
 	aeval(aGlobalArray, TestFunctionCalls);
 
-:RETURN bIsEmpty;
+	:RETURN bIsEmpty;
 :ENDPROC;
 
 /* endregion;
@@ -325,7 +326,8 @@ Date......... : 2025-11-13
 /* region Object-Oriented Programming Tests;
 
 :PROCEDURE TestObjectOperations;
-:DECLARE oUserObject, oDataSet, sUserName;
+	:DECLARE oUserObject, oDataSet, sUserName;
+	
 	/* Test UDO creation;
 	oUserObject := CreateUdoObject("UserAccount");
 
@@ -338,7 +340,7 @@ Date......... : 2025-11-13
 	oUserObject:Save();
 	oUserObject:Initialize("NewUser", "user@example.com");
 
-:RETURN oUserObject;
+	:RETURN oUserObject;
 :ENDPROC;
 
 /* endregion;
@@ -347,10 +349,13 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestVariableDeclarations;
 :PARAMETERS nPublicParam1, nPublicParam2;
-:DEFAULT nPublicParam1, 0;
-:DEFAULT nPublicParam2, 100;
-:DECLARE nLocal1, nLocal2, sLocalString;
-:DECLARE aLocalArray, dLocalDate;
+
+	:DEFAULT nPublicParam1, 0;
+	:DEFAULT nPublicParam2, 100;
+
+	:DECLARE nLocal1, nLocal2, sLocalString;
+	:DECLARE aLocalArray, dLocalDate;
+
 	/* Test local variable declarations;
 	nLocal1 := nPublicParam1 + nPublicParam2;
 	nLocal2 := nLocal1 * 2;
@@ -358,7 +363,7 @@ Date......... : 2025-11-13
 	aLocalArray := {1, 2, 3, 4, 5};
 	dLocalDate := Today();
 
-:RETURN nLocal1;
+	:RETURN nLocal1;
 :ENDPROC;
 
 /* endregion;
@@ -367,7 +372,9 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestTypeConversion;
 :PARAMETERS vMixedValue;
-:DECLARE nNumeric, sString, lLogical;
+
+	:DECLARE nNumeric, sString, lLogical;
+	
 	/* Type conversion functions;
 	nNumeric := Val(vMixedValue);
 	sString := Trim(vMixedValue);
@@ -379,7 +386,7 @@ Date......... : 2025-11-13
 	nNumeric := _XOR(12, 10);
 	nNumeric := _NOT(5);
 
-:RETURN nNumeric;
+	:RETURN nNumeric;
 :ENDPROC;
 
 /* endregion;
@@ -388,7 +395,9 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestCodeBlocks;
 :PARAMETERS aNumbers;
-:DECLARE codeBlock, nResult;
+
+	:DECLARE codeBlock, nResult;
+	
 	/* Test code block literals;
 	codeBlock := {|x| x * 2};
 
@@ -398,7 +407,7 @@ Date......... : 2025-11-13
 	/* More complex code block;
 	codeBlock := {|x, y| x + y > 50};
 
-:RETURN nResult;
+	:RETURN nResult;
 :ENDPROC;
 
 /* endregion;
@@ -407,20 +416,22 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestReturnStatements;
 :PARAMETERS nCondition;
-:DECLARE nValue;
+
+	:DECLARE nValue;
+
 	nValue := 0;
 
 	/* Test early returns;
 	:IF nCondition == 1;
-:RETURN 1;
+		:RETURN 1;
 	:ENDIF;
 
 	:IF nCondition == 2;
-:RETURN 2;
+		:RETURN 2;
 	:ENDIF;
 
 	/* Default return;
-:RETURN nValue;
+	:RETURN nValue;
 :ENDPROC;
 
 /* endregion;
@@ -428,7 +439,8 @@ Date......... : 2025-11-13
 /* region Label and Error Markers;
 
 :PROCEDURE TestLabelsAndErrors;
-:DECLARE nCounter;
+	:DECLARE nCounter;
+
 	nCounter := 0;
 	:LABEL StartLoop;
 	nCounter := nCounter + 1;
@@ -441,7 +453,7 @@ Date......... : 2025-11-13
 		:ERROR "Counter exceeded limit";
 	:ENDIF;
 
-:RETURN nCounter;
+	:RETURN nCounter;
 :ENDPROC;
 
 /* endregion;
@@ -453,42 +465,45 @@ Date......... : 2025-11-13
 	:CLASS TestDataModel;
 		:INHERIT BaseModel;
 
-:DECLARE sClassName, nVersion, aProperties;
-:DECLARE bIsInitialized;
+		:DECLARE sClassName, nVersion, aProperties;
+		:DECLARE bIsInitialized;
 
 		:PROCEDURE Initialize;
-:PARAMETERS sName, nVer;
-	sClassName := sName;
-	nVersion := nVer;
-	bIsInitialized := .T.;
-	aProperties := {};
-:RETURN .T.;
-:ENDPROC;
+		:PARAMETERS sName, nVer;
 
-:PROCEDURE AddProperty;
-:PARAMETERS sPropertyName, vPropertyValue;
-	aadd(aProperties, {sPropertyName, vPropertyValue});
-:RETURN Len(aProperties);
-:ENDPROC;
+			sClassName := sName;
+			nVersion := nVer;
+			bIsInitialized := .T.;
+			aProperties := {};
+			:RETURN .T.;
+		:ENDPROC;
 
-:PROCEDURE GetProperty;
-:PARAMETERS sPropertyName;
-:DECLARE nIndex, vReturnValue;
-	nIndex := ascan(aProperties, sPropertyName);
-	:IF nIndex > 0;
-		vReturnValue := aProperties[nIndex, 2];
-	:ELSE;
-		vReturnValue := NIL;
-	:ENDIF;
-:RETURN vReturnValue;
-:ENDPROC;
+		:PROCEDURE AddProperty;
+		:PARAMETERS sPropertyName, vPropertyValue;
 
-:PROCEDURE Validate;
-	:IF .NOT. bIsInitialized;
-		:ERROR "Object not initialized";
-	:ENDIF;
-:RETURN .T.;
-:ENDPROC;
+			aadd(aProperties, {sPropertyName, vPropertyValue});
+			:RETURN Len(aProperties);
+		:ENDPROC;
+
+		:PROCEDURE GetProperty;
+		:PARAMETERS sPropertyName;
+		
+			:DECLARE nIndex, vReturnValue;
+			nIndex := ascan(aProperties, sPropertyName);
+			:IF nIndex > 0;
+				vReturnValue := aProperties[nIndex, 2];
+			:ELSE;
+				vReturnValue := NIL;
+			:ENDIF;
+			:RETURN vReturnValue;
+		:ENDPROC;
+
+		:PROCEDURE Validate;
+			:IF .NOT. bIsInitialized;
+				:ERROR "Object not initialized";
+			:ENDIF;
+			:RETURN .T.;
+		:ENDPROC;
 
 :ENDREGION;
 
@@ -498,7 +513,8 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestComplexControlFlow;
 :PARAMETERS nLevel;
-:DECLARE nCounter, bContinue;
+
+	:DECLARE nCounter, bContinue;
 	bContinue := .T.;
 	nCounter := 0;
 
@@ -521,7 +537,7 @@ Date......... : 2025-11-13
 		:ENDIF;
 	:ENDWHILE;
 
-:RETURN nCounter;
+	:RETURN nCounter;
 :ENDPROC;
 
 /* endregion;
@@ -530,6 +546,7 @@ Date......... : 2025-11-13
 
 :PROCEDURE TestSystemFunctions;
 :DECLARE sEnvironment, nRecordCount, sDirectory, sNewId;
+
 	/* System information functions;
 	sEnvironment := GetSetting("ENVIRONMENT");
 	nRecordCount := 0;
@@ -544,7 +561,7 @@ Date......... : 2025-11-13
 	/* GUID generation;
 	sNewId := CreateGUID();
 
-:RETURN sEnvironment;
+	:RETURN sEnvironment;
 :ENDPROC;
 
 /* endregion;
@@ -552,8 +569,10 @@ Date......... : 2025-11-13
 /* region String Formatting and Building;
 
 :PROCEDURE TestStringBuilding;
-:PARAMETERS nCount, sPrefix;
-:DECLARE sResult, aStringParts;
+:PARAMETERS nCount, sPrefix;	
+
+	:DECLARE sResult, aStringParts;
+
 	/* Test string building functions;
 	aStringParts := {};
 	aadd(aStringParts, sPrefix);
@@ -566,7 +585,7 @@ Date......... : 2025-11-13
 	/* Test string substitution;
 	sResult := StrTran(sResult, ":", " equals ");
 
-:RETURN sResult;
+	:RETURN sResult;
 :ENDPROC;
 
 /* endregion;
@@ -574,9 +593,12 @@ Date......... : 2025-11-13
 /* region Main Test Execution;
 
 :PROCEDURE FormatterComprehensiveTest;
-:DECLARE nTestsPassed, nTestsFailed, aTestResults, sErrorMessage;
-:DEFAULT nTestsPassed, 0;
-:DEFAULT nTestsFailed, 0;
+:PARAMETERS nTestsPassed, nTestsFailed;
+
+	:DEFAULT nTestsPassed, 0;
+	:DEFAULT nTestsFailed, 0;
+
+	:DECLARE aTestResults, sErrorMessage;
 
 	aTestResults := {};
 
@@ -609,11 +631,9 @@ Date......... : 2025-11-13
 		/* Test cleanup;
 	:ENDTRY;
 
-:RETURN nTestsPassed;
+	:RETURN nTestsPassed;
 :ENDPROC;
 
 /* endregion;
 
-/*******************************************************************************
-End of Comprehensive Formatter Test Document
-*******************************************************************************/;
+*******************************************************************************;

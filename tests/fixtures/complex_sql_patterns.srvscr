@@ -1,0 +1,102 @@
+/* region Complex SQL Patterns;
+/*
+ * This file contains generic examples of complex SQL patterns
+ * to test the formatter's handling of:
+ * - Oracle-style tuple updates
+ * - Nested subqueries
+ * - INSERT INTO ... SELECT
+ * String concatenation in SQL calls
+ *;
+:PROCEDURE TestTupleUpdate;
+:PARAMETERS batchData;
+	/* Oracle-style tuple update with subquery alignment;
+	SQLExecute("
+        UPDATE generic_table SET
+            (
+                col_a, col_b, col_c
+            ) = (
+                SELECT s.val_a, s.val_b, s.val_c
+                FROM source_table s
+                WHERE s.id = generic_table.id
+                  AND s.status = ?'Active'?
+            )
+        WHERE run_id = ?batchData:runId?
+        ");
+	:RETURN;
+:ENDPROC;
+
+:PROCEDURE TestComplexInsert;
+:PARAMETERS batchData;
+
+	:DECLARE sOrderList;
+	sOrderList := BuildStringForIn(batchData:orderIds);
+
+	/* Insert with Select and Not Exists;
+	SQLExecute("
+        INSERT INTO target_table
+            (
+                run_id, order_id, test_code, item_id, measurement, unit, location
+            )
+        SELECT ?batchData:currentRunId?, o.order_id, ?batchData:testCode?,
+               s.item_id, s.measurement, s.unit, s.location
+        FROM orders o, inventory s
+        WHERE o.test_code = s.test_code
+          AND o.order_id = s.order_id
+          AND o.run_id = s.run_id
+          AND o.test_code IN (?batchData:prepTestCode?, ?batchData:qcTestCode?)
+          AND o.order_id IN " + sOrderList + "
+          AND NOT EXISTS (
+              SELECT 1
+              FROM target_table tt
+              WHERE tt.order_id = o.order_id
+                AND tt.test_code = ?batchData:testCode?
+                AND tt.location = s.location
+                AND tt.item_id = s.item_id
+          )
+    ");
+	:RETURN;
+:ENDPROC;
+
+:PROCEDURE TestNestedSubqueryUpdate;
+:PARAMETERS batchData;
+	/* Update with scalar subquery;
+	SQLExecute("
+        UPDATE tasks SET
+            priority_score = (
+                SELECT COUNT(*)
+                FROM tasks t2
+                WHERE t2.run_id = tasks.run_id
+                  AND t2.sequence <= tasks.sequence
+            )
+        WHERE run_id = ?batchData:currentRunId?
+    ");
+
+	/* Update with DISTINCT scalar subquery;
+	SQLExecute("
+        UPDATE results SET
+            batch_seq = (
+                SELECT DISTINCT batch_seq
+                FROM tasks
+                WHERE tasks.order_id = results.order_id
+                  AND tasks.run_id = results.run_id
+            )
+        WHERE run_id = ?batchData:currentRunId?
+        ");
+	:RETURN;
+:ENDPROC;
+
+:PROCEDURE TestDynamicSqlConcat;
+:PARAMETERS sTable, sCondition;
+	/* String concatenation within SqlExecute;
+	SQLExecute("
+        SELECT *
+        FROM " + sTable + " WHERE status = 'READY' " + " AND " + sCondition);
+
+	/* User Message formatting with concatenation;
+	UsrMes("Data validation results", "Run ID: " + Transform(batchData:runId) + CRLF
+           + "Test Code: " + Transform(batchData:testCode) + CRLF + "Status: "
+           + batchData:status);
+	:RETURN;
+:ENDPROC;
+
+/* endregion;
