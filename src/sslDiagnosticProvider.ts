@@ -337,25 +337,25 @@ export class SSLDiagnosticProvider {
 					diagnostics.push(this.createDiagnostic(i, 0, line.length,
 						DIAGNOSTIC_MESSAGES.BLOCK_DEPTH_EXCEEDED(blockStack.length, config.maxBlockDepth), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.BLOCK_DEPTH));
 				}
+			}
 
-				// Missing Semicolon Check
-				const isStructure = blockStack.some(b => b.line === i) || BLOCK_MIDDLE.has(keywordMatch?.[1].toUpperCase() || "");
+			// Missing Semicolon Check
+			const isStructure = blockStack.some(b => b.line === i) || (keywordMatch && BLOCK_MIDDLE.has(keywordMatch[1].toUpperCase()));
 
-				let isContinuation = /[+\-*/,{(]$/.test(trimmed) ||
-					/^[+\-*/,})]/.test(trimmed) ||
-					/^(\.AND\.|\.OR\.|\.NOT\.)/i.test(trimmed);
+			let isContinuation = /[+\-*/,{(]$/.test(trimmed) ||
+				/^[+\-*/,})]/.test(trimmed) ||
+				/^(\.AND\.|\.OR\.|\.NOT\.)/i.test(trimmed);
 
-				// Look ahead for continuation if not found
-				if (!isContinuation && !trimmed.endsWith(';') && i + 1 < analysis.lines.length) {
-					const nextLine = analysis.lines[i + 1].trim();
-					if (/^[+\-*/,})]/.test(nextLine) || /^(\.AND\.|\.OR\.|\.NOT\.)/i.test(nextLine)) {
-						isContinuation = true;
-					}
+			// Look ahead for continuation if not found
+			if (!isContinuation && !trimmed.endsWith(';') && i + 1 < analysis.lines.length) {
+				const nextLine = analysis.lines[i + 1].trim();
+				if (/^[+\-*/,})]/.test(nextLine) || /^(\.AND\.|\.OR\.|\.NOT\.)/i.test(nextLine)) {
+					isContinuation = true;
 				}
+			}
 
-				if (!trimmed.endsWith(';') && !isStructure && !isContinuation && !trimmed.startsWith(':')) {
-					diagnostics.push(this.createDiagnostic(i, line.length - 1, 1, "Statement should end with semicolon", vscode.DiagnosticSeverity.Warning, "ssl-missing-semicolon"));
-				}
+			if (!trimmed.endsWith(';') && !isStructure && !isContinuation && !trimmed.startsWith(':')) {
+				diagnostics.push(this.createDiagnostic(i, line.length - 1, 1, "Statement should end with semicolon", vscode.DiagnosticSeverity.Warning, "ssl-missing-semicolon"));
 			}
 		}
 	}

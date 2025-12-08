@@ -25,7 +25,7 @@ result := DoProc("HelperProc", {
 	});
 
 	// TODO: Fix this test - valid logic but test harness not seeing diagnostic?
-	it.skip('still reports real missing semicolons outside multi-line structures', () => {
+	it('still reports real missing semicolons outside multi-line structures', () => {
 		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
 sValue := "Hello"
 :ENDPROC;`);
