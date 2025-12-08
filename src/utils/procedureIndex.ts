@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import * as path from "path";
+import { PATTERNS } from "../constants/patterns";
 
 export interface ProcedureInfo {
 	name: string;
@@ -199,7 +200,7 @@ function parseProceduresFromDocument(document: vscode.TextDocument): Omit<Proced
 	const procedures: Omit<ProcedureInfo, "fileBaseName" | "scriptKeys">[] = [];
 	for (let lineNumber = 0; lineNumber < document.lineCount; lineNumber++) {
 		const lineText = document.lineAt(lineNumber).text;
-		const match = lineText.match(/^\s*:PROCEDURE\s+(\w+)/i);
+		const match = lineText.match(PATTERNS.PROCEDURE.DEFINITION);
 		if (!match) {
 			continue;
 		}
@@ -223,16 +224,20 @@ function parseProceduresFromDocument(document: vscode.TextDocument): Omit<Proced
 
 function extractProcedureParameters(document: vscode.TextDocument, procLine: number): string[] {
 	const parameters: string[] = [];
+	// Look ahead a reasonable number of lines for :PARAMETERS
 	for (let line = procLine + 1; line < Math.min(document.lineCount, procLine + 20); line++) {
 		const text = document.lineAt(line).text.trim();
 		if (!text) {
 			continue;
 		}
-		const paramMatch = text.match(/^:PARAMETERS\s+(.+?);/i);
+
+		const paramMatch = text.match(PATTERNS.PROCEDURE.PARAMETERS);
 		if (paramMatch) {
 			return paramMatch[1].split(",").map(param => param.trim()).filter(Boolean);
 		}
-		if (/^:(PROCEDURE|ENDPROC)\b/i.test(text)) {
+
+		// Stop if we hit end of proc or start of new one
+		if (PATTERNS.PROCEDURE.END.test(text) || PATTERNS.PROCEDURE.DEFINITION.test(text)) {
 			break;
 		}
 	}

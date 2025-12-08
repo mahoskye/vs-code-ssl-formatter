@@ -1,5 +1,5 @@
 import { SqlLexer } from './sqlLexer';
-import { Token, TokenType, Lexer } from './lexer';
+import { Token, TokenType } from './lexer';
 import {
     BLOCK_START_KEYWORDS,
     BLOCK_END_KEYWORDS,
@@ -31,7 +31,6 @@ export interface Node {
 
 export class Parser {
     private tokens: Token[];
-    private pos: number = 0;
 
     constructor(tokens: Token[]) {
         this.tokens = tokens;
@@ -46,165 +45,140 @@ export class Parser {
             endLine: 0
         };
 
-        let currentNode: Node = root;
-
         const statements = this.groupStatements(this.tokens);
-
+        let currentNode: Node = root;
         const stack: Node[] = [root];
 
         for (const stmt of statements) {
-            // Determine if statement starts/ends a block
             const blockStart = this.isBlockStart(stmt);
             const blockEnd = this.isBlockEnd(stmt);
             const blockMiddle = this.isBlockMiddle(stmt);
 
             if (blockMiddle) {
-                // :ELSE, :CASE, :CATCH
-                // These end the *current* block (e.g. the IF body) and start a *new* block (the ELSE body).
-
-                // Special handling for CASE/OTHERWISE
-                // They should NOT close a :BEGINCASE block, but SHOULD close a previous :CASE block.
-                const firstToken = this.getFirstSignificantToken(stmt);
-                const isCase = firstToken && CASE_KEYWORDS.includes(firstToken.text.toUpperCase().replace(':', ''));
-
-                let shouldPop = true;
-                if (isCase && stack.length > 1) {
-                    const currentBlock = stack[stack.length - 1];
-                    const starter = this.getBlockStarter(currentBlock);
-                    if (starter) {
-                        const starterToken = this.getFirstSignificantToken(starter);
-                        if (starterToken && starterToken.text.toUpperCase().replace(':', '') === 'BEGINCASE') {
-                            shouldPop = false;
-                        }
-                    }
-                }
-
-                // 1. Close current block (if valid and should pop)
-                if (shouldPop && stack.length > 1) {
-                    stack.pop();
-                    currentNode = stack[stack.length - 1];
-                }
-
-                // 2. Add the middle statement (e.g. :ELSE) to the parent
-                currentNode.children.push(stmt);
-
-                // 3. Start a new block for the body following this middle statement
-                const newBlock: Node = {
-                    type: NodeType.Block,
-                    tokens: [],
-                    children: [],
-                    parent: currentNode,
-                    startLine: stmt.endLine + 1, // Approx
-                    endLine: 0
-                };
-                currentNode.children.push(newBlock);
-                currentNode = newBlock;
-                stack.push(newBlock);
-
-                // Skip the standard processing since we just handled it
+                currentNode = this.handleBlockMiddle(stmt, currentNode, stack);
                 continue;
             }
 
             if (blockEnd) {
-                // Standard pop
-                if (stack.length > 1) {
-                    stack.pop();
-                    currentNode = stack[stack.length - 1];
-                }
-
-                // Special handling for ENDCASE: It blindly closes the BEGINCASE block as well
-                const first = this.getFirstSignificantToken(stmt);
-                if (first && first.text.toUpperCase().replace(':', '') === 'ENDCASE') {
-                    if (stack.length > 1) {
-                        const currentBlock = stack[stack.length - 1];
-                        const starter = this.getBlockStarter(currentBlock);
-                        if (starter) {
-                            const starterToken = this.getFirstSignificantToken(starter);
-                            if (starterToken && starterToken.text.toUpperCase().replace(':', '') === 'BEGINCASE') {
-                                stack.pop();
-                                currentNode = stack[stack.length - 1];
-                            }
-                        }
-                    }
-                }
+                currentNode = this.handleBlockEnd(stmt, currentNode, stack);
             }
 
             // Add statement to current node
             currentNode.children.push(stmt);
 
             if (blockStart) {
-                // :IF, :WHILE, :PROCEDURE
-                // Start a new block
-                const newBlock: Node = {
-                    type: NodeType.Block,
-                    tokens: [], // Block node itself doesn't have tokens, it collects children
-                    children: [],
-                    parent: currentNode,
-                    startLine: stmt.startLine,
-                    endLine: stmt.endLine
-                };
-                // The statement that STARTED the block (e.g. :IF) is already added to 'currentNode'.
-                // The new block will collect SUBSEQUENT statements.
-
-                currentNode.children.push(newBlock);
-                currentNode = newBlock;
-                stack.push(newBlock);
+                currentNode = this.handleBlockStart(stmt, currentNode, stack);
             }
         }
 
         return root;
     }
 
-    private checkSqlContext(tokens: Token[], index: number) {
-        // Look back: Identifier (Function Name) -> ( -> String (Current)
-        // Check if Function Name is one of the SQL executing functions
-        if (index < 2) { return; }
+    // --- Block Handlers ---
 
-        let lookbackIndex = index - 1;
-        // Skip whitespace/comments backwards
-        while (lookbackIndex >= 0 && (tokens[lookbackIndex].type === TokenType.Whitespace || tokens[lookbackIndex].type === TokenType.Comment)) {
-            lookbackIndex--;
+    private handleBlockMiddle(stmt: Node, currentNode: Node, stack: Node[]): Node {
+        // :ELSE, :CASE, :CATCH
+        // These end the *current* block and start a *new* block.
+        // Special logic for nested CASE/BEGINCASE interaction.
+
+        let shouldPop = true;
+
+        // CASE logic: check if this :CASE should close the current block
+        // It SHOULD close a previous :CASE block, but NOT a :BEGINCASE block.
+        const firstToken = this.getFirstSignificantToken(stmt);
+        const isCase = firstToken && (CASE_KEYWORDS as readonly string[]).includes(this.getNormalizedText(firstToken));
+
+        if (isCase && stack.length > 1) {
+            const currentBlock = stack[stack.length - 1];
+            const starter = this.getBlockStarter(currentBlock);
+            if (starter) {
+                const starterToken = this.getFirstSignificantToken(starter);
+                if (starterToken && this.getNormalizedText(starterToken) === 'BEGINCASE') {
+                    shouldPop = false; // Don't pop the BEGINCASE block, just append to it?
+                    // Actually, :CASE inside BEGINCASE usually implies:
+                    // BEGINCASE (starts block) -> ... -> CASE (ends previous case-block?! No, it starts a case-block inside main block?)
+                    // SSL Logic: BEGINCASE ... CASE ... CASE ... ENDCASE
+                    // We treat BEGINCASE as a block. The things inside are children.
+                    // If we treat CASE as a block starter?
+                    // Actually, usually CASE is treated as a label or a block switcher.
+                    // Current logic assumes it switches blocks.
+
+                    // If we are directly inside BEGINCASE, we shouldn't Pop.
+                    // But if we are inside a previous CASE block, we SHOuld Pop?
+                }
+            }
         }
 
-        if (lookbackIndex < 0) { return; }
-        const prev = tokens[lookbackIndex];
+        // 1. Close current block (if valid and should pop)
+        let activeNode = currentNode;
+        if (shouldPop && stack.length > 1) {
+            stack.pop();
+            activeNode = stack[stack.length - 1];
+        }
 
-        if (prev.text === '(' || prev.text === ',') {
-            // Find the function name
-            // If prev is '(', then [Func] [Whitespace?] [(] [Whitespace?] [String]
-            // If prev is ',', then we are in an argument list. This is harder to check simply by looking back.
-            // Simplified check: if it is '(', look back for identifier.
+        // 2. Add the middle statement (e.g. :ELSE) to the parent
+        activeNode.children.push(stmt);
 
-            if (prev.text === '(') {
-                lookbackIndex--;
-                while (lookbackIndex >= 0 && (tokens[lookbackIndex].type === TokenType.Whitespace || tokens[lookbackIndex].type === TokenType.Comment)) {
-                    lookbackIndex--;
-                }
+        // 3. Start a new block for the body following this middle statement
+        const newBlock: Node = {
+            type: NodeType.Block,
+            tokens: [],
+            children: [],
+            parent: activeNode,
+            startLine: stmt.endLine + 1,
+            endLine: 0
+        };
+        activeNode.children.push(newBlock);
+        stack.push(newBlock);
 
-                if (lookbackIndex >= 0) {
-                    const func = tokens[lookbackIndex];
-                    if (func.type === TokenType.Identifier) {
-                        if (SQL_CONTEXT_FUNCTIONS.some(f => f.toLowerCase() === func.text.toLowerCase())) {
-                            // This string token is likely SQL
-                            const token = tokens[index]; // The string token
-                            if (token.type === TokenType.String) {
-                                // Extract content (strip quotes)
-                                let content = token.text;
-                                if (content.startsWith('"') || content.startsWith("'")) {
-                                    content = content.substring(1, content.length - 1);
-                                } else if (content.startsWith('[')) {
-                                    content = content.substring(1, content.length - 1);
-                                }
+        return newBlock; // Return the new current node
+    }
 
-                                const sqlLexer = new SqlLexer(content);
-                                token.sqlTokens = sqlLexer.tokenize();
-                            }
-                        }
+    private handleBlockEnd(stmt: Node, currentNode: Node, stack: Node[]): Node {
+        // Standard pop
+        let activeNode = currentNode;
+        if (stack.length > 1) {
+            stack.pop();
+            activeNode = stack[stack.length - 1];
+        }
+
+        // Special handling for ENDCASE: It blindly closes the BEGINCASE block as well if we just popped a CASE block
+        // Or if we are now at BEGINCASE block, we need to pop that too.
+        const first = this.getFirstSignificantToken(stmt);
+        if (first && this.getNormalizedText(first) === 'ENDCASE') {
+            if (stack.length > 1) {
+                const currentBlock = stack[stack.length - 1];
+                const starter = this.getBlockStarter(currentBlock);
+                if (starter) {
+                    const starterToken = this.getFirstSignificantToken(starter);
+                    if (starterToken && this.getNormalizedText(starterToken) === 'BEGINCASE') {
+                        stack.pop();
+                        activeNode = stack[stack.length - 1];
                     }
                 }
             }
         }
+        return activeNode;
     }
+
+    private handleBlockStart(stmt: Node, currentNode: Node, stack: Node[]): Node {
+        // :IF, :WHILE, :PROCEDURE
+        // Start a new block
+        const newBlock: Node = {
+            type: NodeType.Block,
+            tokens: [],
+            children: [],
+            parent: currentNode,
+            startLine: stmt.startLine,
+            endLine: stmt.endLine // Will be updated? No, usually not used for Blocks until closed.
+        };
+
+        currentNode.children.push(newBlock);
+        stack.push(newBlock);
+        return newBlock;
+    }
+
+    // --- Statement Grouping ---
 
     private groupStatements(tokens: Token[]): Node[] {
         const statements: Node[] = [];
@@ -227,32 +201,23 @@ export class Parser {
                 currentTokens = [];
             } else if (token.type === TokenType.Whitespace && token.text.includes('\n')) {
                 // Implicit semicolon check
-                let j = i + 1;
-                while (j < tokens.length && tokens[j].type === TokenType.Whitespace) { j++; }
-
-                if (j < tokens.length) {
-                    const next = tokens[j];
-
-                    // Retrieve last significant token logic
-                    let k = currentTokens.length - 2;
-                    while (k >= 0 && currentTokens[k].type === TokenType.Whitespace) { k--; }
-
-                    if (k >= 0) {
-                        const last = currentTokens[k];
-                        const lastIsContinuation = last.type === TokenType.Operator || last.text === ',' || last.text === '(' || last.text === '[' || last.text === '{';
-
-                        const nextIsContinuation = next.type === TokenType.Operator || next.text === ',' || next.text === '.' || next.text === ')' || next.text === ']' || next.text === '}' || next.text === ';';
-                        const isFunctionCall = next.text === '(' && (last.type === TokenType.Identifier || last.type === TokenType.Keyword);
-
-                        if (!lastIsContinuation && !nextIsContinuation && !isFunctionCall) {
-                            statements.push(this.createNode(currentTokens));
-                            currentTokens = [];
-                        }
-                    }
+                if (this.isStatementContinuation(tokens, i, currentTokens)) {
+                    continue;
                 }
-            }
-
-            if (token.type === TokenType.Comment) {
+                statements.push(this.createNode(currentTokens));
+                currentTokens = [];
+            } else if (token.type === TokenType.Comment) {
+                // Comments usually stand alone if they are single lines. 
+                // If we have accumulated tokens (code), comment might be inline?
+                // But groupStatements pushes comments as separate nodes if they appear?
+                // Original logic: if token is Comment, push immediately.
+                // This implies comments break statements? 
+                // If we have `x = 1 /* comment */`, `currentTokens` has `x=1`.
+                // Then we push `/* comment */`. 
+                // Then next might be `\n`.
+                // Original logic pushed comment ONLY if it was the token.
+                // Actually original loop logic was: if comment, statements.push(createNode([token])), clear currentTokens.
+                // This splits `x=1 /*comment*/` into `x=1` and `/*comment*/`. Correct.
                 statements.push(this.createNode([token]));
                 currentTokens = [];
             }
@@ -265,11 +230,73 @@ export class Parser {
         return statements;
     }
 
+    private isStatementContinuation(tokens: Token[], currentIndex: number, currentStatementTokens: Token[]): boolean {
+        // Look ahead for next non-whitespace
+        let j = currentIndex + 1;
+        while (j < tokens.length && tokens[j].type === TokenType.Whitespace) { j++; }
+
+        if (j >= tokens.length) { return false; } // End of file, so yes, end of statement.
+
+        const next = tokens[j];
+
+        // Retrieve last significant token of current statement
+        let k = currentStatementTokens.length - 2; // -1 is the current Newline token we just pushed
+        while (k >= 0 && currentStatementTokens[k].type === TokenType.Whitespace) { k--; }
+
+        if (k < 0) { return false; } // No significant tokens in current statement yet
+
+        const last = currentStatementTokens[k];
+
+        const lastIsContinuation = last.type === TokenType.Operator || last.text === ',' || last.text === '(' || last.text === '[' || last.text === '{';
+        const nextIsContinuation = next.type === TokenType.Operator || next.text === ',' || next.text === '.' || next.text === ')' || next.text === ']' || next.text === '}' || next.text === ';';
+        const isFunctionCall = next.text === '(' && (last.type === TokenType.Identifier || last.type === TokenType.Keyword);
+
+        return lastIsContinuation || nextIsContinuation || isFunctionCall;
+    }
+
+    private checkSqlContext(tokens: Token[], index: number) {
+        if (index < 2) { return; }
+
+        let lookbackIndex = index - 1;
+        while (lookbackIndex >= 0 && (tokens[lookbackIndex].type === TokenType.Whitespace || tokens[lookbackIndex].type === TokenType.Comment)) {
+            lookbackIndex--;
+        }
+
+        if (lookbackIndex < 0) { return; }
+        const prev = tokens[lookbackIndex];
+
+        if (prev.text === '(') {
+            lookbackIndex--;
+            while (lookbackIndex >= 0 && (tokens[lookbackIndex].type === TokenType.Whitespace || tokens[lookbackIndex].type === TokenType.Comment)) {
+                lookbackIndex--;
+            }
+
+            if (lookbackIndex >= 0) {
+                const func = tokens[lookbackIndex];
+                if (func.type === TokenType.Identifier) {
+                    if (SQL_CONTEXT_FUNCTIONS.some(f => f.toLowerCase() === func.text.toLowerCase())) {
+                        const token = tokens[index];
+                        if (token.type === TokenType.String) {
+                            let content = token.text;
+                            if (content.startsWith('"') || content.startsWith("'")) {
+                                content = content.substring(1, content.length - 1);
+                            } else if (content.startsWith('[')) {
+                                content = content.substring(1, content.length - 1);
+                            }
+
+                            const sqlLexer = new SqlLexer(content);
+                            token.sqlTokens = sqlLexer.tokenize();
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     private createNode(tokens: Token[]): Node {
         if (tokens.length === 0) { return { type: NodeType.Statement, tokens: [], children: [], startLine: 0, endLine: 0 }; }
 
         let type = NodeType.Statement;
-        // If single token and it's a comment
         if (tokens.length === 1 && tokens[0].type === TokenType.Comment) {
             const text = tokens[0].text;
             if (this.isRegionStartText(text)) {
@@ -290,6 +317,12 @@ export class Parser {
         };
     }
 
+    // --- Helpers ---
+
+    private getNormalizedText(token: Token): string {
+        return token.text.toUpperCase().replace(':', '');
+    }
+
     private isRegionStartText(text: string): boolean {
         return REGION_START_PATTERN.test(text);
     }
@@ -300,25 +333,21 @@ export class Parser {
 
     private isBlockStart(node: Node): boolean {
         const first = this.getFirstSignificantToken(node);
-        if (!first) { return false; }
-        if (first.type !== TokenType.Keyword) { return false; }
-
-        const text = first.text.toUpperCase().replace(':', '');
-        return BLOCK_START_KEYWORDS.includes(text);
+        if (!first || first.type !== TokenType.Keyword) { return false; }
+        return (BLOCK_START_KEYWORDS as readonly string[]).includes(this.getNormalizedText(first));
     }
 
     private isBlockEnd(node: Node): boolean {
         const first = this.getFirstSignificantToken(node);
         if (!first || first.type !== TokenType.Keyword) { return false; }
-        const text = first.text.toUpperCase().replace(':', '');
-        return BLOCK_END_KEYWORDS.includes(text);
+        return (BLOCK_END_KEYWORDS as readonly string[]).includes(this.getNormalizedText(first));
     }
 
     private isBlockMiddle(node: Node): boolean {
         const first = this.getFirstSignificantToken(node);
         if (!first || first.type !== TokenType.Keyword) { return false; }
-        const text = first.text.toUpperCase().replace(':', '');
-        return BLOCK_MIDDLE_KEYWORDS.includes(text) || CASE_KEYWORDS.includes(text);
+        const text = this.getNormalizedText(first);
+        return (BLOCK_MIDDLE_KEYWORDS as readonly string[]).includes(text) || (CASE_KEYWORDS as readonly string[]).includes(text);
     }
 
     private getFirstSignificantToken(node: Node): Token | undefined {
@@ -338,3 +367,4 @@ export class Parser {
         return undefined;
     }
 }
+

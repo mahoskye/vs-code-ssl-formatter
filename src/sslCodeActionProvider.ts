@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { looksLikeSql } from "./commands/formatSql";
+import { looksLikeSql } from "./formatting/sqlContext";
 
 /**
  * SSL Code Action Provider
@@ -20,6 +20,9 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 	): vscode.CodeAction[] {
 		const codeActions: vscode.CodeAction[] = [];
 
+		// Analyze context only once
+		const analysis = this.analyzeContext(document, range.start);
+
 		// Process each diagnostic
 		context.diagnostics.forEach(diagnostic => {
 			if (diagnostic.source === "ssl" || !diagnostic.source) {
@@ -29,26 +32,31 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 
 		// Add general code actions
 		const line = document.lineAt(range.start.line);
-		const lineText = line.text;
 
-		// Add semicolon if missing
-		if (!lineText.trim().endsWith(";") && this.needsSemicolon(lineText)) {
-			const addSemicolon = this.createAddSemicolonAction(document, line);
-			if (addSemicolon) {
-				codeActions.push(addSemicolon);
+		// Semicolon check: Only if not in string/comment
+		if (!analysis.insideString && !analysis.insideComment) {
+			if (!line.text.trim().endsWith(";") && this.needsSemicolon(line.text)) {
+				const addSemicolon = this.createAddSemicolonAction(document, line);
+				if (addSemicolon) {
+					codeActions.push(addSemicolon);
+				}
+			}
+
+			// Keyword casing fix: Only if not in string/comment
+			const keywordFix = this.createFixKeywordCasingAction(document, line);
+			if (keywordFix) {
+				codeActions.push(keywordFix);
 			}
 		}
 
-		// Fix keyword casing
-		const keywordFix = this.createFixKeywordCasingAction(document, line);
-		if (keywordFix) {
-			codeActions.push(keywordFix);
-		}
-
-		// Format SQL code action - detect SQL-like strings
-		const formatSqlAction = this.createFormatSqlAction(document, range);
-		if (formatSqlAction) {
-			codeActions.push(formatSqlAction);
+		// Format SQL - Check if inside string and looks like SQL
+		if (analysis.insideString && analysis.stringContent && analysis.stringRange) {
+			if (looksLikeSql(analysis.stringContent)) {
+				const formatSqlAction = this.createFormatSqlAction(document, analysis.stringRange);
+				if (formatSqlAction) {
+					codeActions.push(formatSqlAction);
+				}
+			}
 		}
 
 		return codeActions;
@@ -67,7 +75,6 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 
 			case "ssl-hungarian-notation":
 				// Could offer to rename with proper prefix
-				// For now, just document the issue
 				break;
 
 			case "ssl-sql-injection":
@@ -87,14 +94,11 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 
 	private createAddSemicolonAction(document: vscode.TextDocument, line: vscode.TextLine): vscode.CodeAction | null {
 		const action = new vscode.CodeAction("Add missing semicolon", vscode.CodeActionKind.QuickFix);
-
 		const edit = new vscode.WorkspaceEdit();
 		const lineEnd = new vscode.Position(line.lineNumber, line.text.length);
 		edit.insert(document.uri, lineEnd, ";");
-
 		action.edit = edit;
 		action.isPreferred = true;
-
 		return action;
 	}
 
@@ -103,15 +107,12 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 		diagnostic: vscode.Diagnostic
 	): vscode.CodeAction {
 		const action = new vscode.CodeAction("Add semicolon", vscode.CodeActionKind.QuickFix);
-
 		const edit = new vscode.WorkspaceEdit();
 		const lineEnd = new vscode.Position(diagnostic.range.end.line, diagnostic.range.end.character);
 		edit.insert(document.uri, lineEnd, ";");
-
 		action.edit = edit;
 		action.diagnostics = [diagnostic];
 		action.isPreferred = true;
-
 		return action;
 	}
 
@@ -135,19 +136,15 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 					`Fix keyword casing to :${keyword}`,
 					vscode.CodeActionKind.QuickFix
 				);
-
 				const edit = new vscode.WorkspaceEdit();
 				const startPos = new vscode.Position(line.lineNumber, match.index!);
 				const endPos = new vscode.Position(line.lineNumber, match.index! + match[0].length);
 				const range = new vscode.Range(startPos, endPos);
-
 				edit.replace(document.uri, range, `:${keyword}`);
 				action.edit = edit;
-
 				return action;
 			}
 		}
-
 		return null;
 	}
 
@@ -159,17 +156,12 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 			"Convert to parameterized query",
 			vscode.CodeActionKind.QuickFix
 		);
-
 		action.diagnostics = [diagnostic];
-
-		// This is a complex transformation that would require more context
-		// For now, just provide a hint
 		action.command = {
 			command: "editor.action.showMessage",
 			title: "Show parameterized query help",
 			arguments: ["Use ?PARAM_NAME? placeholders in your SQL query and pass parameters as the third argument"]
 		};
-
 		return action;
 	}
 
@@ -182,11 +174,9 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 			vscode.CodeActionKind.QuickFix
 		);
 
-		// Find the :ENDCASE for this :BEGINCASE
 		const text = document.getText();
 		const lines = text.split("\n");
 		const startLine = diagnostic.range.start.line;
-
 		let endCaseLine = -1;
 		let depth = 1;
 
@@ -207,32 +197,23 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 			const insertPos = new vscode.Position(endCaseLine, 0);
 			const indent = this.getIndentation(lines[startLine]);
 			edit.insert(document.uri, insertPos, `${indent}:OTHERWISE;\n${indent}\t/* Default case;\n`);
-
 			action.edit = edit;
 			action.diagnostics = [diagnostic];
 		}
-
 		return action;
 	}
 
 	private needsSemicolon(lineText: string): boolean {
 		const trimmed = lineText.trim();
-
-		// Lines that need semicolons
 		if (trimmed.startsWith(":") && !trimmed.startsWith("/*")) {
 			return true;
 		}
-
-		// Assignment statements
 		if (trimmed.includes(":=")) {
 			return true;
 		}
-
-		// Function calls (heuristic: ends with )
 		if (/\w+\([^)]*\)$/.test(trimmed)) {
 			return true;
 		}
-
 		return false;
 	}
 
@@ -241,90 +222,166 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 		return match ? match[1] : "";
 	}
 
-	/**
-	 * Create a "Format as SQL" code action if cursor is inside a SQL-like string
-	 */
 	private createFormatSqlAction(
 		document: vscode.TextDocument,
-		range: vscode.Range | vscode.Selection
+		range: vscode.Range
 	): vscode.CodeAction | null {
-		// Find string at cursor position
-		const stringInfo = this.findStringAtPosition(document, range.start);
-		if (!stringInfo) {
-			return null;
-		}
-
-		// Check if content looks like SQL
-		if (!looksLikeSql(stringInfo.content)) {
-			return null;
-		}
-
-		// Create the code action
 		const action = new vscode.CodeAction(
 			"Format as SQL",
 			vscode.CodeActionKind.Refactor
 		);
-
-		// Set up the command to format the SQL
-		action.command = {
-			command: "ssl.formatSql",
-			title: "Format SQL",
-			arguments: []
-		};
-
-		// The command will use the current selection, so we need to select the string first
-		// We'll use a workspace edit to select the range, then the command will format it
 		action.command = {
 			command: "ssl.formatSqlRange",
 			title: "Format SQL",
-			arguments: [document.uri, stringInfo.range]
+			arguments: [document.uri, range]
 		};
-
 		return action;
 	}
 
 	/**
-	 * Find a string literal at the given position
-	 * Returns the string range and content (without quotes)
+	 * Scans the document up to the cursor position (and slightly beyond if inside a token)
+	 * to determine the context (String, Comment, Code).
 	 */
-	private findStringAtPosition(
-		document: vscode.TextDocument,
-		position: vscode.Position
-	): { range: vscode.Range; content: string; quote: string } | null {
-		const line = document.lineAt(position.line);
-		const lineText = line.text;
-		const charIndex = position.character;
+	private analyzeContext(document: vscode.TextDocument, position: vscode.Position): {
+		insideString: boolean;
+		insideComment: boolean;
+		stringContent?: string;
+		stringRange?: vscode.Range;
+	} {
+		const text = document.getText();
+		const offset = document.offsetAt(position);
 
-		// Find string literals in the line
-		let inString = false;
-		let stringStart = -1;
-		let stringQuote = '';
+		let state: 'CODE' | 'STRING' | 'COMMENT_LINE' | 'COMMENT_BLOCK' = 'CODE';
+		let stringChar: string | null = null;
+		let stringStartOffset = -1;
 
-		for (let i = 0; i < lineText.length; i++) {
-			const char = lineText[i];
+		for (let i = 0; i < text.length; i++) {
+			// Early exit if we passed offset and are back in CODE, 
+			// meaning we found the relevant token or lack thereof.
+			// But we need to handle "cursor is inside the string that hasn't ended yet".
 
-			if (!inString && (char === '"' || char === "'")) {
-				inString = true;
-				stringStart = i;
-				stringQuote = char;
-			} else if (inString && char === stringQuote) {
-				// End of string - check if cursor is inside
-				if (charIndex > stringStart && charIndex <= i) {
-					const content = lineText.substring(stringStart + 1, i);
-					const range = new vscode.Range(
-						new vscode.Position(position.line, stringStart),
-						new vscode.Position(position.line, i + 1)
-					);
-					return { range, content, quote: stringQuote };
+			const char = text[i];
+			const nextChar = i + 1 < text.length ? text[i + 1] : '';
+
+			if (state === 'STRING') {
+				if (char === stringChar) {
+					// End of string
+					const stringEndOffset = i + 1; // inclusive of quote
+					// Did this string contain our cursor?
+					if (stringStartOffset <= offset && offset <= stringEndOffset) {
+						// Yes.
+						// Extract content (without quotes for SQL checking, or with?)
+						// `findStringAtPosition` returned without quotes.
+						const content = text.substring(stringStartOffset + 1, i);
+						const range = new vscode.Range(
+							document.positionAt(stringStartOffset),
+							document.positionAt(stringEndOffset)
+						);
+						return { insideString: true, insideComment: false, stringContent: content, stringRange: range };
+					}
+
+					state = 'CODE';
+					stringChar = null;
+				} else {
+					// Check if we passed the cursor while still inside string (and string continues)
+					// We only return when we find the END of the string to get full content/range.
 				}
-				inString = false;
-				stringStart = -1;
+				continue;
+			}
+
+			if (state === 'COMMENT_LINE') {
+				if (char === '\n') {
+					if (stringStartOffset <= offset && offset < i) {
+						return { insideString: false, insideComment: true };
+					}
+					state = 'CODE';
+				} else {
+					// Check if cursor is here
+					if (offset === i) {
+						return { insideString: false, insideComment: true };
+					}
+				}
+				continue;
+			}
+
+			if (state === 'COMMENT_BLOCK') {
+				if (char === '*' && nextChar === '/') {
+					const endComment = i + 2;
+					if (stringStartOffset <= offset && offset < endComment) {
+						return { insideString: false, insideComment: true };
+					}
+					state = 'CODE';
+					i++;
+				} else {
+					if (offset === i) {
+						return { insideString: false, insideComment: true };
+					}
+				}
+				continue;
+			}
+
+			// CODE state
+			if (i > offset) {
+				// We passed the cursor and are in CODE. So not in string/comment.
+				return { insideString: false, insideComment: false };
+			}
+
+			// Comments
+			if (char === '/' && nextChar === '/') {
+				state = 'COMMENT_LINE';
+				stringStartOffset = i; // borrow variable for comment start
+				i++;
+				continue;
+			}
+			if (char === '/' && nextChar === '*') {
+				state = 'COMMENT_BLOCK';
+				stringStartOffset = i;
+				i++;
+				continue;
+			}
+
+			// Strings
+			if (char === '"' || char === "'") {
+				state = 'STRING';
+				stringChar = char;
+				stringStartOffset = i;
+				continue;
+			}
+			if (char === '[') {
+				// Heuristic: check if preceded by identifier?
+				// For code actions, assume [..] is string if we want to format SQL inside it.
+				// NOTE: Unlike CodeLens where we want strict ID counting, here we want to offer help for SQL strings.
+				// SQL in SSL often uses [ select ... ].
+				// So we assume [ starts a string if appropriate.
+				// Let's assume [ is string start for simplicity in this context or check simple lookbehind?
+				// Simple lookbehind: Is previous char non-identifier?
+				// But we are in a loop.
+				// Let's assume [ is a string for now, as it covers the SQL usage case.
+				state = 'STRING';
+				stringChar = ']';
+				stringStartOffset = i;
+				continue;
 			}
 		}
 
-		// Handle multi-line strings (cursor might be on a line that's part of a multi-line string)
-		// For now, just check single lines - multi-line string support can be added later
+		// If loop ends and we are inside string (e.g. unclosed string at EOF or just open), 
+		// and cursor was after start...
+		if (state === 'STRING') {
+			if (offset >= stringStartOffset) {
+				const content = text.substring(stringStartOffset + 1);
+				const range = new vscode.Range(
+					document.positionAt(stringStartOffset),
+					document.positionAt(text.length)
+				);
+				return { insideString: true, insideComment: false, stringContent: content, stringRange: range };
+			}
+		}
+		if (state === 'COMMENT_LINE' || state === 'COMMENT_BLOCK') {
+			if (offset >= stringStartOffset) {
+				return { insideString: false, insideComment: true };
+			}
+		}
 
-		return null;
+		return { insideString: false, insideComment: false };
 	}
 }

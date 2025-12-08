@@ -1,0 +1,126 @@
+SSL Language Quick Reference
+
+Operators (symbol - name [category])
+- ! - unary_not [logical]
+- != - not_equals [comparison]
+- # - hash [other]
+- $ - dollar [other]
+- % - modulo [arithmetic]
+- %= - modulo_assign [compound]
+- * - multiply [arithmetic]
+- *= - multiply_assign [compound]
+- + - plus [arithmetic]
+- += - add_assign [compound]
+- - - minus [arithmetic]
+- -= - subtract_assign [compound]
+- .AND. - and [logical]
+- .NOT. - not [logical]
+- .OR. - or [logical]
+- / - divide [arithmetic]
+- /= - divide_assign [compound]
+- := - assignment [assignment]
+- < - less_than [comparison]
+- <= - less_than_or_equal [comparison]
+- <> - not_equals_legacy [comparison]
+- = - equals [comparison]
+- == - strict_equals [comparison]
+- > - greater_than [comparison]
+- >= - greater_than_or_equal [comparison]
+- ^ - power [arithmetic]
+- ^= - power_assign [compound]
+
+Literals (representation - name)
+- .F. - false
+- NIL - nil
+- .T. - true
+
+Keywords (alphabetical)
+- BEGINCASE
+- BEGININLINECODE
+- CASE
+- CATCH
+- CLASS
+- DECLARE
+- DEFAULT
+- ELSE
+- ENDCASE
+- ENDIF
+- ENDINLINECODE
+- ENDPROC
+- ENDREGION
+- ENDTRY
+- ENDWHILE
+- ERROR
+- EXITCASE
+- EXITFOR
+- EXITWHILE
+- FINALLY
+- FOR
+- IF
+- INCLUDE
+- INHERIT
+- LABEL
+- LOOP
+- NEXT
+- OTHERWISE
+- PARAMETERS
+- PROCEDURE
+- PUBLIC
+- REGION
+- RETURN
+- STEP
+- TO
+- TRY
+- WHILE
+
+Top 50 Functions by usage (common types)
+- 32822 - SQLExecute(any commandString, any friendlyName, any rollbackExistingTransaction, any nullAsBlank, any invariantDateColumns, any returnType, any tableName, any includeSchema, any includeHeader)->any
+- 14372 - Empty(any value)->bool
+- 11413 - DoProc(any[] args)->any
+- 11058 - Len(any source)->number
+- 10340 - LimsString(any source)->string
+- 8914 - ExecFunction(string name, any[] parameters)->any
+- 8638 - usrmes(any a, any b)->any
+- 8119 - Upper(string source)->string
+- 5804 - aadd(array target, any element)->any
+- 4634 - Chr(number asciiCode)->string
+- 4486 - AllTrim(string source)->string
+- 2873 - RunSQL(string commandString, string friendlyName, any arrayOfValues)->bool
+- 2785 - SubStr(string source, number startPos, number length)->string
+- 2750 - Now()->date
+- 2720 - GetSetting(string name)->any
+- 2324 - Left(string source, number length)->string
+- 2233 - Val(string sNumber)->number
+- 2211 - LSearch(string commandString, any defaultValue, string friendlyName, array arrayOfValues)->any
+- 2130 - extractcol(array target, number column)->array
+- 2002 - At(string subString, string source)->number
+- 1958 - Trim(string source)->string
+- 1802 - Max(any value1, any value2)->any
+- 1705 - Time()->string
+- 1661 - IIf(bool condition, any trueValue, any falseValue)->any
+- 1612 - StrTran(string source, string searchFor, string replaceWith)->string
+- 1573 - CreateUdObject(any[] args)->object
+- 1571 - RaiseError(string message, string location, number errorCode, error innerException)->bool
+- 1412 - Today()->date
+- 1303 - GetDataSet(string commandString, array arrayOfValues, bool includeSchema, string tableName, bool nullAsBlank, array invariantDateColumns)->string
+- 1280 - buildstring(array target, number start, number count, string delimiter)->string
+- 1065 - Str(number number, number length, number decimals)->string
+- 860 - EndLimsTransaction(string friendlyName, bool commit)->bool
+- 828 - Replace(string source, string searchFor, string replaceWith)->string
+- 780 - FileSupport(any fileIdentifier, any request, any arg1, any arg2, any encoding)->any
+- 658 - LimsNETConnect(string assembly, string typeName, array args, any asStatic)->any
+- 647 - Right(string source, number length)->string
+- 615 - GetDataSetXMLFromArray(array arrayOfValues, array arrayFields, string tableName, bool includeHeader, bool includeSchema)->string
+- 614 - LimsTypeEx(any source)->string
+- 554 - GetLastSSLError()->error
+- 529 - BuildStringForIn(array target)->string
+- 529 - LimsTime()->string
+- 507 - buildarray(string text, bool crlfOk, string delimiter, bool unique, bool trimSpaces)->array
+- 479 - BeginLimsTransaction(any friendlyName, any isoLevel)->any
+- 454 - getregion(any s, any src, any dst)->string
+- 448 - ascan(array target, any value, number start, number count)->number
+- 440 - LimsSetCounter(string tableName, string fieldName, string prefix, array arrayOfFields, array arrayOfValues, any incrementWith = null)->number
+- 436 - Directory(string filePattern, string attributes)->any
+- 429 - ToXml(any o, string typeName)->string
+- 415 - LimsRecordsAffected()->number
+- 410 - LimsSqlConnect(string friendlyName)->bool
