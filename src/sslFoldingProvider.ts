@@ -7,6 +7,7 @@ import * as vscode from "vscode";
 export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
 
     // Config for folding blocks
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     private static readonly BLOCK_PAIRS: Record<string, string> = {
         'IF': 'ENDIF',
         'WHILE': 'ENDWHILE',
@@ -21,6 +22,7 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
     };
 
     // Keywords that are "middle" parts of a block (end previous, start new)
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     private static readonly MIDDLE_KEYWORDS: Record<string, string[]> = {
         'ELSE': ['IF'],
         'CATCH': ['TRY'],

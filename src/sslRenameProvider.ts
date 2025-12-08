@@ -173,7 +173,7 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 						stringChar = char === '[' ? ']' : char;
 					}
 				} else if (inComment) {
-					if (char === ';') inComment = false;
+					if (char === ';') { inComment = false; }
 				} else if (inString) {
 					if (char === stringChar) {
 						inString = false;
@@ -229,14 +229,9 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 				}
 			}
 			// End of line cleanup
-			if (/^\s*:ENDPROC(EDURE)?\b/i.test(line) && !inComment && !inString) {
-				currentScopeName = null;
-			}
 		}
 
-		// Debug Log
-		// console.log(`Scan Result for ${targetName}:`, JSON.stringify(occurrences, null, 2));
-		// console.log(`Source Scope: ${sourceScope}, SourceIsProc: ${sourceIsProcedure}`);
+
 
 		return { occurrences, sourceScope, sourceIsProcedure };
 	}
@@ -283,9 +278,9 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 				if (char === '/' && next === '*') { inComment = true; i++; continue; }
 				if (char === '"' || char === '\'' || char === '[') { inString = true; stringChar = char === '[' ? ']' : char; }
 			} else if (inComment) {
-				if (char === ';') inComment = false;
+				if (char === ';') { inComment = false; }
 			} else if (inString) {
-				if (char === stringChar) inString = false;
+				if (char === stringChar) { inString = false; }
 			}
 		}
 
