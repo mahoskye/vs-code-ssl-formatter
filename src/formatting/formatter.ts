@@ -122,7 +122,7 @@ export class SSLFormatter {
      * and should be skipped for normal printing.
      */
     private handleVerticalWhitespace(prev: Node | undefined, current: Node): boolean {
-        if (!prev) return false;
+        if (!prev) {return false;}
 
         const lines = this.whitespaceManager.getVerticalWhitespace(prev, current);
         if (lines === -1) {

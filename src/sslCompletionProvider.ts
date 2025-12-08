@@ -129,7 +129,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 
 		for (const line of lines) {
 			const trimmed = line.trim();
-			if (!trimmed) continue;
+			if (!trimmed) {continue;}
 
 			// Handle comments
 			if (inCommentBlock) {

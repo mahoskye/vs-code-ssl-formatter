@@ -260,10 +260,8 @@ export class SSLDiagnosticProvider {
 		const BLOCK_MIDDLE = new Set(['ELSE', 'CATCH', 'FINALLY', 'CASE', 'OTHERWISE', 'TO', 'STEP']);
 
 		for (let i = 0; i < analysis.lines.length; i++) {
-			if (diagnostics.length >= config.maxProblems) break;
-			if (diagnostics.length >= config.maxProblems) {
-				break;
-			}
+			if (diagnostics.length >= config.maxProblems) { break; }
+
 
 			const line = analysis.lines[i];
 			const trimmed = line.trim();
@@ -528,7 +526,7 @@ export class SSLDiagnosticProvider {
 			}
 		}
 
-		if (!sqlString) return;
+		if (!sqlString) { return; }
 
 		// Heuristic: Check for placeholders
 		const hasNamed = /\?[a-zA-Z0-9_]+\?/.test(sqlString);
@@ -573,7 +571,7 @@ export class SSLDiagnosticProvider {
 	}
 
 	private getSeverity(configSeverity: string, strict: boolean): vscode.DiagnosticSeverity {
-		if (strict) return vscode.DiagnosticSeverity.Error;
+		if (strict) { return vscode.DiagnosticSeverity.Error; }
 		return configSeverity === 'error' ? vscode.DiagnosticSeverity.Error :
 			configSeverity === 'information' ? vscode.DiagnosticSeverity.Information :
 				vscode.DiagnosticSeverity.Warning;

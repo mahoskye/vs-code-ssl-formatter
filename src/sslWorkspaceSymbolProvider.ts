@@ -27,7 +27,7 @@ export class SSLWorkspaceSymbolProvider implements vscode.WorkspaceSymbolProvide
 		const allProcs = this.procedureIndex.getAllProcedures();
 
 		for (const proc of allProcs) {
-			if (token.isCancellationRequested) break;
+			if (token.isCancellationRequested) {break;}
 
 			if (this.matchesQuery(proc.name, queryLower)) {
 				symbols.push(this.createSymbol(
@@ -40,7 +40,7 @@ export class SSLWorkspaceSymbolProvider implements vscode.WorkspaceSymbolProvide
 		// 2. Search Classes <Type Fix>
 		const allClasses = this.classIndex.getAllClasses();
 		for (const cls of allClasses) {
-			if (token.isCancellationRequested) break;
+			if (token.isCancellationRequested) {break;}
 
 			if (this.matchesQuery(cls.className, queryLower)) {
 				if (cls.uri && cls.range) {
