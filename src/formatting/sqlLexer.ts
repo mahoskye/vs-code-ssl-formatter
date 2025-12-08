@@ -57,7 +57,7 @@ export class SqlLexer {
                 tokens.push(this.readIdentifierOrKeyword());
             } else if ("(),;.".includes(char)) {
                 tokens.push(this.readPunctuation());
-            } else if ("+-*/%=!<>".includes(char)) {
+            } else if ("+-*/%=!<>|".includes(char)) {
                 tokens.push(this.readOperator());
             } else {
                 tokens.push(this.readUnknown());
@@ -67,7 +67,7 @@ export class SqlLexer {
     }
 
     private peek(offset: number = 1): string {
-        if (this.pos + offset >= this.input.length) {return "";}
+        if (this.pos + offset >= this.input.length) { return ""; }
         return this.input[this.pos + offset];
     }
 
@@ -109,7 +109,7 @@ export class SqlLexer {
             const char = this.input[this.pos];
             text += char;
             this.advance();
-            if (char === '/' && text.endsWith('*/')) {break;}
+            if (char === '/' && text.endsWith('*/')) { break; }
         }
         return { type: SqlTokenType.Whitespace, text, line, column: col, offset: start };
     }
@@ -179,7 +179,7 @@ export class SqlLexer {
         const col = this.column;
         let text = this.input[this.pos];
         this.advance();
-        // Check for multi-char operators: <=, >=, <>, !=
+        // Check for multi-char operators: <=, >=, <>, !=, ||
         if (text === '<' || text === '>' || text === '!') {
             if (this.pos < this.input.length && this.input[this.pos] === '=') {
                 text += '=';
@@ -188,6 +188,10 @@ export class SqlLexer {
                 text += '>';
                 this.advance();
             }
+        } else if (text === '|' && this.pos < this.input.length && this.input[this.pos] === '|') {
+            // Oracle/PostgreSQL concatenation operator ||
+            text += '|';
+            this.advance();
         }
         return { type: SqlTokenType.Operator, text, line, column: col, offset: start };
     }
@@ -212,7 +216,7 @@ export class SqlLexer {
             if (c === '(') {
                 pDepth++;
             } else if (c === ')') {
-                if (pDepth > 0) {pDepth--;}
+                if (pDepth > 0) { pDepth--; }
             }
 
             if (c === '?' && pDepth === 0) {

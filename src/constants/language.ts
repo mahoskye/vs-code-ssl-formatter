@@ -85,7 +85,7 @@ export const SSL_OPERATORS = [
 ];
 
 export const SSL_COMPOUND_OPERATORS = [
-    ":=", "+=", "-=", "*=", "/=", "==", "!=", ">=", "<=", "<>", "^=", "%="
+    ":=", "+=", "-=", "*=", "/=", "==", "!=", ">=", "<=", "<>", "^=", "%=", "++", "--"
 ];
 
 export const SSL_LITERALS = [

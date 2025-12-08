@@ -235,6 +235,9 @@ export class SqlFormatter {
                 if (prevToken && prevToken.text === '=' &&
                     nextToken && nextToken.text.toUpperCase() === SQL_KW_SELECT) {
                     extraOffset = 4; // Tuple subqueries need their content indented
+                } else if (nextToken && nextToken.text.toUpperCase() === SQL_KW_SELECT) {
+                    // Subquery in list (e.g. SELECT (SELECT ...))
+                    extraOffset = 4;
                 }
 
                 const currentStackOffset = state.getCurrentStackOffset();
@@ -284,39 +287,35 @@ export class SqlFormatter {
             let needsBreak = false;
             let extraIndent = '';
 
-            // Check if previous token forces a break (e.g. comma in SET)
-            if (i > 0) {
-                const prev = tokens[i - 1];
-                if (prev.text === ',' && currentClause === 'SET' && state.parenDepth === 0) {
-                    needsBreak = true;
-                    // Indent assignments under SET?
-                    // SET is usually at base indent (or slightly indented).
-                    // Assignments should align or indent.
-                    // If we just break, it uses currentIndent.
-                    // If SET triggered a break/indent (it doesn't by default), we match it.
-                    // If SET is inline 'UPDATE table SET', then assignments on new line should indent.
-                    extraIndent = this.options.indentSpaces ? ' '.repeat(this.options.indentSpaces) : this.indentString;
+            // Look ahead for subquery detection
+            const next = i < tokens.length - 1 ? tokens[i + 1] : null;
+
+            if (!isFirstToken) {
+                // Check if previous token forces a break
+                if (i > 0) {
+                    const prev = tokens[i - 1];
+                    const prevUpper = prev.text.toUpperCase();
+
+                    if (prev.text === ',' && currentClause === 'SET' && state.parenDepth === 0) {
+                        needsBreak = true;
+                        extraIndent = this.options.indentSpaces ? ' '.repeat(this.options.indentSpaces) : this.indentString;
+                    }
+
+                    if ((prevUpper === 'SET' || prevUpper === 'VALUES') && state.parenDepth === 0) {
+                        needsBreak = true;
+                        extraIndent = this.options.indentSpaces ? ' '.repeat(this.options.indentSpaces) : this.indentString;
+                    }
                 }
 
-                // INSERT INTO table ( ... ) logic?
-                // INSERT INTO or VALUES context for parenthesis
-                // Break before '(' in INSERT lists to verticalize them?
-                // Also break after VALUES?
-                const prevUpper = prev.text.toUpperCase();
-
-                // Break after SET or VALUES to start content on new line
-                if ((prevUpper === 'SET' || prevUpper === 'VALUES') && state.parenDepth === 0) {
-                    needsBreak = true;
-                    extraIndent = this.options.indentSpaces ? ' '.repeat(this.options.indentSpaces) : this.indentString;
-                }
-
-                // Break AFTER opening paren in VALUES/INSERT/INTO lists
-
-
-                if (t.text === '(' && (currentClause === 'VALUES' || currentClause === 'INTO' || currentClause === 'INSERT') && state.parenDepth === 0) {
-                    // Force break before opening paren for cleaner lists
-                    needsBreak = true;
-                    extraIndent = this.options.indentSpaces ? ' '.repeat(this.options.indentSpaces) : this.indentString;
+                if (t.text === '(') {
+                    if ((currentClause === 'VALUES' || currentClause === 'INTO' || currentClause === 'INSERT') && state.parenDepth === 0) {
+                        needsBreak = true;
+                        extraIndent = this.options.indentSpaces ? ' '.repeat(this.options.indentSpaces) : this.indentString;
+                    } else if (next && next.text.toUpperCase() === SQL_KW_SELECT) {
+                        // Break before subquery in SELECT list: SELECT col, (SELECT...)
+                        needsBreak = true;
+                        extraIndent = '   '; // 3 spaces
+                    }
                 }
             } else {
                 // First token special handling if it's ')'
@@ -329,8 +328,6 @@ export class SqlFormatter {
                 // Actually parenDepth is updated later? No, state update happens WHERE?
                 // I need to check where `state.update` is called.
             }
-            // Look ahead for subquery detection
-            const next = i < sqlTokens.length - 1 ? sqlTokens[i + 1] : null; // Changed tokens to sqlTokens
 
             if (!isFirstToken) {
                 if (isClosingParen) {
@@ -432,6 +429,14 @@ export class SqlFormatter {
                 }
             }
 
+            // Check for || concatenation operator in SELECT - should break like AND/OR
+            // This provides consistent formatting for concatenated expressions
+            if (!needsBreak && t.text === '||' && state.inSelectColumns && prev) {
+                // Break before || operator for better readability
+                needsBreak = true;
+                extraIndent = '       '; // 7 spaces to align with "SELECT "
+            }
+
             // Proactive wrapping: check if adding this token would exceed line limit
             if (!needsBreak && prev) {
                 const wouldNeedSpace = this.shouldAddSqlSpace(prev, t);
@@ -439,9 +444,9 @@ export class SqlFormatter {
                 const projectedLen = currentLineLen + spaceLen + tokenText.length;
 
                 // If adding this token would exceed limit and we can safely break, do it
-                // Safe break points: after comma, or before identifier/keyword (not operators/parens)
+                // Safe break points: after comma, before identifier/keyword, or before || concatenation operator
                 // CRITICAL: Do NOT break immediately after a dot (e.g. table.column with split logic)
-                const canBreak = (prev.text === ',' || (t.type === SqlTokenType.Keyword || t.type === SqlTokenType.Identifier)) && prev.text !== '.';
+                const canBreak = (prev.text === ',' || (t.type === SqlTokenType.Keyword || t.type === SqlTokenType.Identifier) || t.text === '||') && prev.text !== '.';
 
                 if (projectedLen > maxLineLen && canBreak && prev.text !== '(') {
                     needsBreak = true;
@@ -502,7 +507,7 @@ export class SqlFormatter {
             isFirstToken = false;
         }
 
-        // End block with newline + base indent + close quote if complex
+        // End block with close quote - add newline for complex queries
         if (isComplex) {
             result += '\n' + baseIndent;
         }
@@ -668,6 +673,8 @@ export class SqlFormatter {
                 // Check if this looks like unary (e.g., after comma in a list)
                 return false;
             }
+            // Always add space after || concatenation operator
+            if (prev.text === '||') { return true; }
             return true; // Operator
         }
         // Space between key/ident/num/placeholder/string

@@ -8,6 +8,7 @@ export interface ParenContext {
     isMultiline: boolean;
     indentOffset: number;
     closingIndent: number;
+    wasInSelectColumns: boolean;
 }
 
 export class SqlFormattingState {
@@ -32,7 +33,7 @@ export class SqlFormattingState {
         const upperText = token.text.toUpperCase();
 
         if (token.type === SqlTokenType.Keyword) {
-            if (upperText === SQL_KW_UPDATE) {this.afterUpdate = true;}
+            if (upperText === SQL_KW_UPDATE) { this.afterUpdate = true; }
             if (upperText === SQL_KW_WHERE) { this.inWhereClause = true; this.afterSet = false; }
             if (upperText === SQL_KW_SET) { this.afterUpdate = false; this.afterSet = true; }
             if (upperText === SQL_KW_INSERT) { this.inInsert = true; this.inInsertColumnList = true; }
@@ -47,7 +48,8 @@ export class SqlFormattingState {
         this.parenStack.push({
             isMultiline: false,
             indentOffset,
-            closingIndent
+            closingIndent,
+            wasInSelectColumns: this.inSelectColumns
         });
     }
 
@@ -56,6 +58,8 @@ export class SqlFormattingState {
         if (ctx) {
             this.poppedClosingIndent = ctx.closingIndent;
             this.parenDepth--;
+            // Restore context
+            this.inSelectColumns = ctx.wasInSelectColumns;
         }
         return ctx;
     }

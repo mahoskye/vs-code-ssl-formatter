@@ -56,7 +56,7 @@ export class Lexer {
                 } else {
                     tokens.push(this.readDotOperatorOrBoolean());
                 }
-            } else if (char === ':' && this.isKeywordStart()) {
+            } else if (char === ':' && this.isKeywordStart(tokens)) {
                 tokens.push(this.readKeyword());
             } else if (char === ':' && this.peek() === '=') {
                 tokens.push(this.readAssignmentOperator());
@@ -98,7 +98,7 @@ export class Lexer {
     }
 
     private peek(offset: number = 1): string {
-        if (this.pos + offset >= this.input.length) {return "";}
+        if (this.pos + offset >= this.input.length) { return ""; }
         return this.input[this.pos + offset];
     }
 
@@ -108,7 +108,7 @@ export class Lexer {
         // So we look at previous tokens.
         for (let i = tokens.length - 1; i >= 0; i--) {
             if (tokens[i].type === TokenType.Whitespace) {
-                if (tokens[i].text.includes('\n')) {return true;}
+                if (tokens[i].text.includes('\n')) { return true; }
                 continue;
             }
             return false;
@@ -120,11 +120,11 @@ export class Lexer {
         // Look back for last non-whitespace/comment token
         for (let i = tokens.length - 1; i >= 0; i--) {
             const t = tokens[i];
-            if (t.type === TokenType.Whitespace || t.type === TokenType.Comment) {continue;}
+            if (t.type === TokenType.Whitespace || t.type === TokenType.Comment) { continue; }
 
             // Term tokens: Identifier, Number, String, ), ]
-            if (t.type === TokenType.Identifier || t.type === TokenType.Number || t.type === TokenType.String) {return true;}
-            if (t.type === TokenType.Punctuation && (t.text === ')' || t.text === ']')) {return true;}
+            if (t.type === TokenType.Identifier || t.type === TokenType.Number || t.type === TokenType.String || t.type === TokenType.Keyword) { return true; }
+            if (t.type === TokenType.Punctuation && (t.text === ')' || t.text === ']')) { return true; }
 
             return false;
         }
@@ -217,7 +217,7 @@ export class Lexer {
 
         while (this.pos < this.input.length) {
             const char = this.input[this.pos];
-            if (char === '\n') {break;}
+            if (char === '\n') { break; }
             text += char;
             this.advance();
         }
@@ -290,8 +290,24 @@ export class Lexer {
         return { type: TokenType.Number, text, line, column: col, offset: start };
     }
 
-    private isKeywordStart(): boolean {
+    private isKeywordStart(tokens: Token[]): boolean {
         // Check if : followed by Alpha
+        // Exception: If preceded by Identifier, it's likely Member Access (e.g. obj:Method or ns:Var)
+        // unless it's a known pattern? No, usually keywords start statements.
+        // However, we must be careful about inline keywords if they exist.
+        // SSL keywords are mostly control flow (:IF, :ELSE).
+        // They rarely follow an identifier directly without punctuation.
+        // E.g. "IF cond :THEN" (does not exist).
+
+        if (tokens.length > 0) {
+            const last = tokens[tokens.length - 1];
+            // If preceding token is Identifier, assumed to be Member Access (:)
+            // e.g. "batchData:crtRunNo"
+            if (last.type === TokenType.Identifier || last.text === ')' || last.text === ']') {
+                return false;
+            }
+        }
+
         return this.isAlpha(this.peek());
     }
 
@@ -325,8 +341,8 @@ export class Lexer {
                 const char = this.input[this.pos];
                 text += char;
                 this.advance();
-                if (char === '.') {break;} // End of .AND.
-                if (!this.isAlpha(char)) {break;} // Not a word operator
+                if (char === '.') { break; } // End of .AND.
+                if (!this.isAlpha(char)) { break; } // Not a word operator
             }
             if (SSL_OPERATORS.includes(text.toUpperCase())) {
                 return { type: TokenType.Operator, text, line, column: col, offset: start };
@@ -368,8 +384,8 @@ export class Lexer {
             const char = this.input[this.pos];
             text += char;
             this.advance();
-            if (char === '.') {break;}
-            if (!this.isAlpha(char)) {break;} // Error case or just text
+            if (char === '.') { break; }
+            if (!this.isAlpha(char)) { break; } // Error case or just text
         }
 
         // Check if valid

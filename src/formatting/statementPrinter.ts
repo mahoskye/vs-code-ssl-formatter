@@ -36,6 +36,7 @@ export class StatementPrinter {
         // Track wrap indent within a parameter block (same comma-separated item)
         // Only reset on comma at the top bracket level
         let parameterWrapIndent: number | undefined = undefined;
+        let parameterWrapIndentDepth = 0;
 
         const maxLineLen = (this.options['ssl.format.wrapLength'] as number) || 90;
 
@@ -54,17 +55,19 @@ export class StatementPrinter {
             // Record start position of THIS token
             tokenStarts[i] = currentLineLen;
 
-            // 2. Alignment Stack Management (Pop)
-            if ([']', '}', ')'].includes(token.text) && baseStack.length > 0) {
-                baseStack.pop();
-                itemStack.pop();
-            }
+            // 2. Alignment Stack Management (Pop) - MOVED TO STEP 6 to allow '}' formatting to use stack
+            // if ([']', '}', ')'].includes(token.text) && baseStack.length > 0) {
+            //     baseStack.pop();
+            //     itemStack.pop();
+            // }
 
             // 3. Reset Item Logic - reset wrap lock on comma at outer level only
             if (prev && prev.text === ',') {
                 resetItemNext = true;
                 // Reset wrap indent when moving to a new parameter at TOP level only
-                if (baseStack.length === 0) {
+                // CRITICAL: Do NOT reset when inside brackets (baseStack.length > 0)
+                // This ensures consistent alignment throughout array/list literals
+                if (baseStack.length === 0 && parameterWrapIndentDepth === 0) {
                     parameterWrapIndent = undefined;
                 }
             }
@@ -73,14 +76,7 @@ export class StatementPrinter {
             // Calculate special indent for SQL tokens
             let customIndent = undefined;
             if (token.sqlTokens && token.sqlTokens.length > 0) {
-                // Rule: min(functionStart + 4, quoteStart + 1)
-                // Check if pattern is Function ( prePrev ) "SQL" (token)
-                // i is token. i-1 is (. i-2 is Function.
-                // Verify: prev is '(', prePrev is Identifier/Keyword
-                // Also handle "LSearch" (no space before paren?) -> Logic handles spacing.
-                // tokenStarts[i] is currentLineLen (quote start).
-                // tokenStarts[i-2] is function start.
-
+                // ... (omitted logic remains same) ...
                 const quoteStart = currentLineLen + 1; // Content starts after opening quote
                 let funcStart = currentLineLen; // Default fallback if no function found
 
@@ -102,15 +98,21 @@ export class StatementPrinter {
                 customIndent = Math.max(0, customIndent);
             }
 
-            let formattedToken = this.formatToken(token, currentLineLen, customIndent);
+            // Member access casing check: object:property (property is Keyword)
+            const preserveCase = (prev && prev.type === TokenType.Identifier && token.type === TokenType.Keyword && token.text.startsWith(':'));
+
+            let formattedToken = this.formatToken(token, currentLineLen, customIndent, preserveCase);
+
+
 
             // Handle long string splitting - use locked indent if available
             if (token.type === TokenType.String && !formattedToken.includes('\n')) {
-                const splitResult = this.processStringToken(formattedToken, currentLineLen, maxLineLen, parameterWrapIndent);
+                const splitResult = this.processStringToken(formattedToken, currentLineLen, maxLineLen, parameterWrapIndent, prev, tokens, i);
                 // If string was split (has newlines) and no lock yet, set the lock
                 if (splitResult.includes('\n') && parameterWrapIndent === undefined) {
                     // Lock to current position (first token after split continues here)
                     parameterWrapIndent = currentLineLen;
+                    parameterWrapIndentDepth = baseStack.length;
                 }
                 formattedToken = splitResult;
             }
@@ -121,19 +123,23 @@ export class StatementPrinter {
             const isFunctionCall = token.text === '(' && prev && (prev.type === TokenType.Identifier || prev.type === TokenType.Keyword || prev.type === TokenType.Unknown);
 
             if ((currentLineLen + checkLen > maxLineLen || shouldWrapEarly) && i > 0 && !isParameterStatement && !isFunctionCall) {
-                if (this.isWrappablePoint(token)) {
+                if (this.isWrappablePoint(token, prev, tokens, i)) {
                     // Use locked parameter wrap indent if set, otherwise calculate and lock it
                     // Don't lock on opening brackets - they start new contexts
                     const isOpener = ['(', '{', '['].includes(token.text);
                     let indentCols: number;
 
-                    if (parameterWrapIndent !== undefined && !isOpener) {
+
+
+                    if (parameterWrapIndent !== undefined && !isOpener && baseStack.length === parameterWrapIndentDepth) {
                         indentCols = parameterWrapIndent;
                     } else {
                         indentCols = this.determineWrapPosition(baseStack, itemStack, resetItemNext, prev, baseIndentStr, maxLineLen, checkLen);
-                        // Only lock for non-opener tokens
+                        // Only lock for non-opener tokens and if we are at the base depth (or just track current depth?)
+                        // Better to lock only for the current depth.
                         if (!isOpener) {
                             parameterWrapIndent = indentCols;
+                            parameterWrapIndentDepth = baseStack.length;
                         }
                     }
                     const continuationIndent = ' '.repeat(indentCols);
@@ -164,6 +170,9 @@ export class StatementPrinter {
             if (['(', '{', '['].includes(token.text)) {
                 baseStack.push(currentLineLen);
                 itemStack.push(currentLineLen);
+            } else if ([']', '}', ')'].includes(token.text) && baseStack.length > 0) {
+                baseStack.pop();
+                itemStack.pop();
             }
         }
 
@@ -197,9 +206,30 @@ export class StatementPrinter {
         return { text: "", len: 0 };
     }
 
-    private processStringToken(formattedToken: string, currentLineLen: number, maxLineLen: number, lockedIndent?: number): string {
+    private processStringToken(formattedToken: string, currentLineLen: number, maxLineLen: number, lockedIndent?: number, prev?: Token, tokens?: Token[], currentIndex?: number): string {
         let content = formattedToken.substring(1, formattedToken.length - 1);
         const quote = formattedToken.startsWith('"') ? '"' : "'";
+
+        // Check if this string is the first parameter of ExecFunction, DoProc, or CreateUDObject
+        // These functions take a function/procedure name as the first parameter, which should not be split
+        let isSpecialFunctionFirstParam = false;
+        if (prev && tokens && currentIndex !== undefined) {
+            // Look back to find if we just passed an opening parenthesis after one of these function names
+            if (prev.text === '(' && currentIndex >= 2) {
+                const funcToken = tokens[currentIndex - 2];
+                if (funcToken && funcToken.type === TokenType.Identifier) {
+                    const funcName = funcToken.text.toUpperCase();
+                    if (['EXECFUNCTION', 'DOPROC', 'CREATEUDOBJECT'].includes(funcName)) {
+                        isSpecialFunctionFirstParam = true;
+                    }
+                }
+            }
+        }
+
+        // Don't split if this is a special function's first parameter
+        if (isSpecialFunctionFirstParam) {
+            return formattedToken;
+        }
 
         if (currentLineLen + getVisualLength(formattedToken, this.options.tabSize) > maxLineLen) {
             // Use locked indent if available, otherwise use current position
@@ -209,9 +239,15 @@ export class StatementPrinter {
             const firstLineMax = maxLineLen - currentLineLen;
 
             let useSplit = false;
-            if (firstLineMax > 0 && subsequentMax > 0) {
+            // Only split if we have reasonable space on both lines
+            // firstLineMax > 20 ensures we don't create orphaned empty strings like ExecFunction("" + "...")
+            // Also check that the actual content length is meaningful
+            const contentLen = content.length;
+            const firstPartLen = Math.min(firstLineMax - 2, contentLen); // -2 for quotes
+
+            // Don't split if first part would be less than 5 characters (would create "" or nearly empty string)
+            if (firstLineMax > 20 && subsequentMax > 0 && firstPartLen > 5) {
                 if (getVisualLength(formattedToken, this.options.tabSize) > subsequentMax) { useSplit = true; }
-                else if (firstLineMax > 15) { useSplit = true; }
             }
 
             if (useSplit) {
@@ -229,6 +265,49 @@ export class StatementPrinter {
     private checkEarlyWrap(tokens: Token[], i: number, currentLineLen: number, checkLen: number, maxLineLen: number): boolean {
         const token = tokens[i];
 
+        // Never wrap method name from object (e.g. s:Format)
+        if (i > 0 && tokens[i - 1].text === ':') {
+            return false;
+        }
+
+        // Multi-dimensional Array Expansion: Force wrap for { { ... }, { ... } } structures
+        if (token.text === '{') {
+            // Case 1: { { -> Wrap before second {
+            if (i > 0 && tokens[i - 1].text === '{') { return true; }
+            // Case 2: }, { -> Wrap before second {
+            if (i > 1 && tokens[i - 1].text === ',' && tokens[i - 2].text === '}') { return true; }
+        }
+        if (token.text === '}') {
+            // Case 3: } } -> Wrap before second }
+            if (i > 0 && tokens[i - 1].text === '}') { return true; }
+        }
+
+        // Prevent wrapping immediately after control flow keywords
+        if (i > 0 && tokens[i - 1].type === TokenType.Keyword) {
+            const kw = tokens[i - 1].text.toUpperCase();
+            if ([':IF', ':WHILE', ':ELSEIF', ':CASE', ':RETURN', 'IF', 'WHILE', 'ELSEIF', 'CASE', 'RETURN'].includes(kw)) {
+                return false;
+            }
+        }
+
+        // Prevent wrapping immediately after assignment operator `:=`
+        // to avoid orphaning the LHS (e.g., `rndVal := \n LSearch(...)`)
+        if (i > 0 && tokens[i - 1].text === ':=') {
+            return false;
+        }
+
+        // Prevent wrapping after opening parenthesis of ExecFunction, DoProc, CreateUDObject
+        // to keep first parameter (function name) on same line
+        if (i > 0 && tokens[i - 1].text === '(' && i >= 2) {
+            const funcToken = tokens[i - 2];
+            if (funcToken && funcToken.type === TokenType.Identifier) {
+                const funcName = funcToken.text.toUpperCase();
+                if (['EXECFUNCTION', 'DOPROC', 'CREATEUDOBJECT'].includes(funcName)) {
+                    return false;
+                }
+            }
+        }
+
         // Lookahead Case 1: Binary Operator (prefer wrap before)
         // Check if the entire operand (up to next operator/separator) fits
         // Exception: Assignment operator := should stay with LHS if possible (wrap AFTER)
@@ -239,6 +318,7 @@ export class StatementPrinter {
             // Scan forward to capture the "operand" unit
             while (j < tokens.length) {
                 const nextTok = tokens[j];
+
                 // Stop at separators or next operator (logic handoff)
                 if (nextTok.type === TokenType.Operator || nextTok.text === ',' || nextTok.text === ';') {
                     break;
@@ -252,7 +332,16 @@ export class StatementPrinter {
                 // If previous was word and this is word, add 1.
 
                 // Simple accumulation
-                lookAheadLen += nextTok.text.length;
+                const nextLen = this.getEffectiveTokenLength(nextTok.text);
+                lookAheadLen += nextLen;
+
+                // If this token limits the line (has newline), we can stop checking further?
+                // Actually if it has newline, the visible length is capped.
+                // But we should break the loop because subsequent tokens match "next line".
+                if (nextTok.text.includes('\n')) {
+                    break;
+                }
+
                 // Add 1 space allowance for safety/separation if not punct
                 if (nextTok.type !== TokenType.Punctuation) {
                     lookAheadLen += 1;
@@ -270,12 +359,61 @@ export class StatementPrinter {
             }
         }
 
+
+        // Lookahead Case 1.5: Member Access (Object:Method) - Keep together
+        if (token.type === TokenType.Identifier && i + 1 < tokens.length && tokens[i + 1].text === ':') {
+            let lookAheadLen = checkLen;
+            let k = i + 1;
+            while (k < tokens.length) {
+                const t = tokens[k];
+                if (t.text === ':' || t.type === TokenType.Identifier || t.type === TokenType.Keyword) {
+                    lookAheadLen += t.text.length;
+                    k++;
+                } else {
+                    break;
+                }
+            }
+
+            if (currentLineLen + lookAheadLen > maxLineLen) { return true; }
+        }
+
         // Lookahead Case 2: Identifier followed by (
         if ((token.type === TokenType.Identifier || token.type === TokenType.Keyword) && i + 1 < tokens.length) {
             if (tokens[i + 1].text === '(') {
+                // If identifier + ( itself exceeds logic (rare), wrap
                 if (currentLineLen + checkLen + 1 > maxLineLen) { return true; }
-            }
-        }
+
+                // Deep lookahead: Check if function call "Func(...)" fits on line?
+                let lookAheadFun = checkLen + 1; // Id + (
+                let k = i + 2;
+                let fundepth = 1;
+                let prevFun = tokens[i + 1]; // (
+
+                while (k < tokens.length && fundepth > 0) {
+                    const nextFun = tokens[k];
+                    if (nextFun.text === '(') fundepth++;
+                    else if (nextFun.text === ')') fundepth--;
+
+                    lookAheadFun += this.getEffectiveTokenLength(nextFun.text);
+                    if (this.shouldAddSpace(prevFun, nextFun)) { lookAheadFun += 1; }
+                    prevFun = nextFun;
+
+                    // Stop accumulating if we hit a multi-line token (e.g., string with embedded newlines)
+                    // The effective length only counts the first line, so further accumulation is meaningless
+                    if (nextFun.text.includes('\n')) {
+                        break;
+                    }
+
+                    k++;
+
+                    if (currentLineLen + lookAheadFun > maxLineLen) {
+                        return true;
+                    }
+                    // Limit scan
+                    if (k - i > 60) break;
+                }
+            } // Close L315
+        } // Close L314
 
         // Lookahead Case 3: Opening Brace/Bracket (prefer wrap before if entire block exceeds)
         // If we have "Func", { Content } -> if { Content } exceeds line limit, wrap before {
@@ -283,7 +421,7 @@ export class StatementPrinter {
             let lookAheadLen = checkLen; // Start with opener length
             let j = i + 1;
             let depth = 1; // Track nesting depth
-            const closer = token.text === '{' ? '}' : ']';
+            let prevToken = token;
 
             while (j < tokens.length && depth > 0) {
                 const nextTok = tokens[j];
@@ -292,9 +430,18 @@ export class StatementPrinter {
                 if (nextTok.text === '{' || nextTok.text === '[') { depth++; }
                 else if (nextTok.text === '}' || nextTok.text === ']') { depth--; }
 
-                lookAheadLen += nextTok.text.length;
-                // Add spacing approximation
-                if (nextTok.type !== TokenType.Punctuation) { lookAheadLen += 1; }
+                lookAheadLen += this.getEffectiveTokenLength(nextTok.text);
+
+                // Add spacing approximation using actual logic
+                if (this.shouldAddSpace(prevToken, nextTok)) {
+                    lookAheadLen += 1;
+                }
+                prevToken = nextTok;
+
+                // Stop accumulating if we hit a multi-line token
+                if (nextTok.text.includes('\n')) {
+                    break;
+                }
 
                 j++;
 
@@ -309,11 +456,25 @@ export class StatementPrinter {
         return false;
     }
 
-    private isWrappablePoint(token: Token): boolean {
+    private isWrappablePoint(token: Token, prev?: Token, tokens?: Token[], i?: number): boolean {
+        if (token.text === ':') { return false; }
+        if (prev && prev.text === ':') { return false; }
+
+        // Prevent wrapping after opening parenthesis of ExecFunction, DoProc, CreateUDObject
+        if (prev && prev.text === '(' && tokens && i !== undefined && i >= 2) {
+            const funcToken = tokens[i - 2];
+            if (funcToken && funcToken.type === TokenType.Identifier) {
+                const funcName = funcToken.text.toUpperCase();
+                if (['EXECFUNCTION', 'DOPROC', 'CREATEUDOBJECT'].includes(funcName)) {
+                    return false;
+                }
+            }
+        }
+
         return token.type === TokenType.Identifier || token.type === TokenType.Keyword ||
             token.type === TokenType.Number || token.type === TokenType.String ||
             token.type === TokenType.Operator ||
-            token.text === '{' || token.text === '[';
+            token.text === '{' || token.text === '[' || token.text === '}' || token.text === ']';
     }
 
     private determineWrapPosition(baseStack: number[], itemStack: number[], resetItemNext: boolean, prev: Token | undefined, baseIndentStr: string, maxLineLen: number, effectiveCheckLen: number): number {
@@ -328,7 +489,7 @@ export class StatementPrinter {
 
         // Cap alignment to prevent excessive indentation (e.g., deep nesting)
         // Only use fixed maxAlignTo, not variable token length, to ensure consistent alignment
-        const maxAlignTo = 40;
+        const maxAlignTo = 60;
         if (alignTo > maxAlignTo) {
             const standardIndent = getVisualLength(baseIndentStr, this.options.tabSize) + 8;
             if (standardIndent < alignTo) {
@@ -351,7 +512,7 @@ export class StatementPrinter {
         }
     }
 
-    private formatToken(token: Token, currentColumn: number = 0, customBaseIndent?: number): string {
+    private formatToken(token: Token, currentColumn: number = 0, customBaseIndent?: number, preserveCase: boolean = false): string {
 
 
         if (this.options['ssl.format.sql.enabled'] && token.sqlTokens && token.sqlTokens.length > 0) {
@@ -371,7 +532,7 @@ export class StatementPrinter {
         }
 
         if (token.type === TokenType.Keyword) {
-            return token.text.toUpperCase();
+            return preserveCase ? token.text : token.text.toUpperCase();
         } else if (token.type === TokenType.Identifier) {
             // Check if built-in function
             const lower = token.text.toLowerCase();
@@ -408,26 +569,24 @@ export class StatementPrinter {
             // Unary ! operator - no space after (e.g. !found)
             if (prev.text === '!') { return false; }
 
-            // Space before ! (e.g. if !found) - handled by default return true unless start of expression
-            // But if previous is punctuation like (, space is not needed?
-            // "if (!found)" -> prev=(, curr=! -> usually no space after (
-            // Logic below handles no space after (
+            // Postfix Increment/Decrement (e.g. i++ or i--)
+            // Also identifiers treated as keywords (e.g. :property)
+            if ((curr.text === '++' || curr.text === '--') && (prev.type === TokenType.Identifier || prev.type === TokenType.Number || prev.type === TokenType.Keyword)) {
+                return false;
+            }
 
-            // Unary Minus/Plus Context: No space after ( or { or [ or , or : or ; or return
-            // E.g. :RETURN -1, (-1, {-1, , -1
-            if ((curr.text === '-' || curr.text === '+') && (prev.type === TokenType.Punctuation || prev.type === TokenType.Keyword)) {
+            // Unary Minus/Plus/Inc/Dec Context: No space after ( or { or [ or , or : or ;
+            // E.g. (-1, {-1, , -1, (++i
+            if ((curr.text === '-' || curr.text === '+' || curr.text === '++' || curr.text === '--') && (prev.type === TokenType.Punctuation || prev.type === TokenType.Keyword)) {
                 const isOpenerOrSeparator = ['(', '{', '[', ',', ';', ':'].includes(prev.text);
-                // Also keywords like RETURN, IF, WHILE might precede unary? 
-                // Actually parser handles structure, here we just look at tokens.
-                // "RETURN -1" -> Space required.
-                // "(-1)" -> No space.
+                // "RETURN -1" -> Space required. "(-1)" -> No space.
                 if (prev.type === TokenType.Punctuation && isOpenerOrSeparator) {
                     return false;
                 }
             }
 
-            // Unary Minus/Plus Logic (Contextual)
-            if (prev.text === '-' || prev.text === '+') {
+            // Unary Minus/Plus/Inc/Dec Logic (Contextual) - No space AFTER
+            if (prev.text === '-' || prev.text === '+' || prev.text === '++' || prev.text === '--') {
                 if (prePrev) {
                     // If preceded by Operator, Keyword, or STARTING Punctuation/Separator -> Unary
                     // Closing punctuation like ')', '}', ']' usually implies Binary operator follows.
@@ -442,9 +601,7 @@ export class StatementPrinter {
                 }
             }
 
-            // Range Operator (..) spacing? Usually 1..10 -> no space?
-            // If lexer treats .. as operator. Assuming it doesn't or we want spaces.
-
+            // Range Operator (..) check?
             return true;
         }
 
@@ -454,6 +611,7 @@ export class StatementPrinter {
         if (prev.text === ')' && curr.text === ')') { return false; }
 
         if (prev.text === ')') {
+            if (curr.text === ',') { return false; }
             if (curr.type === TokenType.Keyword) { return true; }
             return true;
         }
@@ -474,11 +632,21 @@ export class StatementPrinter {
         // :RETURN { ... } -> Space
         if (prev.type === TokenType.Keyword && curr.text === '{') { return true; }
 
-        // Pad simple braces { ... }
-        if (prev.text === '{' && curr.text !== '}') { return true; }
-        if (curr.text === '}' && prev.text !== '{') { return true; }
+        // Pad simple braces { ... } - REMOVED per user request
+        // if (prev.text === '{' && curr.text !== '}') { return true; }
+        // if (curr.text === '}' && prev.text !== '{') { return true; }
 
         // 3. Keywords/Identifiers separation
+        // Special Case: Member access "object:property" where property tokenizes as Keyword (:prop)
+        if (prev.type === TokenType.Identifier && curr.type === TokenType.Keyword && curr.text.startsWith(':')) {
+            return false;
+        }
+
+        // Special Case: Array access "array[i]"
+        if (curr.text === '[' && this.isWord(prev)) {
+            return false;
+        }
+
         if (this.isWord(prev) && this.isWord(curr)) { return true; }
 
         return false;
