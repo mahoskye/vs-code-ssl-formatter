@@ -15,7 +15,7 @@ export const DIAGNOSTIC_CODES = {
     HUNGARIAN_NOTATION: "ssl-hungarian-notation",
     SQL_INJECTION: "sql-sql-injection",
     MISSING_SEMICOLON: "ssl-missing-semicolon",
-
+    NESTED_TERNARY: "ssl-nested-ternary",
     INVALID_DECLARE: "ssl-invalid-declare",
     INVALID_CONST: "ssl-invalid-const",
     MISSING_OTHERWISE: "ssl-missing-otherwise",
@@ -26,8 +26,6 @@ export const DIAGNOSTIC_CODES = {
     UNMATCHED_BLOCK_END: "ssl-unmatched-block-end",
     KEYWORD_WITHOUT_CONTEXT: "ssl-keyword-without-context"
 } as const;
-
-export type SSLDiagnosticCode = typeof DIAGNOSTIC_CODES[keyof typeof DIAGNOSTIC_CODES];
 
 export const DIAGNOSTIC_MESSAGES = {
     UNDECLARED_VARIABLE: (varName: string) =>
@@ -62,7 +60,7 @@ export const DIAGNOSTIC_MESSAGES = {
 
     MISSING_SEMICOLON: "Statement should end with semicolon",
 
-
+    NESTED_TERNARY: "Nested ternary expressions are discouraged for readability",
 
     INVALID_DECLARE_SYNTAX: "Invalid syntax: :DECLARE cannot initialize values. Use ':DECLARE var;' followed by 'var := value;' on separate lines",
 

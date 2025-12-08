@@ -1,78 +1,130 @@
 import * as vscode from "vscode";
-import { ProcedureIndex, ProcedureInfo } from "./utils/procedureIndex";
-import { ClassIndex, ClassMembers } from "./utils/classIndex";
 
 /**
  * SSL Workspace Symbol Provider
  * Provides workspace-wide symbol search (Ctrl+T)
- * Refactored to use cached Indexes for performance.
  */
 export class SSLWorkspaceSymbolProvider implements vscode.WorkspaceSymbolProvider {
 
-	constructor(
-		private readonly procedureIndex: ProcedureIndex,
-		private readonly classIndex: ClassIndex
-	) { }
-
-	public provideWorkspaceSymbols(
+	public async provideWorkspaceSymbols(
 		query: string,
 		token: vscode.CancellationToken
-	): vscode.SymbolInformation[] {
+	): Promise<vscode.SymbolInformation[]> {
 		const symbols: vscode.SymbolInformation[] = [];
-		const queryLower = query.toLowerCase();
 
-		// 1. Search Procedures
-		// ProcedureIndex ideally should have a way to get *all* procedures or search them.
-		// We know it has `getAllProcedures()`.
-		const allProcs = this.procedureIndex.getAllProcedures();
+		// Find all SSL files in the workspace
+		const sslFiles = await vscode.workspace.findFiles(
+			"**/*.{ssl,srvscr,ds}",
+			"**/node_modules/**",
+			1000 // Limit to 1000 files for performance
+		);
 
-		for (const proc of allProcs) {
-			if (token.isCancellationRequested) break;
+		// Search each file for symbols matching the query
+		for (const fileUri of sslFiles) {
+			if (token.isCancellationRequested) {
+				break;
+			}
 
-			if (this.matchesQuery(proc.name, queryLower)) {
-				symbols.push(this.createSymbol(
-					proc,
-					vscode.SymbolKind.Function
-				));
+			try {
+				const document = await vscode.workspace.openTextDocument(fileUri);
+				const fileSymbols = this.findSymbolsInDocument(document, query);
+				symbols.push(...fileSymbols);
+			} catch (error) {
+				// Skip files that can't be opened
+				continue;
 			}
 		}
-
-		// 2. Search Classes <Type Fix>
-		const allClasses = this.classIndex.getAllClasses();
-		for (const cls of allClasses) {
-			if (token.isCancellationRequested) break;
-
-			if (this.matchesQuery(cls.className, queryLower)) {
-				if (cls.uri && cls.range) {
-					symbols.push(new vscode.SymbolInformation(
-						cls.className,
-						vscode.SymbolKind.Class,
-						"",
-						new vscode.Location(cls.uri, cls.range)
-					));
-				}
-			}
-		}
-
-
 
 		return symbols;
 	}
 
-	private matchesQuery(name: string, query: string): boolean {
-		// Simple case-insensitive substring match
-		return name.toLowerCase().indexOf(query) >= 0;
-	}
+	private findSymbolsInDocument(
+		document: vscode.TextDocument,
+		query: string
+	): vscode.SymbolInformation[] {
+		const symbols: vscode.SymbolInformation[] = [];
+		const text = document.getText();
+		const lines = text.split("\n");
+		const queryLower = query.toLowerCase();
 
-	private createSymbol(
-		info: ProcedureInfo,
-		kind: vscode.SymbolKind
-	): vscode.SymbolInformation {
-		return new vscode.SymbolInformation(
-			info.name,
-			kind,
-			info.fileBaseName,
-			new vscode.Location(info.uri, info.range)
-		);
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			const trimmed = line.trim();
+
+			// Find procedures
+			const procMatch = trimmed.match(/^\s*:PROCEDURE\s+(\w+)/i);
+			if (procMatch) {
+				const procName = procMatch[1];
+
+				// Filter by query if provided
+				if (query && !procName.toLowerCase().includes(queryLower)) {
+					continue;
+				}
+
+				const location = new vscode.Location(
+					document.uri,
+					new vscode.Position(i, 0)
+				);
+
+				const symbol = new vscode.SymbolInformation(
+					procName,
+					vscode.SymbolKind.Function,
+					"",
+					location
+				);
+
+				symbols.push(symbol);
+			}
+
+			// Find classes
+			const classMatch = trimmed.match(/^\s*:CLASS\s+(\w+)/i);
+			if (classMatch) {
+				const className = classMatch[1];
+
+				if (query && !className.toLowerCase().includes(queryLower)) {
+					continue;
+				}
+
+				const location = new vscode.Location(
+					document.uri,
+					new vscode.Position(i, 0)
+				);
+
+				const symbol = new vscode.SymbolInformation(
+					className,
+					vscode.SymbolKind.Class,
+					"",
+					location
+				);
+
+				symbols.push(symbol);
+			}
+
+			// Find regions
+			const regionMatch = trimmed.match(/^\s*:REGION\s+(.+?);/i);
+			if (regionMatch) {
+				const regionName = regionMatch[1].trim();
+
+				if (query && !regionName.toLowerCase().includes(queryLower)) {
+					continue;
+				}
+
+				const location = new vscode.Location(
+					document.uri,
+					new vscode.Position(i, 0)
+				);
+
+				const symbol = new vscode.SymbolInformation(
+					regionName,
+					vscode.SymbolKind.Namespace,
+					"",
+					location
+				);
+
+				symbols.push(symbol);
+			}
+		}
+
+		return symbols;
 	}
 }

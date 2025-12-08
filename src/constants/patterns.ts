@@ -4,131 +4,118 @@
  */
 
 export const PATTERNS = {
-    PROCEDURE: {
-        DEFINITION: /^\s*:PROCEDURE\s+(\w+)\b/i,
-        END: /^\s*:ENDPROC\b/i,
-        PARAMETERS: /^\s*:PARAMETERS\s+(.+?);/i,
-        DEFAULT_VALUE: /^\s*:DEFAULT\s+(\w+)\s*,\s*(.+?);/i,
-    },
+    // Procedure patterns
+    PROCEDURE_DEFINITION: /^\s*:PROCEDURE\s+(\w+)\b/i,
+    PROCEDURE_END: /^\s*:ENDPROC\b/i,
+    PARAMETERS_DEFINITION: /^\s*:PARAMETERS\s+(.+?);/i,
+    DEFAULT_VALUE: /^\s*:DEFAULT\s+(\w+)\s*,\s*(.+?);/i,
 
-    CLASS: {
-        DEFINITION: /^\s*:CLASS\s+(\w+)\b/i,
-        INHERIT: /^\s*:INHERIT\s+(\w+)/i,
-    },
+    // Class patterns
+    CLASS_DEFINITION: /^\s*:CLASS\s+(\w+)\b/i,
+    INHERIT_DEFINITION: /^\s*:INHERIT\s+(\w+)/i,
 
-    VARIABLE: {
-        ASSIGNMENT: /^([a-z][a-zA-Z0-9_]*)\s*:=/,
-        DECLARE: /^\s*:DECLARE\s+(.+?);/i,
-        GLOBAL_CONSTANT: /^[A-Z_][A-Z0-9_]*\s*:=/,
-        UNDECLARED: /\b([a-z][a-zA-Z0-9_]*)\b/g,
-    },
+    // Variable patterns
+    VARIABLE_ASSIGNMENT: /^([a-z][a-zA-Z0-9_]*)\s*:=/,
+    DECLARE_STATEMENT: /^\s*:DECLARE\s+(.+?);/i,
+    GLOBAL_CONSTANT: /^[A-Z_][A-Z0-9_]*\s*:=/,
 
-    CONTROL_FLOW: {
-        IF: /^\s*:IF\b/i,
-        ELSE: /^\s*:ELSE\b/i,
-        ENDIF: /^\s*:ENDIF\b/i,
-        WHILE: /^\s*:WHILE\b/i,
-        ENDWHILE: /^\s*:ENDWHILE\b/i,
-        FOR: /^\s*:FOR\b/i,
-        NEXT: /^\s*:NEXT\b/i,
-        BEGINCASE: /^\s*:BEGINCASE\b/i,
-        CASE: /^\s*:CASE\b/i,
-        OTHERWISE: /^\s*:OTHERWISE\b/i,
-        ENDCASE: /^\s*:ENDCASE\b/i,
-        TRY: /^\s*:TRY\b/i,
-        CATCH: /^\s*:CATCH\b/i,
-        FINALLY: /^\s*:FINALLY\b/i,
-        ENDTRY: /^\s*:ENDTRY\b/i,
-        CASE_KEYWORD: /^\s*:(CASE|OTHERWISE)\b/i,
-    },
+    // Control flow patterns
+    IF_STATEMENT: /^\s*:IF\b/i,
+    ELSE_STATEMENT: /^\s*:ELSE\b/i,
+    ENDIF_STATEMENT: /^\s*:ENDIF\b/i,
+    WHILE_STATEMENT: /^\s*:WHILE\b/i,
+    ENDWHILE_STATEMENT: /^\s*:ENDWHILE\b/i,
+    FOR_STATEMENT: /^\s*:FOR\b/i,
+    NEXT_STATEMENT: /^\s*:NEXT\b/i,
+    BEGINCASE_STATEMENT: /^\s*:BEGINCASE\b/i,
+    CASE_STATEMENT: /^\s*:CASE\b/i,
+    OTHERWISE_STATEMENT: /^\s*:OTHERWISE\b/i,
+    ENDCASE_STATEMENT: /^\s*:ENDCASE\b/i,
+    TRY_STATEMENT: /^\s*:TRY\b/i,
+    CATCH_STATEMENT: /^\s*:CATCH\b/i,
+    FINALLY_STATEMENT: /^\s*:FINALLY\b/i,
+    ENDTRY_STATEMENT: /^\s*:ENDTRY\b/i,
 
-    BLOCK: {
-        START: /^\s*:(IF|WHILE|FOR|BEGINCASE|TRY|PROCEDURE|CLASS|REGION)\b/i,
-        MIDDLE: /^\s*:(ELSE|CATCH|FINALLY)\b/i,
-        END: /^\s*:(ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDREGION)\b/i,
-    },
+    // Block patterns
+    BLOCK_START: /^\s*:(IF|WHILE|FOR|BEGINCASE|TRY|PROCEDURE|CLASS|REGION)\b/i,
+    BLOCK_MIDDLE: /^\s*:(ELSE|CATCH|FINALLY)\b/i,
+    CASE_KEYWORD: /^\s*:(CASE|OTHERWISE)\b/i,
+    BLOCK_END: /^\s*:(ENDIF|ENDWHILE|NEXT|ENDCASE|ENDTRY|ENDPROC|ENDREGION)\b/i,
 
-    COMMENT: {
-        MULTILINE_START: /^\s*\/\*/,
-        MULTILINE_END: /;\s*$/,
-        SINGLELINE: /^\s*\*/,
-        INVALID: /\/\*.*\*\//,
-    },
+    // Comment patterns
+    MULTILINE_COMMENT_START: /^\s*\/\*/,
+    MULTILINE_COMMENT_END: /;\s*$/,
+    SINGLELINE_COMMENT: /^\s*\*/,
 
-    SQL: {
-        FUNCTION_CALL: /\b(SQLExecute|RunSQL|LSearch)\s*\(/i,
-        PARAMETER_PLACEHOLDER: /\?([A-Za-z0-9_]+(?:\[[^\]]+\])?)\?/g,
-        CONCATENATION: /\+/,
-        INVALID_PARAM: /\?([A-Za-z0-9_]+(?:\[[^\]]+\])?)\?/g,
-    },
+    // SQL patterns
+    SQL_FUNCTION_CALL: /\b(SQLExecute|RunSQL|LSearch)\s*\(/i,
+    SQL_PARAMETER_PLACEHOLDER: /\?([A-Za-z0-9_]+(?:\[[^\]]+\])?)\?/g,
+    SQL_CONCATENATION: /\+/,
 
-    OBJECT: {
-        MEMBER_ACCESS: /(\w+):(\w+)\s*:=/,
-        BUILTIN_CLASS_INSTANTIATION: /\b(\w+)\s*:=\s*(\w+)\{\}/i,
-        UDOBJECT_INSTANTIATION: /\b(\w+)\s*:=\s*CreateUDObject\s*\(\s*["']([^"']+)["']/i,
-        UDOBJECT_ANONYMOUS: /\b(\w+)\s*:=\s*CreateUDObject\s*\(\s*\)/i,
-    },
+    // Object patterns
+    OBJECT_MEMBER_ACCESS: /(\w+):(\w+)\s*:=/,
+    BUILTIN_CLASS_INSTANTIATION: /\b(\w+)\s*:=\s*(\w+)\{\}/i,
+    UDOBJECT_INSTANTIATION: /\b(\w+)\s*:=\s*CreateUDObject\s*\(\s*["']([^"']+)["']/i,
+    UDOBJECT_ANONYMOUS: /\b(\w+)\s*:=\s*CreateUDObject\s*\(\s*\)/i,
 
-    STRING: {
-        DOUBLE: /"/g,
-        SINGLE: /'/g,
-    },
+    // String patterns
+    STRING_LITERAL_DOUBLE: /"/g,
+    STRING_LITERAL_SINGLE: /'/g,
 
-    KEYWORD: {
-        WITH_COLON: /^\s*:([A-Za-z]+)\b/,
-    },
+    // Keyword patterns
+    KEYWORD_WITH_COLON: /^\s*:([A-Za-z]+)\b/,
 
-    SEMICOLON: {
-        MISSING: /[^\s;]$/,
-        TRAILING: /\s*;/g,
-    },
+    // Ternary patterns
+    TERNARY_EXPRESSION: /\?[^?]+\?[^?]*:[^?]*\?[^?]+\?/,
 
-    OPERATOR: {
-        ASSIGNMENT: /\s*:=\s*|\s*\+=\s*|\s*-=\s*|\s*\*=\s*|\s*\/=\s*|\s*\^=\s*|\s*%=\s*/,
-        ARITHMETIC: /([a-zA-Z0-9_\)])(\+|\*|\/|\^|%)([a-zA-Z0-9_\(])/g,
-        COMPARISON: /\s*(==|!=|<>|<=|>=|=|<|>|\#)\s*/g,
-        LOGICAL: /\s*\.AND\.\s*|\s*\.OR\.\s*|\s*\.NOT\.\s*/gi,
-        UNARY: /\s*!\s*/g,
-        SPACING: /(\w)(==|!=|<>|<=|>=|=|<|>|\#)(\w)/g,
-    },
+    // Semicolon patterns
+    MISSING_SEMICOLON: /[^\s;]$/,
+    TRAILING_SEMICOLON: /\s*;/g,
 
-    SPACING: {
-        COMMA: /,(\S)/g,
-    },
+    // Operator patterns
+    ASSIGNMENT_OPERATORS: /\s*:=\s*|\s*\+=\s*|\s*-=\s*|\s*\*=\s*|\s*\/=\s*|\s*\^=\s*|\s*%=\s*/,
+    ARITHMETIC_OPERATORS: /([a-zA-Z0-9_\)])(\+|\*|\/|\^|%)([a-zA-Z0-9_\(])/g,
+    COMPARISON_OPERATORS: /\s*(==|!=|<>|<=|>=|=|<|>|\#)\s*/g,
+    LOGICAL_OPERATORS: /\s*\.AND\.\s*|\s*\.OR\.\s*|\s*\.NOT\.\s*/gi,
+    UNARY_OPERATORS: /\s*!\s*/g,
 
-    INDENTATION: {
-        LEADING_WHITESPACE: /^(\s*)/,
-        ASSIGNMENT_LINE: /^(\s*)(\w+)\s*:=\s*(.+)/,
-    },
+    // Spacing patterns
+    COMMA_SPACING: /,(\S)/g,
+    OPERATOR_SPACING: /(\w)(==|!=|<>|<=|>=|=|<|>|\#)(\w)/g,
 
-    CONTINUATION: {
-        ENDS_WITH_OPERATOR: /[+\-*/,]$/,
-        STARTS_WITH_OPERATOR: /^[+\-*/,]/,
-    },
+    // Indentation patterns
+    LEADING_WHITESPACE: /^(\s*)/,
+    ASSIGNMENT_LINE: /^(\s*)(\w+)\s*:=\s*(.+)/,
 
-    REGION: {
-        START: /^\s*:REGION\s+(.+)/i,
-        END: /^\s*:ENDREGION\b/i,
-    },
+    // Continuation patterns
+    ENDS_WITH_OPERATOR: /[+\-*/,]$/,
+    STARTS_WITH_OPERATOR: /^[+\-*/,]/,
 
-    VALIDATION: {
-        INVALID_DECLARE_ASSIGNMENT: /^\s*:DECLARE.*:=/i,
-        INVALID_CONST_KEYWORD: /\b(const|CONST)\b/i,
-        HUNGARIAN_VARIABLE: /^[a-z][A-Z]/,
-        VALID_IDENTIFIER: /^[a-zA-Z_][a-zA-Z0-9_]*$/,
-    },
+    // Region patterns
+    REGION_START: /^\s*:REGION\s+(.+)/i,
+    REGION_END: /^\s*:ENDREGION\b/i,
 
-    DOPROC: {
-        CALL: /DoProc\s*\(\s*["']([^"']+)["']\s*,\s*\{([^}]*)\}/i,
-        NO_PARAMS: /DoProc\s*\(\s*["']([^"']+)["']\s*\)/i,
-        COMPLETION: /DoProc\s*\(\s*["']([^"']*)$/i,
-    },
+    // Invalid syntax patterns
+    INVALID_DECLARE_ASSIGNMENT: /^\s*:DECLARE.*:=/i,
+    INVALID_CONST_KEYWORD: /\b(const|CONST)\b/i,
+    INVALID_COMMENT_SYNTAX: /\/\*.*\*\//,
 
-    EXEC_FUNCTION: {
-        COMPLETION: /ExecFunction\s*\(\s*["']([^"']*)$/i,
-    },
+    // Hungarian notation patterns
+    HUNGARIAN_VARIABLE: /^[a-z][A-Z]/,
+    VALID_IDENTIFIER: /^[a-zA-Z_][a-zA-Z0-9_]*$/,
 
-    FUNCTION: {
-        CALL: /\b(\w+)\s*\(/g,
-    }
+    // DoProc patterns
+    DOPROC_CALL: /DoProc\s*\(\s*["']([^"']+)["']\s*,\s*\{([^}]*)\}/i,
+    DOPROC_NO_PARAMS: /DoProc\s*\(\s*["']([^"']+)["']\s*\)/i,
+    DOPROC_COMPLETION: /DoProc\s*\(\s*["']([^"']*)$/i,
+
+    // ExecFunction patterns
+    EXEC_FUNCTION_COMPLETION: /ExecFunction\s*\(\s*["']([^"']*)$/i,
+
+    // Function call patterns
+    FUNCTION_CALL: /\b(\w+)\s*\(/g,
+
+    // Error patterns
+    UNDECLARED_VARIABLE: /\b([a-z][a-zA-Z0-9_]*)\b/g,
+    INVALID_SQL_PARAM: /\?([A-Za-z0-9_]+(?:\[[^\]]+\])?)\?/g
 } as const;

@@ -5,11 +5,10 @@ import { CONFIG_KEYS, CONFIG_DEFAULTS } from "./constants/config";
 /**
  * SSL Reference Provider
  * Provides "Find All References" functionality for procedures and variables
- * Refactored for performance (single-pass scan).
  */
 export class SSLReferenceProvider implements vscode.ReferenceProvider {
 
-	constructor(private readonly procedureIndex?: ProcedureIndex) { }
+	constructor(private readonly procedureIndex?: ProcedureIndex) {}
 
 	public provideReferences(
 		document: vscode.TextDocument,
@@ -23,210 +22,117 @@ export class SSLReferenceProvider implements vscode.ReferenceProvider {
 		}
 
 		const word = document.getText(range);
-		const locations: vscode.Location[] = [];
-
-		// 1. Identify what we are looking for (Procedure vs Variable)
-		// Check current line context to see if we are on a procedure definition
-		const lineText = document.lineAt(position.line).text;
-		const isProcDef = new RegExp(`^\\s*:PROCEDURE\\s+${this.escapeRegex(word)}\\b`, "i").test(lineText);
-
-		// Also check if we are in a string that looks like a proc call (DoProc("Name"))
+		const symbolType = this.getSymbolType(document, range, word);
 		const invocation = this.getProcedureInvocation(document, range);
+		const workspaceLocations = invocation ? this.resolveWorkspaceLocations(invocation.literal) : [];
 
-		// If it's a known procedure context OR if we find it defined as a procedure elsewhere?
-		// Actually, "Find References" usually treats the symbol at cursor as the source of truth.
-		// If it looks like a variable usage, we search for variable usages.
-		// If it looks like a procedure usage/def, we search for procedure.
-
-		// Let's do the single-pass scan to find ALL occurrences of the word, 
-		// and classify them.
-
-		const occurrences = this.scanDocumentForWord(document, word, token);
-		if (token.isCancellationRequested) {
-			return [];
+		if (symbolType === "procedure") {
+			const localReferences = this.findProcedureReferences(document, word);
+			return this.mergeLocations(localReferences, workspaceLocations);
 		}
 
-		if (isProcDef || invocation) {
-			// It is a procedure. Filter for procedure-relevant occurrences.
-			// 1. :PROCEDURE Name
-			// 2. DoProc("Name")
-			occurrences.forEach(occ => {
-				if (occ.type === 'PROCEDURE_DEF' || occ.type === 'PROCEDURE_CALL') {
-					locations.push(new vscode.Location(document.uri, occ.range));
-				}
-			});
-
-			// Add workspace references if index available
-			if (invocation) {
-				const workspaceLocs = this.resolveWorkspaceLocations(invocation.literal);
-				return this.mergeLocations(locations, workspaceLocs);
-			}
-			// If we are at definition, we should also check workspace for *other* files calling this? 
-			// The current implementation only looked up workspace if *calling* (invocation).
-			// "Find References" at definition should surely find calls in other files?
-			// The `procedureIndex` might support finding references? 
-			// The `ProcedureIndex` interface shows `getProceduresByName` but not "getReferences".
-			// Typically ReferenceProvider is for the *current* file + maybe basic workspace.
-			// The previous code only looked up workspace locations if `invocation` was present (literals).
-			// I will retain that behavior for parity, but typically one wants global refs.
-
-			return locations;
-		} else {
-			// It is likely a variable (or unknown).
-			// Filter for variable usages.
-			// Exclude comments/strings (handled by scanner).
-			occurrences.forEach(occ => {
-				if (occ.type === 'CODE' || occ.type === 'VARIABLE_DECL') {
-					locations.push(new vscode.Location(document.uri, occ.range));
-				}
-			});
-			return locations;
-		}
+		return this.findVariableReferences(document, word);
 	}
 
-	private scanDocumentForWord(document: vscode.TextDocument, word: string, token: vscode.CancellationToken): Occurrence[] {
+	private getSymbolType(document: vscode.TextDocument, range: vscode.Range, word: string): "procedure" | "variable" {
+		const lineText = document.lineAt(range.start.line).text;
+		const procedureDefinitionPattern = new RegExp(`^\\s*:PROCEDURE\\s+${this.escapeRegex(word)}\\b`, "i");
+		if (procedureDefinitionPattern.test(lineText)) {
+			return "procedure";
+		}
+
+		const procedureCalls = this.getProcedureCallRanges(lineText, range.start.line, word);
+		if (procedureCalls.some(callRange => 
+			callRange.start.character === range.start.character &&
+			callRange.end.character === range.end.character
+		)) {
+			return "procedure";
+		}
+
+		return "variable";
+	}
+
+	private findProcedureReferences(document: vscode.TextDocument, word: string): vscode.Location[] {
+		const locations: vscode.Location[] = [];
+		const lowerWord = word.toLowerCase();
+
+		for (let lineNumber = 0; lineNumber < document.lineCount; lineNumber++) {
+			const lineText = document.lineAt(lineNumber).text;
+			const definitionPattern = new RegExp(`^\\s*:PROCEDURE\\s+${this.escapeRegex(word)}\\b`, "i");
+			if (definitionPattern.test(lineText)) {
+				const startIndex = lineText.toLowerCase().indexOf(lowerWord);
+				const range = new vscode.Range(
+					new vscode.Position(lineNumber, startIndex),
+					new vscode.Position(lineNumber, startIndex + word.length)
+				);
+				locations.push(new vscode.Location(document.uri, range));
+			}
+
+			const callRanges = this.getProcedureCallRanges(lineText, lineNumber, word);
+			callRanges.forEach(range => {
+				if (!this.isInComment(document, range.start)) {
+					locations.push(new vscode.Location(document.uri, range));
+				}
+			});
+		}
+
+		return locations;
+	}
+
+	private findVariableReferences(document: vscode.TextDocument, word: string): vscode.Location[] {
+		const locations: vscode.Location[] = [];
 		const text = document.getText();
-		const results: Occurrence[] = [];
-		const wordLen = word.length;
-		const lowerWord = word.toLowerCase(); // Case insensitive? SSL usually is.
-		// Previous code used 'gi' regex, so yes.
+		const lines = text.split("\n");
+		const wordPattern = new RegExp(`\\b${this.escapeRegex(word)}\\b`, "gi");
 
-		// Combined state machine scan
-		let inString = false;
-		let stringChar = '';
-		let inComment = false; // Block or line? SSL has /* ... ;
+		for (let i = 0; i < lines.length; i++) {
+			const line = lines[i];
+			let match: RegExpExecArray | null;
+			wordPattern.lastIndex = 0;
 
-		// We can iterate lines for easier Range creation, or offset.
-		// Line iteration is safer for line-based regexes (like :PROCEDURE check).
-
-		for (let i = 0; i < document.lineCount; i++) {
-			if (token.isCancellationRequested) {
-				break;
-			}
-			const line = document.lineAt(i).text;
-			const lineLower = line.toLowerCase();
-
-			// Optimization: If line doesn't contain word at all, just update state? 
-			// Note: block comments span lines.
-
-			for (let j = 0; j < line.length; j++) {
-				const char = line[j];
-				const next = line[j + 1] || '';
-
-				// State Updates
-				if (!inString && !inComment) {
-					if (char === '/' && next === '*') {
-						inComment = true;
-						j++; continue;
-					}
-					if (char === '"' || char === '\'' || char === '[') {
-						inString = true;
-						stringChar = char === '[' ? ']' : char;
-						// But wait, if the word STARTs here? (e.g. "Word")
-						// If we are IN string, we track word? 
-						// Previous finder: `findVariableReferences` EXCLUDED strings.
-						// `findProcedureReferences` looked INSIDE strings for DoProc("Word").
-					}
-				} else if (inComment) {
-					if (char === ';') {
-						inComment = false;
-					}
-				} else if (inString) {
-					if (char === stringChar) {
-						inString = false;
-						stringChar = '';
-					}
-				}
-
-				// Check for word match at this position
-				// Must be whole word? Previous code used \\bWORD\\b
-				if (lineLower.startsWith(lowerWord, j)) {
-					// Check boundaries for whole word
-					const prevChar = j > 0 ? line[j - 1] : ' ';
-					const nextChar = j + wordLen < line.length ? line[j + wordLen] : ' ';
-
-					if (this.isWordBoundary(prevChar) && this.isWordBoundary(nextChar)) {
-						// We have a match!
-						const range = new vscode.Range(i, j, i, j + wordLen);
-
-						if (inComment) {
-							// Ignore comments entirely
-						} else if (inString) {
-							// Only interesting if it's a Procedure Call string
-							// e.g. DoProc("Word")
-							// We need to check context locally
-							if (this.isProcedureCallStringContext(line, j, inString)) {
-								results.push({ type: 'PROCEDURE_CALL', range });
-							}
-						} else {
-							// In Code
-							// Check if declaration
-							if (this.isProcedureDefinition(line, j)) {
-								results.push({ type: 'PROCEDURE_DEF', range });
-							} else if (this.isVariableDeclaration(line, j)) {
-								results.push({ type: 'VARIABLE_DECL', range });
-							} else {
-								results.push({ type: 'CODE', range });
-							}
-						}
-					}
-
-					// Skip word length - 1 (loop increments 1)
-					// But we must continue state tracking!
-					// Actually, if we skip, we might miss quote/comment markers inside the word?
-					// Unlikely for a variable name, but safety first.
-					// Just let the loop continue? No, if we matched "Word", we shouldn't match "ord" inside it.
-					// But we need to update state.
-					// We can fast-forward state? 
-					// Let's just process char by char. Matching logic is simple enough.
-				}
+			while ((match = wordPattern.exec(line)) !== null) {
+				const startPos = new vscode.Position(i, match.index);
+				const endPos = new vscode.Position(i, match.index + word.length);
+				locations.push(new vscode.Location(
+					document.uri,
+					new vscode.Range(startPos, endPos)
+				));
 			}
 		}
-		return results;
+
+		return locations.filter(loc =>
+			!this.isInComment(document, loc.range.start) &&
+			!this.isInString(document, loc.range.start)
+		);
 	}
 
-	private isWordBoundary(char: string): boolean {
-		return /[^a-zA-Z0-9_]/.test(char);
-	}
+	private getProcedureCallRanges(lineText: string, lineNumber: number, filterWord?: string): vscode.Range[] {
+		const ranges: vscode.Range[] = [];
+		const pattern = /(DoProc|ExecFunction)\s*\(\s*["']([^"']+)["']/gi;
+		let match: RegExpExecArray | null;
+		const target = filterWord ? filterWord.toLowerCase() : undefined;
 
-	private isProcedureCallStringContext(line: string, matchIndex: number, inString: boolean): boolean {
-		// Look behind for DoProc/ExecFunction
-		// We know we are inside a string.
-		// Scan back from matchIndex to find start of string?
-		// Simple heuristic: Line up to matchIndex
-		const prefix = line.substring(0, matchIndex);
-		// Find last quote
-		// This is tricky without strict state.
-		// But we know 'inString' is true. 
-		// Heuristic: Check if line matches (DoProc|ExecFunction)\s*\(\s*["']...$
-		// This is what previous code did approx.
-		const procMatch = /(DoProc|ExecFunction)\s*\(\s*["']([^"']*)$/i.exec(prefix);
-		if (procMatch && procMatch[2].length < line.length) { // match[2] is partial string content before word
-			return true;
+		while ((match = pattern.exec(lineText)) !== null) {
+			const rawLiteral = match[2];
+			const nameInfo = this.extractProcedureName(rawLiteral);
+			if (!nameInfo.name) {
+				continue;
+			}
+			if (target && nameInfo.name.toLowerCase() !== target) {
+				continue;
+			}
+
+			const literalStart = match.index + match[0].indexOf(rawLiteral);
+			const startCharacter = literalStart + nameInfo.offset;
+			const range = new vscode.Range(
+				new vscode.Position(lineNumber, startCharacter),
+				new vscode.Position(lineNumber, startCharacter + nameInfo.name.length)
+			);
+			ranges.push(range);
 		}
-		return false;
-	}
 
-	private isProcedureDefinition(line: string, index: number): boolean {
-		// :PROCEDURE Word
-		const prefix = line.substring(0, index);
-		return /:PROCEDURE\s+$/i.test(prefix);
+		return ranges;
 	}
-
-	private isVariableDeclaration(line: string, index: number): boolean {
-		// :DECLARE ... Word
-		// :PARAMETERS ... Word
-		// This is hard to check purely with prefix if multiple vars: :DECLARE a, b, Word;
-		// But "Find References" is usually fuzzy enough.
-		// Or we check start of line.
-		const start = line.trimLeft();
-		if (start.match(/^:(DECLARE|PARAMETERS)\b/i)) {
-			return true;
-		}
-		return false;
-	}
-
-	// --- Helpers from original (cleaned) ---
 
 	private getProcedureInvocation(document: vscode.TextDocument, range: vscode.Range): { literal: string } | undefined {
 		const lineText = document.lineAt(range.start.line).text;
@@ -244,35 +150,46 @@ export class SSLReferenceProvider implements vscode.ReferenceProvider {
 				return { literal: rawLiteral };
 			}
 		}
+
 		return undefined;
 	}
 
 	private resolveWorkspaceLocations(literal: string): vscode.Location[] {
-		if (!this.procedureIndex) {
+		const match = this.resolveWorkspaceProcedure(literal);
+		if (!match) {
 			return [];
+		}
+		return [new vscode.Location(match.uri, match.range)];
+	}
+
+	private resolveWorkspaceProcedure(literal: string) {
+		if (!this.procedureIndex) {
+			return undefined;
 		}
 		const config = vscode.workspace.getConfiguration("ssl");
 		const namespaceRoots = config.get<Record<string, string>>(
 			CONFIG_KEYS.DOCUMENT_NAMESPACES,
 			CONFIG_DEFAULTS[CONFIG_KEYS.DOCUMENT_NAMESPACES] as Record<string, string>
-		) || {}; // Fixed: Added cast or fallback
-		const match = this.procedureIndex.resolveProcedureLiteral(literal, namespaceRoots);
-		return match ? [new vscode.Location(match.uri, match.range)] : [];
+		) || {};
+		return this.procedureIndex.resolveProcedureLiteral(literal, namespaceRoots);
 	}
 
 	private mergeLocations(local: vscode.Location[], workspace: vscode.Location[]): vscode.Location[] {
 		if (!workspace.length) {
 			return local;
 		}
+
 		const result = [...local];
 		const seen = new Set(result.map(loc => this.locationKey(loc)));
-		for (const loc of workspace) {
-			const key = this.locationKey(loc);
+
+		for (const location of workspace) {
+			const key = this.locationKey(location);
 			if (!seen.has(key)) {
 				seen.add(key);
-				result.push(loc);
+				result.push(location);
 			}
 		}
+
 		return result;
 	}
 
@@ -281,12 +198,66 @@ export class SSLReferenceProvider implements vscode.ReferenceProvider {
 		return `${location.uri.toString()}:${start.line}:${start.character}:${end.line}:${end.character}`;
 	}
 
+	private extractProcedureName(rawLiteral: string): { name: string; offset: number } {
+		const trimmedLeft = rawLiteral.replace(/^\s+/, "");
+		const leftOffset = rawLiteral.length - trimmedLeft.length;
+		const trimmed = trimmedLeft.replace(/\s+$/, "");
+		const lastDot = trimmed.lastIndexOf('.');
+		const nameStart = lastDot === -1 ? 0 : lastDot + 1;
+		const name = trimmed.substring(nameStart);
+		return {
+			name,
+			offset: leftOffset + nameStart
+		};
+	}
+
 	private escapeRegex(str: string): string {
 		return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 	}
-}
 
-interface Occurrence {
-	type: 'CODE' | 'PROCEDURE_DEF' | 'PROCEDURE_CALL' | 'VARIABLE_DECL';
-	range: vscode.Range;
+	private isInString(document: vscode.TextDocument, position: vscode.Position): boolean {
+		const line = document.lineAt(position.line).text;
+		let inString = false;
+		let stringChar: string | null = null;
+
+		for (let i = 0; i < position.character; i++) {
+			const char = line[i];
+			
+			if (!inString && (char === '"' || char === "'")) {
+				inString = true;
+				stringChar = char;
+			} else if (inString && char === stringChar) {
+				inString = false;
+				stringChar = null;
+			}
+		}
+
+		return inString;
+	}
+
+	private isInComment(document: vscode.TextDocument, position: vscode.Position): boolean {
+		// Scan through the document from the beginning to check if we're inside a multi-line comment
+		// SSL comments start with /* and end with ;
+		let inComment = false;
+
+		for (let i = 0; i <= position.line; i++) {
+			const line = document.lineAt(i).text;
+			const relevantPart = i === position.line ? line.substring(0, position.character) : line;
+
+			for (let j = 0; j < relevantPart.length; j++) {
+				// Check for comment start
+				if (!inComment && j < relevantPart.length - 1 &&
+				    relevantPart[j] === '/' && relevantPart[j + 1] === '*') {
+					inComment = true;
+					j++; // Skip the '*'
+				}
+				// Check for comment end
+				else if (inComment && relevantPart[j] === ';') {
+					inComment = false;
+				}
+			}
+		}
+
+		return inComment;
+	}
 }

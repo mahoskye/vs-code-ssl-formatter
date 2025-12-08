@@ -20,47 +20,62 @@ export class WhitespaceManager {
         const currText = currToken ? currToken.text.toUpperCase() : "";
         const prevText = prevToken ? prevToken.text.toUpperCase() : "";
 
-        // Inline Comments - append to same line
+        // 0. Inline Comments
+        // If current is a comment and starts on same line as previous ends -> Inline
+        // Must return -1 to signal appending
         if (curr.type === NodeType.Comment && prev.endLine === curr.startLine) {
             return -1;
         }
 
-        // Definition Blocks (PARAMETERS, DEFAULT, DECLARE)
+        let res = 0;
+
+
+        // 1. Definition Blocks (PARAMETERS, DEFAULT, DECLARE)
         if (this.isDefinition(currToken) && this.isDefinition(prevToken)) {
-            if (currText === prevText) { return 0; }
+            // Group only if same type (e.g. DEFAULT followed by DEFAULT)
+            if (currText === prevText) {
+                return 0;
+            }
             return 1;
         }
 
-        // Comments - give them room
+        // 2. Comments - give them room
         const currIsComment = curr.tokens.some(t => t.type === TokenType.Comment);
         const prevIsComment = prev.tokens.some(t => t.type === TokenType.Comment);
 
+        // Check for specific comment regions
         if (this.isRegionComment(curr) && this.isEndRegionComment(prev)) {
             return 1;
         }
 
         if (currIsComment && !prevIsComment && !this.isDefinition(prevToken)) {
+            // If current is a comment block and previous was code definitions
             return 1;
         }
 
-        // Control Structures (IF, WHILE, FOR, etc.)
-        if (this.isControlStart(currToken) && !this.isControlStart(prevToken)) {
-            return 1;
+        // 3. Control Structures (IF, WHILE, FOR, etc.)
+        // Add blank line before control block start
+        if (this.isControlStart(currToken)) {
+            if (!this.isControlStart(prevToken)) {
+                return 1;
+            }
         }
 
         // Force blank line before :CASE, :OTHERWISE
+        // (Removing isBlockMiddle check to avoid forcing blank line before :ELSE)
         if (this.isCaseKeyword(currToken)) {
             return 1;
         }
 
         // Add blank line after control block end
         if (this.isControlEnd(prevToken)) {
+            // Unless followed by ELSE or another END (nested closing)
             if (!this.isBlockMiddle(currToken) && !this.isCaseKeyword(currToken) && !this.isControlEnd(currToken)) {
                 return 1;
             }
         }
 
-        // Major Blocks (Procedure, Class) - Always separate
+        // 4. Major Blocks (Procedure, Class) - Always separate
         if (this.isMajorBlockStart(currToken)) {
             if (prev.type === NodeType.Comment) { return 0; }
             return 1;
@@ -70,8 +85,6 @@ export class WhitespaceManager {
         return 0;
     }
 
-    // --- Private Helpers ---
-
     private getFirstSignificantToken(node: Node): Token | undefined {
         if (!node || node.tokens.length === 0) { return undefined; }
         for (const t of node.tokens) {
@@ -80,49 +93,48 @@ export class WhitespaceManager {
         return undefined;
     }
 
-    /** Normalize keyword text by uppercasing and removing legacy colon prefix */
-    private normalizeKeyword(token: Token | undefined): string {
-        if (!token) { return ''; }
-        return token.text.toUpperCase().replace(/^:/, '');
-    }
-
     private isDefinition(token: Token | undefined): boolean {
         if (!token || token.type !== TokenType.Keyword) { return false; }
-        return (PROCEDURE_LEVEL_KEYWORDS as readonly string[]).includes(this.normalizeKeyword(token));
+        const text = token.text.toUpperCase().replace(/^:/, ''); // Handle legacy colon
+        return PROCEDURE_LEVEL_KEYWORDS.includes(text);
     }
 
     private isControlStart(token: Token | undefined): boolean {
         if (!token || token.type !== TokenType.Keyword) { return false; }
-        const text = this.normalizeKeyword(token);
-        return (BLOCK_START_KEYWORDS as readonly string[]).includes(text) &&
-            !(MAJOR_BLOCK_START_KEYWORDS as readonly string[]).includes(text);
+        const text = token.text.toUpperCase().replace(/^:/, '');
+        // Exclude Procedure/Class/Region from "Control Start" spacing logic if handled separately
+        return BLOCK_START_KEYWORDS.includes(text) && !MAJOR_BLOCK_START_KEYWORDS.includes(text);
     }
 
     private isControlEnd(token: Token | undefined): boolean {
         if (!token || token.type !== TokenType.Keyword) { return false; }
-        const text = this.normalizeKeyword(token);
-        return (BLOCK_END_KEYWORDS as readonly string[]).includes(text) &&
-            !(MAJOR_BLOCK_END_KEYWORDS as readonly string[]).includes(text);
+        const text = token.text.toUpperCase().replace(/^:/, '');
+        return BLOCK_END_KEYWORDS.includes(text) && !MAJOR_BLOCK_END_KEYWORDS.includes(text);
     }
 
+    // Middle keywords like ELSE, CATCH, FINALLY
     private isBlockMiddle(token: Token | undefined): boolean {
         if (!token || token.type !== TokenType.Keyword) { return false; }
-        return (BLOCK_MIDDLE_KEYWORDS as readonly string[]).includes(this.normalizeKeyword(token));
+        const text = token.text.toUpperCase().replace(/^:/, '');
+        return BLOCK_MIDDLE_KEYWORDS.includes(text);
     }
 
     private isCaseKeyword(token: Token | undefined): boolean {
         if (!token) { return false; }
-        return (CASE_KEYWORDS as readonly string[]).includes(this.normalizeKeyword(token));
+        const text = token.text.toUpperCase().replace(/^:/, '');
+        return CASE_KEYWORDS.includes(text);
     }
 
     private isMajorBlockStart(token: Token | undefined): boolean {
         if (!token || token.type !== TokenType.Keyword) { return false; }
-        return (MAJOR_BLOCK_START_KEYWORDS as readonly string[]).includes(this.normalizeKeyword(token));
+        const text = token.text.toUpperCase().replace(/^:/, '');
+        return MAJOR_BLOCK_START_KEYWORDS.includes(text);
     }
 
     private isMajorBlockEnd(token: Token | undefined): boolean {
         if (!token || token.type !== TokenType.Keyword) { return false; }
-        return (MAJOR_BLOCK_END_KEYWORDS as readonly string[]).includes(this.normalizeKeyword(token));
+        const text = token.text.toUpperCase().replace(/^:/, '');
+        return MAJOR_BLOCK_END_KEYWORDS.includes(text);
     }
 
     private isRegionComment(node: Node): boolean {
@@ -133,4 +145,3 @@ export class WhitespaceManager {
         return node.type === NodeType.RegionEnd;
     }
 }
-

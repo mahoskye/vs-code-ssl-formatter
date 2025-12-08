@@ -1,6 +1,6 @@
 
 import * as vscode from "vscode";
-import { SSLFormatter, FormattingOptions } from "./formatting/formatter";
+import { SSLFormatter } from "./formatting/formatter";
 
 /**
  * SSL Formatting Provider
@@ -59,35 +59,27 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		range: vscode.Range,
 		initialIndentLevel: number
 	): vscode.TextEdit[] {
-		const extendedOptions = this.getFormatterOptions(options);
-		const formatter = new SSLFormatter(extendedOptions);
-		const formatted = formatter.format(text, initialIndentLevel);
-		return [vscode.TextEdit.replace(range, formatted)];
-	}
-
-	/**
-	 * Helper to extract and merge configuration options
-	 */
-	private getFormatterOptions(options: vscode.FormattingOptions): FormattingOptions {
 		const config = vscode.workspace.getConfiguration('ssl');
-
-		// Resolve indentSpaces: if not explicitly set by user/workspace, leave undefined
-		// so that the formatter can fall back to the document's indentation (e.g. tabs).
-		const indentSpaces = (() => {
-			const inspect = config.inspect<number>('format.sql.indentSpaces');
-			if (inspect && (inspect.globalValue !== undefined || inspect.workspaceValue !== undefined || inspect.workspaceFolderValue !== undefined)) {
-				return config.get<number>('format.sql.indentSpaces');
-			}
-			return undefined;
-		})();
-
-		return {
+		const extendedOptions = {
 			...options,
 			'ssl.format.wrapLength': config.get<number>('format.wrapLength', 90),
 			'ssl.format.sql.enabled': config.get<boolean>('format.sql.enabled', false),
 			'ssl.format.sql.keywordCase': config.get<string>('format.sql.keywordCase', 'upper'),
-			'ssl.format.sql.indentSpaces': indentSpaces,
+
+			// Resolve indentSpaces: if not explicitly set by user/workspace, leave undefined
+			// so that the formatter can fall back to the document's indentation (e.g. tabs).
+			'ssl.format.sql.indentSpaces': (() => {
+				const inspect = config.inspect<number>('format.sql.indentSpaces');
+				if (inspect && (inspect.globalValue !== undefined || inspect.workspaceValue !== undefined || inspect.workspaceFolderValue !== undefined)) {
+					return config.get<number>('format.sql.indentSpaces');
+				}
+				return undefined;
+			})(),
+
 			'ssl.format.sql.style': config.get<string>('format.sql.style', 'canonicalCompact')
 		};
+		const formatter = new SSLFormatter(extendedOptions);
+		const formatted = formatter.format(text, initialIndentLevel);
+		return [vscode.TextEdit.replace(range, formatted)];
 	}
 }

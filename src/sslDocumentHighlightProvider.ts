@@ -3,7 +3,6 @@ import * as vscode from "vscode";
 /**
  * SSL Document Highlight Provider
  * Highlights all occurrences of a symbol in the current document
- * Refactored to use a single-pass linear scan for performance (O(N)).
  */
 export class SSLDocumentHighlightProvider implements vscode.DocumentHighlightProvider {
 
@@ -18,143 +17,55 @@ export class SSLDocumentHighlightProvider implements vscode.DocumentHighlightPro
 		}
 
 		const word = document.getText(range);
+		const text = document.getText();
+		const lines = text.split("\n");
+		const highlights: vscode.DocumentHighlight[] = [];
+
+		// Don't highlight keywords
 		if (this.isKeyword(word)) {
 			return [];
 		}
 
-		const text = document.getText();
-		const lines = text.split(/\r?\n/);
-		const highlights: vscode.DocumentHighlight[] = [];
-		const escapedWord = this.escapeRegex(word);
-		const wordPattern = new RegExp(`\\b${escapedWord}\\b`, "gi");
-
-		let inBlockComment = false;
+		// Find all occurrences of the word
+		const wordPattern = new RegExp(`\\b${this.escapeRegex(word)}\\b`, "gi");
 
 		for (let i = 0; i < lines.length; i++) {
-			if (token.isCancellationRequested) {
-				return [];
-			}
-
 			const line = lines[i];
-			const trimmed = line.trim();
-
-			// Fast path for comment-only lines
-			if (trimmed.startsWith('*') || trimmed.startsWith('//')) {
-				continue;
-			}
-
-			// Calculate safe regions (code ranges) for this line
-			const { regions, newInBlockComment } = this.computeSafeRegions(line, inBlockComment);
-			inBlockComment = newInBlockComment;
-
-			if (regions.length === 0) {
-				continue;
-			}
-
-			// Find matches and check if they fall within safe regions
-			wordPattern.lastIndex = 0;
 			let match: RegExpExecArray | null;
+
+			wordPattern.lastIndex = 0;
+
 			while ((match = wordPattern.exec(line)) !== null) {
-				const matchStart = match.index;
-				const matchEnd = match.index + word.length;
-
-				// Check intersection with safe regions
-				const isSafe = regions.some(r => matchStart >= r.start && matchEnd <= r.end);
-
-				if (isSafe) {
-					const startPos = new vscode.Position(i, matchStart);
-					const endPos = new vscode.Position(i, matchEnd);
-					const highlightRange = new vscode.Range(startPos, endPos);
-
-					// Determine highlight kind
-					let kind = vscode.DocumentHighlightKind.Text;
-					if (this.isDefinition(line, matchStart)) {
-						kind = vscode.DocumentHighlightKind.Write;
-					} else if (this.isAssignment(line, matchEnd)) {
-						kind = vscode.DocumentHighlightKind.Write;
-					} else {
-						kind = vscode.DocumentHighlightKind.Read;
-					}
-
-					highlights.push(new vscode.DocumentHighlight(highlightRange, kind));
+				// Skip if in comment
+				if (this.isInComment(document, i, match.index)) {
+					continue;
 				}
+
+				const startPos = new vscode.Position(i, match.index);
+				const endPos = new vscode.Position(i, match.index + word.length);
+				const highlightRange = new vscode.Range(startPos, endPos);
+
+				// Determine highlight kind
+				let kind = vscode.DocumentHighlightKind.Text;
+
+				// Check if this is a definition (procedure or variable declaration)
+				if (this.isDefinition(line, match.index)) {
+					kind = vscode.DocumentHighlightKind.Write;
+				} else if (this.isAssignment(line, match.index)) {
+					kind = vscode.DocumentHighlightKind.Write;
+				} else {
+					kind = vscode.DocumentHighlightKind.Read;
+				}
+
+				highlights.push(new vscode.DocumentHighlight(highlightRange, kind));
 			}
 		}
 
 		return highlights;
 	}
 
-	/**
-	 * Computes the regions of the line that are actual code (not comments or strings).
-	 */
-	private computeSafeRegions(line: string, inBlockComment: boolean): { regions: { start: number, end: number }[], newInBlockComment: boolean } {
-		const regions: { start: number, end: number }[] = [];
-		let state = inBlockComment ? 'COMMENT' : 'CODE';
-		let regionStart = 0;
-		let currentInBlockComment = inBlockComment;
-
-		for (let i = 0; i < line.length; i++) {
-			const char = line[i];
-			const nextChar = line[i + 1] || '';
-
-			if (state === 'CODE') {
-				if (char === '/' && nextChar === '*') {
-					// Start Block Comment
-					if (i > regionStart) {
-						regions.push({ start: regionStart, end: i });
-					}
-					state = 'COMMENT';
-					currentInBlockComment = true;
-					i++; // Skip *
-				}
-				else if (char === '/' && nextChar === '/') {
-					// Single line comment //
-					if (i > regionStart) {
-						regions.push({ start: regionStart, end: i });
-					}
-					return { regions, newInBlockComment: currentInBlockComment }; // Stop processing line
-				}
-				else if (char === '"' || char === "'") {
-					// Start String
-					if (i > regionStart) {
-						regions.push({ start: regionStart, end: i });
-					}
-					state = char === '"' ? 'STRING_DOUBLE' : 'STRING_SINGLE';
-				}
-			}
-			else if (state === 'COMMENT') {
-				if (char === ';') {
-					// End Block Comment (SSL specific)
-					state = 'CODE';
-					currentInBlockComment = false;
-					regionStart = i + 1;
-				}
-			}
-			else if (state === 'STRING_DOUBLE') {
-				if (char === '"') {
-					state = 'CODE';
-					regionStart = i + 1;
-				}
-			}
-			else if (state === 'STRING_SINGLE') {
-				if (char === "'") {
-					state = 'CODE';
-					regionStart = i + 1;
-				}
-			}
-		}
-
-		// Close final region if in CODE state
-		if (state === 'CODE' && regionStart < line.length) {
-			regions.push({ start: regionStart, end: line.length });
-		}
-
-		return { regions, newInBlockComment: currentInBlockComment };
-	}
-
 	private isKeyword(word: string): boolean {
-		// Common SSL keywords to ignore
-		const keywords = new Set([
+		const keywords = [
 			"IF", "ELSE", "ENDIF",
 			"WHILE", "ENDWHILE", "FOR", "TO", "STEP", "NEXT",
 			"FOREACH", "IN", "BEGINCASE", "CASE", "OTHERWISE", "ENDCASE",
@@ -162,36 +73,52 @@ export class SSLDocumentHighlightProvider implements vscode.DocumentHighlightPro
 			"PROCEDURE", "ENDPROC", "ENDPROCEDURE", "RETURN",
 			"DECLARE", "DEFAULT", "PARAMETERS", "PUBLIC",
 			"CLASS", "INHERIT", "REGION", "ENDREGION"
-		]);
-		return keywords.has(word.toUpperCase());
+		];
+		return keywords.includes(word.toUpperCase());
 	}
 
 	private isDefinition(line: string, position: number): boolean {
+		// Check if this is in a :PROCEDURE, :DECLARE, :PARAMETERS, or :CLASS line
 		const beforePos = line.substring(0, position);
-		// :PROCEDURE Name, :DECLARE Name, :PARAMETERS Name, :CLASS Name
-		// Also handling comma lists: :DECLARE A, B, C
-		// Simplistic check: if the line started with a definition keyword
-		const defMatch = /^\s*:(PROCEDURE|DECLARE|PARAMETERS|CLASS)\b/i.exec(beforePos);
-		if (defMatch) {
-			return true;
-		}
-		// Sub-check for :PROCEDURE ... ( ... Name ... ) ? 
-		// Typically definitions are top-level or clearly marked.
-		return false;
+		return /^\s*:(PROCEDURE|DECLARE|PARAMETERS|CLASS)\s+/i.test(beforePos);
 	}
 
-	private isAssignment(line: string, matchEndIndex: number): boolean {
+	private isAssignment(line: string, position: number): boolean {
 		// Check if there's an assignment operator after the word
-		const afterPos = line.substring(matchEndIndex);
-
-		// Skip whitespace
-		const trimmed = afterPos.trimStart();
-		if (!trimmed) {
+		const afterPos = line.substring(position);
+		const wordEnd = afterPos.match(/^\w+/);
+		if (!wordEnd) {
 			return false;
 		}
 
-		// Check for operators
-		return /^(:=|\+=|-=|\*=|\/=|\^=|%=)/.test(trimmed);
+		const remaining = afterPos.substring(wordEnd[0].length).trim();
+		return /^(:=|\+=|-=|\*=|\/=|\^=|%=)/.test(remaining);
+	}
+
+	private isInComment(document: vscode.TextDocument, lineNumber: number, characterPosition: number): boolean {
+		// Scan through the document from the beginning to check if we're inside a multi-line comment
+		// SSL comments start with /* and end with ;
+		let inComment = false;
+
+		for (let i = 0; i <= lineNumber; i++) {
+			const line = document.lineAt(i).text;
+			const relevantPart = i === lineNumber ? line.substring(0, characterPosition) : line;
+
+			for (let j = 0; j < relevantPart.length; j++) {
+				// Check for comment start
+				if (!inComment && j < relevantPart.length - 1 &&
+				    relevantPart[j] === '/' && relevantPart[j + 1] === '*') {
+					inComment = true;
+					j++; // Skip the '*'
+				}
+				// Check for comment end
+				else if (inComment && relevantPart[j] === ';') {
+					inComment = false;
+				}
+			}
+		}
+
+		return inComment;
 	}
 
 	private escapeRegex(str: string): string {
