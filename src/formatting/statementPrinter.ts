@@ -1,5 +1,5 @@
-import { Node } from './parser';
-import { Token, TokenType } from './lexer';
+import { Node } from '../parsing/parser';
+import { Token, TokenType } from '../parsing/lexer';
 import { SqlFormatter } from './sqlFormatter';
 import { getVisualLength, splitStringToken, wrapParameterLine } from './formattingUtils';
 import { ALL_SQL_FUNCTIONS, SSL_OPERATORS, SSL_LITERALS, PROCEDURE_LEVEL_KEYWORDS } from '../constants/language';

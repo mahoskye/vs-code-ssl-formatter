@@ -3,7 +3,7 @@ import { expect } from 'chai';
 import {
 	looksLikeSql,
 	detectSqlContext
-} from '../src/formatting/sqlContext';
+} from '../src/parsing/sqlContext';
 import {
 	formatSqlContent,
 	formatAsMultilineString,

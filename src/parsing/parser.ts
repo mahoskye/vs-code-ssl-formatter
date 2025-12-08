@@ -71,6 +71,18 @@ export class Parser {
             }
         }
 
+        // Close any remaining open blocks (e.g. Program, or unclosed CLASS)
+        if (this.tokens.length > 0) {
+            const lastLine = this.tokens[this.tokens.length - 1].line;
+            while (stack.length > 0) {
+                const node = stack.pop();
+                // Check if endLine is unset (0 is valid if start is 0, but endLine must be >= startLine)
+                if (node && (node.endLine === 0 || node.endLine <= node.startLine)) {
+                    node.endLine = lastLine;
+                }
+            }
+        }
+
         return root;
     }
 
@@ -112,8 +124,11 @@ export class Parser {
         // 1. Close current block (if valid and should pop)
         let activeNode = currentNode;
         if (shouldPop && stack.length > 1) {
-            stack.pop();
-            activeNode = stack[stack.length - 1];
+            const popped = stack.pop();
+            if (popped) {
+                popped.endLine = stmt.startLine - 1; // End before the middle keyword
+                activeNode = stack[stack.length - 1];
+            }
         }
 
         // 2. Add the middle statement (e.g. :ELSE) to the parent
@@ -138,8 +153,11 @@ export class Parser {
         // Standard pop
         let activeNode = currentNode;
         if (stack.length > 1) {
-            stack.pop();
-            activeNode = stack[stack.length - 1];
+            const popped = stack.pop();
+            if (popped) {
+                popped.endLine = stmt.endLine; // End at the closing keyword
+                activeNode = stack[stack.length - 1];
+            }
         }
 
         // Special handling for ENDCASE: It blindly closes the BEGINCASE block as well if we just popped a CASE block
@@ -152,8 +170,11 @@ export class Parser {
                 if (starter) {
                     const starterToken = this.getFirstSignificantToken(starter);
                     if (starterToken && this.getNormalizedText(starterToken) === 'BEGINCASE') {
-                        stack.pop();
-                        activeNode = stack[stack.length - 1];
+                        const popped = stack.pop();
+                        if (popped) {
+                            popped.endLine = stmt.endLine;
+                            activeNode = stack[stack.length - 1];
+                        }
                     }
                 }
             }

@@ -1,5 +1,5 @@
-import { Node, NodeType, Parser } from './parser';
-import { Lexer, TokenType } from './lexer';
+import { Node, NodeType, Parser } from '../parsing/parser';
+import { Lexer, TokenType } from '../parsing/lexer';
 import { SqlFormatter } from './sqlFormatter';
 import { WhitespaceManager } from './whitespaceManager';
 import { StatementPrinter } from './statementPrinter';
@@ -122,7 +122,7 @@ export class SSLFormatter {
      * and should be skipped for normal printing.
      */
     private handleVerticalWhitespace(prev: Node | undefined, current: Node): boolean {
-        if (!prev) {return false;}
+        if (!prev) { return false; }
 
         const lines = this.whitespaceManager.getVerticalWhitespace(prev, current);
         if (lines === -1) {

@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { looksLikeSql } from "./formatting/sqlContext";
+import { looksLikeSql } from "./parsing/sqlContext";
 
 /**
  * SSL Code Action Provider

@@ -1,4 +1,4 @@
-import { SqlToken, SqlTokenType } from './sqlLexer';
+import { SqlToken, SqlTokenType } from '../parsing/sqlLexer';
 import { SQL } from "../constants/sql";
 
 export interface ParenContext {

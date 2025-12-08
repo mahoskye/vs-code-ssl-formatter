@@ -1,8 +1,8 @@
 import * as vscode from "vscode";
 import { CONFIG_KEYS, CONFIG_DEFAULTS } from "../constants/config";
 import { SqlFormatter, SqlFormattingOptions } from "../formatting/sqlFormatter";
-import { SqlLexer } from "../formatting/sqlLexer";
-import { detectSqlContext, findSqlStringInLine, looksLikeSql } from "../formatting/sqlContext";
+import { SqlLexer } from "../parsing/sqlLexer";
+import { detectSqlContext, findSqlStringInLine, looksLikeSql } from "../parsing/sqlContext";
 import { formatSqlWithStyleImpl, SqlFormattingStyle } from "../formatting/legacySqlFormatter";
 
 /**

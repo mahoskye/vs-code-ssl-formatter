@@ -1,5 +1,5 @@
-import { Node, NodeType } from './parser';
-import { Token, TokenType } from './lexer';
+import { Node, NodeType } from '../parsing/parser';
+import { Token, TokenType } from '../parsing/lexer';
 import {
     BLOCK_START_KEYWORDS,
     BLOCK_END_KEYWORDS,

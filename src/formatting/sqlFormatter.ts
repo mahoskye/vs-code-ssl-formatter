@@ -1,6 +1,6 @@
 import { ALL_SQL_FUNCTIONS } from '../constants/language';
 import { SQL } from "../constants/sql";
-import { SqlToken, SqlTokenType } from './sqlLexer';
+import { SqlToken, SqlTokenType } from '../parsing/sqlLexer';
 import { SqlFormattingState } from './sqlFormattingState';
 
 export interface SqlFormattingOptions {
