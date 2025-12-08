@@ -12,12 +12,11 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
         'IF': 'ENDIF',
         'WHILE': 'ENDWHILE',
         'FOR': 'NEXT',
-
         'BEGINCASE': 'ENDCASE',
         'TRY': 'ENDTRY',
         'PROCEDURE': 'ENDPROC',
         'REGION': 'ENDREGION',
-        'CLASS': 'ENDCLASS',
+
         'BEGININLINE': 'ENDINLINE' // Assuming this exists or similar
     };
 
@@ -145,6 +144,12 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
             if (SSLFoldingProvider.BLOCK_PAIRS[keyword]) {
                 stack.push({ keyword, line: i });
             }
+            else if (keyword === 'CLASS') {
+                // Class extends to end of file (only one per file allowed)
+                // We push it, but it will never be popped by a matching END keyword.
+                // We will close it at the end of the loop.
+                stack.push({ keyword, line: i });
+            }
             // 2. Block Middle (Else, Case, etc.)
             else if (SSLFoldingProvider.MIDDLE_KEYWORDS[keyword]) {
                 // Check if top of stack is compatible to be closed/continued
@@ -153,13 +158,6 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
                     // Close previous section
                     foldingRanges.push(new vscode.FoldingRange(top.line, i - 1));
                     stack.pop();
-
-                    // IF we are closing a CASE/OTHERWISE to start another CASE/OTHERWISE, 
-                    // we need to make sure we don't pop the BEGINCASE parent accidentally? 
-                    // No, the logic "MIDDLE_KEYWORDS['CASE'] = ['BEGINCASE', 'CASE']" means:
-                    // If top is BEGINCASE, we DON'T pop it (wait, we should NOT pop BEGINCASE).
-                    // We only pop 'CASE' or 'OTHERWISE'. 
-                    // BUT 'CASE' is listed as valid *previous*. 
 
                     // Correction:
                     // If keyword is CASE:
@@ -176,13 +174,6 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
                     }
                     else if (keyword === 'ELSE' || keyword === 'CATCH' || keyword === 'FINALLY') {
                         // Standard mid-block: Close IF/TRY/CATCH, replace with ELSE/FINALLY
-                        // (Actually strictly speaking ELSE replaces IF on stack top?)
-                        // If we Pop IF and Push ELSE, then ENDIF matches ELSE?
-                        // We need ENDIF to close ELSE. 
-                        // Our BLOCK_PAIRS map for ENDIF is IF. So we need to map ELSE to IF? 
-                        // Or we can just change the stack entry type to ELSE, and make ENDIF close ELSE too?
-                        // Let's check BLOCK_PAIRS usage.
-
                         foldingRanges.push(new vscode.FoldingRange(top.line, i - 1));
                         stack.pop();
                         // Push new
@@ -195,45 +186,16 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
             // 3. Block End
             else {
                 // Check if it's an end keyword
-                // Reverse lookup in BLOCK_PAIRS? Or just specific map?
-                // Construct a reverse map or iterate
                 const startKeyword = Object.keys(SSLFoldingProvider.BLOCK_PAIRS).find(k => SSLFoldingProvider.BLOCK_PAIRS[k] === keyword);
 
                 if (startKeyword) {
-                    // We found an end keyword (e.g. ENDIF, which maps to start IF)
-                    // But wait, if we have ELSE on stack, ENDIF matches ELSE too?
-                    // We need to support that.
-
                     const top = stack.pop();
                     if (top) {
-                        // Validate matching? 
-                        // IF -> ELSE -> ENDIF. 
-                        // Stack: IF (pushed), ELSE (replaces IF? or pushes on top? logic above pushed on top)
-                        // If ELSE pushed on top: Stack = [IF, ELSE]. 
-                        // ENDIF pops ELSE. Matches? 
-
-                        // Let's adjust logic: 
-                        // IF pushes. 
-                        // ELSE pops IF, folds it, pushes ELSE. 
-                        // ENDIF pops ELSE, folds it. 
-                        // Done.
-                        // Wait, does 'ELSE' match 'ENDIF'? 
-                        // BLOCK_PAIRS['ELSE'] is undefined. 
-
-                        // We need to allow endpoints to close their specific middles.
-                        // ENDIF closes IF and ELSE. 
-                        // ENDTRY closes TRY, CATCH, FINALLY.
-
                         foldingRanges.push(new vscode.FoldingRange(top.line, i));
                     }
                 }
                 else if (keyword === 'ENDCASE') {
-                    // ENDCASE closes CASE, OTHERWISE, and BEGINCASE?
-                    // Similar to ENDIF. 
-                    // Stack could be [BEGINCASE, CASE, CASE...] -> No we pop siblings.
-                    // Stack: [BEGINCASE, CASE]. 
-                    // ENDCASE pops CASE (folds it), then pops BEGINCASE (folds it).
-
+                    // ENDCASE closes CASE, OTHERWISE, and BEGINCASE
                     let top = stack.pop();
                     while (top && (top.keyword === 'CASE' || top.keyword === 'OTHERWISE')) {
                         foldingRanges.push(new vscode.FoldingRange(top.line, i));
@@ -243,6 +205,18 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
                         foldingRanges.push(new vscode.FoldingRange(top.line, i));
                     }
                 }
+            }
+        }
+
+        // Close any remaining blocks at the end of the file (e.g. CLASS)
+        const lastLine = document.lineCount - 1;
+        while (stack.length > 0) {
+            const top = stack.pop();
+            if (top) {
+                // Only close CLASS or maybe other open blocks at EOF if appropriate
+                // For CLASS, yes. For others, maybe tolerance for syntax errors?
+                // Let's indiscriminately close for robustness.
+                foldingRanges.push(new vscode.FoldingRange(top.line, lastLine));
             }
         }
 

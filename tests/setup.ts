@@ -26,7 +26,9 @@ import {
 	MockWorkspaceConfiguration,
 	MockSnippetString,
 	MockCompletionItem,
-	MockCompletionItemKind
+	MockCompletionItemKind,
+	MockFoldingRange,
+	MockFoldingRangeKind
 } from './helpers/mockVSCode';
 
 // Create the mock vscode module
@@ -70,6 +72,8 @@ const mockVscode = {
 	EndOfLine: MockEndOfLine,
 	DiagnosticSeverity: MockDiagnosticSeverity,
 	Diagnostic: MockDiagnostic,
+	FoldingRange: MockFoldingRange,
+	FoldingRangeKind: MockFoldingRangeKind,
 	languages: {
 		createDiagnosticCollection(name: string): MockDiagnosticCollection {
 			return new MockDiagnosticCollection();
@@ -82,7 +86,7 @@ const mockVscode = {
 
 // Override require() to return our mock when 'vscode' is imported
 const originalRequire = Module.prototype.require;
-(Module.prototype.require as any) = function(id: string) {
+(Module.prototype.require as any) = function (id: string) {
 	if (id === 'vscode') {
 		return mockVscode;
 	}

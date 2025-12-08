@@ -594,6 +594,7 @@ export class MockCompletionItem {
 	) { }
 }
 
+
 export const MockCompletionItemKind = {
 	Keyword: 0,
 	Function: 1,
@@ -602,3 +603,18 @@ export const MockCompletionItemKind = {
 	Property: 4,
 	Snippet: 5
 } as const;
+
+export class MockFoldingRange {
+	constructor(
+		public start: number,
+		public end: number,
+		public kind?: MockFoldingRangeKind
+	) { }
+}
+
+export enum MockFoldingRangeKind {
+	Comment = 1,
+	Imports = 2,
+	Region = 3
+}
+

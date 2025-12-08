@@ -129,7 +129,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 
 		for (const line of lines) {
 			const trimmed = line.trim();
-			if (!trimmed) {continue;}
+			if (!trimmed) { continue; }
 
 			// Handle comments
 			if (inCommentBlock) {
@@ -174,7 +174,12 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 				continue;
 			}
 			if (/^\s*:ENDCLASS/i.test(codeLine)) {
-				currentClass = null;
+				// Should not happen if strictly one class per file to end, but if user types it, ignore or treat as end?
+				// User says "class declarations to the end of file". 
+				// So we generally assume class continues.
+				// However, maintaining ability to break out if user explicitly types invalid keyword might be good/bad?
+				// Let's remove it as it's invalid.
+				// currentClass = null; 
 			}
 
 			// 3. Variable Instantiation / Assignment

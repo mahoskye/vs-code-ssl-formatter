@@ -115,8 +115,7 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 				continue;
 			}
 
-			// :CLASS usually extends to end of file, but if we had :ENDCLASS? (SSL doesn't strictly require it usually implies file scope)
-			// But if we encounter another :CLASS, it implies logic (only if multiple classes allowed, which is rare in SSL).
+			// :CLASS extends to end of file as per language spec.
 			// We'll leave Class open until end of file usually.
 		}
 
