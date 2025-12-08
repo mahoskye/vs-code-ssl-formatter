@@ -2,13 +2,15 @@ import { describe, it } from 'mocha';
 import { expect } from 'chai';
 import {
 	looksLikeSql,
+	detectSqlContext
+} from '../src/formatting/sqlContext';
+import {
 	formatSqlContent,
 	formatAsMultilineString,
 	formatAsConcatenatedString,
-	detectSqlContext,
 	formatSqlWithStyleImpl,
 	SqlFormattingStyle
-} from '../src/commands/formatSql';
+} from '../src/formatting/legacySqlFormatter';
 describe('SQL Format Command - SQL Detection', () => {
 	it('should detect SELECT statements as SQL', () => {
 		expect(looksLikeSql('SELECT * FROM users')).to.be.true;

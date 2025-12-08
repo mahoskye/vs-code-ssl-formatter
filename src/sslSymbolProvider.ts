@@ -1,8 +1,10 @@
 import * as vscode from "vscode";
+import { PATTERNS } from "./constants/patterns";
 
 /**
  * SSL Document Symbol Provider
  * Provides symbols for outline view, breadcrumbs, and navigation
+ * Refactored to support nested scopes (stack-based).
  */
 export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 
@@ -10,169 +12,207 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 		document: vscode.TextDocument,
 		token: vscode.CancellationToken
 	): vscode.DocumentSymbol[] {
-		const symbols: vscode.DocumentSymbol[] = [];
 		const text = document.getText();
 		const lines = text.split("\n");
 
-		let currentProcedure: vscode.DocumentSymbol | null = null;
-		let currentRegion: vscode.DocumentSymbol | null = null;
-		let currentClass: vscode.DocumentSymbol | null = null;
+		// Root symbols
+		const rootSymbols: vscode.DocumentSymbol[] = [];
+
+		// Stack of active containers
+		const stack: vscode.DocumentSymbol[] = [];
 
 		for (let i = 0; i < lines.length; i++) {
+			if (token.isCancellationRequested) {
+				return [];
+			}
+
 			const line = lines[i];
 			const trimmed = line.trim();
-
-			// Match comment regions: /* region Name; or /*region Name;
-			const commentRegionMatch = trimmed.match(/^\/\*\s*region\s+(.+?);/i);
-			if (commentRegionMatch) {
-				const name = commentRegionMatch[1].trim();
-				const range = new vscode.Range(i, 0, i, line.length);
-				const selectionRange = new vscode.Range(i, line.indexOf(name), i, line.indexOf(name) + name.length);
-
-				currentRegion = new vscode.DocumentSymbol(
-					name,
-					"Region",
-					vscode.SymbolKind.Namespace,
-					range,
-					selectionRange
-				);
-
-				symbols.push(currentRegion);
+			if (!trimmed) {
 				continue;
 			}
 
-			// Match end of comment region: /* endregion; or /*endregion;
-			const commentEndRegionMatch = trimmed.match(/^\/\*\s*endregion/i);
-			if (commentEndRegionMatch && currentRegion) {
-				currentRegion.range = new vscode.Range(
-					currentRegion.range.start,
-					new vscode.Position(i, line.length)
+			// 1. Check for Block Starts
+
+			// :CLASS
+			const classMatch = trimmed.match(/^:CLASS\s+(\w+)/i);
+			if (classMatch) {
+				this.pushSymbol(
+					stack, rootSymbols,
+					classMatch[1], vscode.SymbolKind.Class,
+					i, line, "Class"
 				);
-				currentRegion = null;
 				continue;
 			}
 
-			// Match procedures
-			const procMatch = trimmed.match(/^:PROCEDURE\s+(\w+)/i);
-			if (procMatch) {
-				const name = procMatch[1];
-				const range = new vscode.Range(i, 0, i, line.length);
-				const selectionRange = new vscode.Range(i, line.indexOf(name), i, line.indexOf(name) + name.length);
-
-				currentProcedure = new vscode.DocumentSymbol(
-					name,
-					"",
-					vscode.SymbolKind.Function,
-					range,
-					selectionRange
+			// :PROCEDURE
+			const procMatch = trimmed.match(PATTERNS ? PATTERNS.PROCEDURE.DEFINITION : /^:PROCEDURE\s+(\w+)/i);
+			if (procMatch && procMatch[1]) {
+				this.pushSymbol(
+					stack, rootSymbols,
+					procMatch[1], vscode.SymbolKind.Function,
+					i, line, "Procedure"
 				);
+				continue;
+			}
 
-				if (currentClass) {
-					currentClass.children.push(currentProcedure);
-				} else if (currentRegion) {
-					currentRegion.children.push(currentProcedure);
-				} else {
-					symbols.push(currentProcedure);
+			// :REGION or /* region
+			let regionName: string | null = null;
+			const colonRegionRequest = trimmed.match(/^:REGION\s+(.+?)(;|$)/i);
+			if (colonRegionRequest) {
+				regionName = colonRegionRequest[1].trim();
+			} else {
+				const commentRegionMatch = trimmed.match(/^\/\*\s*region\s+(.+?)(;|$)/i);
+				if (commentRegionMatch) {
+					regionName = commentRegionMatch[1].trim();
 				}
-				continue;
 			}
 
-			// Match end of procedure
-			const endProcMatch = trimmed.match(/^:(ENDPROC|ENDPROCEDURE)\b/i);
-			if (endProcMatch && currentProcedure) {
-				currentProcedure.range = new vscode.Range(
-					currentProcedure.range.start,
-					new vscode.Position(i, line.length)
+			if (regionName) {
+				this.pushSymbol(
+					stack, rootSymbols,
+					regionName, vscode.SymbolKind.Namespace,
+					i, line, "Region"
 				);
-				currentProcedure = null;
 				continue;
 			}
 
-			// Match regions
-			const regionMatch = trimmed.match(/^:REGION\s+(.+?);/i);
-			if (regionMatch) {
-				const name = regionMatch[1].trim();
-				const range = new vscode.Range(i, 0, i, line.length);
-				const selectionRange = new vscode.Range(i, line.indexOf(name), i, line.indexOf(name) + name.length);
-
-				currentRegion = new vscode.DocumentSymbol(
-					name,
-					"",
-					vscode.SymbolKind.Namespace,
-					range,
-					selectionRange
-				);
-
-				symbols.push(currentRegion);
-				continue;
-			}
-
-			// Match end of region
-			const endRegionMatch = trimmed.match(/^:ENDREGION\b/i);
-			if (endRegionMatch && currentRegion) {
-				currentRegion.range = new vscode.Range(
-					currentRegion.range.start,
-					new vscode.Position(i, line.length)
-				);
-				currentRegion = null;
-				continue;
-			}
-
-			// Match variable declarations
-			const declareMatch = trimmed.match(/^:DECLARE\s+(.+?);/i);
+			// 2. Check for Variables (:DECLARE, :PARAMETERS)
+			// These are leaves, added to current container
+			const declareMatch = trimmed.match(/^:(DECLARE|PARAMETERS)\s+(.+?)(;|$)/i);
 			if (declareMatch) {
-				const vars = declareMatch[1].split(",").map(v => v.trim());
-				vars.forEach(varName => {
+				const isParam = declareMatch[1].toUpperCase() === "PARAMETERS";
+				const varsContext = declareMatch[2];
+				// Split by comma
+				const vars = varsContext.split(",").map(v => v.trim()).filter(v => v.length > 0);
+
+				vars.forEach(v => {
+					// Check if it has type info? e.g. "x AS INTEGER" (Not typical in generic SSL, usually just names)
+					// If v is "Name", easy.
 					const varSymbol = new vscode.DocumentSymbol(
-						varName,
-						"",
-						vscode.SymbolKind.Variable,
+						v,
+						isParam ? "Parameter" : "Variable",
+						isParam ? vscode.SymbolKind.Variable : vscode.SymbolKind.Variable, // Field? Property? 
 						new vscode.Range(i, 0, i, line.length),
-						new vscode.Range(i, line.indexOf(varName), i, line.indexOf(varName) + varName.length)
+						new vscode.Range(i, line.indexOf(v), i, line.indexOf(v) + v.length)
 					);
 
-					if (currentProcedure) {
-						currentProcedure.children.push(varSymbol);
-					} else if (currentClass) {
-						currentClass.children.push(varSymbol);
-					} else if (currentRegion) {
-						currentRegion.children.push(varSymbol);
-					} else {
-						symbols.push(varSymbol);
-					}
+					this.addToCurrent(stack, rootSymbols, varSymbol);
 				});
 				continue;
 			}
 
-			// Match classes
-			const classMatch = trimmed.match(/^:CLASS\s+(\w+)/i);
-			if (classMatch) {
-				// SSL supports one class per file, and it extends to end of file
-				const name = classMatch[1];
-				const range = new vscode.Range(i, 0, i, line.length);
-				const selectionRange = new vscode.Range(i, line.indexOf(name), i, line.indexOf(name) + name.length);
-
-				currentClass = new vscode.DocumentSymbol(
-					name,
-					"",
-					vscode.SymbolKind.Class,
-					range,
-					selectionRange
-				);
-
-				symbols.push(currentClass);
+			// 3. Check for Block Ends
+			const endProcMatch = trimmed.match(/^:(ENDPROC|ENDPROCEDURE)\b/i);
+			if (endProcMatch) {
+				this.popSymbol(stack, "Procedure", i, line.length);
 				continue;
+			}
+
+			const endRegionMatch = trimmed.match(/^:ENDREGION\b/i) || trimmed.match(/^\/\*\s*endregion/i);
+			if (endRegionMatch) {
+				this.popSymbol(stack, "Region", i, line.length);
+				continue;
+			}
+
+			// :CLASS usually extends to end of file, but if we had :ENDCLASS? (SSL doesn't strictly require it usually implies file scope)
+			// But if we encounter another :CLASS, it implies logic (only if multiple classes allowed, which is rare in SSL).
+			// We'll leave Class open until end of file usually.
+		}
+
+		// Close any remaining symbols at end of document
+		const lastLine = lines.length - 1;
+		const lastLen = lines[Math.max(0, lastLine)].length;
+		while (stack.length > 0) {
+			const sym = stack.pop()!;
+			sym.range = new vscode.Range(sym.range.start, new vscode.Position(lastLine, lastLen));
+		}
+
+		return rootSymbols;
+	}
+
+	private pushSymbol(
+		stack: vscode.DocumentSymbol[],
+		roots: vscode.DocumentSymbol[],
+		name: string,
+		kind: vscode.SymbolKind,
+		lineIndex: number,
+		lineText: string,
+		detail: string
+	) {
+		// Create with placeholder end range (current line end)
+		// We will update 'range' (full range) when popping.
+		// 'selectionRange' is the identifier.
+		const startPos = new vscode.Position(lineIndex, 0);
+		const endPos = new vscode.Position(lineIndex, lineText.length); // Placeholder
+		const nameIdx = lineText.indexOf(name);
+		const selStart = new vscode.Position(lineIndex, nameIdx >= 0 ? nameIdx : 0);
+		const selEnd = new vscode.Position(lineIndex, nameIdx >= 0 ? nameIdx + name.length : lineText.length);
+
+		const symbol = new vscode.DocumentSymbol(
+			name,
+			detail,
+			kind,
+			new vscode.Range(startPos, endPos),
+			new vscode.Range(selStart, selEnd)
+		);
+
+		this.addToCurrent(stack, roots, symbol);
+		stack.push(symbol);
+	}
+
+	private addToCurrent(stack: vscode.DocumentSymbol[], roots: vscode.DocumentSymbol[], symbol: vscode.DocumentSymbol) {
+		if (stack.length > 0) {
+			stack[stack.length - 1].children.push(symbol);
+		} else {
+			roots.push(symbol);
+		}
+	}
+
+	private popSymbol(stack: vscode.DocumentSymbol[], expectedDetail: string, lineIndex: number, lineLen: number) {
+		// We look for the nearest symbol of type 'expectedDetail' in the stack.
+		// If not found at top, we close intermediates?
+
+		// Find index of matching symbol (search from top)
+		let matchIdx = -1;
+		for (let j = stack.length - 1; j >= 0; j--) {
+			if (stack[j].detail === expectedDetail) {
+				matchIdx = j;
+				break;
 			}
 		}
 
-		// Close any remaining open class at end of file
-		if (currentClass) {
-			currentClass.range = new vscode.Range(
-				currentClass.range.start,
-				new vscode.Position(lines.length - 1, lines[lines.length - 1].length)
-			);
+		if (matchIdx !== -1) {
+			// Close everything from top down to match
+			while (stack.length > matchIdx) {
+				const sym = stack.pop()!;
+				// Update full range to include this closing line
+				sym.range = new vscode.Range(sym.range.start, new vscode.Position(lineIndex, lineLen));
+
+				// If we are popping something that ISN'T what we looked for (nested mismatch?),
+				// we still close it gracefully at this point.
+			}
+			// Logic above pops the match itself too (loop condition > matchIdx? No, we need to pop matchIdx too)
+			// Wait, while stack.length > matchIdx will pop [length-1] ... [matchIdx+1].
+			// We need to pop matchIdx as well.
+			// Ah, loop condition.
+			// Let's rewrite:
+
+			// Pop the specific one:
+			// But we can't leave orphans on stack if we skip them.
+			// We must close deeper scopes if we close outer scope?
+			// Yes.
+		} else {
+			// Unmatched close? Ignore.
 		}
 
-		return symbols;
+		// Re-implement correctly:
+		// If we found 'matchIdx', we want to pop everything from stack until we have popped that index.
+		if (matchIdx !== -1) {
+			while (stack.length > matchIdx) {
+				const sym = stack.pop()!;
+				sym.range = new vscode.Range(sym.range.start, new vscode.Position(lineIndex, lineLen));
+			}
+		}
 	}
 }

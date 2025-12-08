@@ -14,6 +14,8 @@ export const HUNGARIAN_PREFIXES = [
     "u"  // user-defined object
 ] as const;
 
+export type HungarianPrefix = typeof HUNGARIAN_PREFIXES[number];
+
 export const HUNGARIAN_EXCEPTIONS = [
     // Loop counters
     "i", "j", "k", "x", "y", "z",
@@ -46,8 +48,9 @@ export function hasValidHungarianNotation(name: string): boolean {
     const prefix = name[0].toLowerCase();
 
     // Check if first char is valid prefix and second char is uppercase
-    return HUNGARIAN_VALID_PREFIXES.has(prefix as typeof HUNGARIAN_PREFIXES[number]) &&
-           name[1] === name[1].toUpperCase();
+    // Cast strict type for Set lookup check
+    return HUNGARIAN_VALID_PREFIXES.has(prefix as HungarianPrefix) &&
+        name[1] === name[1].toUpperCase();
 }
 
 /**
@@ -59,7 +62,7 @@ export function getHungarianPrefixSuggestion(name: string): string {
     }
 
     const prefix = name[0].toLowerCase();
-    if (HUNGARIAN_VALID_PREFIXES.has(prefix as typeof HUNGARIAN_PREFIXES[number])) {
+    if (HUNGARIAN_VALID_PREFIXES.has(prefix as HungarianPrefix)) {
         return prefix;
     }
 
