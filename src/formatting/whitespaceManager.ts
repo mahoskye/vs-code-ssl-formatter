@@ -28,7 +28,7 @@ export class WhitespaceManager {
         }
 
         let res = 0;
-        // console.log(`WS check: ${prev.type}(${prevText}) -> ${curr.type}(${currText})`);
+
 
         // 1. Definition Blocks (PARAMETERS, DEFAULT, DECLARE)
         if (this.isDefinition(currToken) && this.isDefinition(prevToken)) {
