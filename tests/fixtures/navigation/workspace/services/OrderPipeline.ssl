@@ -12,5 +12,5 @@
     :DECLARE sSQL;
 
     sSQL := "SELECT OrderID FROM TOrders WHERE OrderID = ?";
-    RunSQL(sSQL, , , { nOrderId });
+    RunSQL(sSQL,, { nOrderId });
 :ENDPROC;

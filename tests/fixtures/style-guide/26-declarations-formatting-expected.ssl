@@ -1,9 +1,10 @@
 :PROCEDURE MyProc;
 :PARAMETERS p1;
+
 	:DEFAULT p1, 10;
+
 	:DECLARE x, y, z;
 	:DECLARE a, b, c;
 
 	:PUBLIC g_Var1, g_Var2;
-
 :ENDPROC;

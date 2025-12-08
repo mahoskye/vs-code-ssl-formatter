@@ -1,11 +1,7 @@
 :CLASS MyClass;
-  :INHERIT BaseClass;
-
+:INHERIT BaseClass;
 :DECLARE sName;
-
 :PROCEDURE Init;
-  :PARAMETERS name;
- sName := name;
+:PARAMETERS name;
+sName:=name;
 :ENDPROC;
-
-:ENDCLASS;

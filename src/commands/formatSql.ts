@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import { CONFIG_KEYS, CONFIG_DEFAULTS } from "../constants/config";
+import { SqlFormatter, SqlFormattingOptions } from "../formatting/sqlFormatter";
+import { SqlLexer } from "../formatting/sqlLexer";
 
 /**
  * SQL formatting style presets
@@ -129,6 +131,77 @@ export function registerFormatSqlCommand(context: vscode.ExtensionContext): void
 /**
  * Format SQL with a specific style
  */
+/**
+ * Context of the SQL to be formatted
+ */
+export interface SqlContext {
+	content: string;
+	quoteChar: string; // " or ' or [ or empty
+	prefix: string;    // Text to preserve before content (e.g. 'SqlExecute("')
+	suffix: string;    // Text to preserve after content (e.g. '")')
+	type: 'raw' | 'quoted' | 'function';
+}
+
+/**
+ * Detect the context of the SQL selection
+ */
+export function detectSqlContext(text: string): SqlContext {
+	const trimmed = text.trim();
+
+	// 1. Check for function call wrapper: Function("...")
+	// We support SqlExecute("..."), RunSQL("..."), etc.
+	// We handle simple case where the string is the first/only argument or at least clearly delimited.
+	const funcMatch = trimmed.match(/^(SqlExecute|RunSQL|LSearch|LSelect|LSelect1|LSelectC|GetDataSet|GetNetDataSet)\s*\(\s*(["'])([\s\S]*)\2\s*\);?$/i);
+	if (funcMatch) {
+		const funcName = funcMatch[1];
+		const quote = funcMatch[2];
+		const innerContent = funcMatch[3];
+		const prefix = text.substring(0, text.indexOf(innerContent));
+		const suffix = text.substring(text.lastIndexOf(innerContent) + innerContent.length);
+		return {
+			content: innerContent,
+			quoteChar: quote,
+			prefix: prefix,
+			suffix: suffix,
+			type: 'function'
+		};
+	}
+
+	// 2. Check for quoted string: "..." or '...' or [...]
+	const stringMatch = trimmed.match(/^((["'\[])([\s\S]*)(["'\]]))$/);
+	if (stringMatch) {
+		const fullMatch = stringMatch[1];
+		const quote = stringMatch[2];
+		const content = stringMatch[3];
+		// ensure close quote matches open/bracket
+		const close = stringMatch[4];
+		if ((quote === '[' && close === ']') || (quote !== '[' && quote === close)) {
+			// Preserve whitespace around the quotes if selection had it?
+			const prefix = text.substring(0, text.indexOf(content));
+			const suffix = text.substring(text.lastIndexOf(content) + content.length);
+			return {
+				content: content,
+				quoteChar: quote,
+				prefix: prefix,
+				suffix: suffix,
+				type: 'quoted'
+			};
+		}
+	}
+
+	// 3. Raw SQL
+	return {
+		content: text,
+		quoteChar: '',
+		prefix: '',
+		suffix: '',
+		type: 'raw'
+	};
+}
+
+/**
+ * Format SQL with a specific style
+ */
 async function formatSqlWithStyle(style: SqlFormattingStyle): Promise<void> {
 	const editor = vscode.window.activeTextEditor;
 	if (!editor) {
@@ -146,15 +219,36 @@ async function formatSqlWithStyle(style: SqlFormattingStyle): Promise<void> {
 		CONFIG_KEYS.FORMAT_SQL_KEYWORD_CASE,
 		CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_SQL_KEYWORD_CASE]
 	) || "upper";
-	const indentSpaces = config.get<number>(
-		CONFIG_KEYS.FORMAT_SQL_INDENT_SPACES,
-		CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_SQL_INDENT_SPACES]
-	) || 4;
+
+	// Resolve indentation settings
+	let indentSpaces = 4;
+	let indentString = "    ";
+
+	// Check if user explicitly set indentation settings in config
+	const inspectIndent = config.inspect<number>(CONFIG_KEYS.FORMAT_SQL_INDENT_SPACES);
+	const explicitIndent = inspectIndent && (inspectIndent.globalValue !== undefined || inspectIndent.workspaceValue !== undefined || inspectIndent.workspaceFolderValue !== undefined);
+
+	if (explicitIndent) {
+		indentSpaces = config.get<number>(CONFIG_KEYS.FORMAT_SQL_INDENT_SPACES) || 4;
+		indentString = " ".repeat(indentSpaces);
+	} else {
+		// specific indent not set, use editor settings
+		if (editor.options.insertSpaces) {
+			indentSpaces = Number(editor.options.tabSize) || 4;
+			indentString = " ".repeat(indentSpaces);
+		} else {
+			indentSpaces = Number(editor.options.tabSize) || 4; // fallback for calculation
+			indentString = "\t";
+		}
+	}
+
+	const wrapLength = config.get<number>(CONFIG_KEYS.FORMAT_WRAP_LENGTH, 90);
 
 	// Get selection or current line
 	let selection = editor.selection;
 	let text: string;
 	let targetRange: vscode.Range;
+	let baseIndentColumn = 0;
 
 	if (selection.isEmpty) {
 		// No selection - try to find SQL string on current line
@@ -168,27 +262,33 @@ async function formatSqlWithStyle(style: SqlFormattingStyle): Promise<void> {
 
 		targetRange = sqlRange.range;
 		text = sqlRange.content;
+		baseIndentColumn = sqlRange.range.start.character;
 	} else {
 		// Use selection
 		targetRange = selection;
 		text = editor.document.getText(selection);
+
+		// If multiline selection, adjust base indent from first line
+		const startLine = editor.document.lineAt(selection.start.line);
+		baseIndentColumn = startLine.firstNonWhitespaceCharacterIndex;
 	}
 
-	// Extract content from string literal if it's a string
-	const stringMatch = text.match(/^(["'\[])([\s\S]*)(["'\]])$/);
-	let sqlContent: string;
-	let quoteChar: string;
-	let isStringLiteral = false;
+	// Detect Context
+	const contextStr = detectSqlContext(text);
+	const sqlContent = contextStr.content;
+	const isStringLiteral = contextStr.type === 'quoted' || contextStr.type === 'function';
+	// If we are printing raw SQL, we use "" as quote char to tell formatter NOT to wrap it.
+	// However, if we are inside a function/quote, we format the content ONLY, then wrap it ourselves with prefix/suffix.
+	// So we pass quoteChar="" to formatter always?
+	// Wait, SqlFormatter.formatSqlTokens uses quoteChar to determine if it should escape quotes inside?
+	// And uses it as the wrapper.
+	// If I pass "", it might not escape embedded quotes correctly?
+	// If the input was "It's" and I format it, does it escape 's?
+	// No, SqlLexer reads string. SqlFormatter prints string.
+	// If I pass quoteChar='', result is unquoted.
 
-	if (stringMatch) {
-		quoteChar = stringMatch[1];
-		sqlContent = stringMatch[2];
-		isStringLiteral = true;
-	} else {
-		// Check if it's just SQL content without quotes
-		sqlContent = text;
-		quoteChar = '"';
-	}
+	// We want the formatted SQL content unquoted, then we stitch it back.
+	const formatterQuoteChar = "";
 
 	// Check if content looks like SQL
 	if (!looksLikeSql(sqlContent)) {
@@ -196,29 +296,81 @@ async function formatSqlWithStyle(style: SqlFormattingStyle): Promise<void> {
 		return;
 	}
 
-	// Format the SQL with the selected style
-	const formattedSql = formatSqlWithStyleImpl(sqlContent, style, keywordCase, indentSpaces);
+	let formattedSql: string;
 
-	// Wrap in quotes if it was a string literal
-	let formattedOutput: string;
-	if (isStringLiteral) {
-		const closeQuote = quoteChar === '[' ? ']' : quoteChar;
-		formattedOutput = `${quoteChar}${formattedSql}${closeQuote}`;
+	// Use robust formatting engine for default style (canonicalCompact)
+	if (style === "canonicalCompact") {
+		const options: SqlFormattingOptions = {
+			wrapLength: wrapLength,
+			insertSpaces: editor.options.insertSpaces as boolean, // respect editor settings
+			tabSize: Number(editor.options.tabSize) || 4,
+			keywordCase: keywordCase as any,
+			indentSpaces: explicitIndent ? indentSpaces : undefined, // pass undefined to let formatter use tabs if applicable
+			style: style
+		};
+
+		const formatter = new SqlFormatter(options);
+		const lexer = new SqlLexer(sqlContent);
+		const tokens = lexer.tokenize();
+		// Note: formatSqlTokens expects tokens, quoteChar, baseIndentCol.
+		// It returns startChar + formatted + endChar.
+		// We stripped quotes above, so we pass quoteChar to formatter which will add them back.
+		// Wait, formatSqlTokens adds quotes BACK.
+		// But lower down we handle quotes ourselves.
+		// formatSqlTokens signature: (tokens, startChar, baseIndentColumn, baseIndentStr)
+		// It returns string WITH quotes.
+
+		// Use the base indentation of the line where selection starts
+		// Ideally we want the indentation of the line...
+		// If selection.start.character is > 0, we can guess.
+
+		// Format tokens without forced quotes
+		formattedSql = formatter.formatSqlTokens(tokens, formatterQuoteChar, baseIndentColumn);
 	} else {
-		formattedOutput = formattedSql;
+		// Use legacy implementation for other styles
+		// Pass indentString instead of just number
+		formattedSql = formatSqlWithStyleImpl(sqlContent, style, keywordCase, indentSpaces, wrapLength, indentString);
+		// formatSqlWithStyleImpl returns UNQUOTED sql.
+	}
+
+	// Reconstruction
+	// For legacy styles, `formattedSql` is raw.
+	// For canonical, `formattedSql` is raw (due to quoteChar="").
+
+	// We must re-assemble: prefix + formatted + suffix.
+
+	// One catch: `formatSqlTokens` logic for `canonicalCompact` MIGHT add indentation relative to baseIndentColumn?
+	// If so, `formattedSql` has indent.
+
+	// If I select `SqlExecute("select...")`, prefix is `SqlExecute("`.
+	// It ends at some column.
+	// If formatted SQL starts on new line, it should indent relative to baseIndentColumn?
+	// Or relative to where it starts?
+
+	// If `isComplex` (in formatSqlTokens) is true, it starts with `\n` + baseIndent.
+	// So `prefix` + `\n` + baseIndent + content...
+	// That looks correct.
+
+	if (contextStr.type === 'quoted' || contextStr.type === 'function') {
+		formattedSql = contextStr.prefix + formattedSql + contextStr.suffix;
+	} else {
+		// Raw SQL. Just return formatted.
+		// But what if formattedSql has newlines and we selected a partial line?
+		// Typically raw SQL selection replaces the whole block.
+		formattedSql = formattedSql;
 	}
 
 	// Apply the edit
 	// Preserve trailing newline if it existed in the original selection
-	if (text.endsWith('\n') && !formattedOutput.endsWith('\n')) {
-		formattedOutput += '\n';
-	} else if (text.endsWith('\r\n') && !formattedOutput.endsWith('\r\n')) {
-		formattedOutput += '\r\n';
+	if (text.endsWith('\n') && !formattedSql.endsWith('\n')) {
+		formattedSql += '\n';
+	} else if (text.endsWith('\r\n') && !formattedSql.endsWith('\r\n')) {
+		formattedSql += '\r\n';
 	}
 
 	// Apply the edit
 	await editor.edit(editBuilder => {
-		editBuilder.replace(targetRange, formattedOutput);
+		editBuilder.replace(targetRange, formattedSql);
 	});
 
 	vscode.window.showInformationMessage(`SQL formatted with ${STYLE_DISPLAY_NAMES[style]} style.`);
@@ -288,13 +440,21 @@ export function formatSqlWithStyleImpl(
 	style: SqlFormattingStyle,
 	keywordCase: string,
 	indentSpaces: number,
-	wrapLength: number = 0
+	wrapLength: number = 0,
+	indentString?: string
 ): string {
-	// Normalize the SQL first
-	let sql = content.replace(/\r\n/g, "\n").trim();
-	if (!sql) {
-		return content.trim();
-	}
+	const effectiveIndentString = indentString ?? " ".repeat(indentSpaces);
+	// Handle single-line comments in content (preserve them?)
+	// The parsing logic might strip them or break.
+	// We want to process valid SQL.
+
+	// Step 0: Extract strings and params to protect them?
+	// Actually, the new SqlFormatter handles tokenization safely.
+	let sql = content;
+
+	// Clean up initial/trailing whitespace
+	sql = sql.trim();
+	if (sql.length === 0) { return ""; }
 
 	// Collapse multiple whitespace to single space
 	sql = sql.replace(/\s+/g, " ");
@@ -460,21 +620,21 @@ export function formatSqlWithStyleImpl(
 	// Format based on style
 	switch (style) {
 		case "compact":
-			return formatCompactStyle(sql, keywordCase, indentSpaces);
+			return formatCompactStyle(sql, keywordCase, effectiveIndentString);
 		case "canonicalCompact":
-			return formatCanonicalCompactStyle(sql, keywordCase, indentSpaces, wrapLength);
+			return formatCanonicalCompactStyle(sql, keywordCase, effectiveIndentString, wrapLength);
 		case "expanded":
-			return formatExpandedStyle(sql, keywordCase, indentSpaces);
+			return formatExpandedStyle(sql, keywordCase, effectiveIndentString);
 		case "hangingOperators":
-			return formatHangingOperatorsStyle(sql, keywordCase, indentSpaces);
+			return formatHangingOperatorsStyle(sql, keywordCase, effectiveIndentString);
 		case "knr":
-			return formatKnrStyle(sql, keywordCase, indentSpaces, false);
+			return formatKnrStyle(sql, keywordCase, effectiveIndentString, false);
 		case "knrCompact":
-			return formatKnrStyle(sql, keywordCase, indentSpaces, true);
+			return formatKnrStyle(sql, keywordCase, effectiveIndentString, true);
 		case "ormFriendly":
-			return formatOrmFriendlyStyle(sql, keywordCase, indentSpaces);
+			return formatOrmFriendlyStyle(sql, keywordCase, effectiveIndentString);
 		default:
-			return formatCompactStyle(sql, keywordCase, indentSpaces);
+			return formatCompactStyle(sql, keywordCase, effectiveIndentString);
 	}
 }
 
@@ -482,8 +642,8 @@ export function formatSqlWithStyleImpl(
  * Compact Style - Single-line clauses
  * SELECT u.id, u.name FROM users u WHERE u.active = 1 AND u.deleted_at IS NULL
  */
-function formatCompactStyle(sql: string, keywordCase: string, indentSpaces: number): string {
-	const indent = " ".repeat(indentSpaces);
+function formatCompactStyle(sql: string, keywordCase: string, indentString: string): string {
+	const indent = indentString;
 
 	// Break at major clause keywords
 	SQL_CLAUSE_KEYWORDS.forEach(keyword => {
@@ -512,8 +672,8 @@ function formatCompactStyle(sql: string, keywordCase: string, indentSpaces: numb
  * WHERE
  *     u.active = 1
  */
-function formatExpandedStyle(sql: string, keywordCase: string, indentSpaces: number): string {
-	const indent = " ".repeat(indentSpaces);
+function formatExpandedStyle(sql: string, keywordCase: string, indentString: string): string {
+	const indent = indentString;
 
 	// Parse SELECT columns
 	const selectMatch = sql.match(/^(SELECT\s+(?:DISTINCT\s+)?)(.*?)(?=\s+FROM\b)/i);
@@ -572,10 +732,10 @@ function formatExpandedStyle(sql: string, keywordCase: string, indentSpaces: num
  * GROUP BY u.id, u.name, u.email
  * ORDER BY order_count DESC;
  */
-function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpaces: number, wrapLength: number = 0): string {
+function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentString: string, wrapLength: number = 0): string {
 	let result = sql;
 	const columnAlignIndent = 7; // "SELECT " length for column continuation alignment
-	const hangingIndent = indentSpaces; // For ON, AND, OR (use configured indent)
+	const hangingIndent = indentString; // For ON, AND, OR (use configured indent)
 
 	// Format SELECT with columns on same line where possible
 	// Use manual scanning to find the FROM clause to avoid stopping at nested FROMs
@@ -737,7 +897,7 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 		}
 
 		const isCaseKeyword = ["CASE", "WHEN", "ELSE", "END"].includes(keyword);
-		const prefixSpace = isCaseKeyword ? " ".repeat(indentSpaces) : "";
+		const prefixSpace = isCaseKeyword ? indentString : "";
 
 		if (keyword === "CASE") {
 			// Detect CASE with optional parenthesis prefix (CASE
@@ -760,7 +920,7 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 		} else {
 			const caseRegex = new RegExp(`([\\s(]+)(${pattern})\\b`, "gi");
 			result = result.replace(caseRegex, (match, prefix, clause) => {
-				if (prefix.includes('\n')) {return match;}
+				if (prefix.includes('\n')) { return match; }
 
 				if (prefix.includes('(')) {
 					const lastParenIndex = prefix.lastIndexOf('(');
@@ -780,7 +940,7 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 	result = result.replace(setRegex, (match, setKw, content, lookahead) => {
 		const assignments = parseColumns(content);
 		if (assignments.length > 0) {
-			const indent = " ".repeat(indentSpaces); // Indent for assignments
+			const indent = indentString; // Indent for assignments
 			const formattedAssignments = assignments.map(a => indent + a.trim());
 
 			// Result: SET \n    col1=val1,\n    col2=val2
@@ -793,8 +953,8 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 	 * Helper to wrap comma-separated list of items
 	 */
 	function wrapSqlList(items: string[], indent: string, wrapLength: number): string {
-		if (items.length === 0) {return "";}
-		if (wrapLength <= 0) {return indent + items.join(", ");} // No wrapping
+		if (items.length === 0) { return ""; }
+		if (wrapLength <= 0) { return indent + items.join(", "); } // No wrapping
 
 		let currentLine = indent;
 		const lines: string[] = [];
@@ -841,7 +1001,9 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 			// But wrapSqlList needs to know availability.
 			// Assume 4 spaces indent will be added by post-process.
 			const wrapIndentVal = 0; // wrapSqlList generates clean lines, post-process adds indent
-			const effectiveWrap = wrapLength > 0 ? Math.max(20, wrapLength - indentSpaces) : 0;
+			// Estimate indent length from string length if possible, otherwise default to 4 for calculation
+			const indentLen = indentString.indexOf('\t') !== -1 ? 4 : indentString.length;
+			const effectiveWrap = wrapLength > 0 ? Math.max(20, wrapLength - indentLen) : 0;
 
 			// wrapSqlList should just return lines without indent prefix if we pass ""
 			const wrappedCols = wrapSqlList(columns, "", effectiveWrap);
@@ -870,7 +1032,8 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 				const innerVals = valuesContent.replace(/^\s*\(\s*/, '').replace(/\s*\)\s*$/, '');
 				const vals = parseColumns(innerVals);
 
-				const effectiveWrap = wrapLength > 0 ? Math.max(20, wrapLength - indentSpaces) : 0;
+				const indentLen = indentString.indexOf('\t') !== -1 ? 4 : indentString.length;
+				const effectiveWrap = wrapLength > 0 ? Math.max(20, wrapLength - indentLen) : 0;
 				const wrappedVals = wrapSqlList(vals, "", effectiveWrap);
 
 				contentBlock = `\n${applySqlKeywordCase("VALUES", keywordCase, "VALUES")}\n(\n${wrappedVals}\n)`;
@@ -885,8 +1048,9 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 
 			// If formatting SELECT, we should wrap the list.
 			// But unlike VALUES, we need manual indentation because there are no parens to trigger post-process indent.
-			const indent = " ".repeat(indentSpaces);
-			const effectiveWrap = wrapLength > 0 ? Math.max(20, wrapLength - indentSpaces) : 0;
+			const indent = indentString;
+			const indentLen = indentString.indexOf('\t') !== -1 ? 4 : indentString.length;
+			const effectiveWrap = wrapLength > 0 ? Math.max(20, wrapLength - indentLen) : 0;
 
 			// We parseColumns just like values.
 			// Note: SELECT list might contain function calls with parens, parseColumns handles that.
@@ -909,13 +1073,13 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 	// Move ON conditions to their own indented line after JOIN
 	result = result.replace(/((?:INNER |LEFT |RIGHT |FULL )?JOIN[^\n]*?)\s+ON\s+(.+?)(?=\n|$)/gi,
 		(_match, joinPart, condition) => {
-			return `${joinPart}\n${" ".repeat(hangingIndent)}${applySqlKeywordCase("ON", keywordCase, "ON")} ${condition.trim()}`;
+			return `${joinPart}\n${hangingIndent}${applySqlKeywordCase("ON", keywordCase, "ON")} ${condition.trim()}`;
 		}
 	);
 
 	// Handle AND/OR with hanging indent (no change needed)
 	result = result.replace(/\s+(AND)\s+/gi, (_match, op) => {
-		return `\n${" ".repeat(hangingIndent)}${applySqlKeywordCase("AND", keywordCase, op)} `;
+		return `\n${hangingIndent}${applySqlKeywordCase("AND", keywordCase, op)} `;
 	});
 
 	result = result.replace(/\s+(OR)\s+/gi, (_match, op) => {
@@ -990,7 +1154,7 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 			// Find split point
 			for (let j = 0; j < masked.length; j++) {
 				const char = masked[j];
-				if (char === '(') {balance++;}
+				if (char === '(') { balance++; }
 				else if (char === ')') {
 					balance--;
 					if (balance < 0) {
@@ -1024,7 +1188,6 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 
 	const lines = processedResult.split('\n');
 	let currentDepth = 0;
-	const subqueryIndent = " ".repeat(indentSpaces); // Matches basic indent
 	// Track whether each level's opening ( had content before it
 	// Stack to track the indentation of open blocks
 	const indentStack: number[] = [];
@@ -1083,7 +1246,18 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 			const parentIndent = indentStack[effectiveDepth - 1] || 0;
 
 			// Content: indent + 4 from parent
-			thisLineIndentCount = parentIndent + indentSpaces;
+			// We need to add ONE level of indentation. 
+			// If we are using spaces, we add indentSpaces.
+			// If we are using indentString (which is one level), we add its length?
+			// But indentStack stores counts (numbers).
+
+			// We need to resolve indentString to a count if possible, or just assume 4 if it's tabs?
+			// The original code used indentStack numbers.
+			// If we switched to strict "indentString" passing, we lose the "count" ability for complex nesting if we mix things?
+			// But indentStack seems to store LENGTHS.
+
+			const indentLen = indentString.indexOf('\t') !== -1 ? 4 : indentString.length;
+			thisLineIndentCount = parentIndent + indentLen;
 
 			thisLineIndentString = " ".repeat(thisLineIndentCount);
 		}
@@ -1145,7 +1319,7 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
 		currentDepth += netChange;
 
 		// Ensure non-negative depth
-		if (currentDepth < 0) {currentDepth = 0;}
+		if (currentDepth < 0) { currentDepth = 0; }
 
 		return thisLineIndentString + extraIndent + trimmed;
 	});
@@ -1159,8 +1333,8 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentSpa
  *   AND u.deleted_at IS NULL
  *   OR u.deleted_at > NOW()
  */
-function formatHangingOperatorsStyle(sql: string, keywordCase: string, indentSpaces: number): string {
-	const indent = " ".repeat(indentSpaces);
+function formatHangingOperatorsStyle(sql: string, keywordCase: string, indentString: string): string {
+	const indent = indentString;
 	const hangingIndent = "  "; // 2 spaces for hanging operators
 
 	// Break at major clause keywords
@@ -1188,8 +1362,8 @@ function formatHangingOperatorsStyle(sql: string, keywordCase: string, indentSpa
 /**
  * ORM-Friendly Style - Inline JOINs, hanging logical operators
  */
-function formatOrmFriendlyStyle(sql: string, keywordCase: string, indentSpaces: number): string {
-	const indent = " ".repeat(indentSpaces);
+function formatOrmFriendlyStyle(sql: string, keywordCase: string, indentString: string): string {
+	const indent = indentString;
 	const hangingIndent = "  ";
 	let result = sql;
 
@@ -1243,8 +1417,8 @@ function formatOrmFriendlyStyle(sql: string, keywordCase: string, indentSpaces: 
  *     )
  * )
  */
-function formatKnrStyle(sql: string, keywordCase: string, indentSpaces: number, compactSelect: boolean): string {
-	const indent = " ".repeat(indentSpaces);
+function formatKnrStyle(sql: string, keywordCase: string, indentString: string, compactSelect: boolean): string {
+	const indent = indentString;
 
 	// Parse SELECT columns
 	const selectMatch = sql.match(/^(SELECT\s+(?:DISTINCT\s+)?)(.*?)(?=\s+FROM\b)/i);
@@ -1404,7 +1578,8 @@ function applySqlKeywordCase(keyword: string, style: string, original: string): 
 
 // Legacy exports for backward compatibility with tests
 export function formatSqlContent(content: string, keywordCase: string, indentSpaces: number): string {
-	return formatSqlWithStyleImpl(content, "compact", keywordCase, indentSpaces);
+	const indentString = " ".repeat(indentSpaces);
+	return formatSqlWithStyleImpl(content, "compact", keywordCase, indentSpaces, 0, indentString);
 }
 
 export function formatAsMultilineString(sql: string, quoteChar: string, wasStringLiteral: boolean): string {

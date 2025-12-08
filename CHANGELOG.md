@@ -5,6 +5,33 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-12-08
+
+### Added
+
+#### Core Architecture
+- **Tree-sitter Grammar**: Introduced a robust Tree-sitter based grammar for potentially more accurate parsing and syntax highlighting (internal).
+- **SSL Style Guide**: Added comprehensive integration with the SSL Style Guide, providing stricter validation and formatting rules.
+
+#### SQL Formatter
+- **Dedicated SQL Engine**: Implemented a dedicated SQL formatting engine capable of complex indentation, subquery alignment, and handling of various SQL dialects (Oracle/SQL Server style nuances).
+- **Advanced Wrapping**: Improved line wrapping for complex SQL statements, including correct handling of `VALUES` lists, `INSERT` columns, and string concatenations.
+
+### Fixed
+
+#### Document Formatter & Tests
+- **Comment Syntax Validation**: Updated test fixtures to strictly enforce standard SSL block comment syntax (`/* ... ;`) and removed conflicting legacy test cases.
+- **Test Harness Restoration**: Repaired corrupted structure in `tests/formatter.test.ts` to ensure complete coverage of comment and style guide fixtures.
+- **Project Hygiene**: Resolved ESLint warnings in formatter logic.
+
+#### Formatting Refinements
+- **Comprehensive Fixes**: Verified and finalized fixes for reported regressions:
+  - Array bracket parsing and alignment
+  - proper parameter list wrapping
+  - SQL `UPDATE` and `INSERT` statement indentation
+  - Logical operator spacing matches
+
+
 ## [1.2.5] - 2025-12-05
 
 ### Fixed

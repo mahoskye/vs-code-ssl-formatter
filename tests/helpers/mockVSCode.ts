@@ -4,7 +4,7 @@
  */
 
 export class MockPosition {
-	constructor(public line: number, public character: number) {}
+	constructor(public line: number, public character: number) { }
 
 	isAfter(other: MockPosition): boolean {
 		if (this.line > other.line) return true;
@@ -27,7 +27,7 @@ export class MockRange {
 	constructor(
 		public start: MockPosition,
 		public end: MockPosition
-	) {}
+	) { }
 
 	contains(positionOrRange: MockPosition | MockRange): boolean {
 		if (positionOrRange instanceof MockPosition) {
@@ -45,7 +45,7 @@ export class MockTextLine {
 	constructor(
 		public text: string,
 		public lineNumber: number
-	) {}
+	) { }
 
 	get range(): MockRange {
 		return new MockRange(
@@ -72,7 +72,7 @@ export class MockTextLine {
 }
 
 export class MockUri {
-	constructor(public fsPath: string) {}
+	constructor(public fsPath: string) { }
 
 	static file(path: string): MockUri {
 		return new MockUri(path);
@@ -216,7 +216,7 @@ export class MockTextEdit {
 	constructor(
 		public range: MockRange,
 		public newText: string
-	) {}
+	) { }
 
 	static replace(range: MockRange, newText: string): MockTextEdit {
 		return new MockTextEdit(range, newText);
@@ -235,7 +235,7 @@ export class MockLocation {
 	constructor(
 		public uri: MockUri,
 		public range: MockRange
-	) {}
+	) { }
 }
 
 export class MockWorkspaceEdit {
@@ -286,7 +286,7 @@ export class MockHover {
 	constructor(
 		public contents: MockMarkdownString,
 		public range?: MockRange
-	) {}
+	) { }
 }
 
 export class MockEventEmitter<T = void> {
@@ -319,7 +319,7 @@ export class MockInlayHint {
 		public position: MockPosition,
 		public label: string,
 		public kind?: number
-	) {}
+	) { }
 }
 
 export const MockInlayHintKind = {
@@ -343,6 +343,28 @@ export class MockWorkspaceConfiguration {
 				this.values.set(key, value);
 			});
 		}
+	}
+
+	inspect<T>(key: string): { key: string; defaultValue?: T; globalValue?: T; workspaceValue?: T; workspaceFolderValue?: T; defaultLanguageValue?: T; globalLanguageValue?: T; workspaceLanguageValue?: T; workspaceFolderLanguageValue?: T; languageIds?: string[]; } | undefined {
+		// Mock implementation: treat current values as workspace values
+		// We need to resolve the full key similarly to get()
+		const fullKey = `${this.section}.${key}`;
+		let val = this.values.get(fullKey);
+		if (val === undefined && this.values.has(key)) {
+			val = this.values.get(key);
+		}
+
+		if (val === undefined) {
+			return undefined;
+		}
+
+		return {
+			key,
+			defaultValue: undefined,
+			globalValue: undefined,
+			workspaceValue: val as T,
+			workspaceFolderValue: undefined
+		};
 	}
 
 	get<T>(key: string, defaultValue?: T): T {
@@ -380,7 +402,7 @@ export class MockDiagnostic {
 		public range: MockRange,
 		public message: string,
 		public severity: MockDiagnosticSeverity = MockDiagnosticSeverity.Error
-	) {}
+	) { }
 
 	public code?: string | number;
 	public source?: string;
@@ -544,12 +566,12 @@ export class MockDocumentSymbol {
 		public detail: string,
 		public kind: MockSymbolKind,
 		public range: MockRange,
-	public selectionRange: MockRange
-	) {}
+		public selectionRange: MockRange
+	) { }
 }
 
 export class MockSnippetString {
-	constructor(public value: string) {}
+	constructor(public value: string) { }
 }
 
 export class MockCompletionItem {
@@ -561,7 +583,7 @@ export class MockCompletionItem {
 	constructor(
 		public label: string,
 		public kind?: number
-	) {}
+	) { }
 }
 
 export const MockCompletionItemKind = {

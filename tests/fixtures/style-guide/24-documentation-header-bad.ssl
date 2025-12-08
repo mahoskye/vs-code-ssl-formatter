@@ -4,4 +4,5 @@
 * Parameters: x - indent check
 ;
 :PROCEDURE MyProc;
+:PARAMETERS x;
 :ENDPROC;

@@ -355,7 +355,7 @@ export class StatementPrinter {
                 }
 
                 // Limit lookahead depth to avoid perf hit on massive lines? 
-                if (j - i > 20) break;
+                if (j - i > 20) {break;}
             }
         }
 
@@ -391,8 +391,8 @@ export class StatementPrinter {
 
                 while (k < tokens.length && fundepth > 0) {
                     const nextFun = tokens[k];
-                    if (nextFun.text === '(') fundepth++;
-                    else if (nextFun.text === ')') fundepth--;
+                    if (nextFun.text === '(') {fundepth++;}
+                    else if (nextFun.text === ')') {fundepth--;}
 
                     lookAheadFun += this.getEffectiveTokenLength(nextFun.text);
                     if (this.shouldAddSpace(prevFun, nextFun)) { lookAheadFun += 1; }
@@ -410,7 +410,7 @@ export class StatementPrinter {
                         return true;
                     }
                     // Limit scan
-                    if (k - i > 60) break;
+                    if (k - i > 60) {break;}
                 }
             } // Close L315
         } // Close L314
@@ -449,7 +449,7 @@ export class StatementPrinter {
                 if (currentLineLen + lookAheadLen > maxLineLen) { return true; }
 
                 // Safety limit
-                if (j - i > 50) break;
+                if (j - i > 50) {break;}
             }
         }
 

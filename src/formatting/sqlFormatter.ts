@@ -108,15 +108,15 @@ export class SqlFormatter {
 
                     while (j < tokens.length && depth > 0) {
                         const tok = tokens[j];
-                        if (tok.text === '(') depth++;
+                        if (tok.text === '(') {depth++;}
                         else if (tok.text === ')') {
                             depth--;
-                            if (depth === 0) break;
+                            if (depth === 0) {break;}
                         }
 
                         if (tok.text === ',' && depth === 1) {
                             // End of item
-                            if (currentItem.trim()) items.push(currentItem.trim());
+                            if (currentItem.trim()) {items.push(currentItem.trim());}
                             currentItem = '';
                         } else {
                             // Add to current item with spacing
@@ -128,7 +128,7 @@ export class SqlFormatter {
                         }
                         j++;
                     }
-                    if (currentItem.trim()) items.push(currentItem.trim());
+                    if (currentItem.trim()) {items.push(currentItem.trim());}
 
                     if (items.length > 0) {
                         // Calculate indent for items (paren depth * 4 + some offset)
@@ -163,8 +163,8 @@ export class SqlFormatter {
                 let depth = 1;
                 i++;
                 while (i < tokens.length && depth > 0) {
-                    if (tokens[i].text === '(') depth++;
-                    else if (tokens[i].text === ')') depth--;
+                    if (tokens[i].text === '(') {depth++;}
+                    else if (tokens[i].text === ')') {depth--;}
                     i++;
                 }
                 i--; // Adjust for loop increment
@@ -520,7 +520,7 @@ export class SqlFormatter {
      * Tracks remaining space on line, breaks when adding token would go negative.
      */
     private formatBalancedList(items: string[], indent: string, maxLen: number): string {
-        if (items.length === 0) return '';
+        if (items.length === 0) {return '';}
 
         const indentLen = indent.length;
         const availableLen = maxLen - indentLen;

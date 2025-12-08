@@ -6,6 +6,8 @@ import { SSLFormatter } from '../src/formatting/formatter';
 const fixturesDir = path.join(process.cwd(), 'tests/fixtures/style-guide');
 
 const filesToUpdate = [
+    '22-function-calls-multiline-arguments',
+    '26-declarations-formatting',
     '27-sql-formatting-select',
     '28-sql-formatting-update'
 ];

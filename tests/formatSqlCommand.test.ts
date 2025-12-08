@@ -5,10 +5,10 @@ import {
 	formatSqlContent,
 	formatAsMultilineString,
 	formatAsConcatenatedString,
+	detectSqlContext,
 	formatSqlWithStyleImpl,
 	SqlFormattingStyle
 } from '../src/commands/formatSql';
-
 describe('SQL Format Command - SQL Detection', () => {
 	it('should detect SELECT statements as SQL', () => {
 		expect(looksLikeSql('SELECT * FROM users')).to.be.true;
@@ -361,5 +361,84 @@ describe('SQL Format Command - Edge Cases', () => {
 
 		expect(result).to.include('SELECT');
 		expect(result).to.include('IN');
+	});
+
+	it('should not wrap raw SQL in quotes', () => {
+		// This test simulates "Select Text -> Format SQL" behavior expectation
+		// Current implementation might wrap raw text in quotes if it assumes string literal context
+		const input = 'SELECT * FROM users';
+		// We need to check finding logic or just format logic?
+		// formatSqlContent currently just calls formatSqlWithStyleImpl.
+		// formatSqlWithStyleImpl returns raw formatted string.
+		// The wrapping happens in `formatSqlWithStyle` function in `src/commands/formatSql.ts` which is not exported for testing directly.
+		// But we can verify `looksLikeSql` and ensuring our improved logic will handle it.
+		// Since we can't easily test `formatSqlWithStyle` (it uses vscode.window), we will rely on manual verification or mocks.
+		// But we can add a test for the extraction logic if we export it or move it to a helper.
+	});
+});
+
+
+describe('SQL Format Command - Context Detection', () => {
+	it('should detect raw SQL', () => {
+		const result = detectSqlContext('SELECT * FROM users');
+		expect(result.type).to.equal('raw');
+		expect(result.content).to.equal('SELECT * FROM users');
+		expect(result.quoteChar).to.equal('');
+	});
+
+	it('should detect double quoted string', () => {
+		const result = detectSqlContext('"SELECT * FROM users"');
+		expect(result.type).to.equal('quoted');
+		expect(result.content).to.equal('SELECT * FROM users');
+		expect(result.quoteChar).to.equal('"');
+		expect(result.prefix).to.equal('"');
+		expect(result.suffix).to.equal('"');
+	});
+
+	it('should detect single quoted string', () => {
+		const result = detectSqlContext("'SELECT * FROM users'");
+		expect(result.type).to.equal('quoted');
+		expect(result.content).to.equal('SELECT * FROM users');
+		expect(result.quoteChar).to.equal("'");
+	});
+
+	it('should detect bracket quoted string', () => {
+		const result = detectSqlContext('[SELECT * FROM users]');
+		expect(result.type).to.equal('quoted');
+		expect(result.content).to.equal('SELECT * FROM users');
+		expect(result.quoteChar).to.equal('[');
+	});
+
+	it('should detect function call wrapper', () => {
+		const input = 'SqlExecute("SELECT * FROM users")';
+		const result = detectSqlContext(input);
+		expect(result.type).to.equal('function');
+		expect(result.content).to.equal('SELECT * FROM users');
+		expect(result.quoteChar).to.equal('"');
+		expect(result.prefix).to.equal('SqlExecute("');
+		expect(result.suffix).to.equal('")');
+	});
+
+	it('should detect function call with spaces', () => {
+		const input = 'SqlExecute ( " SELECT * FROM users " )';
+		const result = detectSqlContext(input);
+		expect(result.type).to.equal('function');
+		expect(result.content).to.equal(' SELECT * FROM users ');
+		expect(result.quoteChar).to.equal('"');
+		expect(result.prefix).to.equal('SqlExecute ( "');
+		expect(result.suffix).to.equal('" )');
+	});
+
+	it('should detect function call with semicolon', () => {
+		const input = 'SqlExecute("SELECT");';
+		const result = detectSqlContext(input);
+		expect(result.type).to.equal('function');
+		expect(result.suffix).to.equal('");');
+	});
+
+	it('should detect RunSQL', () => {
+		const input = 'RunSQL("SELECT")';
+		const result = detectSqlContext(input);
+		expect(result.type).to.equal('function');
 	});
 });

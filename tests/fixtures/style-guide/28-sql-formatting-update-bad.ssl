@@ -1,3 +1,8 @@
 :PROCEDURE UpdateTest;
-RunSQL("update mytable set col1=?val1?, col2=?val2? where id=?id?", "DB");
+:PARAMETERS col1, col2, id;
+RunSQL("	    UPDATE mytable SET
+	        col1 = ?,
+	        col2 = ?
+	    WHERE id = ?
+	    ",, {col1, col2, id});
 :ENDPROC;

@@ -6,8 +6,10 @@ import { SSLFormatter } from '../src/formatting/formatter';
 const fixturesDir = path.join(process.cwd(), 'tests/fixtures/style-guide');
 
 const filesToUpdate = [
-    '03-formatting-spacing-after-comma',
-    '22-function-calls-multiline-arguments'
+    '22-function-calls-multiline-arguments',
+    '26-declarations-formatting',
+    '27-sql-formatting-select',
+    '28-sql-formatting-update'
 ];
 
 const options = {

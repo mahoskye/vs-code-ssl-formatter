@@ -1,3 +1,9 @@
 :PROCEDURE SqlTest;
-sSql := SQLExecute("select a,b,c from table where x=? and y=? order by z", "Query1", 0, 0, 0, "", "", "", 0);
+:PARAMETERS x, y;
+sSql := SQLExecute("		SELECT a, b, c
+		FROM table
+		WHERE x = ?x?
+			AND y = ?y?
+		ORDER BY z
+		");
 :ENDPROC;
