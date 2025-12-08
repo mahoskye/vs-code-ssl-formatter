@@ -12,7 +12,7 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
         'IF': 'ENDIF',
         'WHILE': 'ENDWHILE',
         'FOR': 'NEXT',
-        'FOREACH': 'NEXT',
+
         'BEGINCASE': 'ENDCASE',
         'TRY': 'ENDTRY',
         'PROCEDURE': 'ENDPROC',

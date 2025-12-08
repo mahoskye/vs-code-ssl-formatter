@@ -157,7 +157,7 @@ export class SSLDocumentHighlightProvider implements vscode.DocumentHighlightPro
 		const keywords = new Set([
 			"IF", "ELSE", "ENDIF",
 			"WHILE", "ENDWHILE", "FOR", "TO", "STEP", "NEXT",
-			"FOREACH", "IN", "BEGINCASE", "CASE", "OTHERWISE", "ENDCASE",
+			"BEGINCASE", "CASE", "OTHERWISE", "ENDCASE",
 			"TRY", "CATCH", "FINALLY", "ENDTRY",
 			"PROCEDURE", "ENDPROC", "ENDPROCEDURE", "RETURN",
 			"DECLARE", "DEFAULT", "PARAMETERS", "PUBLIC",
