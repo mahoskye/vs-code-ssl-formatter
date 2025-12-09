@@ -210,6 +210,13 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.window.onDidChangeTextEditorSelection((event) => {
             const editor = event.textEditor;
             if (editor.document.languageId === 'ssl') {
+                const config = vscode.workspace.getConfiguration("ssl");
+                const showOnActiveLineOnly = config.get<boolean>("intellisense.inlayHints.showOnActiveLineOnly", true);
+
+                if (!showOnActiveLineOnly) {
+                    return;
+                }
+
                 if (debounceTimer) {
                     clearTimeout(debounceTimer);
                 }

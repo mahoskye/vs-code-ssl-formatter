@@ -398,8 +398,10 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 
 		// Local procedures (from analysis)
 		for (const procName of analysis.localProcedures) {
+			// console.log(`[DEBUG] Processing local procedure: ${procName}`);
 			const key = procName.toLowerCase();
 			if (!addedKeys.has(key)) {
+				// console.log(`[DEBUG] Adding local procedure to completions: ${procName}`);
 				addedKeys.add(key);
 				const item = new vscode.CompletionItem(procName, vscode.CompletionItemKind.Function);
 				item.detail = 'Procedure (current file)';

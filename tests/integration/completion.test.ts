@@ -55,18 +55,20 @@ Str
     });
 
     test('Provides completion for local procedures', async () => {
+        // Local procedures are suggested inside DoProc/ExecFunction string contexts
         const content = `
 :PROCEDURE MyLocalProc;
 :ENDPROC;
 
 :PROCEDURE TestCompletionProc;
-MyLo
+DoProc("MyLo
 :ENDPROC;
 `;
         const doc = await vscode.workspace.openTextDocument({ language: 'ssl', content });
         await vscode.window.showTextDocument(doc);
 
-        const position = new vscode.Position(5, 4); // 'MyLo'
+        // Position inside DoProc("MyLo") string
+        const position = new vscode.Position(5, 12); // Inside "MyLo"
 
         const list = await vscode.commands.executeCommand<vscode.CompletionList>(
             'vscode.executeCompletionItemProvider',
@@ -74,7 +76,10 @@ MyLo
             position
         );
 
-        assert.ok(list.items.some(i => i.label === 'MyLocalProc'), 'Should suggest MyLocalProc');
+        assert.ok(list.items.some(i => {
+            const label = typeof i.label === 'string' ? i.label : i.label.label;
+            return label === 'MyLocalProc';
+        }), 'Should suggest MyLocalProc inside DoProc');
     });
 
     test('Provides completion for DoProc', async () => {

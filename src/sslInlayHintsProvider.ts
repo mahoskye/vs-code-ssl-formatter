@@ -53,10 +53,9 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 			if (editor) {
 				const activeLine = editor.selection.active.line;
-				// Only provide hints if the active line is within the requested range
-				if (activeLine >= range.start.line && activeLine <= range.end.line) {
-					hints.push(...this.getLineInlayHints(document, activeLine));
-				}
+				// Always provide hints for the active line - VS Code handles rendering
+				// even if the line is outside the currently visible viewport range
+				hints.push(...this.getLineInlayHints(document, activeLine));
 			}
 		} else {
 			// Show hints for all lines in the requested range
