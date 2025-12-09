@@ -5,6 +5,29 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2025-12-08
+
+### Added
+
+#### Integration Testing Framework
+- **Comprehensive Integration Tests**: Added a robust integration test suite covering Diagnostics, Formatting, Hover, and Completions in a real VS Code environment.
+  - `tests/integration/diagnostics.test.ts`: Validates error reporting for invalid SQL usage and ensures no false positives for `ALen`/`AEval`.
+  - `tests/integration/formatting.test.ts`: Verifies indentation logic and SQL string formatting.
+  - `tests/integration/hover.test.ts`: Checks tooltip documentation for built-in functions.
+  - `tests/integration/completion.test.ts`: Tests procedure and keyword completion.
+- **CI Integration**: Updated GitHub Actions workflow to run integration tests (using `xvfb` on Linux).
+
+### Fixed
+
+#### Parsing & Formatting
+- **Block Indentation Bug**: Fixed a critical issue where `IF` blocks (and other keywords without colons) were not indenting correctly.
+  - This was due to the Lexer misidentifying keywords like `IF` as identifiers.
+  - Updated `Lexer` to check identifiers against `SSL_KEYWORDS` list to correctly classify them as `TokenType.Keyword`.
+- **Inlay Hints Refresh**: Fixed an issue where inlay hints would not update immediately when moving the cursor.
+
+### Changed
+- **Performance**: Optimized `SSLCompletionProvider` to better handle local procedure lookups.
+
 ## [1.3.0] - 2025-12-08
 
 ### Added

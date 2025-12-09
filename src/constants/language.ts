@@ -612,13 +612,13 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
     {
         "name": "LimsSetCounter",
         "description": "Sets a counter value in the database.",
-        "params": "(string tableName, string fieldName, string prefix, array arrayOfFields, array arrayOfValues, any incrementWith)",
+        "params": "(string tableName, string fieldName, string prefix, array arrayOfFields, array arrayOfValues, any incrementWith = null)",
         "returns": "number",
-        "signature": "LimsSetCounter(string tableName, string fieldName, string prefix, array arrayOfFields, array arrayOfValues, any incrementWith)",
+        "signature": "LimsSetCounter(string tableName, string fieldName, string prefix, array arrayOfFields, array arrayOfValues, any incrementWith = null)",
         "returnType": "number",
         "category": "Database Functions",
         "frequency": "Moderate",
-        "untypedSignature": "LimsSetCounter(tableName, fieldName, prefix, arrayOfFields, arrayOfValues, incrementWith)"
+        "untypedSignature": "LimsSetCounter(tableName, fieldName, prefix, arrayOfFields, arrayOfValues, incrementWith = null)"
     },
     {
         "name": "Directory",
@@ -663,6 +663,28 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "category": "Database Functions",
         "frequency": "Moderate",
         "untypedSignature": "LimsSqlConnect(friendlyName)"
+    },
+    {
+        "name": "ALen",
+        "description": "Returns the number of elements in an array.",
+        "params": "(array target)",
+        "returns": "number",
+        "signature": "ALen(array target)",
+        "returnType": "number",
+        "category": "Array Functions",
+        "frequency": "High",
+        "untypedSignature": "ALen(target)"
+    },
+    {
+        "name": "AEval",
+        "description": "Evaluates a code block for each element in an array.",
+        "params": "(array target, block codeBlock, number start, number count)",
+        "returns": "any",
+        "signature": "AEval(array target, block codeBlock, number start, number count)",
+        "returnType": "any",
+        "category": "Array Functions",
+        "frequency": "High",
+        "untypedSignature": "AEval(target, codeBlock, start, count)"
     }
 ];
 

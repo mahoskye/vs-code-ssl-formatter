@@ -204,17 +204,25 @@ export async function activate(context: vscode.ExtensionContext) {
 
     // Refresh inlay hints when cursor position changes
     let lastActiveLine: number | undefined = undefined;
+    let debounceTimer: NodeJS.Timeout | undefined;
+
     context.subscriptions.push(
         vscode.window.onDidChangeTextEditorSelection((event) => {
             const editor = event.textEditor;
             if (editor.document.languageId === 'ssl') {
-                const currentLine = editor.selection.active.line;
-                // Only refresh if we moved to a different line
-                if (lastActiveLine !== currentLine) {
-                    lastActiveLine = currentLine;
-                    // Trigger inlay hints refresh using the provider's event
-                    inlayHintsProvider.refresh();
+                if (debounceTimer) {
+                    clearTimeout(debounceTimer);
                 }
+
+                // Debounce refresh to avoid performance impact
+                debounceTimer = setTimeout(() => {
+                    const currentLine = editor.selection.active.line;
+                    // Always refresh if line changed or if we suspect stale hints
+                    if (lastActiveLine !== currentLine) {
+                        lastActiveLine = currentLine;
+                        inlayHintsProvider.refresh();
+                    }
+                }, 25);
             }
         })
     );

@@ -29,6 +29,7 @@ interface VariableDefinition {
 	line: number;
 	column: number;
 	literalValue?: string; // For static analysis of content
+	assignments: { line: number, value: string }[]; // Track history of assignments
 }
 
 interface ProcedureScope {
@@ -197,7 +198,8 @@ export class SSLDiagnosticProvider {
 						const def: VariableDefinition = {
 							name: name,
 							line: i,
-							column: line.indexOf(name)
+							column: line.indexOf(name),
+							assignments: []
 						};
 
 						if (currentProcedure) {
@@ -205,10 +207,12 @@ export class SSLDiagnosticProvider {
 								currentProcedure.parameters.push(def);
 							}
 							// Parameters are also local variables
+							def.assignments = [];
 							currentProcedure.variables.set(name.toLowerCase(), def);
 						} else {
 							// Global if not in procedure (or PARAMETERS outside procedure is odd but syntactically possible?)
 							// treating as global
+							def.assignments = [];
 							analysis.globalVariables.set(name.toLowerCase(), def);
 						}
 					}
@@ -216,24 +220,38 @@ export class SSLDiagnosticProvider {
 			}
 
 			// Capture basic string assignments for SQL analysis
-			const assignMatch = trimmed.match(/^([a-z][a-z0-9_]*)\s*:=\s*(["'].*["']);?$/i);
+			// Capture string assignments (flow sensitive)
+			const assignMatch = trimmed.match(/^([a-z][a-z0-9_]*)\s*:=\s*(.+);?$/i);
 			if (assignMatch) {
 				const varName = assignMatch[1];
-				const value = assignMatch[2]; // Includes quotes
+				const rhs = assignMatch[2];
 
-				// Helper to update definition
-				const updateDef = (map: Map<string, VariableDefinition>) => {
-					const def = map.get(varName.toLowerCase());
-					if (def) {
-						// Store literal without outer quotes (simplistic)
-						def.literalValue = value.substring(1, value.length - 1);
+				// Extract all string literals from RHS
+				let constructedString = "";
+				const stringPattern = /(?:'((?:[^'\\]|\\.)*)')|(?:"((?:[^"\\]|\\.)*)")/g;
+				let match;
+				while ((match = stringPattern.exec(rhs)) !== null) {
+					// Group 1 is single quoted, Group 2 is double quoted
+					constructedString += match[1] !== undefined ? match[1] : match[2];
+				}
+
+				if (constructedString) {
+					// Helper to update definition
+					const updateDef = (map: Map<string, VariableDefinition>) => {
+						const def = map.get(varName.toLowerCase());
+						if (def) {
+							if (!def.assignments) { def.assignments = []; }
+							def.assignments.push({ line: i, value: constructedString });
+							// Also update literalValue for legacy fallback (last assignment wins)
+							def.literalValue = constructedString;
+						}
+					};
+
+					if (currentProcedure) {
+						updateDef(currentProcedure.variables);
+					} else {
+						updateDef(analysis.globalVariables);
 					}
-				};
-
-				if (currentProcedure) {
-					updateDef(currentProcedure.variables);
-				} else {
-					updateDef(analysis.globalVariables);
 				}
 			}
 		}
@@ -364,6 +382,7 @@ export class SSLDiagnosticProvider {
 
 	private validateVariables(analysis: DocumentAnalysis, config: ValidationConfig, diagnostics: vscode.Diagnostic[]) {
 		const reported = new Set<string>();
+		let inCommentBlock = false;
 
 		for (let i = 0; i < analysis.lines.length; i++) {
 			if (diagnostics.length >= config.maxProblems) {
@@ -371,7 +390,24 @@ export class SSLDiagnosticProvider {
 			}
 			const line = analysis.lines[i];
 			const trimmed = line.trim();
-			if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith(':')) {
+
+			// --- Comment Tracking (Added) ---
+			if (inCommentBlock) {
+				if (trimmed.endsWith(';')) {
+					inCommentBlock = false;
+				}
+				continue;
+			}
+			if (trimmed.startsWith('/*')) {
+				if (!trimmed.endsWith(';')) {
+					inCommentBlock = true;
+				}
+				continue; // Skip comment start line
+			}
+			if (trimmed.startsWith('*') || trimmed.startsWith('//')) {
+				continue;
+			}
+			if (!trimmed || trimmed.startsWith(':')) {
 				continue;
 			}
 
@@ -433,11 +469,31 @@ export class SSLDiagnosticProvider {
 	// --- Validation Phase 3: SQL & Exec ---
 
 	private validateSqlAndExec(analysis: DocumentAnalysis, config: ValidationConfig, diagnostics: vscode.Diagnostic[]) {
+		let inCommentBlock = false;
+
 		for (let i = 0; i < analysis.lines.length; i++) {
 			if (diagnostics.length >= config.maxProblems) {
 				break;
 			}
 			const line = analysis.lines[i];
+			const trimmed = line.trim();
+
+			// --- Comment Tracking (Added) ---
+			if (inCommentBlock) {
+				if (trimmed.endsWith(';')) {
+					inCommentBlock = false;
+				}
+				continue;
+			}
+			if (trimmed.startsWith('/*')) {
+				if (!trimmed.endsWith(';')) {
+					inCommentBlock = true;
+				}
+				continue;
+			}
+			if (trimmed.startsWith('*') || trimmed.startsWith('//')) {
+				continue;
+			}
 
 			// Check SQL Injection
 			if (config.preventSqlInjection && /(SQLExecute|RunSQL|LSearch)/i.test(line)) {
@@ -453,9 +509,25 @@ export class SSLDiagnosticProvider {
 				// SQLExecute -> Named '?name?'
 
 				// Check RunSQL calls
-				const runSqlMatch = /RunSQL\s*\(\s*([^,]+)/i.exec(line);
-				if (runSqlMatch) {
-					this.validateSqlPlaceholders(i, runSqlMatch[1].trim(), 'RunSQL', analysis, diagnostics);
+				const runSqlCallMatch = /RunSQL\s*\((.+)\)/i.exec(line);
+				if (runSqlCallMatch) {
+					const args = this.parseArguments(runSqlCallMatch[1]);
+					const sqlArg = args[0] || "";
+
+					// Validate Style
+					this.validateSqlPlaceholders(i, sqlArg.trim(), 'RunSQL', analysis, diagnostics);
+
+					// Validate Params Count
+					// Resolve SQL to check for placeholders
+					const sqlString = this.resolveSqlString(i, sqlArg.trim(), analysis);
+					if (sqlString && /\?/.test(sqlString)) {
+						// If placeholders exist (? or ?name?), proper params array is required (3rd argument)
+						// RunSQL(sql, name, params)
+						if (args.length < 3) {
+							diagnostics.push(this.createDiagnostic(i, runSqlCallMatch.index!, runSqlCallMatch[0].length,
+								"RunSQL requires parameters argument when placeholders are used", vscode.DiagnosticSeverity.Error, "ssl-runsql-missing-params"));
+						}
+					}
 				}
 
 				// Check SQLExecute calls
@@ -481,24 +553,18 @@ export class SSLDiagnosticProvider {
 			// Check ExecFunction Targets
 
 			// Check ExecFunction Targets
-			const execMatch = /ExecFunction\s*\(\s*["']([^"']+)["']/i.exec(line);
+			const execMatch = /ExecFunction\s*\(\s*["']([^"']*)["']/i.exec(line);
 			if (execMatch) {
 				const target = execMatch[1];
 				const parts = target.split('.');
 
 				let isValid = false;
-				if (parts.length >= 3) {
-					isValid = true; // Namespace.Script.Proc
-				} else if (parts.length === 2) {
-					// Script.Proc or Namespace.Script (Invalid)
-					// Check if first part is a known namespace alias
-					if (config.namespaceAliases.has(parts[0].toLowerCase())) {
-						isValid = false; // Missing Procedure (Alias.Script)
-					} else {
-						isValid = true; // Script.Proc
-					}
+				if (parts.length >= 2) {
+					isValid = true; // Namespace.Script.Proc OR Script.Proc (Valid enough)
+				} else if (parts.length === 1 && parts[0].length > 0) {
+					isValid = true; // Procedure only (implicit current script/global)
 				} else {
-					isValid = false; // incomplete
+					isValid = false; // Empty?
 				}
 
 				if (!isValid) {
@@ -512,20 +578,73 @@ export class SSLDiagnosticProvider {
 
 	// --- Helpers ---
 
-	private validateSqlPlaceholders(lineIdx: number, arg: string, funcName: string, analysis: DocumentAnalysis, diagnostics: vscode.Diagnostic[]) {
-		let sqlString = '';
-		if (arg.startsWith('"') || arg.startsWith("'")) {
-			sqlString = arg.substring(1, arg.length - 1);
-		} else {
-			// Resolve variable
-			const scope = analysis.procedures.find(p => lineIdx >= p.startLine && lineIdx <= (p.endLine || Infinity));
-			const locals = scope ? scope.variables : new Map<string, VariableDefinition>();
-			const def = locals.get(arg.toLowerCase()) || analysis.globalVariables.get(arg.toLowerCase());
-			if (def && def.literalValue) {
-				sqlString = def.literalValue;
+	private parseArguments(argsString: string): string[] {
+		const args: string[] = [];
+		let current = "";
+		let depth = 0;
+		let inQuote = false;
+		let quoteChar = "";
+
+		for (let i = 0; i < argsString.length; i++) {
+			const char = argsString[i];
+
+			if (inQuote) {
+				current += char;
+				if (char === quoteChar && argsString[i - 1] !== '\\') {
+					inQuote = false;
+				}
+			} else {
+				if (char === '"' || char === "'") {
+					inQuote = true;
+					quoteChar = char;
+					current += char;
+				} else if (char === '{' || char === '(') {
+					depth++;
+					current += char;
+				} else if (char === '}' || char === ')') {
+					depth--;
+					current += char;
+				} else if (char === ',' && depth === 0) {
+					args.push(current.trim());
+					current = "";
+				} else {
+					current += char;
+				}
 			}
 		}
+		if (current.trim()) {
+			args.push(current.trim());
+		}
+		return args;
+	}
 
+	private resolveSqlString(lineIdx: number, arg: string, analysis: DocumentAnalysis): string {
+		if (arg.startsWith('"') || arg.startsWith("'")) {
+			return arg.substring(1, arg.length - 1);
+		}
+		// Resolve variable
+		const scope = analysis.procedures.find(p => lineIdx >= p.startLine && lineIdx <= (p.endLine || Infinity));
+		const locals = scope ? scope.variables : new Map<string, VariableDefinition>();
+		const def = locals.get(arg.toLowerCase()) || analysis.globalVariables.get(arg.toLowerCase());
+
+		if (def && def.assignments && def.assignments.length > 0) {
+			// Find assignment closest to and before current line
+			const relevantAssignment = def.assignments
+				.filter(a => a.line < lineIdx)
+				.sort((a, b) => b.line - a.line)[0];
+
+			if (relevantAssignment) {
+				return relevantAssignment.value;
+			}
+		}
+		if (def && def.literalValue) {
+			return def.literalValue;
+		}
+		return "";
+	}
+
+	private validateSqlPlaceholders(lineIdx: number, arg: string, funcName: string, analysis: DocumentAnalysis, diagnostics: vscode.Diagnostic[]) {
+		const sqlString = this.resolveSqlString(lineIdx, arg, analysis);
 		if (!sqlString) { return; }
 
 		// Heuristic: Check for placeholders
@@ -535,12 +654,12 @@ export class SSLDiagnosticProvider {
 		if (funcName === 'RunSQL') {
 			if (hasNamed) {
 				diagnostics.push(this.createDiagnostic(lineIdx, 0, 1,
-					"RunSQL should use positional placeholders '?'", vscode.DiagnosticSeverity.Warning, "ssl-invalid-sql-placeholder-style"));
+					"RunSQL should use positional placeholders '?'", vscode.DiagnosticSeverity.Error, "ssl-invalid-sql-placeholder-style"));
 			}
 		} else if (funcName === 'SQLExecute') {
 			if (hasPositional) {
 				diagnostics.push(this.createDiagnostic(lineIdx, 0, 1,
-					"SQLExecute should use named placeholders '?param?'", vscode.DiagnosticSeverity.Warning, "ssl-invalid-sql-placeholder-style"));
+					"SQLExecute should use named placeholders '?param?'", vscode.DiagnosticSeverity.Error, "ssl-invalid-sql-placeholder-style"));
 			}
 		}
 	}

@@ -39,6 +39,11 @@ jobs:
     - name: Run unit tests
       run: npm run test:unit
 
+    - name: Run integration tests
+      uses: coactions/setup-xvfb@v1
+      with:
+        run: npm run test:integration
+
     - name: Check for console.log in production code
       if: runner.os == 'Linux'
       run: |

@@ -51,6 +51,9 @@ const mockVscode = {
 		},
 		showInformationMessage(message: string): void {
 			// No-op for tests
+		},
+		onDidChangeTextEditorSelection(listener: (e: any) => any): any {
+			return { dispose: () => { } };
 		}
 	},
 	Range: MockRange,

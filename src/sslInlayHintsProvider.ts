@@ -13,6 +13,8 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 	private _onDidChangeInlayHints = new vscode.EventEmitter<void>();
 	public readonly onDidChangeInlayHints = this._onDidChangeInlayHints.event;
 
+	private debounceTimer: NodeJS.Timeout | undefined;
+
 	constructor(
 		private readonly procedureIndex?: ProcedureIndex
 	) {
@@ -45,8 +47,11 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 		// If showing only on active line, restrict to the cursor's line
 		if (showOnActiveLineOnly) {
-			const editor = vscode.window.activeTextEditor;
-			if (editor && editor.document === document) {
+			// Find the editor for this document
+			// We iterate visibleTextEditors because activeTextEditor might be stale or not match receiving document
+			const editor = vscode.window.visibleTextEditors.find(e => e.document === document);
+
+			if (editor) {
 				const activeLine = editor.selection.active.line;
 				// Only provide hints if the active line is within the requested range
 				if (activeLine >= range.start.line && activeLine <= range.end.line) {
@@ -392,6 +397,13 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 		return params.map(param => {
 			param = param.trim();
+
+			// Remove default values if present (e.g. "any val = null" -> "any val")
+			const equalsIndex = param.indexOf('=');
+			if (equalsIndex !== -1) {
+				param = param.substring(0, equalsIndex).trim();
+			}
+
 			// Format is usually "type name", we want "name"
 			// Handle array types like "any[] args" correctly
 			// Just take the last word after splitting by space

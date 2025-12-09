@@ -152,4 +152,20 @@ DoProc("Helper", { "SELECT id FROM table" });
 		const labels = hints.map(h => h.label);
 		expect(labels).to.include('sQuery:');
 	});
+
+	it('provides hints for LimsSetCounter with default value in signature', () => {
+		const doc = createDocument(`:PROCEDURE Test;
+LimsSetCounter("Table", "Field", "Prefix", {}, {}, 1);
+:ENDPROC;`);
+
+		const range = fullRangeFor(doc.lineCount, doc.lineAt(doc.lineCount - 1).text.length);
+		const hints = provider.provideInlayHints(doc as any, range as any, {} as any);
+
+		// Expected: tableName, fieldName, prefix, arrayOfFields, arrayOfValues, incrementWith
+		// "incrementWith = null" should be parsed as "incrementWith"
+
+		const labels = hints.map(h => h.label);
+		expect(labels).to.include('tableName:');
+		expect(labels).to.include('incrementWith:');
+	});
 });

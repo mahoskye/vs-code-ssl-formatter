@@ -205,17 +205,29 @@ CustomFunc(sValue);
 		);
 		expect(undefinedDiagnostics).to.have.length(0);
 	});
+	it('ignores built-in functions ALen and AEval', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
+:DECLARE aList;
+nLen := ALen(aList);
+AEval(aList, {|x| x := 1});
+:ENDPROC;`);
+		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undefined-variable' && (diag.message.includes('ALen') || diag.message.includes('AEval'))
+		);
+		expect(undefinedDiagnostics).to.have.length(0);
+	});
 });
 
 describe('SSL Diagnostic Provider - SQL placeholder style', () => {
-	it('warns when RunSQL uses named placeholders', () => {
+	it('errors when RunSQL uses named placeholders', () => {
 		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
 :DECLARE sSQL, nId;
 sSQL := "SELECT * FROM Foo WHERE ID = ?nId?";
-RunSQL(sSQL, , , { nId });
+RunSQL(sSQL, "Query", { nId });
 :ENDPROC;`);
 		const styleDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-placeholder-style');
-		expect(styleDiagnostics.length).to.equal(1);
+		expect(styleDiagnostics).to.have.length(1);
+		expect(styleDiagnostics[0].severity).to.equal(0); // Error = 0
 	});
 
 	it('warns when SQLExecute uses positional placeholders', () => {
@@ -224,6 +236,16 @@ SQLExecute("SELECT * FROM Foo WHERE ID = ?", "Default");
 :ENDPROC;`);
 		const styleDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-placeholder-style');
 		expect(styleDiagnostics.length).to.equal(1);
+	});
+
+	it('errors when RunSQL is missing parameters argument with placeholders', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
+:DECLARE sSQL;
+sSQL := "SELECT * FROM Foo WHERE ID = ?";
+RunSQL(sSQL, "Query"); // Missing params argument (3rd position)
+:ENDPROC;`);
+		const missingParamsDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-runsql-missing-params');
+		expect(missingParamsDiagnostics).to.have.length(1);
 	});
 
 	it('does not warn when placeholders match helper requirements', () => {
@@ -235,6 +257,36 @@ SQLExecute("SELECT * FROM Foo WHERE ID = ?nId?", "Default");
 :ENDPROC;`);
 		const styleDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-placeholder-style');
 		expect(styleDiagnostics).to.have.length(0);
+	});
+	it('validates SQL placeholders correctly when variable is reused (Flow Sensitive)', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
+:DECLARE sSQL;
+sSQL := "SELECT * FROM Table WHERE ID = ?id?";
+RunSQL(sSQL, "Valid", 0, 0, {}); 
+
+sSQL := "SELECT * FROM Table WHERE ID = ?"; 
+SQLExecute(sSQL, "InvalidReuse", 0, 0, 0, "", "", "", 0);
+:ENDPROC;`);
+
+		// First usage uses named placeholders for RunSQL -> ERROR (Strict rules)
+		// Second usage uses positional placeholders for SQLExecute -> ERROR (Strict rules)
+		// Both show that the validator is checking the SPECIFIC value assigned before the call.
+
+		const styleDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-placeholder-style');
+		expect(styleDiagnostics).to.have.length(2);
+		expect(styleDiagnostics[0].range.start.line).to.equal(3); // RunSQL line
+		expect(styleDiagnostics[1].range.start.line).to.equal(6); // SQLExecute line
+	});
+
+	it('validates SQL inside concatenated strings correctly', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
+:DECLARE sSQL;
+sSQL := "SELECT * " + "FROM Table " + "WHERE ID = ?";
+SQLExecute(sSQL, "InvalidConcatenated");
+:ENDPROC;`);
+		// Should detect ? and warn for SQLExecute
+		const styleDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-placeholder-style');
+		expect(styleDiagnostics).to.have.length(1);
 	});
 });
 
@@ -278,21 +330,21 @@ describe('SSL Diagnostic Provider - ExecFunction namespace validation', () => {
 		config.update('ssl.documentNamespaces', {});
 	});
 
-	it('warns when ExecFunction omits procedure segment entirely', () => {
+	it('accepts ExecFunction with single procedure name', () => {
 		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
 ExecFunction("ReportGenerator", { });
 :ENDPROC;`);
 		const execDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-exec-target');
-		expect(execDiagnostics.length).to.be.greaterThan(0);
+		expect(execDiagnostics).to.have.length(0);
 	});
 
-	it('warns when namespace literal omits script/procedure segment', () => {
+	it('accepts namespace literal with only script/procedure segment', () => {
 		config.update('ssl.documentNamespaces', { Reporting: 'reporting' });
 		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
 ExecFunction("Reporting.GenerateReport", { });
 :ENDPROC;`);
 		const execDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-exec-target');
-		expect(execDiagnostics.length).to.be.greaterThan(0);
+		expect(execDiagnostics).to.have.length(0);
 	});
 
 	it('accepts namespace literal with explicit script and procedure', () => {

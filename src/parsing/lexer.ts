@@ -1,4 +1,4 @@
-import { SSL_COMPOUND_OPERATORS, SSL_OPERATORS, SSL_LITERALS } from '../constants/language';
+import { SSL_COMPOUND_OPERATORS, SSL_OPERATORS, SSL_LITERALS, SSL_KEYWORDS } from '../constants/language';
 
 export enum TokenType {
     Whitespace,
@@ -331,6 +331,13 @@ export class Lexer {
         while (this.pos < this.input.length && this.isIdentifierPart(this.input[this.pos])) {
             text += this.input[this.pos];
             this.advance();
+        }
+
+        // Check if keyword (case insensitive or sensitive? Language seems case insensitive for keywords usually, but constants says uppercased keys)
+        // SSL keywords are case insensitive usually.
+        const upper = text.toUpperCase();
+        if ((SSL_KEYWORDS as readonly string[]).includes(upper)) {
+            return { type: TokenType.Keyword, text, line, column: col, offset: start };
         }
 
         return { type: TokenType.Identifier, text, line, column: col, offset: start };
