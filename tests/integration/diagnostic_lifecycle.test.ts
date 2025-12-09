@@ -4,14 +4,12 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { describe, it } from 'mocha';
 
-import { activate } from '../../src/extension';
+
 
 describe('Diagnostic Lifecycle Integration Test', () => {
 
     it('Diagnostics persist for other files when one is closed', async () => {
-        // Activate extension to register listeners
-        const context: any = { subscriptions: [], extensionUri: vscode.Uri.file('/') };
-        await activate(context);
+        // Extension is activated automatically when opening SSL files
 
         // Document A content (has error)
         const contentA = `
