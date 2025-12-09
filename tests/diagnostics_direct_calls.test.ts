@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import { activate } from '../src/extension';
 import { describe, it } from 'mocha';
 import { SSLHoverProvider } from '../src/sslHoverProvider';
+import { SSLDiagnosticProvider } from '../src/sslDiagnosticProvider';
 import { WorkspaceProcedureIndex } from '../src/utils/procedureIndex';
 
 describe('Diagnostic Reproduction: Invalid Direct Calls', () => {
@@ -42,6 +43,10 @@ describe('Diagnostic Reproduction: Invalid Direct Calls', () => {
         // But for Hover, we use our local provider instance.
 
         await new Promise(resolve => setTimeout(resolve, 1000)); // buffer for diagnostic generation
+
+        const diagProvider = new SSLDiagnosticProvider();
+        diagProvider.updateDiagnostics(doc);
+
         const diags = vscode.languages.getDiagnostics(doc.uri);
         const invCall = diags.find(d => d.message.includes('Procedures must be called using DoProc or ExecFunction'));
         assert.ok(invCall, 'Should report error for direct procedure call MyOtherProc(1)');

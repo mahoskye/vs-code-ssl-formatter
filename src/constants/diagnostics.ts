@@ -40,7 +40,7 @@ export const DIAGNOSTIC_MESSAGES = {
         `Procedure uses global variable '${varName}' without declaring it locally. Declare it with ':DECLARE ${varName};' or pass it as a parameter for better encapsulation.`,
 
     INVALID_SQL_PARAM: (paramName: string) =>
-        `SQL parameter '${paramName}' does not reference a valid variable or constant. Use lowercase variable names like '?sResult?' to pass through strings.`,
+        `SQL parameter '${paramName}' does not reference a valid variable or constant.`,
     INVALID_EXEC_TARGET: (literal: string, example: string) =>
         `ExecFunction target "${literal}" is incomplete. Provide script and procedure segments (e.g., ${example}).`,
     INVALID_SQL_PLACEHOLDER_STYLE: (funcName: string, expected: "named" | "positional") =>

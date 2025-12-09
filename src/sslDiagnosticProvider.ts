@@ -256,7 +256,7 @@ export class SSLDiagnosticProvider {
 
 				// Extract all string literals from RHS
 				let constructedString = "";
-				const stringPattern = /(?:'((?:[^'\\]|\\.)*)')|(?:"((?:[^"\\]|\\.)*)")/g;
+				const stringPattern = /(?:'([^']*)')|(?:"([^"]*)")/g;
 				let match;
 				while ((match = stringPattern.exec(rhs)) !== null) {
 					// Group 1 is single quoted, Group 2 is double quoted
@@ -316,37 +316,57 @@ export class SSLDiagnosticProvider {
 				continue;
 			}
 
-			// --- Multiline String Tracking ---
-			// We need to know if the line ends while still inside a string.
-			// Simple parser for quotes.
+
+			const startInString = inStringQuote;
+			const startInCommentBlock = inCommentBlock;
+
+			// Consistent string and comment parsing
 			for (let charIndex = 0; charIndex < line.length; charIndex++) {
 				const char = line[charIndex];
-				if (inCommentBlock) { break; } // Don't parse quotes in comments (simplified)
+				const next = line[charIndex + 1] || '';
+
+				if (inCommentBlock) {
+					if (char === ';') {
+						inCommentBlock = false;
+					}
+					continue;
+				}
 
 				if (inStringQuote) {
 					if (char === inStringQuote) {
-						// Check for escaped quote? simple check for now
-						// In SSL " "" " is escape? or \" ? Assuming standard or simple.
-						// Lexer handles escapes. Here we do simple toggle.
 						inStringQuote = null;
 					}
 				} else {
+					if (char === '/' && next === '*') {
+						inCommentBlock = true;
+						charIndex++;
+						continue;
+					}
+					if (char === '/' && next === '/') {
+						break; // Single line comment ignores rest of line
+					}
+
 					if (char === '"' || char === "'") {
 						inStringQuote = char;
-					} else if (char === '/' && line[charIndex + 1] === '*') {
-						// Start of comment block inside line? Handled by line check below usually
-						// But strictly we should track it here too if mixing.
-						// Keeping it simple: If line starts with /* we handle it.
 					}
 				}
 			}
 
-			// If we are inside a string at the end of the line, skip block/style checks for this line
-			if (inStringQuote) {
+			// If we started inside a string, the start of the line is string content, 
+			// so it cannot be a valid block keyword.
+			if (startInString) {
 				continue;
 			}
 
-			// Comment            if (inCommentBlock) {
+			// Use the state at the START of the line to determine if we should skip validation
+			// If we started in a comment block, the WHOLE line is considered part of the comment 
+			// (even if it ends with ;). The only exception would be if we supported Code-After-Comment,
+			// but typically in SSL /* ... ; is a standalone block.
+			if (startInCommentBlock) {
+				continue; // Skip all keyword/syntax checks for this line
+			}
+
+			// Comment check
 			if (inCommentBlock) {
 				if (trimmed.endsWith(';')) {
 					inCommentBlock = false;
@@ -356,14 +376,6 @@ export class SSLDiagnosticProvider {
 			if (trimmed.startsWith('/*')) {
 				if (!trimmed.endsWith(';')) {
 					inCommentBlock = true;
-				} else {
-					// Single line block comment check style
-					if (config.enforceCommentSyntax && PATTERNS.COMMENT.INVALID.test(trimmed) && !trimmed.includes(';')) {
-						// This case (starts /* ends */ no ;) is handled by logic above?
-						// Wait, logic above says: starts /*, checks endsWith ;
-						// If user wrote /* ... */ it fails endsWith(';') check -> enters inCommentBlock = true.
-						// So this validation needs to be smarter or run before state change.
-					}
 				}
 				// Check for invalid syntax: /* ... */ without semicolon
 				if (config.enforceCommentSyntax && PATTERNS.COMMENT.INVALID.test(line) && !line.includes(';')) {
@@ -393,6 +405,18 @@ export class SSLDiagnosticProvider {
 					vscode.DiagnosticSeverity.Error
 				));
 				continue;
+			}
+
+			// Invalid 'variable' keyword check
+			if (/^\s*variable\b/i.test(line)) {
+				const match = line.match(/variable\b/i);
+				if (match && match.index !== undefined) {
+					diagnostics.push(this.createDiagnostic(i, match.index, 8,
+						"Invalid syntax: 'variable' is not a valid SSL keyword. Did you mean ':DECLARE'?",
+						vscode.DiagnosticSeverity.Error,
+						"ssl-invalid-keyword-variable"
+					));
+				}
 			}
 
 			// Keyword Validation
@@ -435,19 +459,28 @@ export class SSLDiagnosticProvider {
 			// Missing Semicolon Check
 			const isStructure = blockStack.some(b => b.line === i) || (keywordMatch && BLOCK_MIDDLE.has(keywordMatch[1].toUpperCase()));
 
+			// Check for line continuation operators at end of current line
 			let isContinuation = /[+\-*/,{(]$/.test(trimmed) ||
-				/^[+\-*/,})]/.test(trimmed) ||
+				/(?:^|[\s]):=$/.test(trimmed) || // Assignment
+				/(?:^|[\s])\+=$/.test(trimmed) || // Plus-Assignment
+				/(?:^|[\s])-=$/.test(trimmed) || // Minus-Assignment
+				/(?:^|[\s])\*=$/.test(trimmed) || // Multiply-Assignment
+				/(?:^|[\s])\/=$/.test(trimmed) || // Divide-Assignment
+				/^[+\-*/,})]/.test(trimmed) ||     // Current line starts with operator
 				/^(\.AND\.|\.OR\.|\.NOT\.)/i.test(trimmed);
 
 			// Look ahead for continuation if not found
 			if (!isContinuation && !trimmed.endsWith(';') && i + 1 < analysis.lines.length) {
 				const nextLine = analysis.lines[i + 1].trim();
-				if (/^[+\-*/,})]/.test(nextLine) || /^(\.AND\.|\.OR\.|\.NOT\.)/i.test(nextLine)) {
+				// Check if next line starts with continuation chars (including open paren for function call)
+				if (/^[+\-*/,{(})\]]/.test(nextLine) || /^(\.AND\.|\.OR\.|\.NOT\.)/i.test(nextLine)) {
 					isContinuation = true;
 				}
 			}
 
-			if (!trimmed.endsWith(';') && !isStructure && !isContinuation && !trimmed.startsWith(':')) {
+			// Check if we ended inside a string (e.g. multi-line string or incomplete string)
+			// If so, it's not the end of the statement.
+			if (!trimmed.endsWith(';') && !isStructure && !isContinuation && !trimmed.startsWith(':') && !inStringQuote) {
 				diagnostics.push(this.createDiagnostic(i, line.length - 1, 1, "Statement should end with semicolon", vscode.DiagnosticSeverity.Warning, "ssl-missing-semicolon"));
 			}
 		}
@@ -483,14 +516,19 @@ export class SSLDiagnosticProvider {
 			if (trimmed.startsWith('*') || trimmed.startsWith('//')) {
 				continue;
 			}
-			if (!trimmed || trimmed.startsWith(':')) {
-				continue;
-			}
 
-			// --- String Masking (Support Multiline) ---
 			let maskedLine = "";
 			for (let j = 0; j < line.length; j++) {
 				const char = line[j];
+				const next = line[j + 1] || '';
+
+				if (inCommentBlock) {
+					maskedLine += " ";
+					if (char === ';') {
+						inCommentBlock = false;
+					}
+					continue;
+				}
 
 				if (inStringQuote) {
 					maskedLine += " "; // Mask content
@@ -498,6 +536,18 @@ export class SSLDiagnosticProvider {
 						inStringQuote = null;
 					}
 				} else {
+					if (char === '/' && next === '*') {
+						inCommentBlock = true;
+						maskedLine += "  ";
+						j++; // Skip next char
+						continue;
+					}
+					if (char === '/' && next === '/') {
+						// Single line comment
+						maskedLine += " ".repeat(line.length - j);
+						break;
+					}
+
 					if (char === '"' || char === "'") {
 						inStringQuote = char;
 						maskedLine += " "; // Mask quote too to avoid partial matches
@@ -532,6 +582,12 @@ export class SSLDiagnosticProvider {
 				// Skip if property access (Prop:Name or :Name)
 				const charBefore = lineWithoutStrings.charAt(match.index - 1);
 				if (charBefore === ':') {
+					continue;
+				}
+
+				// Skip dot operators (.and. .or. .not. .t. .f.)
+				const charAfter = lineWithoutStrings.charAt(match.index + varName.length);
+				if (charBefore === '.' && charAfter === '.') {
 					continue;
 				}
 
@@ -679,7 +735,7 @@ export class SSLDiagnosticProvider {
 			}
 			const char = line[i];
 			if (insideString) {
-				if (char === quoteChar && line[i - 1] !== '\\') {
+				if (char === quoteChar) {
 					insideString = false;
 				}
 			} else {
@@ -704,7 +760,7 @@ export class SSLDiagnosticProvider {
 
 			if (inQuote) {
 				current += char;
-				if (char === quoteChar && argsString[i - 1] !== '\\') {
+				if (char === quoteChar) {
 					inQuote = false;
 				}
 			} else {
@@ -802,7 +858,7 @@ export class SSLDiagnosticProvider {
 
 			if (!isDeclared) {
 				diagnostics.push(this.createDiagnostic(lineIdx, match.index, match[0].length,
-					DIAGNOSTIC_MESSAGES.INVALID_SQL_PARAM(paramName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.INVALID_SQL_PARAM));
+					DIAGNOSTIC_MESSAGES.INVALID_SQL_PARAM(paramName), vscode.DiagnosticSeverity.Error, DIAGNOSTIC_CODES.INVALID_SQL_PARAM));
 			}
 		}
 	}
@@ -853,27 +909,23 @@ export class SSLDiagnosticProvider {
 			// except for some cases, but for safety lets assuming single line strings for now unless end is missing)
 
 			// Masking Logic: Replace strings and comments with spaces
+			// --- String Masking (Support Multiline) ---
 			let maskedLine = "";
-			// inString and stringChar are persisted across lines
-
-
 			for (let j = 0; j < line.length; j++) {
 				const char = line[j];
 				const next = line[j + 1] || '';
 
 				if (inCommentBlock) {
 					maskedLine += " ";
-					if (char === '*' && next === '/') {
+					if (char === ';') {
 						inCommentBlock = false;
-						maskedLine += " "; // consume /
-						j++;
 					}
 					continue;
 				}
 
 				if (inString) {
 					maskedLine += " ";
-					if (char === stringChar && line[j - 1] !== '\\') {
+					if (char === stringChar) {
 						inString = false;
 					}
 					continue;
@@ -912,19 +964,21 @@ export class SSLDiagnosticProvider {
 				const name = match[1];
 				const nameLower = name.toLowerCase();
 
-				// If it is NOT a valid function, check if it's a procedure in this file or just unknown
+				// If it is NOT a valid function, check if it's a procedure in this file
 				if (!validFunctionNames.has(nameLower)) {
 					// Check if it is a known procedure in this file
 					const isLocalProcedure = analysis.procedures.some(p => p.name.toLowerCase() === nameLower);
 
-					const range = new vscode.Range(i, match.index, i, match.index + name.length);
-					const diag = new vscode.Diagnostic(
-						range,
-						`Invalid direct procedure call '${name}'. Procedures must be called using DoProc or ExecFunction.`,
-						vscode.DiagnosticSeverity.Error
-					);
-					diag.code = "ssl-invalid-direct-call"; // Assign code for CodeAction
-					diagnostics.push(diag);
+					if (isLocalProcedure) {
+						const range = new vscode.Range(i, match.index, i, match.index + name.length);
+						const diag = new vscode.Diagnostic(
+							range,
+							`Invalid direct procedure call '${name}'. Procedures must be called using DoProc or ExecFunction.`,
+							vscode.DiagnosticSeverity.Error
+						);
+						diag.code = "ssl-invalid-direct-call"; // Assign code for CodeAction
+						diagnostics.push(diag);
+					}
 				}
 			}
 		}

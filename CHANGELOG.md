@@ -5,6 +5,21 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2025-12-09
+
+### Fixed
+
+#### Diagnostics & Validation
+- **Missing Semicolon Fixes**: Resolved false positive `ssl-missing-semicolon` errors for:
+  - Multi-line statements using assignment operators (`:=`, `+=`, etc.) as continuation.
+  - Multi-line function calls where arguments start on a new line with `(`, `{`, or `,`.
+  - Statements ending inside multi-line strings (e.g. `SQLExecute` calls).
+- **Comment Syntax**: Fixed `Invalid syntax: '*'` diagnostic flagging lines that start with `*` inside a block comment.
+- **Undefined Variable Check**: Resolved false positive `ssl-undefined-variable` errors for dot-separated operators/literals (e.g., `.AND.`, `.OR.`, `.NOT.`, `.T.`, `.F.`).
+- **SQL Parameter Validation**: Updated `ssl-invalid-sql-param` diagnostic:
+  - Changed severity from **Warning** to **Error**.
+  - Simplified message to remove prescriptive variable naming advice.
+
 ## [1.3.1] - 2025-12-08
 
 ### Added

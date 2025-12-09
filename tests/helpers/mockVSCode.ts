@@ -446,9 +446,9 @@ export class MockDiagnosticCollection {
 /**
  * Create a mock document from text content
  */
-export function createDocument(content: string, languageId: string = 'ssl'): MockTextDocument {
+export function createDocument(content: string, languageId: string = 'ssl', filePath: string = '/test.ssl'): MockTextDocument {
 	return new MockTextDocument(
-		MockUri.file('/test.ssl'),
+		MockUri.file(filePath),
 		languageId,
 		content
 	);
