@@ -49,6 +49,16 @@ export class WorkspaceProcedureIndex implements ProcedureIndex {
 				if (this.isSSLDocument(document)) {
 					this.updateDocument(document);
 				}
+			}),
+			vscode.workspace.onDidOpenTextDocument(document => {
+				if (this.isSSLDocument(document)) {
+					this.updateDocument(document);
+				}
+			}),
+			vscode.workspace.onDidChangeTextDocument(event => {
+				if (this.isSSLDocument(event.document)) {
+					this.updateDocument(event.document);
+				}
 			})
 		);
 

@@ -10,8 +10,8 @@ const provider = new SSLRenameProvider();
  */
 function getEditRanges(edit: any, documentUri: any): { line: number; startChar: number; endChar: number }[] {
 	const ranges: { line: number; startChar: number; endChar: number }[] = [];
-	if (edit && edit._edits) {
-		for (const [uri, edits] of edit._edits) {
+	if (edit && edit._changes) {
+		for (const [uri, edits] of edit._changes) {
 			if (uri.toString() === documentUri.toString()) {
 				for (const e of edits) {
 					ranges.push({

@@ -161,7 +161,7 @@
       "patterns": [
         {
           "name": "keyword.other.database-parameter.ssl",
-          "match": "\\?[^?]*\\?"
+          "match": "\\?[^?\\s]+\\?"
         },
         {
           "name": "support.function.odbc-escape.ssl",
@@ -186,7 +186,7 @@
       "patterns": [
         {
           "name": "string.quoted.single.ssl keyword.other.database-parameter.ssl",
-          "match": "\\?[^?]*\\?",
+          "match": "\\?[^?\\s]+\\?",
           "captures": {
             "0": {
               "name": "keyword.other.database-parameter.ssl"

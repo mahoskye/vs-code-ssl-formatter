@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Updated `Lexer` to check identifiers against `SSL_KEYWORDS` list to correctly classify them as `TokenType.Keyword`.
 - **Inlay Hints Refresh**: Fixed an issue where inlay hints would not update immediately when moving the cursor.
 
+#### Diagnostics & Validation
+- **False Positive Diagnostics**: Resolved multiple false positive warnings:
+  - `values` keyword in `SQLExecute` strings no longer flagged as invalid procedure call.
+  - Multi-line `SQLExecute` strings with placeholders (`?var?`) at line ends no longer flagged.
+  - Variables declared in multi-line `:DECLARE` statements are now correctly recognized.
+  - `:PUBLIC` variable declarations are now fully supported.
+
 ### Changed
 - **Performance**: Optimized `SSLCompletionProvider` to better handle local procedure lookups.
 

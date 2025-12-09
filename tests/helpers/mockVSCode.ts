@@ -132,6 +132,11 @@ export class MockTextDocument {
 		return this.lines.length;
 	}
 
+	public setText(text: string) {
+		this.content = text;
+		this.lines = text.split('\n');
+	}
+
 	getText(range?: MockRange): string {
 		if (!range) {
 			return this.content;
@@ -247,30 +252,28 @@ export class MockLocation {
 }
 
 export class MockWorkspaceEdit {
-	public _edits: Map<MockUri, { range: MockRange; newText: string }[]> = new Map();
+	public _changes: Map<MockUri, MockTextEdit[]> = new Map();
 
-	replace(uri: MockUri, range: MockRange, newText: string): void {
-		if (!this._edits.has(uri)) {
-			this._edits.set(uri, []);
-		}
-		this._edits.get(uri)!.push({ range, newText });
+	replace(uri: MockUri, range: MockRange, newText: string) {
+		const edits = this._changes.get(uri) || [];
+		edits.push(new MockTextEdit(range, newText));
+		this._changes.set(uri, edits);
 	}
 
 	insert(uri: MockUri, position: MockPosition, newText: string): void {
-		const range = new MockRange(position, position);
-		this.replace(uri, range, newText);
+		this.replace(uri, new MockRange(position, position), newText);
 	}
 
 	delete(uri: MockUri, range: MockRange): void {
-		this.replace(uri, range, '');
+		this.replace(uri, range, "");
 	}
 
 	has(uri: MockUri): boolean {
-		return this._edits.has(uri);
+		return this._changes.has(uri);
 	}
 
-	entries(): IterableIterator<[MockUri, { range: MockRange; newText: string }[]]> {
-		return this._edits.entries();
+	entries(): IterableIterator<[MockUri, MockTextEdit[]]> {
+		return this._changes.entries();
 	}
 }
 
@@ -618,3 +621,19 @@ export enum MockFoldingRangeKind {
 	Region = 3
 }
 
+export class MockCodeActionKind {
+	static QuickFix = new MockCodeActionKind('quickfix');
+	static Refactor = new MockCodeActionKind('refactor');
+	static RefactorExtract = new MockCodeActionKind('refactor.extract');
+	static RefactorInline = new MockCodeActionKind('refactor.inline');
+	static RefactorRewrite = new MockCodeActionKind('refactor.rewrite');
+	static Source = new MockCodeActionKind('source');
+	static SourceOrganizeImports = new MockCodeActionKind('source.organizeImports');
+	static SourceFixAll = new MockCodeActionKind('source.fixAll');
+
+	constructor(public value: string) { }
+
+	append(part: string): MockCodeActionKind {
+		return new MockCodeActionKind(this.value + '.' + part);
+	}
+}

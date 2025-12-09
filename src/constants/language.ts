@@ -148,6 +148,28 @@ export const SSL_BUILTIN_FUNCTIONS: SSLFunction[] = [
         "untypedSignature": "DoProc(args)"
     },
     {
+        "name": "Transform",
+        "description": "Transforms a value into a string representation.",
+        "params": "(any value)",
+        "returns": "string",
+        "signature": "Transform(any value)",
+        "returnType": "string",
+        "category": "String Functions",
+        "frequency": "High",
+        "untypedSignature": "Transform(value)"
+    },
+    {
+        "name": "Transform",
+        "description": "Transforms a value into a string representation.",
+        "params": "(any value)",
+        "returns": "string",
+        "signature": "Transform(any value)",
+        "returnType": "string",
+        "category": "String Functions",
+        "frequency": "High",
+        "untypedSignature": "Transform(value)"
+    },
+    {
         "name": "Len",
         "description": "Returns the length of the input string.",
         "params": "(any source)",

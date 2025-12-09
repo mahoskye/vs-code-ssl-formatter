@@ -45,9 +45,6 @@ export class Lexer {
                 tokens.push(this.readWhitespace());
             } else if (char === '/' && this.peek() === '*') {
                 tokens.push(this.readBlockComment());
-            } else if (char === '*' && this.isStartOfLine(tokens)) {
-                // Star at start of line is a comment in SSL (legacy)
-                tokens.push(this.readLineComment());
             } else if (char === ';') {
                 tokens.push(this.readPunctuation());
             } else if (char === '.') {
@@ -100,19 +97,7 @@ export class Lexer {
         return this.input[this.pos + offset];
     }
 
-    private isStartOfLine(tokens: Token[]): boolean {
-        // Retrieve the last significant token (ignore whitespace?)
-        // Actually, for '*' comment check, it strictly must be start of line, possibly after whitespace.
-        // So we look at previous tokens.
-        for (let i = tokens.length - 1; i >= 0; i--) {
-            if (tokens[i].type === TokenType.Whitespace) {
-                if (tokens[i].text.includes('\n')) { return true; }
-                continue;
-            }
-            return false;
-        }
-        return true; // Start of file
-    }
+
 
     private isArrayAccessContext(tokens: Token[]): boolean {
         // Look back for last non-whitespace/comment token
@@ -201,22 +186,7 @@ export class Lexer {
         return { type: TokenType.Comment, text, line, column: col, offset: start };
     }
 
-    private readLineComment(): Token {
-        // Line comments starting with *
-        const start = this.pos;
-        const line = this.line;
-        const col = this.column;
-        let text = "";
 
-        while (this.pos < this.input.length) {
-            const char = this.input[this.pos];
-            if (char === '\n') { break; }
-            text += char;
-            this.advance();
-        }
-
-        return { type: TokenType.Comment, text, line, column: col, offset: start };
-    }
 
     private readString(): Token {
         const start = this.pos;

@@ -8,7 +8,7 @@
  * String concatenation in SQL calls
  *;
 :PROCEDURE TestTupleUpdate;
-:PARAMETERS batchData;
+:PARAMETERS oBatchData;
 	/* Oracle-style tuple update with subquery alignment;
 	SQLExecute("
         UPDATE generic_table SET
@@ -20,16 +20,16 @@
                 WHERE s.id = generic_table.id
                   AND s.status = ?'Active'?
             )
-        WHERE run_id = ?batchData:runId?
+        WHERE run_id = ?oBatchData:runId?
         ");
 	:RETURN;
 :ENDPROC;
 
 :PROCEDURE TestComplexInsert;
-:PARAMETERS batchData;
+:PARAMETERS oBatchData;
 
 	:DECLARE sOrderList;
-	sOrderList := BuildStringForIn(batchData:orderIds);
+	sOrderList := BuildStringForIn(oBatchData:orderIds);
 
 	/* Insert with Select and Not Exists;
 	SQLExecute("
@@ -37,19 +37,19 @@
             (
                 run_id, order_id, test_code, item_id, measurement, unit, location
             )
-        SELECT ?batchData:currentRunId?, o.order_id, ?batchData:testCode?,
+        SELECT ?oBatchData:currentRunId?, o.order_id, ?oBatchData:testCode?,
                s.item_id, s.measurement, s.unit, s.location
         FROM orders o, inventory s
         WHERE o.test_code = s.test_code
           AND o.order_id = s.order_id
           AND o.run_id = s.run_id
-          AND o.test_code IN (?batchData:prepTestCode?, ?batchData:qcTestCode?)
+          AND o.test_code IN (?oBatchData:prepTestCode?, ?oBatchData:qcTestCode?)
           AND o.order_id IN " + sOrderList + "
           AND NOT EXISTS (
               SELECT 1
               FROM target_table tt
               WHERE tt.order_id = o.order_id
-                AND tt.test_code = ?batchData:testCode?
+                AND tt.test_code = ?oBatchData:testCode?
                 AND tt.location = s.location
                 AND tt.item_id = s.item_id
           )
@@ -58,7 +58,7 @@
 :ENDPROC;
 
 :PROCEDURE TestNestedSubqueryUpdate;
-:PARAMETERS batchData;
+:PARAMETERS oBatchData;
 	/* Update with scalar subquery;
 	SQLExecute("
         UPDATE tasks SET
@@ -68,7 +68,7 @@
                 WHERE t2.run_id = tasks.run_id
                   AND t2.sequence <= tasks.sequence
             )
-        WHERE run_id = ?batchData:currentRunId?
+        WHERE run_id = ?oBatchData:currentRunId?
     ");
 
 	/* Update with DISTINCT scalar subquery;
@@ -80,22 +80,22 @@
                 WHERE tasks.order_id = results.order_id
                   AND tasks.run_id = results.run_id
             )
-        WHERE run_id = ?batchData:currentRunId?
+        WHERE run_id = ?oBatchData:currentRunId?
         ");
 	:RETURN;
 :ENDPROC;
 
 :PROCEDURE TestDynamicSqlConcat;
-:PARAMETERS sTable, sCondition;
+:PARAMETERS sTable, sCondition, oBatchData;
 	/* String concatenation within SqlExecute;
 	SQLExecute("
         SELECT *
         FROM " + sTable + " WHERE status = 'READY' " + " AND " + sCondition);
 
 	/* User Message formatting with concatenation;
-	UsrMes("Data validation results", "Run ID: " + Transform(batchData:runId) + CRLF
-           + "Test Code: " + Transform(batchData:testCode) + CRLF + "Status: "
-           + batchData:status);
+	UsrMes("Data validation results", "Run ID: " + Transform(oBatchData:runId) + CRLF
+           + "Test Code: " + Transform(oBatchData:testCode) + CRLF + "Status: "
+           + oBatchData:status);
 	:RETURN;
 :ENDPROC;
 

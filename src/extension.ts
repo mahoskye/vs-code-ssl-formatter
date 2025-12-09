@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { SSLFoldingProvider } from "./sslFoldingProvider";
 import { SSLFormattingProvider } from "./sslFormattingProvider";
 import { SSLSymbolProvider } from "./sslSymbolProvider";
+import { SSLFormatter } from "./formatting/formatter";
 import { SSLCompletionProvider } from "./sslCompletionProvider";
 import { SSLHoverProvider } from "./sslHoverProvider";
 import { SSLDiagnosticProvider } from "./sslDiagnosticProvider";
@@ -104,7 +105,7 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.workspace.onDidCloseTextDocument(document => {
             if (document.languageId === "ssl") {
-                diagnosticProvider.clear();
+                diagnosticProvider.removeDiagnostics(document.uri);
             }
         })
     );
@@ -130,6 +131,14 @@ export async function activate(context: vscode.ExtensionContext) {
                     );
                 }
             }
+        })
+    );
+
+    // Register Code Action Provider
+    const codeActionProvider = new SSLCodeActionProvider();
+    context.subscriptions.push(
+        vscode.languages.registerCodeActionsProvider('ssl', codeActionProvider, {
+            providedCodeActionKinds: SSLCodeActionProvider.providedCodeActionKinds
         })
     );
 

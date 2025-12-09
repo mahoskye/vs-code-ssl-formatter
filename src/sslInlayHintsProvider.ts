@@ -15,6 +15,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 	private debounceTimer: NodeJS.Timeout | undefined;
 
+
 	constructor(
 		private readonly procedureIndex?: ProcedureIndex
 	) {
@@ -106,15 +107,40 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		const argsList = this.parseArguments(match.args);
 		let currentOffset = match.index + functionName.length + 1; // Start after 'Name('
 
+		// Semantic abbreviations for common long parameters
+		const abbreviations: { [key: string]: string } = {
+			'commandString': 'cmd',
+			'friendlyName': 'id',
+			'rollbackExistingTransaction': 'rb',
+			'invariantDateColumns': 'dates',
+			'includeSchema': 'sch',
+			'includeHeader': 'hdr',
+			'nullAsBlank': 'nulls',
+			'returnType': 'ret',
+			'tableName': 'tbl',
+			'arrayOfValues': 'vals',
+			'incrementWith': 'inc'
+		};
+
+
 		for (let i = 0; i < argsList.length && i < paramNames.length; i++) {
 			const absoluteOffset = lineStartOffset + currentOffset;
 			const hintPosition = this.createHintPosition(document, absoluteOffset);
+
+			// Use abbreviation or truncate
+			let label = paramNames[i];
+			if (abbreviations[label]) {
+				label = abbreviations[label];
+			} else if (label.length > 12) {
+				label = label.substring(0, 10) + '..';
+			}
+
 			const hint = new vscode.InlayHint(
 				hintPosition,
-				`${paramNames[i]}:`,
+				`${label}:`,
 				vscode.InlayHintKind.Parameter
 			);
-			hint.paddingRight = true;
+			// hint.paddingRight = true; 
 			hints.push(hint);
 
 			// Calculate length of argument including potential whitespace preserved in argsList if specific parsing used
@@ -322,19 +348,34 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		const args: string[] = [];
 		let current = "";
 		let depth = 0;
+		let inQuote = false;
+		let quoteChar = '';
 
-		for (const char of argsString) {
-			if (char === "(" || char === "[" || char === "{") {
-				depth++;
+		for (let i = 0; i < argsString.length; i++) {
+			const char = argsString[i];
+
+			if (inQuote) {
 				current += char;
-			} else if (char === ")" || char === "]" || char === "}") {
-				depth--;
-				current += char;
-			} else if (char === "," && depth === 0) {
-				args.push(current);
-				current = "";
+				if (char === quoteChar) {
+					inQuote = false;
+				}
 			} else {
-				current += char;
+				if (char === '"' || char === "'") {
+					inQuote = true;
+					quoteChar = char;
+					current += char;
+				} else if (char === "(" || char === "[" || char === "{") {
+					depth++;
+					current += char;
+				} else if (char === ")" || char === "]" || char === "}") {
+					depth--;
+					current += char;
+				} else if (char === "," && depth === 0) {
+					args.push(current);
+					current = "";
+				} else {
+					current += char;
+				}
 			}
 		}
 

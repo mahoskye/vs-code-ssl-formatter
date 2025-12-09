@@ -94,7 +94,18 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		// Try to resolve as a global/workspace procedure
 		const workspaceProc = this.resolveWorkspaceProcedure(word);
 		if (workspaceProc) {
-			return this.createProcedureHover(workspaceProc, range, "Workspace Procedure");
+			let label = "Workspace Procedure";
+			// Check if this looks like a direct call: Word(
+			const nextCharIndex = range.end.character;
+			const remainingLine = lineText.substring(nextCharIndex).trimLeft();
+			if (remainingLine.startsWith('(')) {
+				// Takes arguments, implying a call -> Warning
+				label += " (Review Usage)";
+				// We can modify the createProcedureHover to accept an extra note or just modify the label.
+				// Let's modify createProcedureHover to be more flexible or just append here.
+				return this.createProcedureHover(workspaceProc, range, label, "⚠️ Procedures must be called using `DoProc` or `ExecFunction`.");
+			}
+			return this.createProcedureHover(workspaceProc, range, label);
 		}
 
 		return null;
@@ -201,11 +212,14 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		return new vscode.Hover(md, range);
 	}
 
-	private createProcedureHover(proc: ProcedureInfo, range: vscode.Range, label: string): vscode.Hover {
+	private createProcedureHover(proc: ProcedureInfo, range: vscode.Range, label: string, alert?: string): vscode.Hover {
 		const md = new vscode.MarkdownString();
 		const sig = proc.declarationText || `:PROCEDURE ${proc.name}`;
 		md.appendCodeblock(sig, "ssl");
 		md.appendMarkdown(`\n**${label}**\n\n`);
+		if (alert) {
+			md.appendMarkdown(`> ${alert}\n\n`);
+		}
 		// Documentation property does not exist on ProcedureInfo currently
 		// if(proc.documentation) md.appendMarkdown(`${proc.documentation}\n\n`);
 		md.appendMarkdown(`Located in \`${vscode.workspace.asRelativePath(proc.uri)}\``);

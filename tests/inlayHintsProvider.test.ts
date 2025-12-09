@@ -82,9 +82,9 @@ describe('SSL Inlay Hints Provider - ExecFunction resolution', () => {
 		const range = fullRangeFor(document.lineCount, document.lineAt(document.lineCount - 1).text.length);
 		const hints = provider.provideInlayHints(document as any, range as any, {} as any);
 		const labels = hints.map(hint => hint.label).filter(Boolean) as string[];
-		expect(labels).to.include('commandString:');
-		expect(labels).to.include('friendlyName:');
-		expect(labels).to.include('arrayOfValues:');
+		expect(labels).to.include('cmd:');
+		expect(labels).to.include('id:');
+		expect(labels).to.include('vals:');
 	});
 });
 
@@ -165,7 +165,7 @@ LimsSetCounter("Table", "Field", "Prefix", {}, {}, 1);
 		// "incrementWith = null" should be parsed as "incrementWith"
 
 		const labels = hints.map(h => h.label);
-		expect(labels).to.include('tableName:');
-		expect(labels).to.include('incrementWith:');
+		expect(labels).to.include('tbl:');
+		expect(labels).to.include('inc:');
 	});
 });

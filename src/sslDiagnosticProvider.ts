@@ -5,7 +5,8 @@ import {
 	BLOCK_END_KEYWORDS,
 	BLOCK_MIDDLE_KEYWORDS,
 	CASE_KEYWORDS,
-	LOOP_COUNTER_EXCEPTIONS
+	LOOP_COUNTER_EXCEPTIONS,
+	SSL_BUILTIN_FUNCTIONS
 } from "./constants/language";
 import {
 	CONFIG_KEYS,
@@ -88,6 +89,7 @@ export class SSLDiagnosticProvider {
 		this.validateBlocksAndStyle(analysis, config, diagnostics);
 		this.validateVariables(analysis, config, diagnostics);
 		this.validateSqlAndExec(analysis, config, diagnostics);
+		this.validateFunctionCalls(analysis, config, diagnostics);
 
 		this.diagnosticCollection.set(document.uri, diagnostics);
 	}
@@ -98,6 +100,10 @@ export class SSLDiagnosticProvider {
 
 	public clear(): void {
 		this.diagnosticCollection.clear();
+	}
+
+	public removeDiagnostics(uri: vscode.Uri): void {
+		this.diagnosticCollection.delete(uri);
 	}
 
 	// --- Configuration Helper ---
@@ -138,6 +144,8 @@ export class SSLDiagnosticProvider {
 
 		let currentProcedure: ProcedureScope | null = null;
 		let inCommentBlock = false;
+		let inDeclarationBlock = false;
+		let currentDeclType = "";
 
 		for (let i = 0; i < lines.length; i++) {
 			const line = lines[i];
@@ -158,9 +166,9 @@ export class SSLDiagnosticProvider {
 				// Even single-line /* ... ; is a comment, skip parsing content
 				continue;
 			}
-			if (trimmed.startsWith('*') || trimmed.startsWith('//')) {
-				continue;
-			}
+			// // is NOT a valid comment in SSL, so we do not skip it
+			// Next steps will handle it or flag it
+
 			// --- End Comment State Tracking ---
 
 			// Procedure Detection
@@ -186,13 +194,38 @@ export class SSLDiagnosticProvider {
 
 			// Variable Declaration detection (:DECLARE or :PARAMETERS)
 			// Note: simple regex for now, handles basic cases
-			const declMatch = trimmed.match(/^:(DECLARE|PARAMETERS)\s+(.+?);/i);
-			if (declMatch) {
-				const type = declMatch[1].toUpperCase();
-				const varList = declMatch[2].split(',');
+			// Variable Declaration detection (:DECLARE or :PARAMETERS or :PUBLIC)
+			// Handle multi-line declarations by accumulating until semicolon
+			// First, check for start of declaration
+			let declMatch = trimmed.match(/^:(DECLARE|PARAMETERS|PUBLIC)\s+(.*)/i);
+			let isNewDecl = !!declMatch;
 
+			if (isNewDecl || inDeclarationBlock) {
+				let contentToParse = "";
+
+				if (isNewDecl) {
+					// fresh start
+					currentDeclType = declMatch![1].toUpperCase();
+					contentToParse = declMatch![2];
+					inDeclarationBlock = true;
+				} else {
+					// continuation
+					contentToParse = trimmed;
+				}
+
+				// Check for end of declaration
+				if (contentToParse.includes(';')) {
+					inDeclarationBlock = false;
+					// Parse up to semicolon
+					contentToParse = contentToParse.substring(0, contentToParse.indexOf(';'));
+				}
+
+				// Parse variables in this chunk
+				const varList = contentToParse.split(',');
 				varList.forEach(v => {
 					const vTrim = v.trim();
+					if (!vTrim) { return; }
+
 					const name = vTrim.split(/\s+/)[0]; // simplistic parse
 					if (name) {
 						const def: VariableDefinition = {
@@ -203,16 +236,11 @@ export class SSLDiagnosticProvider {
 						};
 
 						if (currentProcedure) {
-							if (type === 'PARAMETERS') {
+							if (currentDeclType === 'PARAMETERS') {
 								currentProcedure.parameters.push(def);
 							}
-							// Parameters are also local variables
-							def.assignments = [];
 							currentProcedure.variables.set(name.toLowerCase(), def);
 						} else {
-							// Global if not in procedure (or PARAMETERS outside procedure is odd but syntactically possible?)
-							// treating as global
-							def.assignments = [];
 							analysis.globalVariables.set(name.toLowerCase(), def);
 						}
 					}
@@ -269,6 +297,7 @@ export class SSLDiagnosticProvider {
 	private validateBlocksAndStyle(analysis: DocumentAnalysis, config: ValidationConfig, diagnostics: vscode.Diagnostic[]) {
 		const blockStack: BlockStart[] = [];
 		let inCommentBlock = false;
+		let inStringQuote: string | null = null; // Track if we are inside a multiline string
 
 		const BLOCK_PAIRS: Record<string, string> = {
 			'IF': 'ENDIF', 'WHILE': 'ENDWHILE', 'FOR': 'NEXT',
@@ -284,6 +313,36 @@ export class SSLDiagnosticProvider {
 			const line = analysis.lines[i];
 			const trimmed = line.trim();
 			if (!trimmed) {
+				continue;
+			}
+
+			// --- Multiline String Tracking ---
+			// We need to know if the line ends while still inside a string.
+			// Simple parser for quotes.
+			for (let charIndex = 0; charIndex < line.length; charIndex++) {
+				const char = line[charIndex];
+				if (inCommentBlock) { break; } // Don't parse quotes in comments (simplified)
+
+				if (inStringQuote) {
+					if (char === inStringQuote) {
+						// Check for escaped quote? simple check for now
+						// In SSL " "" " is escape? or \" ? Assuming standard or simple.
+						// Lexer handles escapes. Here we do simple toggle.
+						inStringQuote = null;
+					}
+				} else {
+					if (char === '"' || char === "'") {
+						inStringQuote = char;
+					} else if (char === '/' && line[charIndex + 1] === '*') {
+						// Start of comment block inside line? Handled by line check below usually
+						// But strictly we should track it here too if mixing.
+						// Keeping it simple: If line starts with /* we handle it.
+					}
+				}
+			}
+
+			// If we are inside a string at the end of the line, skip block/style checks for this line
+			if (inStringQuote) {
 				continue;
 			}
 
@@ -316,7 +375,23 @@ export class SSLDiagnosticProvider {
 				}
 				continue;
 			}
-			if (trimmed.startsWith('*') || trimmed.startsWith('//')) {
+			// Invalid Comment Check (Double Slash)
+			if (trimmed.startsWith('//')) {
+				diagnostics.push(new vscode.Diagnostic(
+					new vscode.Range(i, 0, i, line.length),
+					"Invalid syntax: '//' is not a valid comment. Use '/* ... ;'.",
+					vscode.DiagnosticSeverity.Error
+				));
+				continue;
+			}
+
+			// Legacy Comment Check
+			if (trimmed.startsWith('*')) {
+				diagnostics.push(new vscode.Diagnostic(
+					new vscode.Range(i, 0, i, line.length),
+					"Invalid syntax: '*' at start of line is not a valid comment. Use '/* ... ;'.",
+					vscode.DiagnosticSeverity.Error
+				));
 				continue;
 			}
 
@@ -383,6 +458,7 @@ export class SSLDiagnosticProvider {
 	private validateVariables(analysis: DocumentAnalysis, config: ValidationConfig, diagnostics: vscode.Diagnostic[]) {
 		const reported = new Set<string>();
 		let inCommentBlock = false;
+		let inStringQuote: string | null = null;
 
 		for (let i = 0; i < analysis.lines.length; i++) {
 			if (diagnostics.length >= config.maxProblems) {
@@ -391,7 +467,7 @@ export class SSLDiagnosticProvider {
 			const line = analysis.lines[i];
 			const trimmed = line.trim();
 
-			// --- Comment Tracking (Added) ---
+			// --- Comment Tracking ---
 			if (inCommentBlock) {
 				if (trimmed.endsWith(';')) {
 					inCommentBlock = false;
@@ -411,9 +487,27 @@ export class SSLDiagnosticProvider {
 				continue;
 			}
 
-			// Mask strings to avoid false positives for variables inside quotes
-			// Replace with spaces to preserve indices
-			const lineWithoutStrings = line.replace(/(["'])(?:(?=(\\?))\2.)*?\1/g, (m) => ' '.repeat(m.length));
+			// --- String Masking (Support Multiline) ---
+			let maskedLine = "";
+			for (let j = 0; j < line.length; j++) {
+				const char = line[j];
+
+				if (inStringQuote) {
+					maskedLine += " "; // Mask content
+					if (char === inStringQuote) {
+						inStringQuote = null;
+					}
+				} else {
+					if (char === '"' || char === "'") {
+						inStringQuote = char;
+						maskedLine += " "; // Mask quote too to avoid partial matches
+					} else {
+						maskedLine += char;
+					}
+				}
+			}
+
+			const lineWithoutStrings = maskedLine;
 
 			// Determine Scope
 			const scope = analysis.procedures.find(p => i >= p.startLine && i <= (p.endLine || Infinity));
@@ -445,24 +539,21 @@ export class SSLDiagnosticProvider {
 				// Check Declaration
 				const isDeclared = locals.has(lowerName) || globals.has(lowerName) || config.configuredGlobals.has(lowerName);
 
-				if (!isDeclared && !reported.has(lowerName)) {
+				const scopeKey = scope ? `${scope.name.toLowerCase()}:${lowerName}` : lowerName;
+
+				if (!isDeclared && !reported.has(scopeKey)) {
 					diagnostics.push(this.createDiagnostic(i, match.index, varName.length,
 						DIAGNOSTIC_MESSAGES.UNDEFINED_VARIABLE(varName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.UNDEFINED_VARIABLE));
-					reported.add(lowerName);
+					reported.add(scopeKey);
 				}
 
 				// Hungarian Notation
 				if (config.hungarianEnabled && hasValidHungarianNotation && !hasValidHungarianNotation(varName)) {
-					// Need access to wrapper or utility? Using imported one.
-					// Note: imported hasValidHungarianNotation checks if it matches pattern.
 					const severity = config.strictMode ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning;
 					diagnostics.push(this.createDiagnostic(i, match.index, varName.length,
 						`Variable '${varName}' should use Hungarian notation`, severity, "ssl-hungarian-notation"));
 				}
 			}
-
-			// Check specific assignments for Declarations?
-			// The analyzer already parsed declarations. Here we check loose usage.
 		}
 	}
 
@@ -578,6 +669,29 @@ export class SSLDiagnosticProvider {
 
 	// --- Helpers ---
 
+	private isInsideString(line: string, index: number): boolean {
+		let insideString = false;
+		let quoteChar = '';
+
+		for (let i = 0; i < line.length; i++) {
+			if (i === index) {
+				return insideString;
+			}
+			const char = line[i];
+			if (insideString) {
+				if (char === quoteChar && line[i - 1] !== '\\') {
+					insideString = false;
+				}
+			} else {
+				if (char === '"' || char === "'") {
+					insideString = true;
+					quoteChar = char;
+				}
+			}
+		}
+		return false;
+	}
+
 	private parseArguments(argsString: string): string[] {
 		const args: string[] = [];
 		let current = "";
@@ -618,9 +732,17 @@ export class SSLDiagnosticProvider {
 		return args;
 	}
 
+
+
 	private resolveSqlString(lineIdx: number, arg: string, analysis: DocumentAnalysis): string {
 		if (arg.startsWith('"') || arg.startsWith("'")) {
-			return arg.substring(1, arg.length - 1);
+			// Check if it ends with the same quote
+			const quote = arg.charAt(0);
+			if (arg.endsWith(quote) && arg.length > 1) {
+				return arg.substring(1, arg.length - 1);
+			}
+			// Incomplete or multi-line string: only strip the starting quote to preserve content at end of line
+			return arg.substring(1);
 		}
 		// Resolve variable
 		const scope = analysis.procedures.find(p => lineIdx >= p.startLine && lineIdx <= (p.endLine || Infinity));
@@ -647,19 +769,21 @@ export class SSLDiagnosticProvider {
 		const sqlString = this.resolveSqlString(lineIdx, arg, analysis);
 		if (!sqlString) { return; }
 
-		// Heuristic: Check for placeholders
-		const hasNamed = /\?[a-zA-Z0-9_]+\?/.test(sqlString);
-		const hasPositional = /\?/.test(sqlString.replace(/\?[a-zA-Z0-9_]+\?/g, '')); // Check for ? NOT inside named
 
-		if (funcName === 'RunSQL') {
-			if (hasNamed) {
-				diagnostics.push(this.createDiagnostic(lineIdx, 0, 1,
-					"RunSQL should use positional placeholders '?'", vscode.DiagnosticSeverity.Error, "ssl-invalid-sql-placeholder-style"));
-			}
-		} else if (funcName === 'SQLExecute') {
-			if (hasPositional) {
-				diagnostics.push(this.createDiagnostic(lineIdx, 0, 1,
-					"SQLExecute should use named placeholders '?param?'", vscode.DiagnosticSeverity.Error, "ssl-invalid-sql-placeholder-style"));
+
+		// Diagnostic checks based on function type
+		if (funcName === 'SQLExecute') {
+			// SQLExecute supports "Expression" substitution (?expr?)
+			// It does NOT support bare positional parameters matching the broad pattern
+			// Broad pattern from docs: ?[^?]+?
+			const broadExpressionPattern = /\?[^?]+\?/g;
+			const remainingString = sqlString.replace(broadExpressionPattern, '');
+
+			if (/\?/.test(remainingString)) {
+				// Highlight argument
+				diagnostics.push(this.createDiagnostic(lineIdx, 0, arg.length,
+					"SQLExecute should use named parameters '?var?'",
+					vscode.DiagnosticSeverity.Warning, "ssl-invalid-sql-placeholder-style"));
 			}
 		}
 	}
@@ -695,4 +819,115 @@ export class SSLDiagnosticProvider {
 			configSeverity === 'information' ? vscode.DiagnosticSeverity.Information :
 				vscode.DiagnosticSeverity.Warning;
 	}
+
+	// --- Validation Phase 4: Function Calls ---
+
+	private validateFunctionCalls(analysis: DocumentAnalysis, config: ValidationConfig, diagnostics: vscode.Diagnostic[]) {
+		const validFunctionNames = new Set<string>();
+
+		// 1. Add Built-ins
+		SSL_BUILTIN_FUNCTIONS.forEach(f => validFunctionNames.add(f.name.toLowerCase()));
+
+		// 2. Add Configured Functions
+		config.configuredFunctions.forEach(f => validFunctionNames.add(f.toLowerCase()));
+
+		// Also allow keywords that look like functions
+		SSL_KEYWORDS.forEach(k => validFunctionNames.add(k.toLowerCase()));
+
+		let inCommentBlock = false;
+		let inString = false;
+		let stringChar = '';
+
+		for (let i = 0; i < analysis.lines.length; i++) {
+			if (diagnostics.length >= config.maxProblems) { break; }
+
+			let line = analysis.lines[i];
+			const trimmed = line.trim();
+
+			// Basic optimization
+			if (!trimmed || trimmed.startsWith('//')) {
+				continue;
+			}
+
+			// Handle block comments and strings across lines if necessary (though SSL strings are single line generally, 
+			// except for some cases, but for safety lets assuming single line strings for now unless end is missing)
+
+			// Masking Logic: Replace strings and comments with spaces
+			let maskedLine = "";
+			// inString and stringChar are persisted across lines
+
+
+			for (let j = 0; j < line.length; j++) {
+				const char = line[j];
+				const next = line[j + 1] || '';
+
+				if (inCommentBlock) {
+					maskedLine += " ";
+					if (char === '*' && next === '/') {
+						inCommentBlock = false;
+						maskedLine += " "; // consume /
+						j++;
+					}
+					continue;
+				}
+
+				if (inString) {
+					maskedLine += " ";
+					if (char === stringChar && line[j - 1] !== '\\') {
+						inString = false;
+					}
+					continue;
+				}
+
+				// Not in comment or string
+				if (char === '/' && next === '*') {
+					inCommentBlock = true;
+					maskedLine += "  ";
+					j++;
+					continue;
+				}
+
+				if (char === '/' && next === '/') {
+					// Start of single line comment -> ignore rest of line
+					maskedLine += " ".repeat(line.length - j);
+					break;
+				}
+
+				if (char === '"' || char === "'") {
+					inString = true;
+					stringChar = char;
+					maskedLine += " ";
+					continue;
+				}
+
+				maskedLine += char;
+			}
+
+			// Regex for function calls: Name(
+			// Use maskedLine
+			const functionCallRegex = /(?<![\.\:])\b([a-zA-Z][a-zA-Z0-9_]*)\s*\(/g;
+
+			let match;
+			while ((match = functionCallRegex.exec(maskedLine)) !== null) {
+				const name = match[1];
+				const nameLower = name.toLowerCase();
+
+				// If it is NOT a valid function, check if it's a procedure in this file or just unknown
+				if (!validFunctionNames.has(nameLower)) {
+					// Check if it is a known procedure in this file
+					const isLocalProcedure = analysis.procedures.some(p => p.name.toLowerCase() === nameLower);
+
+					const range = new vscode.Range(i, match.index, i, match.index + name.length);
+					const diag = new vscode.Diagnostic(
+						range,
+						`Invalid direct procedure call '${name}'. Procedures must be called using DoProc or ExecFunction.`,
+						vscode.DiagnosticSeverity.Error
+					);
+					diag.code = "ssl-invalid-direct-call"; // Assign code for CodeAction
+					diagnostics.push(diag);
+				}
+			}
+		}
+	}
 }
+

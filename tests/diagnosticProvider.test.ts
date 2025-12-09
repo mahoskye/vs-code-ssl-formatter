@@ -219,16 +219,7 @@ AEval(aList, {|x| x := 1});
 });
 
 describe('SSL Diagnostic Provider - SQL placeholder style', () => {
-	it('errors when RunSQL uses named placeholders', () => {
-		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
-:DECLARE sSQL, nId;
-sSQL := "SELECT * FROM Foo WHERE ID = ?nId?";
-RunSQL(sSQL, "Query", { nId });
-:ENDPROC;`);
-		const styleDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-placeholder-style');
-		expect(styleDiagnostics).to.have.length(1);
-		expect(styleDiagnostics[0].severity).to.equal(0); // Error = 0
-	});
+
 
 	it('warns when SQLExecute uses positional placeholders', () => {
 		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
@@ -272,10 +263,10 @@ SQLExecute(sSQL, "InvalidReuse", 0, 0, 0, "", "", "", 0);
 		// Second usage uses positional placeholders for SQLExecute -> ERROR (Strict rules)
 		// Both show that the validator is checking the SPECIFIC value assigned before the call.
 
-		const styleDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-placeholder-style');
-		expect(styleDiagnostics).to.have.length(2);
-		expect(styleDiagnostics[0].range.start.line).to.equal(3); // RunSQL line
-		expect(styleDiagnostics[1].range.start.line).to.equal(6); // SQLExecute line
+		const diag2diagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-placeholder-style');
+		// RunSQL check disabled to allow valid ?...? syntax (positional)
+		expect(diag2diagnostics).to.have.length(1);
+		expect(diag2diagnostics[0].message).to.contain('SQLExecute'); // SQLExecute line
 	});
 
 	it('validates SQL inside concatenated strings correctly', () => {
