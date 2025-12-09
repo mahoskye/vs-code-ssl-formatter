@@ -242,11 +242,6 @@
                     "default": true,
                     "description": "Show parameter names as inlay hints in function calls"
                 },
-                "ssl.intellisense.inlayHints.showOnActiveLineOnly": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Only show inlay hints on the line where the cursor is positioned"
-                },
                 "ssl.intellisense.completion.enableKeywords": {
                     "type": "boolean",
                     "default": true,
@@ -382,6 +377,11 @@
             {
                 "command": "ssl.formatSqlPickStyle",
                 "title": "SSL: Format SQL (Pick Style)",
+                "category": "SSL"
+            },
+            {
+                "command": "ssl.toggleInlayHints",
+                "title": "SSL: Toggle Inlay Hints",
                 "category": "SSL"
             }
         ],

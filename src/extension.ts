@@ -202,35 +202,14 @@ export async function activate(context: vscode.ExtensionContext) {
         vscode.languages.registerInlayHintsProvider(documentSelector, inlayHintsProvider)
     );
 
-    // Refresh inlay hints when cursor position changes
-    let lastActiveLine: number | undefined = undefined;
-    let debounceTimer: NodeJS.Timeout | undefined;
-
+    // Register command to toggle inlay hints
     context.subscriptions.push(
-        vscode.window.onDidChangeTextEditorSelection((event) => {
-            const editor = event.textEditor;
-            if (editor.document.languageId === 'ssl') {
-                const config = vscode.workspace.getConfiguration("ssl");
-                const showOnActiveLineOnly = config.get<boolean>("intellisense.inlayHints.showOnActiveLineOnly", true);
-
-                if (!showOnActiveLineOnly) {
-                    return;
-                }
-
-                if (debounceTimer) {
-                    clearTimeout(debounceTimer);
-                }
-
-                // Debounce refresh to avoid performance impact
-                debounceTimer = setTimeout(() => {
-                    const currentLine = editor.selection.active.line;
-                    // Always refresh if line changed or if we suspect stale hints
-                    if (lastActiveLine !== currentLine) {
-                        lastActiveLine = currentLine;
-                        inlayHintsProvider.refresh();
-                    }
-                }, 25);
-            }
+        vscode.commands.registerCommand('ssl.toggleInlayHints', async () => {
+            const config = vscode.workspace.getConfiguration("ssl");
+            const currentValue = config.get<boolean>("intellisense.inlayHints.enabled", true);
+            await config.update("intellisense.inlayHints.enabled", !currentValue, vscode.ConfigurationTarget.Global);
+            const status = !currentValue ? "enabled" : "disabled";
+            vscode.window.showInformationMessage(`SSL Inlay Hints ${status}`);
         })
     );
 

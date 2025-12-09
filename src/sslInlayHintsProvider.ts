@@ -37,7 +37,6 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 		const config = vscode.workspace.getConfiguration("ssl");
 		const inlayHintsEnabled = config.get<boolean>("intellisense.inlayHints.enabled", true);
 		const showParameterNames = config.get<boolean>("intellisense.inlayHints.parameterNames", true);
-		const showOnActiveLineOnly = config.get<boolean>("intellisense.inlayHints.showOnActiveLineOnly", true);
 
 		if (!inlayHintsEnabled || !showParameterNames) {
 			return [];
@@ -45,25 +44,11 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 		const hints: vscode.InlayHint[] = [];
 
-		// If showing only on active line, restrict to the cursor's line
-		if (showOnActiveLineOnly) {
-			// Find the editor for this document
-			// We iterate visibleTextEditors because activeTextEditor might be stale or not match receiving document
-			const editor = vscode.window.visibleTextEditors.find(e => e.document === document);
-
-			if (editor) {
-				const activeLine = editor.selection.active.line;
-				// Always provide hints for the active line - VS Code handles rendering
-				// even if the line is outside the currently visible viewport range
-				hints.push(...this.getLineInlayHints(document, activeLine));
-			}
-		} else {
-			// Show hints for all lines in the requested range
-			const startLine = Math.max(0, range.start.line);
-			const endLine = Math.min(document.lineCount - 1, range.end.line);
-			for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
-				hints.push(...this.getLineInlayHints(document, lineNumber));
-			}
+		// Show hints for all lines in the requested range
+		const startLine = Math.max(0, range.start.line);
+		const endLine = Math.min(document.lineCount - 1, range.end.line);
+		for (let lineNumber = startLine; lineNumber <= endLine; lineNumber++) {
+			hints.push(...this.getLineInlayHints(document, lineNumber));
 		}
 
 		return hints;
