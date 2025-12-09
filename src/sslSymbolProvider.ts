@@ -141,11 +141,11 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 					const vars = this.extractVariables(node.tokens, type);
 
 					for (const v of vars) {
-						const sym = new vscode.DocumentSymbol(
+						const sym = this.createSymbol(
 							v,
-							isParam ? "Parameter" : "Variable",
 							vscode.SymbolKind.Variable,
-							new vscode.Range(node.startLine - 1, 0, node.endLine - 1, 0),
+							node.startLine - 1,
+							isParam ? "Parameter" : "Variable",
 							new vscode.Range(node.startLine - 1, 0, node.endLine - 1, 0)
 						);
 						currentContainer.push(sym);
@@ -165,9 +165,24 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 	}
 
 	private createSymbol(name: string, kind: vscode.SymbolKind, line: number, detail: string, range: vscode.Range): vscode.DocumentSymbol {
-		const selRange = new vscode.Range(line, 0, line, name.length);
-		// Improvement: actual range of the name token would be better, but this is sufficient for now
-		return new vscode.DocumentSymbol(name, detail, kind, range, selRange);
+		// Calculate required minimum width for selRange
+		const minWidth = Math.max(1, name.length);
+
+		// Ensure the range is valid (end >= start) AND has sufficient width
+		let validRange = range;
+		const isInvalidRange = range.end.line < range.start.line ||
+			(range.end.line === range.start.line && range.end.character < range.start.character);
+		const hasInsufficientWidth = range.start.line === range.end.line && range.end.character < minWidth;
+
+		if (isInvalidRange || hasInsufficientWidth) {
+			// Fix by using start line with sufficient character width
+			validRange = new vscode.Range(range.start.line, 0, range.start.line, Math.max(100, minWidth));
+		}
+
+		// Create selectionRange within fullRange
+		const selLine = validRange.start.line;
+		const selRange = new vscode.Range(selLine, 0, selLine, minWidth);
+		return new vscode.DocumentSymbol(name, detail, kind, validRange, selRange);
 	}
 
 	private extractRegionName(node: Node): string {
