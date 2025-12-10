@@ -44,6 +44,16 @@ export class MockRange {
 		return this.contains(positionOrRange.start) && this.contains(positionOrRange.end);
 	}
 
+	intersection(other: MockRange): MockRange | undefined {
+		const start = this.start.isAfter(other.start) ? this.start : other.start;
+		const end = this.end.isBefore(other.end) ? this.end : other.end;
+
+		if (start.isAfter(end)) {
+			return undefined;
+		}
+		return new MockRange(start, end);
+	}
+
 	isEmpty(): boolean {
 		return this.start.isEqual(this.end);
 	}
@@ -631,9 +641,27 @@ export class MockCodeActionKind {
 	static SourceOrganizeImports = new MockCodeActionKind('source.organizeImports');
 	static SourceFixAll = new MockCodeActionKind('source.fixAll');
 
+
 	constructor(public value: string) { }
 
 	append(part: string): MockCodeActionKind {
 		return new MockCodeActionKind(this.value + '.' + part);
+	}
+}
+
+export class MockCodeLens {
+	public command?: any;
+
+	constructor(
+		public range: MockRange,
+		command?: any
+	) {
+		if (command) {
+			this.command = command;
+		}
+	}
+
+	get isResolved(): boolean {
+		return !!this.command;
 	}
 }

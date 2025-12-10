@@ -31,7 +31,8 @@ import {
 	MockFoldingRangeKind,
 	MockTextDocument,
 	createDocument,
-	MockCodeActionKind
+	MockCodeActionKind,
+	MockCodeLens
 } from './helpers/mockVSCode';
 
 // Shared state for mocks
@@ -223,6 +224,8 @@ const mockVscode = {
 			this.kind = kind;
 		}
 	},
+	CodeLens: MockCodeLens,
+
 	languages: {
 		createDiagnosticCollection(name: string): MockDiagnosticCollection {
 			const collection = new MockDiagnosticCollection();
