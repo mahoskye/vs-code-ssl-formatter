@@ -665,3 +665,24 @@ export class MockCodeLens {
 		return !!this.command;
 	}
 }
+
+export class MockCancellationToken {
+	isCancellationRequested: boolean = false;
+	onCancellationRequested: any;
+}
+
+export class MockCancellationTokenSource {
+	token: MockCancellationToken;
+
+	constructor() {
+		this.token = new MockCancellationToken();
+	}
+
+	cancel(): void {
+		this.token.isCancellationRequested = true;
+	}
+
+	dispose(): void {
+		// no-op
+	}
+}

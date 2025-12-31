@@ -206,6 +206,8 @@ export class WorkspaceProcedureIndex implements ProcedureIndex {
 	}
 }
 
+
+
 function parseProceduresFromDocument(document: vscode.TextDocument): Omit<ProcedureInfo, "fileBaseName" | "scriptKeys">[] {
 	const procedures: Omit<ProcedureInfo, "fileBaseName" | "scriptKeys">[] = [];
 	for (let lineNumber = 0; lineNumber < document.lineCount; lineNumber++) {

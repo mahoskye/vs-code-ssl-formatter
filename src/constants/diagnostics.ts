@@ -24,7 +24,8 @@ export const DIAGNOSTIC_CODES = {
     MISSING_PARAMS: "ssl-missing-params",
     MISMATCHED_BLOCK_END: "ssl-mismatched-block-end",
     UNMATCHED_BLOCK_END: "ssl-unmatched-block-end",
-    KEYWORD_WITHOUT_CONTEXT: "ssl-keyword-without-context"
+    KEYWORD_WITHOUT_CONTEXT: "ssl-keyword-without-context",
+    COMMENT_TEXT_AFTER_TERMINATOR: "ssl-comment-text-after-terminator"
 } as const;
 
 export type SSLDiagnosticCode = typeof DIAGNOSTIC_CODES[keyof typeof DIAGNOSTIC_CODES];
@@ -85,7 +86,10 @@ export const DIAGNOSTIC_MESSAGES = {
         `Unmatched :${endKeyword} - no matching :${expectedStart} block found`,
 
     KEYWORD_WITHOUT_CONTEXT: (keyword: string, requiredContext: string) =>
-        `:${keyword} requires :${requiredContext} but none was found`
+        `:${keyword} requires :${requiredContext} but none was found`,
+
+    COMMENT_TEXT_AFTER_TERMINATOR: 
+        "Text after ';' will not be part of the comment. Consider placing comments after code or on separate lines."
 } as const;
 
 export const DIAGNOSTIC_SEVERITIES = {

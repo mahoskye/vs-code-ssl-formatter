@@ -32,7 +32,9 @@ import {
 	MockTextDocument,
 	createDocument,
 	MockCodeActionKind,
-	MockCodeLens
+	MockCodeLens,
+	MockCancellationTokenSource,
+	MockCancellationToken
 } from './helpers/mockVSCode';
 
 // Shared state for mocks
@@ -225,6 +227,8 @@ const mockVscode = {
 		}
 	},
 	CodeLens: MockCodeLens,
+	CancellationTokenSource: MockCancellationTokenSource,
+	CancellationToken: MockCancellationToken,
 
 	languages: {
 		createDiagnosticCollection(name: string): MockDiagnosticCollection {

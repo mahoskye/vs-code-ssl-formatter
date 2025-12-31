@@ -66,6 +66,19 @@ sQuery := "SELECT * FROM table WHERE field = ?Unknown?";
 		const sqlDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-param');
 		expect(sqlDiagnostics.length).to.be.greaterThan(0);
 	});
+
+	it('validates SQL params on all lines of multi-line SQL statements', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
+:DECLARE sOrdNo, nTestCode;
+SqlExecute("Update RESULTS set RETESTNO = 1, NUMRES = NULL,
+                               RUNNO = NULL, S = ?Logged?, ORIGSTS = 'N'
+            where ORDNO = ?sOrdNo? and TESTCODE = ?nTestCode?");
+:ENDPROC;`);
+		const sqlDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-param');
+		// ?Logged? should be flagged as undefined on line 2 (inside the multi-line SQL)
+		expect(sqlDiagnostics.length).to.equal(1);
+		expect(sqlDiagnostics[0].message).to.include('Logged');
+	});
 });
 
 describe('SSL Diagnostic Provider - Multi-line Logical Expressions (Bug #3)', () => {
@@ -345,5 +358,196 @@ ExecFunction("Reporting.GenerateReport.GenerateReport", { "Daily" });
 :ENDPROC;`);
 		const execDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-exec-target');
 		expect(execDiagnostics).to.have.length(0);
+	});
+});
+
+describe('SSL Diagnostic Provider - Function Call Recognition (Issue #53)', () => {
+	it('does not flag lowercase function calls as undefined variables', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+infomes("some message");
+:ENDPROC;`);
+		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undefined-variable' && diag.message.includes('infomes'));
+		expect(undefinedDiagnostics).to.have.length(0);
+	});
+
+	it('does not flag any unknown function call as undefined variable', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+:DECLARE sValue;
+myCustomFunc(123);
+AnotherFunc(sValue);
+ALLUPPER(sValue);
+:ENDPROC;`);
+		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undefined-variable' &&
+			(diag.message.includes('myCustomFunc') ||
+			 diag.message.includes('AnotherFunc') ||
+			 diag.message.includes('ALLUPPER')));
+		expect(undefinedDiagnostics).to.have.length(0);
+	});
+
+	it('does not flag function calls with whitespace before parenthesis', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+someFunc (123);
+anotherFunc  ("test");
+:ENDPROC;`);
+		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undefined-variable' &&
+			(diag.message.includes('someFunc') || diag.message.includes('anotherFunc')));
+		expect(undefinedDiagnostics).to.have.length(0);
+	});
+
+	it('flags undeclared variables regardless of casing', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+:DECLARE sValue;
+sValue := undeclaredVar;
+:ENDPROC;`);
+		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undefined-variable');
+		expect(undefinedDiagnostics.length).to.be.greaterThan(0);
+	});
+
+	it('treats variable references case-insensitively', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+:DECLARE myVar;
+myVar := 1;
+sResult := MYVAR + myvar + MyVar;
+:ENDPROC;`);
+		// myVar is declared, so MYVAR, myvar, MyVar should all be valid references
+		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undefined-variable' &&
+			diag.message.toLowerCase().includes('myvar'));
+		expect(undefinedDiagnostics).to.have.length(0);
+	});
+
+	it('does not flag SSL literals NIL, .T., .F. as undefined variables', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+:DECLARE bFlag, oObject;
+bFlag := .T.;
+bFlag := .F.;
+oObject := NIL;
+:ENDPROC;`);
+		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undefined-variable' &&
+			(diag.message.includes('NIL') ||
+			 diag.message.includes('.T.') ||
+			 diag.message.includes('.F.')));
+		expect(undefinedDiagnostics).to.have.length(0);
+	});
+
+	it('flags lowercase nil as undefined variable (literals are case-sensitive)', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+:DECLARE oObject;
+oObject := nil;
+:ENDPROC;`);
+		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undefined-variable' &&
+			diag.message.includes('nil'));
+		expect(undefinedDiagnostics).to.have.length(1);
+	});
+});
+
+describe('SSL Diagnostic Provider - Comment Text After Terminator (Issue #52)', () => {
+	it('errors when code follows comment on same line', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+/* comment; sValue := "test";
+:ENDPROC;`);
+		const commentDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-comment-text-after-terminator');
+		expect(commentDiagnostics).to.have.length(1);
+		expect(commentDiagnostics[0].severity).to.equal(vscode.DiagnosticSeverity.Error);
+	});
+
+	it('warns when multiple comments on same line', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+/* Comment one; /* Comment two;
+:ENDPROC;`);
+		const commentDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-comment-text-after-terminator');
+		expect(commentDiagnostics).to.have.length(1);
+		expect(commentDiagnostics[0].severity).to.equal(vscode.DiagnosticSeverity.Warning);
+	});
+
+	it('errors on premature comment termination (Issue #52 example)', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+/* Create the order; empty return indicates creation failure for this entry;
+:ENDPROC;`);
+		const commentDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-comment-text-after-terminator');
+		expect(commentDiagnostics).to.have.length(1);
+	});
+
+	it('does not warn on normal single-line comment', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+/* This is a normal comment;
+:ENDPROC;`);
+		const commentDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-comment-text-after-terminator');
+		expect(commentDiagnostics).to.have.length(0);
+	});
+
+	it('does not warn on multi-line comments', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+/*
+This is a multi-line comment
+with multiple lines
+;
+:ENDPROC;`);
+		const commentDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-comment-text-after-terminator');
+		expect(commentDiagnostics).to.have.length(0);
+	});
+
+	it('does not warn when comment ends at end of line', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+/* Initialize variables;
+sValue := "test";
+:ENDPROC;`);
+		const commentDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-comment-text-after-terminator');
+		expect(commentDiagnostics).to.have.length(0);
+	});
+
+	it('errors on premature semicolon inside multi-line comment block', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+/*
+Description: This script does something
+Note: REP ; is a part of the key on the ORDTASK table.
+*/;
+:ENDPROC;`);
+		const commentDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-comment-text-after-terminator');
+		expect(commentDiagnostics).to.have.length(1);
+	});
+
+	it('errors on semicolon in middle of multi-line comment documentation', () => {
+		const diagnostics = collectDiagnostics(`/*
+Description: This script adds a QC sample
+Parameter 1: EQID - equipment id
+Return: Fixed RESULTS; cup number update also searches on ORDTASK.REP.
+*/;`);
+		const commentDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-comment-text-after-terminator');
+		expect(commentDiagnostics).to.have.length(1);
+	});
+
+	it('does not warn on multi-line comment with semicolon only at end', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+/*
+Description: This script does something
+No semicolons in the middle of any line
+;
+:ENDPROC;`);
+		const commentDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-comment-text-after-terminator');
+		expect(commentDiagnostics).to.have.length(0);
+	});
+
+	it('warns when comment is followed by another comment', () => {
+		const diagnostics = collectDiagnostics(`/*:PUBLIC VAR1, VAR2;/*not stored, added for calcs;`);
+		const commentDiagnostics = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-comment-text-after-terminator');
+		expect(commentDiagnostics).to.have.length(1);
+		expect(commentDiagnostics[0].severity).to.equal(vscode.DiagnosticSeverity.Warning);
 	});
 });

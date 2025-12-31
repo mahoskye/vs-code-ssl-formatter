@@ -4,5 +4,6 @@
 
 	:PROCEDURE Init;
 	:PARAMETERS name;
+
 		sName := name;
 	:ENDPROC;

@@ -123,6 +123,9 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 				if (char === '*' && nextChar === '/') {
 					state = 'CODE';
 					i++; // skip /
+				} else if (char === ';') {
+					// SSL also supports /* ... ; style comments
+					state = 'CODE';
 				}
 				continue;
 			}

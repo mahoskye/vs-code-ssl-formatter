@@ -1,7 +1,7 @@
 /* Keywords must be uppercase with colon prefix;
-
 :PROCEDURE TestKeywordCase;
 :PARAMETERS nValue;
+
 	:DECLARE nResult;
 
 	:IF nValue > 0;
@@ -9,5 +9,6 @@
 	:ELSE;
 		nResult := 0;
 	:ENDIF;
+
 	:RETURN nResult;
 :ENDPROC;

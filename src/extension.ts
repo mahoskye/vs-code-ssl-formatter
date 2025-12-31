@@ -102,10 +102,22 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
+    // Handle configuration change to cleanup diagnostics if setting enabled
     context.subscriptions.push(
-        vscode.workspace.onDidCloseTextDocument(document => {
-            if (document.languageId === "ssl") {
-                diagnosticProvider.removeDiagnostics(document.uri);
+        vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration("ssl.diagnostics.onlyOpenDocuments")) {
+                const config = vscode.workspace.getConfiguration("ssl");
+                const onlyOpen = config.get<boolean>("diagnostics.onlyOpenDocuments", true);
+
+                if (onlyOpen) {
+                    // Clear all and re-populate only for open documents
+                    diagnosticProvider.clear();
+                    vscode.workspace.textDocuments.forEach(document => {
+                        if (document.languageId === "ssl") {
+                            diagnosticProvider.updateDiagnostics(document);
+                        }
+                    });
+                }
             }
         })
     );

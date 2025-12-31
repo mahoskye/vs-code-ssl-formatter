@@ -1,5 +1,4 @@
 /* Logical operators should have proper spacing;
-
 :PROCEDURE TestLogicalOperators;
 :PARAMETERS bCondition;
 

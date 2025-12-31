@@ -1,9 +1,10 @@
 :PROCEDURE UpdateTest;
 :PARAMETERS col1, col2, id;
+
 	RunSQL("
-     UPDATE mytable SET
-         col1 = ?,
-         col2 = ?
-     WHERE id = ?
-     ",, {col1, col2, id});
+	     UPDATE mytable SET
+	         col1 = ?,
+	         col2 = ?
+	     WHERE id = ?
+	     ",, {col1, col2, id});
 :ENDPROC;

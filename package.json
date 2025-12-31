@@ -112,6 +112,13 @@
                     "default": true,
                     "description": "Remove trailing whitespace from all lines"
                 },
+                "ssl.format.maxConsecutiveBlankLines": {
+                    "type": "number",
+                    "default": 2,
+                    "minimum": 1,
+                    "maximum": 5,
+                    "description": "Maximum number of consecutive blank lines to preserve between statements"
+                },
                 "ssl.format.sql.enabled": {
                     "type": "boolean",
                     "default": true,
@@ -211,11 +218,6 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Warn about non-parameterized SQL queries"
-                },
-                "ssl.security.requireParameterizedQueries": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Require ?PARAM? or ? placeholders in SQL"
                 },
                 "ssl.intellisense.enabled": {
                     "type": "boolean",
