@@ -4,8 +4,8 @@ import * as vscode from 'vscode';
 import { SSLReferenceProvider } from '../../src/sslReferenceProvider';
 import { SSLCodeLensProvider } from '../../src/sslCodeLensProvider';
 
-describe('SSL Reference Provider Reproduction', () => {
-    it('Should find DoProc and ExecFunction references for Procedure', async () => {
+suite('SSL Reference Provider Reproduction', () => {
+    test('Should find DoProc and ExecFunction references for Procedure', async () => {
         const content = `
 :PROCEDURE MyProc
 EndProc
@@ -58,7 +58,7 @@ EndProc
         assert.ok(!lineNumbers.includes(8), 'Should NOT find variable usage x = MyProc when searching for procedure');
     });
 
-    it('Should count CodeLens references including DoProc strings', async () => {
+    test('Should count CodeLens references including DoProc strings', async () => {
         const content = `
 :PROCEDURE MyProc
 EndProc

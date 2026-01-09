@@ -30,7 +30,6 @@ ENDIF;
                 // :ENDPROC (0)
                 const expectedContent = `
 :PROCEDURE TestFormat;
-
 	IF .T. THEN
 		variable x;
 		x = 1;

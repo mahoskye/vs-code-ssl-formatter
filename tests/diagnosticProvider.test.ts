@@ -43,7 +43,7 @@ oUser:sValue := "Updated";
 CallSomething(oUser:sValue);
 Me:sProperty := "value";
 :ENDPROC;`);
-		const variableDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-undefined-variable' || diag.code === 'ssl-global-variable-in-procedure');
+		const variableDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-undeclared-variable' || diag.code === 'ssl-global-variable-in-procedure');
 		expect(variableDiagnostics).to.have.length(0);
 	});
 });
@@ -183,7 +183,7 @@ describe('SSL Diagnostic Provider - Configured globals', () => {
 sOutput := sConfiguredGlobal;
 :ENDPROC;`);
 		const globalWarnings = diagnostics.filter((diag: any) => diag.code === 'ssl-global-variable-in-procedure');
-		const undefinedDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-undefined-variable');
+		const undefinedDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-undeclared-variable');
 		expect(globalWarnings).to.have.length(0);
 		expect(undefinedDiagnostics).to.have.length(0);
 	});
@@ -193,7 +193,7 @@ sOutput := sConfiguredGlobal;
 :DECLARE sOutput;
 sOutput := sNotConfigured;
 :ENDPROC;`);
-		const undefinedDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-undefined-variable');
+		const undefinedDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-undeclared-variable');
 		expect(undefinedDiagnostics.length).to.be.greaterThan(0);
 	});
 });
@@ -214,7 +214,7 @@ describe('SSL Diagnostic Provider - Custom IntelliSense functions', () => {
 CustomFunc(sValue);
 :ENDPROC;`);
 		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
-			diag.code === 'ssl-undefined-variable' && diag.message.includes('CustomFunc')
+			diag.code === 'ssl-undeclared-variable' && diag.message.includes('CustomFunc')
 		);
 		expect(undefinedDiagnostics).to.have.length(0);
 	});
@@ -225,7 +225,7 @@ nLen := ALen(aList);
 AEval(aList, {|x| x := 1});
 :ENDPROC;`);
 		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
-			diag.code === 'ssl-undefined-variable' && (diag.message.includes('ALen') || diag.message.includes('AEval'))
+			diag.code === 'ssl-undeclared-variable' && (diag.message.includes('ALen') || diag.message.includes('AEval'))
 		);
 		expect(undefinedDiagnostics).to.have.length(0);
 	});
@@ -367,7 +367,7 @@ describe('SSL Diagnostic Provider - Function Call Recognition (Issue #53)', () =
 infomes("some message");
 :ENDPROC;`);
 		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
-			diag.code === 'ssl-undefined-variable' && diag.message.includes('infomes'));
+			diag.code === 'ssl-undeclared-variable' && diag.message.includes('infomes'));
 		expect(undefinedDiagnostics).to.have.length(0);
 	});
 
@@ -379,7 +379,7 @@ AnotherFunc(sValue);
 ALLUPPER(sValue);
 :ENDPROC;`);
 		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
-			diag.code === 'ssl-undefined-variable' &&
+			diag.code === 'ssl-undeclared-variable' &&
 			(diag.message.includes('myCustomFunc') ||
 			 diag.message.includes('AnotherFunc') ||
 			 diag.message.includes('ALLUPPER')));
@@ -392,7 +392,7 @@ someFunc (123);
 anotherFunc  ("test");
 :ENDPROC;`);
 		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
-			diag.code === 'ssl-undefined-variable' &&
+			diag.code === 'ssl-undeclared-variable' &&
 			(diag.message.includes('someFunc') || diag.message.includes('anotherFunc')));
 		expect(undefinedDiagnostics).to.have.length(0);
 	});
@@ -403,7 +403,7 @@ anotherFunc  ("test");
 sValue := undeclaredVar;
 :ENDPROC;`);
 		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
-			diag.code === 'ssl-undefined-variable');
+			diag.code === 'ssl-undeclared-variable');
 		expect(undefinedDiagnostics.length).to.be.greaterThan(0);
 	});
 
@@ -415,7 +415,7 @@ sResult := MYVAR + myvar + MyVar;
 :ENDPROC;`);
 		// myVar is declared, so MYVAR, myvar, MyVar should all be valid references
 		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
-			diag.code === 'ssl-undefined-variable' &&
+			diag.code === 'ssl-undeclared-variable' &&
 			diag.message.toLowerCase().includes('myvar'));
 		expect(undefinedDiagnostics).to.have.length(0);
 	});
@@ -428,7 +428,7 @@ bFlag := .F.;
 oObject := NIL;
 :ENDPROC;`);
 		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
-			diag.code === 'ssl-undefined-variable' &&
+			diag.code === 'ssl-undeclared-variable' &&
 			(diag.message.includes('NIL') ||
 			 diag.message.includes('.T.') ||
 			 diag.message.includes('.F.')));
@@ -441,7 +441,7 @@ oObject := NIL;
 oObject := nil;
 :ENDPROC;`);
 		const undefinedDiagnostics = diagnostics.filter((diag: any) =>
-			diag.code === 'ssl-undefined-variable' &&
+			diag.code === 'ssl-undeclared-variable' &&
 			diag.message.includes('nil'));
 		expect(undefinedDiagnostics).to.have.length(1);
 	});
@@ -549,5 +549,83 @@ No semicolons in the middle of any line
 			diag.code === 'ssl-comment-text-after-terminator');
 		expect(commentDiagnostics).to.have.length(1);
 		expect(commentDiagnostics[0].severity).to.equal(vscode.DiagnosticSeverity.Warning);
+	});
+});
+
+describe('SSL Diagnostic Provider - Dynamic Variable Assignment', () => {
+	it('does not error on SQL params for dynamically assigned variables', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+sDebugValue := LimsString(SOMETHING);
+SQLExecute("INSERT INTO debug VALUES (?sDebugValue?)");
+:ENDPROC;`);
+		const sqlParamErrors = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-invalid-sql-param' && diag.message.includes('sDebugValue'));
+		expect(sqlParamErrors).to.have.length(0);
+	});
+
+	it('warns once per scope about undeclared dynamically assigned variables', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+sValue := "test";
+sResult := sValue + sValue;
+:ENDPROC;`);
+		const undeclaredWarnings = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undeclared-variable' && diag.message.includes('sValue'));
+		// Should warn once for sValue usage (not on the LHS where it's defined)
+		expect(undeclaredWarnings).to.have.length(1);
+	});
+
+	it('does not warn on LHS of assignment', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+sNewVar := "value";
+:ENDPROC;`);
+		const undeclaredWarnings = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undeclared-variable' && diag.message.includes('sNewVar'));
+		// Should NOT warn on the assignment line itself
+		expect(undeclaredWarnings).to.have.length(0);
+	});
+
+	it('handles multi-line assignments', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+sLongVarName
+    := "some value";
+SQLExecute("SELECT ?sLongVarName?");
+:ENDPROC;`);
+		const sqlParamErrors = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-invalid-sql-param');
+		expect(sqlParamErrors).to.have.length(0);
+	});
+
+	it('errors on SQL params that are truly never defined', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+SQLExecute("INSERT INTO debug VALUES (?sNeverDefined?)");
+:ENDPROC;`);
+		const sqlParamErrors = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-invalid-sql-param' && diag.message.includes('sNeverDefined'));
+		expect(sqlParamErrors).to.have.length(1);
+	});
+
+	it('does not error on SQL params for properly declared variables', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+:DECLARE sProperVar;
+sProperVar := "value";
+SQLExecute("SELECT ?sProperVar?");
+:ENDPROC;`);
+		const sqlParamErrors = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-invalid-sql-param');
+		const undeclaredWarnings = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-undeclared-variable' && diag.message.includes('sProperVar'));
+		expect(sqlParamErrors).to.have.length(0);
+		expect(undeclaredWarnings).to.have.length(0);
+	});
+
+	it('handles multiple dynamic assignments in same procedure', () => {
+		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
+sDebugAddedQCOrders := LimsString(ADDEDQCORDERS);
+sDebugRunArray := LimsString(RUNARRAY);
+SQLExecute("INSERT INTO usgs_debug VALUES (?sDebugAddedQCOrders?, ?sDebugRunArray?)");
+:ENDPROC;`);
+		const sqlParamErrors = diagnostics.filter((diag: any) =>
+			diag.code === 'ssl-invalid-sql-param');
+		expect(sqlParamErrors).to.have.length(0);
 	});
 });

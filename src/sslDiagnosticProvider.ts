@@ -31,6 +31,7 @@ interface VariableDefinition {
 	column: number;
 	literalValue?: string; // For static analysis of content
 	assignments: { line: number, value: string }[]; // Track history of assignments
+	isDynamic?: boolean; // true if variable was assigned without :DECLARE
 }
 
 interface ProcedureScope {
@@ -247,38 +248,66 @@ export class SSLDiagnosticProvider {
 				});
 			}
 
-			// Capture basic string assignments for SQL analysis
-			// Capture string assignments (flow sensitive)
-			const assignMatch = trimmed.match(/^([a-z][a-z0-9_]*)\s*:=\s*(.+);?$/i);
+			// Track assignment targets (LHS of :=)
+			// This captures dynamically assigned variables (no :DECLARE)
+			// Pattern: identifier := anything
+			const assignMatch = trimmed.match(/^([a-zA-Z][a-zA-Z0-9_]*)\s*:=/i);
 			if (assignMatch) {
 				const varName = assignMatch[1];
-				const rhs = assignMatch[2];
+				const lowerName = varName.toLowerCase();
+				const targetMap = currentProcedure ? currentProcedure.variables : analysis.globalVariables;
 
-				// Extract all string literals from RHS
-				let constructedString = "";
-				const stringPattern = /(?:'([^']*)')|(?:"([^"]*)")/g;
-				let match;
-				while ((match = stringPattern.exec(rhs)) !== null) {
-					// Group 1 is single quoted, Group 2 is double quoted
-					constructedString += match[1] !== undefined ? match[1] : match[2];
+				// Create entry if not exists (dynamic assignment without :DECLARE)
+				if (!targetMap.has(lowerName)) {
+					targetMap.set(lowerName, {
+						name: varName,
+						line: i,
+						column: line.indexOf(varName),
+						assignments: [],
+						isDynamic: true
+					});
 				}
 
-				if (constructedString) {
-					// Helper to update definition
-					const updateDef = (map: Map<string, VariableDefinition>) => {
-						const def = map.get(varName.toLowerCase());
+				// Also capture string literal values for SQL analysis
+				const rhsMatch = trimmed.match(/^[a-zA-Z][a-zA-Z0-9_]*\s*:=\s*(.+);?$/i);
+				if (rhsMatch) {
+					const rhs = rhsMatch[1];
+					// Extract all string literals from RHS
+					let constructedString = "";
+					const stringPattern = /(?:'([^']*)')|(?:"([^"]*)")/g;
+					let strMatch;
+					while ((strMatch = stringPattern.exec(rhs)) !== null) {
+						constructedString += strMatch[1] !== undefined ? strMatch[1] : strMatch[2];
+					}
+
+					if (constructedString) {
+						const def = targetMap.get(lowerName);
 						if (def) {
 							if (!def.assignments) { def.assignments = []; }
 							def.assignments.push({ line: i, value: constructedString });
-							// Also update literalValue for legacy fallback (last assignment wins)
 							def.literalValue = constructedString;
 						}
-					};
+					}
+				}
+			}
 
-					if (currentProcedure) {
-						updateDef(currentProcedure.variables);
-					} else {
-						updateDef(analysis.globalVariables);
+			// Handle multi-line assignments where := appears on a continuation line
+			if (trimmed.startsWith(':=') && i > 0) {
+				const prevLine = lines[i - 1].trim();
+				const prevMatch = prevLine.match(/([a-zA-Z][a-zA-Z0-9_]*)\s*$/);
+				if (prevMatch) {
+					const varName = prevMatch[1];
+					const lowerName = varName.toLowerCase();
+					const targetMap = currentProcedure ? currentProcedure.variables : analysis.globalVariables;
+
+					if (!targetMap.has(lowerName)) {
+						targetMap.set(lowerName, {
+							name: varName,
+							line: i - 1,
+							column: lines[i - 1].lastIndexOf(varName),
+							assignments: [],
+							isDynamic: true
+						});
 					}
 				}
 			}
@@ -661,16 +690,43 @@ export class SSLDiagnosticProvider {
 					continue;
 				}
 
+				// Skip if this identifier is the target of an assignment (LHS of :=)
+				// The variable is being defined here, not used
+				if (/^\s*:=/.test(restOfLine)) {
+					continue;
+				}
+
+				// Also skip if this is a multi-line assignment (identifier at end of line, next line starts with :=)
+				if (i < analysis.lines.length - 1) {
+					const restOfCurrentLine = lineWithoutStrings.substring(match.index + varName.length).trim();
+					if (restOfCurrentLine === '') {
+						const nextLine = analysis.lines[i + 1].trim();
+						if (nextLine.startsWith(':=')) {
+							continue;
+						}
+					}
+				}
 
 				// Check Declaration
-				const isDeclared = locals.has(lowerName) || globals.has(lowerName) || config.configuredGlobals.has(lowerName);
+				const varDef = locals.get(lowerName) || globals.get(lowerName);
+				const isConfiguredGlobal = config.configuredGlobals.has(lowerName);
 
 				const scopeKey = scope ? `${scope.name.toLowerCase()}:${lowerName}` : lowerName;
 
-				if (!isDeclared && !reported.has(scopeKey)) {
-					diagnostics.push(this.createDiagnostic(i, match.index, varName.length,
-						DIAGNOSTIC_MESSAGES.UNDEFINED_VARIABLE(varName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.UNDEFINED_VARIABLE));
-					reported.add(scopeKey);
+				// Warn if variable is not declared (either truly undefined or dynamically assigned)
+				// Only warn once per variable per scope
+				if (!isConfiguredGlobal && !reported.has(scopeKey)) {
+					if (!varDef) {
+						// Truly undefined - not declared AND not assigned anywhere
+						diagnostics.push(this.createDiagnostic(i, match.index, varName.length,
+							DIAGNOSTIC_MESSAGES.UNDECLARED_VARIABLE(varName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.UNDECLARED_VARIABLE));
+						reported.add(scopeKey);
+					} else if (varDef.isDynamic) {
+						// Assigned but not declared - warn about best practice (once per scope)
+						diagnostics.push(this.createDiagnostic(i, match.index, varName.length,
+							DIAGNOSTIC_MESSAGES.UNDECLARED_VARIABLE(varName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.UNDECLARED_VARIABLE));
+						reported.add(scopeKey);
+					}
 				}
 
 				// Hungarian Notation
