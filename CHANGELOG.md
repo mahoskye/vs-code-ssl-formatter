@@ -5,10 +5,15 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.3.3] - 2025-12-09
+## [1.3.3] - 2026-01-09
 
 ### Fixed
 - Fixed CodeLens "0 references" issue for procedures called via `DoProc` and `ExecFunction` by correctly scanning string literals.
+- **Issue #52**: Fixed comment terminator detection - semicolons inside comments now correctly trigger errors when followed by code.
+- **Issue #53**: Fixed built-in function calls being incorrectly marked as undefined variables by:
+  - Renaming diagnostic code from `ssl-undefined-variable` to `ssl-undeclared-variable` for clarity.
+  - Tracking dynamically assigned variables (LHS of `:=`) as defined even without `:DECLARE`.
+  - Only showing `ssl-invalid-sql-param` error for truly undefined variables in SQL parameters.
 
 ## [1.3.2] - 2025-12-09
 
