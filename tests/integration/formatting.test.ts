@@ -14,27 +14,27 @@ suite('Formatting Integration Test', () => {
 
                 const initialContent = `
 :PROCEDURE TestFormat;
-IF .T. THEN
-variable x;
-x = 1;
-ENDIF;
+:IF .T.;
+:DECLARE x;
+x := 1;
+:ENDIF;
 :ENDPROC;
 `;
                 // Expect tabs. 
                 // Logic:
                 // :PROCEDURE (0)
-                // 	IF (1)
-                // 		variable x (2)
-                // 		x = 1 (2)
-                // 	ENDIF (1)
+                // 	:IF (1)
+                // 		:DECLARE x (2)
+                // 		x := 1 (2)
+                // 	:ENDIF (1)
                 // :ENDPROC (0)
                 const expectedContent = `
 :PROCEDURE TestFormat;
+	:IF .T.;
+		:DECLARE x;
 
-	IF .T. THEN
-		variable x;
-		x = 1;
-	ENDIF;
+		x := 1;
+	:ENDIF;
 :ENDPROC;
 `;
                 const doc = await vscode.workspace.openTextDocument({ language: 'ssl', content: initialContent });
@@ -46,8 +46,8 @@ ENDIF;
                 const text = doc.getText();
 
                 // Check if we got tabs
-                assert.ok(text.includes('\tIF'), 'Should indent IF with tab');
-                assert.ok(text.includes('\t\tvariable'), 'Should indent body with 2 tabs');
+                assert.ok(text.includes('\t:IF'), 'Should indent :IF with tab');
+                assert.ok(text.includes('\t\t:DECLARE'), 'Should indent body with 2 tabs');
 
                 // Normalize newlines for cross-platform strict check
                 assert.strictEqual(text.trim().replace(/\r\n/g, '\n'), expectedContent.trim().replace(/\r\n/g, '\n'));

@@ -31,6 +31,7 @@ interface VariableDefinition {
 	column: number;
 	literalValue?: string; // For static analysis of content
 	assignments: { line: number, value: string }[]; // Track history of assignments
+	isDynamic?: boolean; // true if variable was assigned without :DECLARE
 }
 
 interface ProcedureScope {
@@ -247,38 +248,66 @@ export class SSLDiagnosticProvider {
 				});
 			}
 
-			// Capture basic string assignments for SQL analysis
-			// Capture string assignments (flow sensitive)
-			const assignMatch = trimmed.match(/^([a-z][a-z0-9_]*)\s*:=\s*(.+);?$/i);
+			// Track assignment targets (LHS of :=)
+			// This captures dynamically assigned variables (no :DECLARE)
+			// Pattern: identifier := anything
+			const assignMatch = trimmed.match(/^([a-zA-Z][a-zA-Z0-9_]*)\s*:=/i);
 			if (assignMatch) {
 				const varName = assignMatch[1];
-				const rhs = assignMatch[2];
+				const lowerName = varName.toLowerCase();
+				const targetMap = currentProcedure ? currentProcedure.variables : analysis.globalVariables;
 
-				// Extract all string literals from RHS
-				let constructedString = "";
-				const stringPattern = /(?:'([^']*)')|(?:"([^"]*)")/g;
-				let match;
-				while ((match = stringPattern.exec(rhs)) !== null) {
-					// Group 1 is single quoted, Group 2 is double quoted
-					constructedString += match[1] !== undefined ? match[1] : match[2];
+				// Create entry if not exists (dynamic assignment without :DECLARE)
+				if (!targetMap.has(lowerName)) {
+					targetMap.set(lowerName, {
+						name: varName,
+						line: i,
+						column: line.indexOf(varName),
+						assignments: [],
+						isDynamic: true
+					});
 				}
 
-				if (constructedString) {
-					// Helper to update definition
-					const updateDef = (map: Map<string, VariableDefinition>) => {
-						const def = map.get(varName.toLowerCase());
+				// Also capture string literal values for SQL analysis
+				const rhsMatch = trimmed.match(/^[a-zA-Z][a-zA-Z0-9_]*\s*:=\s*(.+);?$/i);
+				if (rhsMatch) {
+					const rhs = rhsMatch[1];
+					// Extract all string literals from RHS
+					let constructedString = "";
+					const stringPattern = /(?:'([^']*)')|(?:"([^"]*)")/g;
+					let strMatch;
+					while ((strMatch = stringPattern.exec(rhs)) !== null) {
+						constructedString += strMatch[1] !== undefined ? strMatch[1] : strMatch[2];
+					}
+
+					if (constructedString) {
+						const def = targetMap.get(lowerName);
 						if (def) {
 							if (!def.assignments) { def.assignments = []; }
 							def.assignments.push({ line: i, value: constructedString });
-							// Also update literalValue for legacy fallback (last assignment wins)
 							def.literalValue = constructedString;
 						}
-					};
+					}
+				}
+			}
 
-					if (currentProcedure) {
-						updateDef(currentProcedure.variables);
-					} else {
-						updateDef(analysis.globalVariables);
+			// Handle multi-line assignments where := appears on a continuation line
+			if (trimmed.startsWith(':=') && i > 0) {
+				const prevLine = lines[i - 1].trim();
+				const prevMatch = prevLine.match(/([a-zA-Z][a-zA-Z0-9_]*)\s*$/);
+				if (prevMatch) {
+					const varName = prevMatch[1];
+					const lowerName = varName.toLowerCase();
+					const targetMap = currentProcedure ? currentProcedure.variables : analysis.globalVariables;
+
+					if (!targetMap.has(lowerName)) {
+						targetMap.set(lowerName, {
+							name: varName,
+							line: i - 1,
+							column: lines[i - 1].lastIndexOf(varName),
+							assignments: [],
+							isDynamic: true
+						});
 					}
 				}
 			}
@@ -363,10 +392,32 @@ export class SSLDiagnosticProvider {
 			// (even if it ends with ;). The only exception would be if we supported Code-After-Comment,
 			// but typically in SSL /* ... ; is a standalone block.
 			if (startInCommentBlock) {
+				// Check for premature comment termination: semicolon not at end of line (Issue #52)
+				// This applies to lines that are inside a multi-line comment block
+				const semiIndex = trimmed.indexOf(';');
+				if (semiIndex !== -1 && semiIndex < trimmed.length - 1) {
+					// Semicolon is not at end - text after it will be treated as code
+					const textAfterSemi = trimmed.substring(semiIndex + 1).trim();
+					if (textAfterSemi) {
+						const semiPosInLine = line.indexOf(';');
+						// If text after semicolon is a new comment, it's valid but confusing (Warning)
+						// If text after semicolon is code, it's an error (Error)
+						const severity = textAfterSemi.startsWith('/*')
+							? vscode.DiagnosticSeverity.Warning
+							: vscode.DiagnosticSeverity.Error;
+						const diag = new vscode.Diagnostic(
+							new vscode.Range(i, semiPosInLine + 1, i, line.length),
+							DIAGNOSTIC_MESSAGES.COMMENT_TEXT_AFTER_TERMINATOR,
+							severity
+						);
+						diag.code = DIAGNOSTIC_CODES.COMMENT_TEXT_AFTER_TERMINATOR;
+						diagnostics.push(diag);
+					}
+				}
 				continue; // Skip all keyword/syntax checks for this line
 			}
 
-			// Comment check
+			// Comment check - this handles lines that START a new comment block
 			if (inCommentBlock) {
 				if (trimmed.endsWith(';')) {
 					inCommentBlock = false;
@@ -374,6 +425,28 @@ export class SSLDiagnosticProvider {
 				continue;
 			}
 			if (trimmed.startsWith('/*')) {
+				// Check for text after first semicolon (Issue #52)
+				const firstSemicolon = trimmed.indexOf(';');
+				if (firstSemicolon !== -1) {
+					const textAfterSemi = trimmed.substring(firstSemicolon + 1).trim();
+					if (textAfterSemi) {
+						// Find the position in the original line (not trimmed)
+						const semiPosInLine = line.indexOf(';');
+						// If text after semicolon is a new comment, it's valid but confusing (Warning)
+						// If text after semicolon is code, it's an error (Error)
+						const severity = textAfterSemi.startsWith('/*')
+							? vscode.DiagnosticSeverity.Warning
+							: vscode.DiagnosticSeverity.Error;
+						const diag = new vscode.Diagnostic(
+							new vscode.Range(i, semiPosInLine + 1, i, line.length),
+							DIAGNOSTIC_MESSAGES.COMMENT_TEXT_AFTER_TERMINATOR,
+							severity
+						);
+						diag.code = DIAGNOSTIC_CODES.COMMENT_TEXT_AFTER_TERMINATOR;
+						diagnostics.push(diag);
+					}
+				}
+
 				if (!trimmed.endsWith(';')) {
 					inCommentBlock = true;
 				}
@@ -564,9 +637,18 @@ export class SSLDiagnosticProvider {
 			const locals = scope ? scope.variables : new Map<string, VariableDefinition>();
 			const globals = analysis.globalVariables;
 
+			// Skip declaration lines - identifiers here are being defined, not used
+			const trimmedForCheck = lineWithoutStrings.trim().toUpperCase();
+			if (trimmedForCheck.startsWith(':PROCEDURE') ||
+				trimmedForCheck.startsWith(':DECLARE') ||
+				trimmedForCheck.startsWith(':PARAMETERS') ||
+				trimmedForCheck.startsWith(':PUBLIC')) {
+				continue;
+			}
+
 			// Check Assignments & Usages
-			// Regex to find variable-like identifiers
-			const identifierPattern = /\b([a-z][a-zA-Z0-9_]*)\b/g;
+			// Regex to find all identifiers (case-insensitive - SSL variables/functions are case-insensitive)
+			const identifierPattern = /\b([a-zA-Z][a-zA-Z0-9_]*)\b/g;
 			let match;
 			while ((match = identifierPattern.exec(lineWithoutStrings)) !== null) {
 				const varName = match[1];
@@ -576,6 +658,16 @@ export class SSLDiagnosticProvider {
 				if (SSL_KEYWORDS.includes(varName.toUpperCase()) ||
 					config.configuredFunctions.has(lowerName) ||
 					LOOP_COUNTER_EXCEPTIONS.includes(lowerName)) {
+					continue;
+				}
+
+				// Skip 'Me' - special self-reference object in SSL classes (case-insensitive)
+				if (lowerName === 'me') {
+					continue;
+				}
+
+				// Skip 'NIL' - null literal in SSL (case-sensitive, must be uppercase)
+				if (varName === 'NIL') {
 					continue;
 				}
 
@@ -591,16 +683,50 @@ export class SSLDiagnosticProvider {
 					continue;
 				}
 
+				// Skip if this is a function call (identifier followed by '(')
+				// Functions are case-insensitive and we treat any identifier( pattern as a function call
+				const restOfLine = lineWithoutStrings.substring(match.index + varName.length);
+				if (/^\s*\(/.test(restOfLine)) {
+					continue;
+				}
+
+				// Skip if this identifier is the target of an assignment (LHS of :=)
+				// The variable is being defined here, not used
+				if (/^\s*:=/.test(restOfLine)) {
+					continue;
+				}
+
+				// Also skip if this is a multi-line assignment (identifier at end of line, next line starts with :=)
+				if (i < analysis.lines.length - 1) {
+					const restOfCurrentLine = lineWithoutStrings.substring(match.index + varName.length).trim();
+					if (restOfCurrentLine === '') {
+						const nextLine = analysis.lines[i + 1].trim();
+						if (nextLine.startsWith(':=')) {
+							continue;
+						}
+					}
+				}
 
 				// Check Declaration
-				const isDeclared = locals.has(lowerName) || globals.has(lowerName) || config.configuredGlobals.has(lowerName);
+				const varDef = locals.get(lowerName) || globals.get(lowerName);
+				const isConfiguredGlobal = config.configuredGlobals.has(lowerName);
 
 				const scopeKey = scope ? `${scope.name.toLowerCase()}:${lowerName}` : lowerName;
 
-				if (!isDeclared && !reported.has(scopeKey)) {
-					diagnostics.push(this.createDiagnostic(i, match.index, varName.length,
-						DIAGNOSTIC_MESSAGES.UNDEFINED_VARIABLE(varName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.UNDEFINED_VARIABLE));
-					reported.add(scopeKey);
+				// Warn if variable is not declared (either truly undefined or dynamically assigned)
+				// Only warn once per variable per scope
+				if (!isConfiguredGlobal && !reported.has(scopeKey)) {
+					if (!varDef) {
+						// Truly undefined - not declared AND not assigned anywhere
+						diagnostics.push(this.createDiagnostic(i, match.index, varName.length,
+							DIAGNOSTIC_MESSAGES.UNDECLARED_VARIABLE(varName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.UNDECLARED_VARIABLE));
+						reported.add(scopeKey);
+					} else if (varDef.isDynamic) {
+						// Assigned but not declared - warn about best practice (once per scope)
+						diagnostics.push(this.createDiagnostic(i, match.index, varName.length,
+							DIAGNOSTIC_MESSAGES.UNDECLARED_VARIABLE(varName), vscode.DiagnosticSeverity.Warning, DIAGNOSTIC_CODES.UNDECLARED_VARIABLE));
+						reported.add(scopeKey);
+					}
 				}
 
 				// Hungarian Notation
@@ -617,6 +743,7 @@ export class SSLDiagnosticProvider {
 
 	private validateSqlAndExec(analysis: DocumentAnalysis, config: ValidationConfig, diagnostics: vscode.Diagnostic[]) {
 		let inCommentBlock = false;
+		let inSqlString = false; // Track if we're inside a multi-line SQL string
 
 		for (let i = 0; i < analysis.lines.length; i++) {
 			if (diagnostics.length >= config.maxProblems) {
@@ -688,13 +815,22 @@ export class SSLDiagnosticProvider {
 
 			// Check for Invalid SQL Params (?Unknown?)
 			// This applies to ANY string that looks like SQL
-			// Simple heuristic: If string contains keywords SELECT/UPDATE/INSERT/DELETE
-			// And we are NOT preventing SQL injection (or we are, but this is separate check?)
-			// Ideally we always check this if strictly validating.
-			// But maybe guard with `preventSqlInjection` or `strictMode`?
-			// Tests expect it always?
+			// Track multi-line SQL strings to validate params on all lines
+
+			// Check if this line starts a SQL statement
 			if (/(SELECT|UPDATE|INSERT|DELETE)\b/i.test(line)) {
+				inSqlString = true;
+			}
+
+			// Validate SQL params if we're in a SQL context
+			if (inSqlString) {
 				this.validateSqlParams(i, line, analysis, diagnostics);
+
+				// Check if the SQL string ends on this line (ends with "); or ";)
+				// This is a heuristic - look for closing quote followed by ) or ;
+				if (/["']\s*\)\s*;?\s*$/.test(trimmed) || /["']\s*;?\s*$/.test(trimmed)) {
+					inSqlString = false;
+				}
 			}
 
 			// Check ExecFunction Targets

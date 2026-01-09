@@ -5,6 +5,11 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2025-12-09
+
+### Fixed
+- Fixed CodeLens "0 references" issue for procedures called via `DoProc` and `ExecFunction` by correctly scanning string literals.
+
 ## [1.3.2] - 2025-12-09
 
 ### Fixed

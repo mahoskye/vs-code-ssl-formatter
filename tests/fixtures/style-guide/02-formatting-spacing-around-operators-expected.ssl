@@ -1,7 +1,7 @@
 /* Test spacing around operators;
-
 :PROCEDURE TestSpacing;
 :PARAMETERS nA, nB;
+
 	:DECLARE nResult;
 
 	/* Missing spaces around operators - BAD;
@@ -14,5 +14,6 @@
 	:ELSE;
 		nResult := 0;
 	:ENDIF;
+
 	:RETURN nResult;
 :ENDPROC;

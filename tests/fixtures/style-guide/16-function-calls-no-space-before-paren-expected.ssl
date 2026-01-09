@@ -1,7 +1,7 @@
 /* Function calls should not have space before parenthesis;
-
 :PROCEDURE TestFunctionCalls;
 	:DECLARE nResult;
+
 	nResult := Len("test");
 	nResult := Empty("value");
 	nResult := SQLExecute("SELECT *", "query", 0, 0, 0, "", "", "", 0);

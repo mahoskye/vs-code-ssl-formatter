@@ -79,6 +79,7 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 		let stringChar: string | null = null;
 		let currentToken = '';
 		let tokenStart = -1;
+		let lastIdentifier: string | null = null;
 
 		// We need to track line numbers for Ranges.
 		// Doing it by char index and converting at the end is fastest for simple parsing,
@@ -92,8 +93,21 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 
 			if (state === 'STRING') {
 				if (char === stringChar) {
+					// End of string
 					state = 'CODE';
 					stringChar = null;
+
+					// Check if this string was a procedure name in DoProc/ExecFunction
+					if (currentToken.length > 0 && lastIdentifier && /^(DoProc|ExecFunction)$/i.test(lastIdentifier)) {
+						// Only treat as reference if it looks like a valid identifier
+						this.addReference(document, references, currentToken, tokenStart);
+					}
+					currentToken = '';
+				} else {
+					if (currentToken === '') {
+						tokenStart = i;
+					}
+					currentToken += char;
 				}
 				continue;
 			}
@@ -109,6 +123,9 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 				if (char === '*' && nextChar === '/') {
 					state = 'CODE';
 					i++; // skip /
+				} else if (char === ';') {
+					// SSL also supports /* ... ; style comments
+					state = 'CODE';
 				}
 				continue;
 			}
@@ -122,6 +139,7 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 				// Finish current token if any
 				if (currentToken) {
 					this.addReference(document, references, currentToken, tokenStart);
+					lastIdentifier = currentToken;
 					currentToken = '';
 				}
 				continue;
@@ -131,6 +149,7 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 				i++; // skip *
 				if (currentToken) {
 					this.addReference(document, references, currentToken, tokenStart);
+					lastIdentifier = currentToken;
 					currentToken = '';
 				}
 				continue;
@@ -142,32 +161,17 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 				stringChar = char;
 				if (currentToken) {
 					this.addReference(document, references, currentToken, tokenStart);
+					lastIdentifier = currentToken;
 					currentToken = '';
 				}
 				continue;
 			}
 			if (char === '[') {
 				// Check if this looks like a string or array access?
-				// Simple heuristic: in generic tokenizing, treating [ as string start is safer for avoiding false positives
-				// unless we are sure it Is array access. 
-				// given this is for "tokenizing identifiers", if we treat [ as string, we miss identifiers inside specific construct?
-				// Identifiers are usually not inside [ string literal.
-				// Identifiers ARE inside array access `arr[index]`.
-				// If we treat [ as string start, we skip `index`. BAD.
-				// BUT SSL uses `[ ... ]` as strings too.
-				// This ambiguity is annoying. 
-				// However, standard SSL formatter logic usually treats `[...]` as string if it doesn't look like array? 
-				// Let's rely on standard VS Code coloring behavior logic if we knew it?
-				// Safest bet for "counting references": 
-				// If we parse `arr[i]`, we want to count `i`.
-				// If we parse `[some string]`, we do NOT want to count `some` `string`.
-				// Use a heuristic: if previous token was an identifier, `[` is likely array access.
-				// If previous was space or operator, `[` is likely string.
-				// `currentToken` holds "arr" -> `[` -> array access.
-				// `currentToken` empty (space before) -> `[` -> string.
 				if (currentToken.length > 0) {
 					// Likely array access. Commit identifier.
 					this.addReference(document, references, currentToken, tokenStart);
+					lastIdentifier = currentToken;
 					currentToken = '';
 					// Stay in CODE, don't enter string mode.
 				} else {
@@ -187,25 +191,8 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 			} else {
 				// Separator/Operator
 				if (currentToken.length > 0) {
-					// Check if this was a :PROCEDURE definition
-					// We need to look behind or checks?
-					// Simpler: Just collect all identifiers. 
-					// Detection of ":PROCEDURE Name" needs context.
-					// Let's handle procedure definition detection specifically.
-					// We'll iterate lines for procedure definitions separately?
-					// No, that defeats single pass purpose.
-					// Let's detect `:PROCEDURE` keyword sequence.
-					// But we are tokenizing chars.
-					// Let's keep `currentToken` as just identifiers.
-					// To detect `:PROCEDURE`, we need to see the colon `.`? 
-					// SSL keyword is just `PROCEDURE` usually, preceded by `:` or newline?
-					// Actually usually `:PROCEDURE`.
-					// If `char` is `:`, it's a separator.
-
-					// Let's allow `currentToken` in parsing logic to be generic.
-					// But for `references`, we just want the identifier.
-
 					this.addReference(document, references, currentToken, tokenStart);
+					lastIdentifier = currentToken;
 					currentToken = '';
 				}
 			}
@@ -216,23 +203,7 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 			this.addReference(document, references, currentToken, tokenStart);
 		}
 
-		// Now scan for Procedure Definitions cleanly using line-based regex, 
-		// because line-based is very reliable for top-level definitions and we don't want to mess up regex complexity in char loop.
-		// Wait, user wanted single pass? 
-		// "Single-pass tokenization ... scans ... identifies all procedure definitions".
-		// Combining them is efficient:
-		// We already scanned the text. `references` map has ALL identifier positions.
-		// If we use regex for definitions: `^\s*:PROCEDURE\s+(\w+)`.
-		// It gives us the name and location.
-		// Cost of running a few specific regexes on lines vs manual char parse: negligible difference, 
-		// but reliability of regex for `^\s*:PROCEDURE` is high.
-		// The O(N) cost is mainly the 'find all references' part which was 'find all occurrences of Name'.
-		// So: 
-		// 1. Build `references` map (Single full text scan).
-		// 2. Scan lines for `:PROCEDURE` (O(Lines)).
-		// 3. Subtract definition from references.
-		// This is effectively O(N).
-
+		// Scan for procedure definitions (same as before)
 		for (let i = 0; i < document.lineCount; i++) {
 			const line = document.lineAt(i);
 			const match = line.text.match(/^\s*:PROCEDURE\s+(\w+)/i);

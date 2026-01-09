@@ -11,6 +11,12 @@ import {
 } from '../constants/language';
 
 export class WhitespaceManager {
+    private maxConsecutiveBlankLines: number;
+
+    constructor(maxConsecutiveBlankLines: number = 2) {
+        this.maxConsecutiveBlankLines = maxConsecutiveBlankLines;
+    }
+
     /**
      * Determine usage of blank lines between statements
      */
@@ -20,14 +26,36 @@ export class WhitespaceManager {
         const currText = currToken ? currToken.text.toUpperCase() : "";
         const prevText = prevToken ? prevToken.text.toUpperCase() : "";
 
+        // Calculate existing blank lines (preservation of intent)
+        // startLine is 1-based, so if prev ends on 10 and curr starts on 12, there is 1 blank line (line 11).
+        // Calculate existing blank lines (preservation of intent)
+        // startLine is 1-based, so if prev ends on 10 and curr starts on 12, there is 1 blank line (line 11).
+        const existingBlankLines = Math.max(0, curr.startLine - prev.endLine - 1);
+        const preservedLines = Math.min(existingBlankLines, this.maxConsecutiveBlankLines);
+
         // Inline Comments - append to same line
         if (curr.type === NodeType.Comment && prev.endLine === curr.startLine) {
             return -1;
         }
 
         // Definition Blocks (PARAMETERS, DEFAULT, DECLARE)
+        // Same definition type = grouped together (no blank)
+        // Different definition types = blank line between
         if (this.isDefinition(currToken) && this.isDefinition(prevToken)) {
-            if (currText === prevText) { return 0; }
+            if (currText === prevText) { return 0; }  // e.g., DEFAULT followed by DEFAULT
+            return 1;  // e.g., PARAMETERS → DEFAULT, or DEFAULT → DECLARE
+        }
+
+        // Special Case: Header Comment -> Definition
+        // If the previous node was a header comment (lines 1-x), and we are now at the first definition (PARAMETERS usually),
+        // we want exactly 1 blank line, not preservedLines (which might be 2 or more if the user went wild).
+        if (this.isDefinition(currToken) && prev.type === NodeType.Comment && prev.startLine === 1) {
+            return 1;
+        }
+
+        // Add blank line after definition block before body code
+        // (style guide section 1.4.1: blank line between declarations and code)
+        if (this.isDefinition(prevToken) && !this.isDefinition(currToken)) {
             return 1;
         }
 
@@ -40,12 +68,24 @@ export class WhitespaceManager {
         }
 
         if (currIsComment && !prevIsComment && !this.isDefinition(prevToken)) {
-            return 1;
+            // Special case: If prev was a block of comments at the very start of the file (likely header),
+            // and we are now at the first code/definition, limit blank lines to 1 (or 0 if user had none).
+            // We want to avoid "double gaping" the header.
+            // A simple heuristic: if prev.startLine is 1 (or close to it) and it's a comment block.
+            if (prev.type === NodeType.Comment && prev.startLine === 1) {
+                return 1; // Enforce distinct separation but no more than 1 blank line for standard header
+            }
+
+            // Preserve user intent for comments, but ensure at least 1 blank line if previously handled
+            // Actually, for comments, we often want to respect the user's spacing more strictly.
+            // If the user put a comment immediately after code, maybe they want it there (handled above).
+            // But generally, comments introducing a section get a blank line.
+            return Math.max(1, preservedLines);
         }
 
         // Control Structures (IF, WHILE, FOR, etc.)
         if (this.isControlStart(currToken) && !this.isControlStart(prevToken)) {
-            return 1;
+            return Math.max(1, preservedLines);
         }
 
         // Force blank line before :CASE, :OTHERWISE
@@ -57,18 +97,21 @@ export class WhitespaceManager {
         if (this.isControlEnd(prevToken)) {
             // Don't add blank if: next node has no token, or followed by block middle/case/control end/major block end
             if (currToken && !this.isBlockMiddle(currToken) && !this.isCaseKeyword(currToken) && !this.isControlEnd(currToken) && !this.isMajorBlockEnd(currToken)) {
-                return 1;
+                return Math.max(1, preservedLines);
             }
         }
 
         // Major Blocks (Procedure, Class) - Always separate
         if (this.isMajorBlockStart(currToken)) {
             if (prev.type === NodeType.Comment) { return 0; }
-            return 1;
+            return Math.max(1, preservedLines);
         }
-        if (this.isMajorBlockEnd(prevToken)) { return 1; }
+        if (this.isMajorBlockEnd(prevToken)) {
+            return Math.max(1, preservedLines);
+        }
 
-        return 0;
+        // Default: Return preserved lines (up to max) instead of 0
+        return preservedLines;
     }
 
     // --- Private Helpers ---

@@ -5,7 +5,6 @@
 
 export const DIAGNOSTIC_CODES = {
     UNDECLARED_VARIABLE: "ssl-undeclared-variable",
-    UNDEFINED_VARIABLE: "ssl-undefined-variable",
     GLOBAL_VARIABLE_IN_PROCEDURE: "ssl-global-variable-in-procedure",
     INVALID_SQL_PARAM: "ssl-invalid-sql-param",
     INVALID_EXEC_TARGET: "ssl-invalid-exec-target",
@@ -24,17 +23,15 @@ export const DIAGNOSTIC_CODES = {
     MISSING_PARAMS: "ssl-missing-params",
     MISMATCHED_BLOCK_END: "ssl-mismatched-block-end",
     UNMATCHED_BLOCK_END: "ssl-unmatched-block-end",
-    KEYWORD_WITHOUT_CONTEXT: "ssl-keyword-without-context"
+    KEYWORD_WITHOUT_CONTEXT: "ssl-keyword-without-context",
+    COMMENT_TEXT_AFTER_TERMINATOR: "ssl-comment-text-after-terminator"
 } as const;
 
 export type SSLDiagnosticCode = typeof DIAGNOSTIC_CODES[keyof typeof DIAGNOSTIC_CODES];
 
 export const DIAGNOSTIC_MESSAGES = {
     UNDECLARED_VARIABLE: (varName: string) =>
-        `Variable '${varName}' is used without being declared. Add ':DECLARE ${varName};' before first use.`,
-
-    UNDEFINED_VARIABLE: (varName: string) =>
-        `Variable '${varName}' is not declared. Add ':DECLARE ${varName};' or pass it as a parameter.`,
+        `Variable '${varName}' is used without being declared. Add ':DECLARE ${varName};' or pass it as a parameter.`,
 
     GLOBAL_VARIABLE_IN_PROCEDURE: (varName: string) =>
         `Procedure uses global variable '${varName}' without declaring it locally. Declare it with ':DECLARE ${varName};' or pass it as a parameter for better encapsulation.`,
@@ -85,7 +82,10 @@ export const DIAGNOSTIC_MESSAGES = {
         `Unmatched :${endKeyword} - no matching :${expectedStart} block found`,
 
     KEYWORD_WITHOUT_CONTEXT: (keyword: string, requiredContext: string) =>
-        `:${keyword} requires :${requiredContext} but none was found`
+        `:${keyword} requires :${requiredContext} but none was found`,
+
+    COMMENT_TEXT_AFTER_TERMINATOR: 
+        "Text after ';' will not be part of the comment. Consider placing comments after code or on separate lines."
 } as const;
 
 export const DIAGNOSTIC_SEVERITIES = {

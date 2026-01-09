@@ -29,7 +29,8 @@ export class SSLFormatter {
             keywordCase: options['ssl.format.sql.keywordCase'] as 'upper' | 'lower' | 'title' | 'preserve',
             indentSpaces: options['ssl.format.sql.indentSpaces'] as number
         });
-        this.whitespaceManager = new WhitespaceManager();
+        const maxConsecutiveBlankLines = (options['ssl.format.maxConsecutiveBlankLines'] as number) || 2;
+        this.whitespaceManager = new WhitespaceManager(maxConsecutiveBlankLines);
         this.statementPrinter = new StatementPrinter(options, this.sqlFormatter);
     }
 
@@ -73,6 +74,8 @@ export class SSLFormatter {
     private visitProgram(node: Node) {
         let prev: Node | undefined = undefined;
         for (const child of node.children) {
+            // Skip whitespace-only nodes - they interfere with spacing logic
+            if (this.isWhitespaceOnlyNode(child)) { continue; }
             if (this.handleVerticalWhitespace(prev, child)) {
                 prev = child;
                 continue;
@@ -86,6 +89,8 @@ export class SSLFormatter {
         this.currentIndentLevel++;
         let prev: Node | undefined = undefined;
         for (const child of node.children) {
+            // Skip whitespace-only nodes - they interfere with spacing logic
+            if (this.isWhitespaceOnlyNode(child)) { continue; }
             if (this.handleVerticalWhitespace(prev, child)) {
                 prev = child;
                 continue;
@@ -138,5 +143,15 @@ export class SSLFormatter {
             }
             return false;
         }
+    }
+
+    /** Check if a node contains only whitespace tokens and has no children */
+    private isWhitespaceOnlyNode(node: Node): boolean {
+        // Never skip nodes that have children (like Block nodes)
+        if (node.children && node.children.length > 0) { return false; }
+        // Never skip Block nodes
+        if (node.type === NodeType.Block) { return false; }
+        // Only skip Statement nodes that contain only whitespace tokens
+        return node.tokens.length > 0 && node.tokens.every(t => t.type === TokenType.Whitespace);
     }
 }

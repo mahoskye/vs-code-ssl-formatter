@@ -1,11 +1,10 @@
 /* CASE statement structure;
-
 :PROCEDURE TestCaseStatement;
 :PARAMETERS sValue;
+
 	:DECLARE nResult;
 
 	:BEGINCASE;
-
 		:CASE sValue == "A";
 			nResult := 1;
 
@@ -15,5 +14,6 @@
 		:OTHERWISE;
 			nResult := 0;
 	:ENDCASE;
+
 	:RETURN nResult;
 :ENDPROC;
