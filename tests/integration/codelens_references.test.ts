@@ -7,21 +7,22 @@ import { SSLCodeLensProvider } from '../../src/sslCodeLensProvider';
 suite('SSL Reference Provider Reproduction', () => {
     test('Should find DoProc and ExecFunction references for Procedure', async () => {
         const content = `
-:PROCEDURE MyProc
-EndProc
+:PROCEDURE MyProc;
+:ENDPROC;
 
-:PROCEDURE Other
-    DoProc("MyProc")
-    ExecFunction('MyProc')
-    MyProc()
-    var x = MyProc
-EndProc
+:PROCEDURE Other;
+    DoProc("MyProc");
+    ExecFunction('MyProc');
+    MyProc();
+    :DECLARE x;
+    x := MyProc;
+:ENDPROC;
 `;
         const document = await vscode.workspace.openTextDocument({ language: 'ssl', content });
         const provider = new SSLReferenceProvider();
 
         // Position at :PROCEDURE MyProc (Line 1, char 12)
-        // :PROCEDURE MyProc
+        // :PROCEDURE MyProc;
         // 01234567890123
         const position = new vscode.Position(1, 12);
 
@@ -38,16 +39,14 @@ EndProc
 
         const results = provider.provideReferences(document, position, { includeDeclaration: true }, token);
 
-        // Expected:
-        // 1. Definition at line 1
-        // 2. DoProc at line 5
-        // 3. ExecFunction at line 6
-        // Should NOT find line 7 (MyProc()) or line 8 (x = MyProc) if strictly looking for procedure references.
+        // Expected line numbers based on content:
+        // Line 1: :PROCEDURE MyProc; (definition)
+        // Line 5: DoProc("MyProc");
+        // Line 6: ExecFunction('MyProc');
+        // Line 7: MyProc(); - should NOT be found
+        // Line 9: x := MyProc; - should NOT be found
 
         const lineNumbers = results.map(l => l.range.start.line).sort((a, b) => a - b);
-
-        // If the bug exists (finding `FunctionName()` style), we might see line 7.
-        // If it works as intended for SSL procedures, we should see [1, 5, 6].
 
         console.log('Found references at lines:', lineNumbers);
 
@@ -55,18 +54,18 @@ EndProc
         assert.ok(lineNumbers.includes(5), 'Should find DoProc');
         assert.ok(lineNumbers.includes(6), 'Should find ExecFunction');
         assert.ok(!lineNumbers.includes(7), 'Should NOT find direct call MyProc() when searching for procedure');
-        assert.ok(!lineNumbers.includes(8), 'Should NOT find variable usage x = MyProc when searching for procedure');
+        assert.ok(!lineNumbers.includes(9), 'Should NOT find variable usage x := MyProc when searching for procedure');
     });
 
     test('Should count CodeLens references including DoProc strings', async () => {
         const content = `
-:PROCEDURE MyProc
-EndProc
+:PROCEDURE MyProc;
+:ENDPROC;
 
-:PROCEDURE Other
-    DoProc("MyProc")
-    ExecFunction('MyProc')
-EndProc
+:PROCEDURE Other;
+    DoProc("MyProc");
+    ExecFunction('MyProc');
+:ENDPROC;
 `;
         const document = await vscode.workspace.openTextDocument({ language: 'ssl', content });
         const provider = new SSLCodeLensProvider();

@@ -7,7 +7,7 @@ suite('Diagnostics Integration Test', () => {
     test('Reports errors for invalid RunSQL usage', async () => {
         const content = `
 :PROCEDURE TestRunSQL;
-    // Missing parameters argument
+    /* Missing parameters argument;
     RunSQL("SELECT * FROM table WHERE id = ?");
 :ENDPROC;
 `;
@@ -27,10 +27,10 @@ suite('Diagnostics Integration Test', () => {
     test('Does NOT report errors for ALen and AEval (Regression)', async () => {
         const content = `
 :PROCEDURE TestBuiltins;
-    variable arr;
-    arr = {1, 2, 3};
-    variable len;
-    len = ALen(arr);
+    :DECLARE arr;
+    arr := {1, 2, 3};
+    :DECLARE len;
+    len := ALen(arr);
     AEval(arr, "SomeFunc");
 :ENDPROC;
 `;

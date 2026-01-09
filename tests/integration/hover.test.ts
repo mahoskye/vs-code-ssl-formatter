@@ -7,8 +7,8 @@ suite('Hover Integration Test', () => {
     test('Provides hover for built-in functions', async () => {
         const content = `
 :PROCEDURE TestHover;
-variable str;
-str = "test";
+:DECLARE str;
+str := "test";
 Len(str);
 :ENDPROC;
 `;

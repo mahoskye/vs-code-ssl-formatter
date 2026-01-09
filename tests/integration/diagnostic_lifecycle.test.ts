@@ -2,27 +2,25 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { describe, it } from 'mocha';
 
 
 
-describe('Diagnostic Lifecycle Integration Test', () => {
+suite('Diagnostic Lifecycle Integration Test', () => {
 
-    it('Diagnostics persist for other files when one is closed', async () => {
+    test('Diagnostics persist for other files when one is closed', async () => {
         // Extension is activated automatically when opening SSL files
 
-        // Document A content (has error)
+        // Document A content (has error - undefined SQL parameter)
         const contentA = `
 :PROCEDURE TestA;
-    // Missing semicolon error
-    variable x
+    SQLExecute("SELECT * FROM table WHERE id = ?sUndefinedVar?");
 :ENDPROC;
 `;
-        // Document B content (has error)
+        // Document B content (has error - undeclared variable usage)
         const contentB = `
 :PROCEDURE TestB;
-    // Undefined variable error
-    y := 1;
+    :DECLARE sResult;
+    sResult := sUndeclaredVar + 1;
 :ENDPROC;
 `;
 
