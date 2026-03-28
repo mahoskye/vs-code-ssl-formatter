@@ -5,6 +5,21 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-03-28
+
+### Added
+- **LSP Integration**: Embedded the `starlims-lsp` language server (v0.2.0) with cross-platform binaries for Linux, macOS, and Windows (amd64/arm64).
+  - When enabled (default), the LSP provides: completion, hover, definition, references, document symbols, folding ranges, signature help, formatting, diagnostics, rename, inlay hints, and workspace symbols.
+  - Native TypeScript providers serve as automatic fallback when the LSP is disabled or fails to start.
+  - New setting `ssl.languageServer.enabled` to toggle LSP on/off.
+  - New setting `ssl.trace.server` to trace LSP communication for debugging.
+  - New command `SSL: Restart Language Server` for troubleshooting.
+- **LSP Configuration Sync**: Extension settings for formatting, diagnostics, and inlay hints are automatically synced to the LSP server via `initializationOptions` and `workspace/didChangeConfiguration`.
+- **Integration Tests**: Added LSP integration tests (rename, inlay hints, workspace symbols, formatting, definitions, symbols, config sync) and fallback integration tests for native provider mode.
+
+### Changed
+- Rename provider, inlay hints provider, and workspace symbol provider are now delegated to the LSP when active (previously always used native providers).
+
 ## [1.3.3] - 2026-01-09
 
 ### Fixed
