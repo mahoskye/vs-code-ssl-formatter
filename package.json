@@ -61,7 +61,7 @@
                     "default": 100,
                     "minimum": 10,
                     "maximum": 1000,
-                    "description": "Maximum number of diagnostics to report per file"
+                    "description": "Maximum number of diagnostics to report per file (native providers only; LSP uses its own limit)"
                 },
                 "ssl.globals": {
                     "type": "array",
@@ -94,7 +94,7 @@
                         "PascalCase"
                     ],
                     "default": "PascalCase",
-                    "description": "Casing for built-in function names. PascalCase normalizes to canonical casing, preserve keeps user's choice."
+                    "description": "Casing for built-in function names. PascalCase normalizes to canonical casing, preserve keeps user's choice. (native providers only; LSP uses canonical inventory)"
                 },
                 "ssl.format.wrapLength": {
                     "type": "number",
@@ -133,7 +133,7 @@
                 "ssl.format.trimTrailingWhitespace": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Remove trailing whitespace from all lines"
+                    "description": "Remove trailing whitespace from all lines (native providers only; LSP handles this internally)"
                 },
                 "ssl.format.maxConsecutiveBlankLines": {
                     "type": "number",
@@ -215,7 +215,7 @@
                         "info"
                     ],
                     "default": "warn",
-                    "description": "Severity level for Hungarian notation violations"
+                    "description": "Severity level for Hungarian notation violations (native providers only; LSP uses its own severity)"
                 },
                 "ssl.naming.hungarianNotation.prefixes": {
                     "type": "array",
@@ -237,12 +237,12 @@
                     "default": 8,
                     "minimum": 0,
                     "maximum": 15,
-                    "description": "Maximum procedure parameter count (0 = disabled)"
+                    "description": "Maximum procedure parameter count (0 = disabled). Native providers only; LSP uses style guide thresholds (8 recommended, 20 warning)"
                 },
                 "ssl.security.preventSqlInjection": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Warn about non-parameterized SQL queries"
+                    "description": "Warn about non-parameterized SQL queries (native providers only; LSP always checks)"
                 },
                 "ssl.intellisense.enabled": {
                     "type": "boolean",
