@@ -86,7 +86,7 @@ function getSSLConfiguration(): object {
     const tabSize = typeof tabSizeValue === 'number' ? tabSizeValue : 4;
     const indentWidth = config.get<number>('format.indentWidth', 1);
     const indentSize = indentStyle === 'tab' ? tabSize : indentWidth;
-    const hungarianPrefixes = config.get<string[]>('naming.hungarianNotation.prefixes', ['s', 'n', 'b', 'd', 'a', 'o', 'u']);
+    const hungarianPrefixes = config.get<string[]>('naming.hungarianNotation.prefixes', ['s', 'n', 'b', 'd', 'a', 'o', 'fn', 'v']);
 
     return {
         ssl: {
@@ -100,7 +100,7 @@ function getSSLConfiguration(): object {
                 blankLinesBetweenProcs: config.get<number>('format.blankLinesBetweenProcs', 1),
                 sql: {
                     enabled: config.get<boolean>('format.sql.enabled', true),
-                    style: config.get<string>('format.sql.style', 'standard'),
+                    style: config.get<string>('format.sql.style', 'canonicalCompact'),
                     keywordCase: config.get<string>('format.sql.keywordCase', 'upper'),
                     indentSize: config.get<number>('format.sql.indentSpaces', 4),
                     maxLineLength: config.get<number>('format.wrapLength', 90)
@@ -109,11 +109,12 @@ function getSSLConfiguration(): object {
             diagnostics: {
                 hungarianNotation: config.get<boolean>('naming.hungarianNotation.enabled', true),
                 hungarianPrefixes,
-                globals: config.get<string[]>('globals', [])
+                globals: config.get<string[]>('globals', []),
+                maxBlockDepth: config.get<number>('styleGuide.limitBlockDepth', 4)
             },
             inlayHints: {
                 enabled: config.get<boolean>('intellisense.inlayHints.enabled', true),
-                parameterNames: config.get<boolean>('intellisense.inlayHints.parameterNames', true)
+                minParameterCount: config.get<number>('intellisense.inlayHints.minParameterCount', 2)
             }
         }
     };
@@ -182,7 +183,7 @@ export async function startClient(context: vscode.ExtensionContext): Promise<Lan
     // Register configuration change listener
     context.subscriptions.push(
         vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration('ssl.format') || e.affectsConfiguration('ssl.naming') || e.affectsConfiguration('ssl.globals') || e.affectsConfiguration('ssl.intellisense.inlayHints')) {
+            if (e.affectsConfiguration('ssl.format') || e.affectsConfiguration('ssl.naming') || e.affectsConfiguration('ssl.globals') || e.affectsConfiguration('ssl.intellisense.inlayHints') || e.affectsConfiguration('ssl.styleGuide')) {
                 sendConfigurationUpdate();
             }
         })

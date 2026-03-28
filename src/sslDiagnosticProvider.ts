@@ -122,7 +122,7 @@ export class SSLDiagnosticProvider {
 			strictMode: config.get(CONFIG_KEYS.STRICT_STYLE_GUIDE_MODE, false),
 			hungarianEnabled: config.get(CONFIG_KEYS.NAMING_HUNGARIAN_ENABLED, false),
 			hungarianSeverity: config.get(CONFIG_KEYS.NAMING_HUNGARIAN_SEVERITY, "warning"),
-			hungarianPrefixes: config.get(CONFIG_KEYS.NAMING_HUNGARIAN_PREFIXES, ["s", "n", "b", "d", "a", "o", "u"]),
+			hungarianPrefixes: config.get(CONFIG_KEYS.NAMING_HUNGARIAN_PREFIXES, ["s", "n", "b", "d", "a", "o", "fn", "v"]),
 			preventSqlInjection: config.get(CONFIG_KEYS.SECURITY_PREVENT_SQL_INJECTION, true),
 			requireParameterized: config.get(CONFIG_KEYS.SECURITY_REQUIRE_PARAMETERIZED_QUERIES, true),
 			enforceKeywordCase: config.get(CONFIG_KEYS.STYLE_GUIDE_ENFORCE_KEYWORD_CASE, false),

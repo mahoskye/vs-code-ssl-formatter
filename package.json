@@ -173,13 +173,13 @@
                         "expanded"
                     ],
                     "enumDescriptions": [
-                        "Standard - Simple clause breaks per official style guide (default)",
-                        "Canonical Compact - Balanced formatting with indented AND/OR and smart wrapping",
+                        "Standard - Simple clause breaks",
+                        "Canonical Compact - Balanced formatting with indented AND/OR and smart wrapping (default, per official style guide)",
                         "Compact - Minimal breaks, fits on fewer lines",
                         "Expanded - Maximum readability, each column/condition on own line"
                     ],
-                    "default": "standard",
-                    "description": "SQL formatting style. 'standard' follows the official STARLIMS Style Guide."
+                    "default": "canonicalCompact",
+                    "description": "SQL formatting style. 'canonicalCompact' follows the official STARLIMS Style Guide."
                 },
                 "ssl.format.sql.concatOperator": {
                     "type": "string",
@@ -219,7 +219,7 @@
                 },
                 "ssl.naming.hungarianNotation.prefixes": {
                     "type": "array",
-                    "default": ["s", "n", "b", "d", "a", "o", "u"],
+                    "default": ["s", "n", "b", "d", "a", "o", "fn", "v"],
                     "items": {
                         "type": "string"
                     },
@@ -268,6 +268,13 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Show parameter names as inlay hints in function calls"
+                },
+                "ssl.intellisense.inlayHints.minParameterCount": {
+                    "type": "number",
+                    "default": 2,
+                    "minimum": 1,
+                    "maximum": 10,
+                    "description": "Minimum number of parameters a function must have before inlay hints are shown"
                 },
                 "ssl.intellisense.completion.enableKeywords": {
                     "type": "boolean",

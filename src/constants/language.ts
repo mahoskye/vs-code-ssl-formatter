@@ -15,7 +15,7 @@ export const SSL_KEYWORDS = [
     "CLASS", "INHERIT",
     "REGION", "ENDREGION",
     "BEGININLINECODE", "ENDINLINECODE",
-    "ERROR", "LABEL"
+    "ERROR", "RESUME", "LABEL"
 ] as const;
 
 export type SSLKeyword = typeof SSL_KEYWORDS[number];

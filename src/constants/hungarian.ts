@@ -4,13 +4,14 @@
  */
 
 export const HUNGARIAN_PREFIXES = [
-    "s", // string
-    "n", // number
-    "b", // boolean
-    "d", // date
-    "a", // array
-    "o", // object
-    "u"  // user-defined object
+    "s",  // string
+    "n",  // number
+    "b",  // boolean
+    "d",  // date
+    "a",  // array
+    "o",  // object
+    "fn", // code block
+    "v"   // variant/any
 ] as const;
 
 export type HungarianPrefix = typeof HUNGARIAN_PREFIXES[number];
@@ -48,13 +49,22 @@ export function hasValidHungarianNotation(name: string, prefixes: readonly strin
         return true;
     }
 
-    const prefix = name[0].toLowerCase();
-    const prefixSet = prefixes === HUNGARIAN_PREFIXES
-        ? HUNGARIAN_VALID_PREFIXES
-        : new Set(prefixes.map(value => value.toLowerCase()));
+    const lowerName = name.toLowerCase();
+    const prefixList = prefixes === HUNGARIAN_PREFIXES
+        ? [...HUNGARIAN_PREFIXES]
+        : prefixes.map(value => value.toLowerCase());
 
-    // Check if first char is valid prefix and second char is uppercase
-    return prefixSet.has(prefix) && name[1] === name[1].toUpperCase();
+    // Sort by length descending so multi-char prefixes (e.g. "fn") are checked first
+    const sorted = [...prefixList].sort((a, b) => b.length - a.length);
+
+    for (const prefix of sorted) {
+        if (lowerName.startsWith(prefix) && name.length > prefix.length) {
+            // Character after prefix must be uppercase
+            return name[prefix.length] === name[prefix.length].toUpperCase();
+        }
+    }
+
+    return false;
 }
 
 /**
