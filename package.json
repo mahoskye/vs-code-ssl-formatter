@@ -1,5 +1,6 @@
 {
     "name": "vs-code-ssl-formatter",
+    "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
     "version": "1.3.3",
@@ -102,6 +103,28 @@
                     "maximum": 200,
                     "description": "Maximum line length before wrapping"
                 },
+                "ssl.format.operatorSpacing": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Insert spaces around operators when formatting"
+                },
+                "ssl.format.commaSpacing": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Insert spaces after commas when formatting"
+                },
+                "ssl.format.semicolonEnforcement": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Ensure statements end with semicolons when formatting"
+                },
+                "ssl.format.blankLinesBetweenProcs": {
+                    "type": "number",
+                    "default": 1,
+                    "minimum": 0,
+                    "maximum": 5,
+                    "description": "Number of blank lines to insert between procedures"
+                },
                 "ssl.format.formatOnSave": {
                     "type": "boolean",
                     "default": false,
@@ -144,25 +167,19 @@
                 "ssl.format.sql.style": {
                     "type": "string",
                     "enum": [
+                        "standard",
                         "canonicalCompact",
                         "compact",
-                        "expanded",
-                        "hangingOperators",
-                        "knr",
-                        "knrCompact",
-                        "ormFriendly"
+                        "expanded"
                     ],
                     "enumDescriptions": [
-                        "Canonical Compact - Hanging operators with JOIN breaks (preferred default)",
-                        "Compact - Single-line clauses, AND/OR inline",
-                        "Expanded - Multi-line SELECT with vertical columns",
-                        "Hanging Operators - AND/OR at line start with indent",
-                        "K&R Style - Parenthesized blocks, one column per line",
-                        "K&R Compact - Parenthesized blocks, compact SELECT",
-                        "No-Newline / ORM Friendly - Inline JOINs, hanging operators"
+                        "Standard - Simple clause breaks per official style guide (default)",
+                        "Canonical Compact - Balanced formatting with indented AND/OR and smart wrapping",
+                        "Compact - Minimal breaks, fits on fewer lines",
+                        "Expanded - Maximum readability, each column/condition on own line"
                     ],
-                    "default": "canonicalCompact",
-                    "description": "Default SQL formatting style used by the Format SQL command"
+                    "default": "standard",
+                    "description": "SQL formatting style. 'standard' follows the official STARLIMS Style Guide."
                 },
                 "ssl.format.sql.concatOperator": {
                     "type": "string",
@@ -199,6 +216,14 @@
                     ],
                     "default": "warn",
                     "description": "Severity level for Hungarian notation violations"
+                },
+                "ssl.naming.hungarianNotation.prefixes": {
+                    "type": "array",
+                    "default": ["s", "n", "b", "d", "a", "o", "u"],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Hungarian notation prefixes allowed for variable names"
                 },
                 "ssl.styleGuide.limitBlockDepth": {
                     "type": "number",
@@ -348,6 +373,11 @@
                         }
                     }
                 },
+                "ssl.languageServer.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "markdownDescription": "Use the starlims-lsp language server for core features (completion, hover, definition, references, symbols, folding, signature help, formatting, diagnostics). When enabled, the native TypeScript providers for these features are disabled to avoid duplication."
+                },
                 "ssl.trace.server": {
                     "type": "string",
                     "enum": [
@@ -384,6 +414,11 @@
             {
                 "command": "ssl.toggleInlayHints",
                 "title": "SSL: Toggle Inlay Hints",
+                "category": "SSL"
+            },
+            {
+                "command": "ssl.restartLanguageServer",
+                "title": "SSL: Restart Language Server",
                 "category": "SSL"
             }
         ],
@@ -429,12 +464,16 @@
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
         "test": "npm run test:unit",
-        "test:unit": "mocha --require ts-node/register --require tests/setup.ts 'tests/*.test.ts'",
+        "test:unit": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"ESNext\"}' NODE_OPTIONS='--no-deprecation' node --import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"ts-node/esm\", pathToFileURL(\"./\")); register(\"./tests/vscode-loader.mjs\", pathToFileURL(\"./\"));' --experimental-specifier-resolution=node ./node_modules/mocha/bin/mocha.js 'tests/*.test.ts'",
         "test:integration": "node ./out/tests/runTest.js",
+        "test:integration-fallback": "node ./out/tests/runFallbackTest.js",
         "test:format-fix": "node ./scripts/assert-format-fix.js",
         "test:comments-preserved": "node ./scripts/assert-comments-preserved.js",
         "package": "vsce package",
         "publish": "vsce publish"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1"
     },
     "devDependencies": {
         "@types/chai": "^4.3.20",

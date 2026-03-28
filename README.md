@@ -125,12 +125,16 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 - `ssl.format.indentWidth`: Number of tabs/spaces per indent (default: `1`).
 - `ssl.format.builtinFunctionCase`: `PascalCase` or `preserve` (default: `PascalCase`). Normalizes built-in functions to their canonical casing, or preserves user's choice.
 - `ssl.format.wrapLength`: Maximum line length before wrapping (default: `90`).
+- `ssl.format.operatorSpacing`: Insert spaces around operators (default: `true`).
+- `ssl.format.commaSpacing`: Insert spaces after commas (default: `true`).
+- `ssl.format.semicolonEnforcement`: Ensure statements end with semicolons (default: `true`).
+- `ssl.format.blankLinesBetweenProcs`: Blank lines between procedures (default: `1`).
 - `ssl.format.formatOnSave`: Automatically format on save (default: `false`).
 - `ssl.format.trimTrailingWhitespace`: Remove trailing whitespace (default: `true`).
-- `ssl.format.sql.enabled`: Format inline SQL string literals (default: `false`).
+- `ssl.format.sql.enabled`: Format inline SQL string literals (default: `true`).
 - `ssl.format.sql.keywordCase`: `preserve`, `upper`, or `lower` for SQL keywords (default: `upper`).
 - `ssl.format.sql.indentSpaces`: Spaces to indent formatted SQL clauses (default: `4`).
-- `ssl.format.sql.style`: Default SQL layout for the **Format SQL** command. Options: `canonicalCompact`, `compact`, `expanded`, `hangingOperators`, `knr`, `knrCompact`, `ormFriendly` (default: `canonicalCompact`). See `sql-formats.md` for examples of each style, and change the default in your user/workspace settings.
+- `ssl.format.sql.style`: SQL layout style. Options: `standard`, `canonicalCompact`, `compact`, `expanded` (default: `standard`). See `sql-formats.md` for examples of each style, and change the default in your user/workspace settings.
 
 **Note:** SSL keywords (`:IF`, `:WHILE`, `:PROCEDURE`, etc.) are always normalized to UPPERCASE per the SSL style guide. This is not configurable.
 
@@ -138,7 +142,9 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 
 - `ssl.naming.hungarianNotation.enabled`: Enforce Hungarian notation (default: `true`).
 - `ssl.naming.hungarianNotation.severity`: `warn`, `error`, or `info` (default: `warn`).
+- `ssl.naming.hungarianNotation.prefixes`: Allowed Hungarian prefixes (default: `s, n, b, d, a, o, u`).
 - `ssl.styleGuide.limitBlockDepth`: Maximum nested block depth (default: `4`, `0` disables).
+
 - `ssl.styleGuide.maxParamsPerProcedure`: Limit on procedure parameters (default: `8`, `0` disables).
 
 ### Security & Diagnostics
@@ -180,6 +186,7 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
   "ssl.format.formatOnSave": true,
   "ssl.format.builtinFunctionCase": "PascalCase",
   "ssl.naming.hungarianNotation.enabled": true,
+  "ssl.naming.hungarianNotation.prefixes": ["s", "n", "b", "d", "a", "o", "u"],
   "ssl.styleGuide.limitBlockDepth": 4,
   "ssl.security.preventSqlInjection": true,
   "ssl.globals": ["sUserName"],

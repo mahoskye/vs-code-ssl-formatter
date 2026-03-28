@@ -58,7 +58,8 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 
 		const config = vscode.workspace.getConfiguration("ssl");
 		const hungarianEnabled = config.get<boolean>("naming.hungarianNotation.enabled", true);
-		if (hungarianEnabled && !this.hasValidHungarianNotation(newName)) {
+		const hungarianPrefixes = config.get<string[]>("naming.hungarianNotation.prefixes", ["s", "n", "b", "d", "a", "o", "u"]);
+		if (hungarianEnabled && !this.hasValidHungarianNotation(newName, hungarianPrefixes)) {
 			vscode.window.showWarningMessage(`"${newName}" does not follow Hungarian notation convention.`);
 		}
 
@@ -333,17 +334,20 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 		return /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name);
 	}
 
-	private hasValidHungarianNotation(name: string): boolean {
+	private hasValidHungarianNotation(name: string, prefixes: string[]): boolean {
 		const exceptions = ["i", "j", "k", "NIL"];
 		if (exceptions.includes(name)) {
+			return true;
+		}
+		if (prefixes.length === 0) {
 			return true;
 		}
 		if (name.length < 2) {
 			return false;
 		}
 		const prefix = name[0].toLowerCase();
-		const validPrefixes = ["s", "n", "b", "l", "d", "a", "o", "u"];
-		return validPrefixes.includes(prefix) && name[1] === name[1].toUpperCase();
+		const prefixSet = new Set(prefixes.map(value => value.toLowerCase()));
+		return prefixSet.has(prefix) && name[1] === name[1].toUpperCase();
 	}
 }
 

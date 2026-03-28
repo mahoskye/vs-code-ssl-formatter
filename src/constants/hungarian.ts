@@ -6,8 +6,7 @@
 export const HUNGARIAN_PREFIXES = [
     "s", // string
     "n", // number
-    "b", // boolean/logical
-    "l", // logical (alternative)
+    "b", // boolean
     "d", // date
     "a", // array
     "o", // object
@@ -29,7 +28,7 @@ export const HUNGARIAN_VALID_EXCEPTIONS = new Set(HUNGARIAN_EXCEPTIONS);
 /**
  * Check if a variable name follows valid Hungarian notation
  */
-export function hasValidHungarianNotation(name: string): boolean {
+export function hasValidHungarianNotation(name: string, prefixes: readonly string[] = HUNGARIAN_PREFIXES): boolean {
     // Exceptions for loop counters and constants
     if (HUNGARIAN_VALID_EXCEPTIONS.has(name as typeof HUNGARIAN_EXCEPTIONS[number])) {
         return true;
@@ -45,12 +44,17 @@ export function hasValidHungarianNotation(name: string): boolean {
         return false;
     }
 
+    if (prefixes.length === 0) {
+        return true;
+    }
+
     const prefix = name[0].toLowerCase();
+    const prefixSet = prefixes === HUNGARIAN_PREFIXES
+        ? HUNGARIAN_VALID_PREFIXES
+        : new Set(prefixes.map(value => value.toLowerCase()));
 
     // Check if first char is valid prefix and second char is uppercase
-    // Cast strict type for Set lookup check
-    return HUNGARIAN_VALID_PREFIXES.has(prefix as HungarianPrefix) &&
-        name[1] === name[1].toUpperCase();
+    return prefixSet.has(prefix) && name[1] === name[1].toUpperCase();
 }
 
 /**

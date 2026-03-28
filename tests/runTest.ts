@@ -1,5 +1,8 @@
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { runTests } from '@vscode/test-electron';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
     try {

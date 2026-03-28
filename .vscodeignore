@@ -9,6 +9,9 @@ out/docs/**
 out/dev docs/**
 out/ssl-style-guide/**
 
+# Ensure LSP server binaries are included
+!server/**
+
 # Source files (only ship compiled JS)
 src/**
 tests/**

@@ -447,10 +447,10 @@ Create/update the root `package.json`:
           "default": "off",
           "description": "Traces communication between VS Code and language server"
         },
-        "ssl.format.indentSize": {
+        "ssl.format.indentWidth": {
           "type": "number",
-          "default": 4,
-          "description": "Number of spaces for indentation"
+          "default": 1,
+          "description": "Number of tabs/spaces per indent level"
         }
       }
     }

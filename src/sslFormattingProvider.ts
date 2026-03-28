@@ -81,13 +81,18 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 			return undefined;
 		})();
 
-		return {
-			...options,
-			'ssl.format.wrapLength': config.get<number>('format.wrapLength', 90),
-			'ssl.format.sql.enabled': config.get<boolean>('format.sql.enabled', false),
-			'ssl.format.sql.keywordCase': config.get<string>('format.sql.keywordCase', 'upper'),
-			'ssl.format.sql.indentSpaces': indentSpaces,
-			'ssl.format.sql.style': config.get<string>('format.sql.style', 'canonicalCompact')
-		};
+        return {
+            ...options,
+            'ssl.format.wrapLength': config.get<number>('format.wrapLength', 90),
+            'ssl.format.operatorSpacing': config.get<boolean>('format.operatorSpacing', true),
+            'ssl.format.commaSpacing': config.get<boolean>('format.commaSpacing', true),
+            'ssl.format.semicolonEnforcement': config.get<boolean>('format.semicolonEnforcement', true),
+            'ssl.format.blankLinesBetweenProcs': config.get<number>('format.blankLinesBetweenProcs', 1),
+            'ssl.format.sql.enabled': config.get<boolean>('format.sql.enabled', true),
+            'ssl.format.sql.keywordCase': config.get<string>('format.sql.keywordCase', 'upper'),
+            'ssl.format.sql.indentSpaces': indentSpaces,
+            'ssl.format.sql.style': config.get<string>('format.sql.style', 'standard')
+        };
+
 	}
 }

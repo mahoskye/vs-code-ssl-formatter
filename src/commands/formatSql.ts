@@ -9,6 +9,7 @@ import { formatSqlWithStyleImpl, SqlFormattingStyle } from "../formatting/legacy
  * Style display names for the picker
  */
 const STYLE_DISPLAY_NAMES: Record<SqlFormattingStyle, string> = {
+	"standard": "Standard - Simple clause breaks",
 	"compact": "Compact - Single-line clauses",
 	"canonicalCompact": "Canonical Compact - Hanging operators + JOIN breaks",
 	"expanded": "Expanded - Vertical columns",
@@ -35,13 +36,10 @@ export function registerFormatSqlCommand(context: vscode.ExtensionContext): void
 	// Command to pick style from menu
 	const formatSqlPickStyleCommand = vscode.commands.registerCommand("ssl.formatSqlPickStyle", async () => {
 		const styles: { label: string; style: SqlFormattingStyle; description: string }[] = [
+			{ label: "$(check) Standard", style: "standard", description: "Simple clause breaks per style guide" },
 			{ label: "$(list-flat) Compact", style: "compact", description: "Single-line clauses, compact SELECT" },
-			{ label: "$(pulse) Canonical Compact", style: "canonicalCompact", description: "Preferred: hanging operators + JOIN breaks" },
-			{ label: "$(list-tree) Expanded", style: "expanded", description: "Multi-line SELECT with vertical columns" },
-			{ label: "$(indent) Hanging Operators", style: "hangingOperators", description: "AND/OR at line start with indent" },
-			{ label: "$(bracket) K&R Style", style: "knr", description: "Parenthesized blocks, one column per line" },
-			{ label: "$(bracket-dot) K&R Compact", style: "knrCompact", description: "Parenthesized blocks, compact SELECT" },
-			{ label: "$(circuit-board) No-Newline / ORM Friendly", style: "ormFriendly", description: "Inline JOINs, hanging operators" }
+			{ label: "$(pulse) Canonical Compact", style: "canonicalCompact", description: "Balanced formatting with indented AND/OR" },
+			{ label: "$(list-tree) Expanded", style: "expanded", description: "Multi-line SELECT with vertical columns" }
 		];
 
 		const selected = await vscode.window.showQuickPick(styles, {
@@ -164,8 +162,8 @@ async function formatSqlWithStyle(style: SqlFormattingStyle): Promise<void> {
 
 	let formattedSql: string;
 
-	// Use robust formatting engine for default style (canonicalCompact)
-	if (style === "canonicalCompact") {
+	// Use LSP-aligned formatter for supported styles
+	if (style === "standard" || style === "canonicalCompact" || style === "compact" || style === "expanded") {
 		const options: SqlFormattingOptions = {
 			wrapLength: wrapLength,
 			insertSpaces: editor.options.insertSpaces as boolean, // respect editor settings
@@ -209,5 +207,6 @@ async function formatSqlWithStyle(style: SqlFormattingStyle): Promise<void> {
 		editBuilder.replace(targetRange, formattedSql);
 	});
 
-	vscode.window.showInformationMessage(`SQL formatted with ${STYLE_DISPLAY_NAMES[style]} style.`);
+	const styleLabel = STYLE_DISPLAY_NAMES[style] ?? style;
+	vscode.window.showInformationMessage(`SQL formatted with ${styleLabel} style.`);
 }

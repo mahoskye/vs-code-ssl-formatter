@@ -10,17 +10,18 @@ suite('Diagnostic Lifecycle Integration Test', () => {
     test('Diagnostics persist for other files when one is closed', async () => {
         // Extension is activated automatically when opening SSL files
 
-        // Document A content (has error - undefined SQL parameter)
+        // Document A content (has error - unclosed block)
         const contentA = `
 :PROCEDURE TestA;
-    SQLExecute("SELECT * FROM table WHERE id = ?sUndefinedVar?");
+    :IF .T.;
+    :DECLARE sResult;
 :ENDPROC;
 `;
-        // Document B content (has error - undeclared variable usage)
+        // Document B content (has error - unmatched parenthesis)
         const contentB = `
 :PROCEDURE TestB;
-    :DECLARE sResult;
-    sResult := sUndeclaredVar + 1;
+    :DECLARE nValue;
+    nValue := (1 + 2;
 :ENDPROC;
 `;
 
