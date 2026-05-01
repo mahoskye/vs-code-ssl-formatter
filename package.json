@@ -494,7 +494,7 @@
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
         "test": "npm run test:unit",
-        "test:unit": "cross-env TS_NODE_COMPILER_OPTIONS={\\\"module\\\":\\\"ESNext\\\",\\\"noUnusedLocals\\\":false,\\\"noUnusedParameters\\\":false} NODE_OPTIONS=--no-deprecation node --import ./tests/register-loaders.mjs --experimental-specifier-resolution=node ./node_modules/mocha/bin/mocha.js \"tests/*.test.ts\"",
+        "test:unit": "cross-env TS_NODE_PROJECT=tsconfig.tsnode.json NODE_OPTIONS=--no-deprecation node --import ./tests/register-loaders.mjs --experimental-specifier-resolution=node ./node_modules/mocha/bin/mocha.js \"tests/*.test.ts\"",
         "test:integration": "node ./out/tests/runTest.js",
         "test:integration-fallback": "node ./out/tests/runFallbackTest.js",
         "test:format-fix": "node ./scripts/assert-format-fix.js",
