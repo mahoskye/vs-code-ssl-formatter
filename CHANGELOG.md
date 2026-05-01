@@ -5,6 +5,21 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.2] - 2026-05-01
+
+### Fixed
+- **LSP startup deadlock on Windows.** Bundled `starlims-lsp` v0.7.2 fixes a
+  pre-existing self-deadlock in the `initialized` notification handler. The
+  handler synchronously called `client/registerCapability` to register
+  file watchers — but glsp dispatches notifications on the same goroutine
+  that reads incoming messages, so the server was blocked waiting for the
+  client's response on the same goroutine that would have to deliver it.
+  Manifested as `fatal error: all goroutines are asleep - deadlock!` and
+  `Cannot call write after a stream was destroyed` on the client side. The
+  registration now runs in a background goroutine. The bug had always been
+  theoretically broken; v1.10.0 evidently shifted the Windows timing
+  enough to make it deterministic.
+
 ## [1.10.1] - 2026-05-01
 
 ### Fixed
