@@ -54,7 +54,7 @@ export class SSLFormatter {
         return this.output.join('\n').trim() + '\n';
     }
 
-    private visitNode(node: Node, prevSibling?: Node, nextSibling?: Node) {
+    private visitNode(node: Node, _prevSibling?: Node, nextSibling?: Node) {
         switch (node.type) {
             case NodeType.Program:
                 this.visitProgram(node);

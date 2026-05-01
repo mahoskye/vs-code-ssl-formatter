@@ -49,7 +49,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 	public provideCompletionItems(
 		document: vscode.TextDocument,
 		position: vscode.Position,
-		token: vscode.CancellationToken,
+		_token: vscode.CancellationToken,
 		context: vscode.CompletionContext
 	): vscode.CompletionItem[] {
 		const config = vscode.workspace.getConfiguration("ssl");
@@ -255,7 +255,6 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 		this.builtinFunctions = functions.map(func => {
 			const item = new vscode.CompletionItem(func.name, vscode.CompletionItemKind.Function);
 			item.detail = func.description || "Custom function";
-			const signature = func.signature || `${func.name}${func.params || "()"}`;
 			item.insertText = new vscode.SnippetString(`${func.name}($1)`);
 
 			let documentation = `**${func.name}**\n\n${func.description || "Custom function"}`;

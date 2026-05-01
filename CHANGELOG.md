@@ -5,6 +5,29 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-04-30
+
+### Added
+- **starlims-lsp bumped to v0.5.0.** Adds server-side support for the new
+  `ssl.diagnostics.rules` setting, source-level suppression comments, and
+  three formatter options that were previously fallback-only on the client:
+  `ssl.format.trimTrailingWhitespace`, `ssl.format.maxConsecutiveBlankLines`,
+  and `ssl.format.builtinFunctionCase`.
+- **Suppression comments** (LSP-side, surfaced through the extension):
+  `/* @ssl-disable <rule>; */` (file-scope) and
+  `/* @ssl-disable-next-line <rule>; */` (line-scope) silence matching
+  diagnostics. Comma-separated rule lists and the `*` wildcard are accepted.
+- **Quick-fix code actions for LSP-emitted diagnostics.** Keyed on the stable rule slugs introduced by `starlims-lsp` v0.4.0:
+  - `udobject_array_in_clause` — *Extract '<expr>' to local '<aLocal>' before SQL call*: inserts `:DECLARE aLocal;` and `aLocal := <expr>;` and rewrites the SQL placeholder.
+  - `keyword_uppercase` — *Uppercase keyword: <KW>*.
+  - `not_preferred_operator` — *Replace '<>' with '!='* (or `#` → `!=`).
+  - `prefer_exitcase` — *Insert ':EXITCASE;' before next :CASE/:ENDCASE*.
+- **`ssl.diagnostics.rules` setting.** Object map of rule slug → `"off" | "info" | "warn" | "error"`. Diagnostics matching a rule set to `off` are dropped on the client; other values remap severity. Forwarded to the LSP via `initializationOptions` for future server-side support, with client-side filtering as the immediate enforcement path.
+- **Status-bar indicator.** When an SSL document is the active editor, a status-bar item displays `SSL · LSP <version> · <fns> fns · <classes> classes` (or `SSL · native` when running without the LSP). Click opens the SSL output channel.
+
+### Changed
+- The diagnostic middleware now applies `ssl.diagnostics.rules` overrides to every batch of LSP diagnostics before VS Code surfaces them.
+
 ## [1.5.1] - 2026-04-30
 
 ### Changed

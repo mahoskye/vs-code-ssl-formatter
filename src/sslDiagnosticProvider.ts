@@ -1,16 +1,11 @@
 import * as vscode from "vscode";
 import {
 	SSL_KEYWORDS,
-	BLOCK_START_KEYWORDS,
-	BLOCK_END_KEYWORDS,
-	BLOCK_MIDDLE_KEYWORDS,
-	CASE_KEYWORDS,
 	LOOP_COUNTER_EXCEPTIONS
 } from "./constants/language";
 import { getBuiltinFunctions } from "./utils/inventory";
 import {
-	CONFIG_KEYS,
-	CONFIG_DEFAULTS
+	CONFIG_KEYS
 } from "./constants/config";
 import {
 	PATTERNS
@@ -20,7 +15,6 @@ import {
 	DIAGNOSTIC_MESSAGES
 } from "./constants/diagnostics";
 import { hasValidHungarianNotation } from "./constants/hungarian";
-import { Logger } from "./utils/logger";
 import { getConfiguredFunctions } from "./utils/intellisense";
 
 // --- Types & Interfaces ---
@@ -863,28 +857,6 @@ export class SSLDiagnosticProvider {
 
 	// --- Helpers ---
 
-	private isInsideString(line: string, index: number): boolean {
-		let insideString = false;
-		let quoteChar = '';
-
-		for (let i = 0; i < line.length; i++) {
-			if (i === index) {
-				return insideString;
-			}
-			const char = line[i];
-			if (insideString) {
-				if (char === quoteChar) {
-					insideString = false;
-				}
-			} else {
-				if (char === '"' || char === "'") {
-					insideString = true;
-					quoteChar = char;
-				}
-			}
-		}
-		return false;
-	}
 
 	private parseArguments(argsString: string): string[] {
 		const args: string[] = [];
@@ -1005,13 +977,6 @@ export class SSLDiagnosticProvider {
 		const d = new vscode.Diagnostic(new vscode.Range(line, col, line, col + len), msg, severity);
 		d.code = code;
 		return d;
-	}
-
-	private getSeverity(configSeverity: string, strict: boolean): vscode.DiagnosticSeverity {
-		if (strict) { return vscode.DiagnosticSeverity.Error; }
-		return configSeverity === 'error' ? vscode.DiagnosticSeverity.Error :
-			configSeverity === 'information' ? vscode.DiagnosticSeverity.Information :
-				vscode.DiagnosticSeverity.Warning;
 	}
 
 	// --- Validation Phase 4: Function Calls ---

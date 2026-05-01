@@ -14,7 +14,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 	public provideDocumentFormattingEdits(
 		document: vscode.TextDocument,
 		options: vscode.FormattingOptions,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.TextEdit[] {
 		const fullRange = new vscode.Range(
 			document.positionAt(0),
@@ -31,7 +31,7 @@ export class SSLFormattingProvider implements vscode.DocumentFormattingEditProvi
 		document: vscode.TextDocument,
 		range: vscode.Range,
 		options: vscode.FormattingOptions,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.TextEdit[] {
 		const text = document.getText(range);
 

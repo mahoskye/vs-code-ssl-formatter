@@ -7,7 +7,17 @@
         "sourceMap": true,
         "rootDir": ".",
         "strict": false,
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true
     },
-    "exclude": ["node_modules", ".vscode-test", "tests", "dev"]
+    "include": [
+        "src/**/*",
+        "tests/runTest.ts",
+        "tests/runFallbackTest.ts",
+        "tests/index.ts",
+        "tests/fallbackIndex.ts",
+        "tests/integration/**/*"
+    ],
+    "exclude": ["node_modules", ".vscode-test", "dev"]
 }

@@ -34,7 +34,6 @@ export class StatementPrinter {
         const tokenStarts: number[] = new Array(tokens.length).fill(0);
 
         let resetItemNext = false;
-        let effectiveIndent = currentLineLen;
         let parameterWrapIndent: number | undefined = undefined;
         let parameterWrapIndentDepth = 0;
 
@@ -104,7 +103,6 @@ export class StatementPrinter {
 
                     line = line.trimEnd() + "\n" + continuationIndent;
                     currentLineLen = getVisualLength(continuationIndent, this.options.tabSize);
-                    effectiveIndent = currentLineLen;
                 }
             }
 
@@ -118,9 +116,6 @@ export class StatementPrinter {
 
             const lengthUpdate = this.calculatePostTokenLength(formattedToken, currentLineLen);
             currentLineLen = lengthUpdate.currentLineLen;
-            if (lengthUpdate.effectiveIndent !== undefined) {
-                effectiveIndent = lengthUpdate.effectiveIndent;
-            }
 
             if (['(', '{', '['].includes(token.text)) {
                 baseStack.push(currentLineLen);
@@ -347,7 +342,7 @@ export class StatementPrinter {
             token.text === '{' || token.text === '[' || token.text === '}' || token.text === ']';
     }
 
-    private determineWrapPosition(baseStack: number[], itemStack: number[], resetItemNext: boolean, prev: Token | undefined, baseIndentStr: string, maxLineLen: number, effectiveCheckLen: number): number {
+    private determineWrapPosition(baseStack: number[], itemStack: number[], _resetItemNext: boolean, prev: Token | undefined, baseIndentStr: string, _maxLineLen: number, _effectiveCheckLen: number): number {
         const useBase = (prev && ['(', '{', '['].includes(prev.text));
         let alignTo = 0;
 

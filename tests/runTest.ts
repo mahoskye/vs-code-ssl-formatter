@@ -1,8 +1,5 @@
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { runTests } from '@vscode/test-electron';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 async function main() {
     try {
@@ -12,7 +9,7 @@ async function main() {
 
         // The path to test runner
         // Passed to --extensionTestsPath
-        const extensionTestsPath = path.resolve(__dirname, './index');
+        const extensionTestsPath = path.resolve(__dirname, './index.js');
 
         // Download VS Code, unzip it and run the integration test
         await runTests({
