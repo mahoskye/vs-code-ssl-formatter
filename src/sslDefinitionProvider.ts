@@ -31,7 +31,7 @@ export class SSLDefinitionProvider implements vscode.DefinitionProvider {
 	public provideDefinition(
 		document: vscode.TextDocument,
 		position: vscode.Position,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.Definition | null {
 		const analysis = this.analyzeDocument(document);
 		const lineText = document.lineAt(position.line).text;

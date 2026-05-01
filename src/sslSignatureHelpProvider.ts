@@ -32,8 +32,8 @@ export class SSLSignatureHelpProvider implements vscode.SignatureHelpProvider {
 	public provideSignatureHelp(
 		document: vscode.TextDocument,
 		position: vscode.Position,
-		token: vscode.CancellationToken,
-		context: vscode.SignatureHelpContext
+		_token: vscode.CancellationToken,
+		_context: vscode.SignatureHelpContext
 	): vscode.SignatureHelp | null {
 		// Fast path: Identify if we are in a function call
 		// We scan backwards from cursor to find opening parenthesis.

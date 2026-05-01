@@ -5,8 +5,6 @@ interface ToggleResult {
 	action: "commented" | "uncommented";
 }
 
-const INLINE_PREFIX = "/*";
-
 function getIndent(line: string): string {
 	const match = line.match(/^(\s*)/);
 	return match ? match[0] : "";

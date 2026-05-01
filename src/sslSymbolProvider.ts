@@ -164,7 +164,7 @@ export class SSLSymbolProvider implements vscode.DocumentSymbolProvider {
 		}
 	}
 
-	private createSymbol(name: string, kind: vscode.SymbolKind, line: number, detail: string, range: vscode.Range): vscode.DocumentSymbol {
+	private createSymbol(name: string, kind: vscode.SymbolKind, _line: number, detail: string, range: vscode.Range): vscode.DocumentSymbol {
 		// Calculate required minimum width for selRange
 		const minWidth = Math.max(1, name.length);
 

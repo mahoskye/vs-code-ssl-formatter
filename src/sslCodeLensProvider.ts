@@ -11,7 +11,7 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 
 	public provideCodeLenses(
 		document: vscode.TextDocument,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.CodeLens[] {
 		const config = vscode.workspace.getConfiguration("ssl");
 		const codeLensEnabled = config.get<boolean>("intellisense.codeLens.enabled", true);
@@ -54,7 +54,7 @@ export class SSLCodeLensProvider implements vscode.CodeLensProvider {
 
 	public resolveCodeLens(
 		codeLens: vscode.CodeLens,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.CodeLens {
 		return codeLens;
 	}

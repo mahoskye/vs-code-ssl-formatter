@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { ProcedureIndex, ProcedureInfo } from "./utils/procedureIndex";
-import { ClassIndex, ClassMembers } from "./utils/classIndex";
+import { ClassIndex } from "./utils/classIndex";
 
 /**
  * SSL Workspace Symbol Provider

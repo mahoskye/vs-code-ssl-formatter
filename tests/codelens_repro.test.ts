@@ -20,10 +20,7 @@ describe('CodeLens Provider Tests', () => {
 
         assert.strictEqual(codeLenses.length, 2, 'Should find 2 procedures');
 
-        // Find CheckCalculations lens
-        const lens = codeLenses.find(l => l.command?.title.includes('reference'));
-        // If undefined, it means 0 references were found (impl might omit "0 references" or title format differs)
-        // Let's check what we got
+        // Find CheckCalculations lens at line 2
         const checkCalcLens = codeLenses.find(l => l.range.start.line === 2);
 
         if (checkCalcLens) {

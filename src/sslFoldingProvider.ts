@@ -9,7 +9,7 @@ export class SSLFoldingProvider implements vscode.FoldingRangeProvider {
 
     public provideFoldingRanges(
         document: vscode.TextDocument,
-        context: vscode.FoldingContext,
+        _context: vscode.FoldingContext,
         token: vscode.CancellationToken
     ): vscode.FoldingRange[] {
         const text = document.getText();

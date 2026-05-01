@@ -34,7 +34,7 @@ suite('SSL Reference Provider Reproduction', () => {
 
         const token: vscode.CancellationToken = {
             isCancellationRequested: false,
-            onCancellationRequested: (listener: any) => ({ dispose: () => { } })
+            onCancellationRequested: (_listener: any) => ({ dispose: () => { } })
         } as any;
 
         const results = provider.provideReferences(document, position, { includeDeclaration: true }, token);

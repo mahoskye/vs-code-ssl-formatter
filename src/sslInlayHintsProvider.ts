@@ -13,9 +13,6 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 	private _onDidChangeInlayHints = new vscode.EventEmitter<void>();
 	public readonly onDidChangeInlayHints = this._onDidChangeInlayHints.event;
 
-	private debounceTimer: NodeJS.Timeout | undefined;
-
-
 	constructor(
 		private readonly procedureIndex?: ProcedureIndex
 	) {
@@ -33,7 +30,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 	public provideInlayHints(
 		document: vscode.TextDocument,
 		range: vscode.Range,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.InlayHint[] {
 		const config = vscode.workspace.getConfiguration("ssl");
 		const inlayHintsEnabled = config.get<boolean>("intellisense.inlayHints.enabled", true);

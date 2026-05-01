@@ -14,7 +14,7 @@ export class SSLReferenceProvider implements vscode.ReferenceProvider {
 	public provideReferences(
 		document: vscode.TextDocument,
 		position: vscode.Position,
-		context: vscode.ReferenceContext,
+		_context: vscode.ReferenceContext,
 		token: vscode.CancellationToken
 	): vscode.Location[] {
 		const range = document.getWordRangeAtPosition(position);
@@ -85,11 +85,9 @@ export class SSLReferenceProvider implements vscode.ReferenceProvider {
 	}
 
 	private scanDocumentForWord(document: vscode.TextDocument, word: string, token: vscode.CancellationToken): Occurrence[] {
-		const text = document.getText();
 		const results: Occurrence[] = [];
 		const wordLen = word.length;
 		const lowerWord = word.toLowerCase(); // Case insensitive? SSL usually is.
-		// Previous code used 'gi' regex, so yes.
 
 		// Combined state machine scan
 		let inString = false;
@@ -189,7 +187,7 @@ export class SSLReferenceProvider implements vscode.ReferenceProvider {
 		return /[^a-zA-Z0-9_]/.test(char);
 	}
 
-	private isProcedureCallStringContext(line: string, matchIndex: number, inString: boolean): boolean {
+	private isProcedureCallStringContext(line: string, matchIndex: number, _inString: boolean): boolean {
 		// Look behind for DoProc/ExecFunction
 		// We know we are inside a string.
 		// Scan back from matchIndex to find start of string?
@@ -213,7 +211,7 @@ export class SSLReferenceProvider implements vscode.ReferenceProvider {
 		return /:PROCEDURE\s+$/i.test(prefix);
 	}
 
-	private isVariableDeclaration(line: string, index: number): boolean {
+	private isVariableDeclaration(line: string, _index: number): boolean {
 		// :DECLARE ... Word
 		// :PARAMETERS ... Word
 		// This is hard to check purely with prefix if multiple vars: :DECLARE a, b, Word;

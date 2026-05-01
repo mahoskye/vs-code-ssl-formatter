@@ -1,7 +1,6 @@
 
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import * as path from 'path';
 
 suite('Inlay Hints Integration Test', () => {
     vscode.window.showInformationMessage('Start Inlay Hints tests.');
@@ -26,12 +25,13 @@ Len("test2");
             await ext.activate();
         }
 
-        // Configure settings to show hints
+        // Configure settings to show hints. The test's calls (Len("test")) take
+        // a single argument, so override minParameterCount=1 — the default of 2
+        // would suppress hints for single-arg calls.
         const config = vscode.workspace.getConfiguration('ssl');
         await config.update('intellisense.inlayHints.enabled', true, vscode.ConfigurationTarget.Global);
         await config.update('intellisense.inlayHints.parameterNames', true, vscode.ConfigurationTarget.Global);
-        // Ensure showOnActiveLineOnly is OFF (or ignored if removed)
-        // await config.update('intellisense.inlayHints.showOnActiveLineOnly', false, vscode.ConfigurationTarget.Global);
+        await config.update('intellisense.inlayHints.minParameterCount', 1, vscode.ConfigurationTarget.Global);
 
         // Wait for ready
         await new Promise(resolve => setTimeout(resolve, 500));
