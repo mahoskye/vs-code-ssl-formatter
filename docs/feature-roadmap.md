@@ -119,3 +119,18 @@ can own the behavior end-to-end:
   uniformly. Action: enumerate the exception fields already present in
   `ssl-element-reference.json` and route them into the relevant diagnostic
   checks.
+
+## CI / build hygiene
+
+- **GitHub Actions Node.js 24 migration.** The publish workflow logs
+  warnings that `actions/checkout@v4` and `actions/setup-node@v4` (and
+  any other v4 actions in `.github/workflows/*.yml`) run on Node.js 20,
+  which is being deprecated. Timeline:
+  - **2026-06-02** — Node 24 becomes the default runner runtime; v4
+    actions still work but emit warnings.
+  - **2026-09-16** — Node.js 20 is removed entirely from runners. Any
+    action that hasn't shipped a Node 24-compatible release will break.
+  Action: bump every `uses: actions/...@v4` to a Node 24-supporting
+  version by Sep 2026. Until then, optionally set
+  `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true` to opt into Node 24 early
+  and surface compatibility issues now.
