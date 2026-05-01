@@ -8,6 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.6.0] - 2026-04-30
 
 ### Added
+- **starlims-lsp bumped to v0.5.0.** Adds server-side support for the new
+  `ssl.diagnostics.rules` setting, source-level suppression comments, and
+  three formatter options that were previously fallback-only on the client:
+  `ssl.format.trimTrailingWhitespace`, `ssl.format.maxConsecutiveBlankLines`,
+  and `ssl.format.builtinFunctionCase`.
+- **Suppression comments** (LSP-side, surfaced through the extension):
+  `/* @ssl-disable <rule>; */` (file-scope) and
+  `/* @ssl-disable-next-line <rule>; */` (line-scope) silence matching
+  diagnostics. Comma-separated rule lists and the `*` wildcard are accepted.
 - **Quick-fix code actions for LSP-emitted diagnostics.** Keyed on the stable rule slugs introduced by `starlims-lsp` v0.4.0:
   - `udobject_array_in_clause` — *Extract '<expr>' to local '<aLocal>' before SQL call*: inserts `:DECLARE aLocal;` and `aLocal := <expr>;` and rewrites the SQL placeholder.
   - `keyword_uppercase` — *Uppercase keyword: <KW>*.

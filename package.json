@@ -219,7 +219,16 @@
                 },
                 "ssl.naming.hungarianNotation.prefixes": {
                     "type": "array",
-                    "default": ["s", "n", "b", "d", "a", "o", "fn", "v"],
+                    "default": [
+                        "s",
+                        "n",
+                        "b",
+                        "d",
+                        "a",
+                        "o",
+                        "fn",
+                        "v"
+                    ],
                     "items": {
                         "type": "string"
                     },
@@ -231,7 +240,12 @@
                     "description": "Per-rule severity overrides for LSP-emitted diagnostics. Keys are stable rule slugs (e.g. parameters_first, prefer_exitcase, udobject_array_in_clause); values are 'off', 'info', 'warn', or 'error'. Rules set to 'off' are dropped on the client; other values remap the LSP-supplied severity. Forwarded to the LSP via initializationOptions for future server-side support.",
                     "additionalProperties": {
                         "type": "string",
-                        "enum": ["off", "info", "warn", "error"]
+                        "enum": [
+                            "off",
+                            "info",
+                            "warn",
+                            "error"
+                        ]
                     }
                 },
                 "ssl.styleGuide.limitBlockDepth": {
@@ -475,12 +489,12 @@
     "main": "./out/src/extension.js",
     "scripts": {
         "vscode:prepublish": "npm run compile",
-        "compile": "tsc -p ./",
+        "compile": "tsc -p ./ && node -e \"require('fs').mkdirSync('out',{recursive:true});require('fs').writeFileSync('out/package.json',JSON.stringify({type:'commonjs'},null,2))\"",
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
         "test": "npm run test:unit",
-        "test:unit": "TS_NODE_COMPILER_OPTIONS='{\"module\":\"ESNext\"}' NODE_OPTIONS='--no-deprecation' node --import 'data:text/javascript,import { register } from \"node:module\"; import { pathToFileURL } from \"node:url\"; register(\"ts-node/esm\", pathToFileURL(\"./\")); register(\"./tests/vscode-loader.mjs\", pathToFileURL(\"./\"));' --experimental-specifier-resolution=node ./node_modules/mocha/bin/mocha.js 'tests/*.test.ts'",
+        "test:unit": "cross-env TS_NODE_COMPILER_OPTIONS={\\\"module\\\":\\\"ESNext\\\"} NODE_OPTIONS=--no-deprecation node --import ./tests/register-loaders.mjs --experimental-specifier-resolution=node ./node_modules/mocha/bin/mocha.js \"tests/*.test.ts\"",
         "test:integration": "node ./out/tests/runTest.js",
         "test:integration-fallback": "node ./out/tests/runFallbackTest.js",
         "test:format-fix": "node ./scripts/assert-format-fix.js",
@@ -502,6 +516,7 @@
         "@vscode/test-electron": "^2.5.2",
         "@vscode/vsce": "^3.2.1",
         "chai": "^4.5.0",
+        "cross-env": "^10.1.0",
         "eslint": "^8.39.0",
         "glob": "^11.0.0",
         "mocha": "^10.8.2",
