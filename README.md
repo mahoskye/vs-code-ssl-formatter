@@ -55,7 +55,7 @@ code --install-extension vs-code-ssl-formatter-*.vsix
 
 - Full TextMate grammar for SSL, including keywords with colon prefixes, built-in functions, string literals (double, single, and bracket notation), SQL snippets inside strings, and both single-line and multi-line comments.
 - Folding ranges for procedure blocks, loops, conditional structures, exception handling, regions, and comment blocks to simplify navigation.
-- Hover documentation for keywords, language constructs, Hungarian notation hints, and inline SQL placeholder guidance (`?param?` vs positional `?`).
+- Hover documentation for keywords, language constructs, Hungarian notation hints, and inline SQL placeholder guidance (`?param?` vs positional `?`). For built-in functions and classes, hover also lists the **documented exceptions** (trigger + canonical exception message), caveats, and anti-pattern guidance pulled from the official ssl-docs reference (covers 263 elements with exceptions, 343 with caveats, 397 with Do/Don't lists).
 - Namespace-aware `Go to Definition`/hover for `DoProc`/`ExecFunction` strings when `ssl.documentNamespaces` is configured.
 
 ### Formatting & Style Guide

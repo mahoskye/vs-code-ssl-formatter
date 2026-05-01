@@ -5,6 +5,21 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-04-30
+
+### Added
+- **starlims-lsp bumped to v0.6.0.** Hover for built-in functions and classes
+  now shows the documented exception triggers + canonical exception messages,
+  caveats, and "Don't" anti-pattern lists straight from `ssl-docs`. Hovering
+  `ExecFunction`, for example, surfaces *"Please provide at least one
+  parameter for ExecFunction"* and *"Wrong parameters for {functionName}"*
+  inline with the signature. The metadata covers 263 elements with
+  exceptions, 343 with caveats, and 397 with do/don't lists.
+
+This change requires no extension-side wiring — the LSP serves the enriched
+hover content directly. The bundled `--export-signatures` payload also
+carries the new fields if you want to consume them via tooling.
+
 ## [1.7.0] - 2026-04-30
 
 ### Added
