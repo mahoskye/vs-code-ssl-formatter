@@ -24,6 +24,7 @@ import { registerConfigureNamespacesCommand } from "./commands/configureNamespac
 import { registerFormatSqlCommand } from "./commands/formatSql";
 import { startClient, stopClient, restartClient, isClientRunning } from "./lspClient";
 import { loadInventory, getInventorySourceVersion } from "./utils/inventory";
+import { registerStatusBar, refreshStatusBar } from "./sslStatusBar";
 
 // Track if LSP is active for this session
 let lspActive = false;
@@ -51,6 +52,7 @@ export async function activate(context: vscode.ExtensionContext) {
         if (ver) {
             Logger.info(`SSL inventory loaded from bundled LSP (${ver})`);
         }
+        refreshStatusBar();
     });
 
     // Try to start the LSP client if enabled
@@ -82,6 +84,7 @@ export async function activate(context: vscode.ExtensionContext) {
     registerCommentController(context);
     registerConfigureNamespacesCommand(context);
     registerFormatSqlCommand(context);
+    registerStatusBar(context);
 
     context.subscriptions.push(
         vscode.commands.registerCommand('ssl.restartLanguageServer', async () => {

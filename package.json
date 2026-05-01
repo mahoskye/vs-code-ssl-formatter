@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.5.1",
+    "version": "1.6.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -224,6 +224,15 @@
                         "type": "string"
                     },
                     "description": "Hungarian notation prefixes allowed for variable names"
+                },
+                "ssl.diagnostics.rules": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Per-rule severity overrides for LSP-emitted diagnostics. Keys are stable rule slugs (e.g. parameters_first, prefer_exitcase, udobject_array_in_clause); values are 'off', 'info', 'warn', or 'error'. Rules set to 'off' are dropped on the client; other values remap the LSP-supplied severity. Forwarded to the LSP via initializationOptions for future server-side support.",
+                    "additionalProperties": {
+                        "type": "string",
+                        "enum": ["off", "info", "warn", "error"]
+                    }
                 },
                 "ssl.styleGuide.limitBlockDepth": {
                     "type": "number",
