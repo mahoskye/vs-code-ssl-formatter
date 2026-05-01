@@ -5,6 +5,29 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-04-30
+
+### Added
+- **Universal suppression code actions.** Every LSP-emitted diagnostic with
+  a known rule slug now offers two extra lightbulb entries:
+  - *"Suppress 'X' on this line"* — inserts `/* @ssl-disable-next-line X; */`
+    on the line above, indented to match.
+  - *"Suppress 'X' for this file"* — inserts `/* @ssl-disable X; */` at the
+    top of the document.
+  The LSP (v0.5.0+) honors both directives natively, so the diagnostic
+  disappears on the next publishDiagnostics round. Legacy native codes
+  (`ssl-*` kebab) skip these actions because the directives don't apply
+  to them.
+- **"Show docs for 'X'" code action.** When a diagnostic message names an
+  SSL element (function, class, etc.), the lightbulb offers a jump straight
+  to the corresponding ssl-docs page. The category is inferred from the
+  rule slug; if the inference can't be made the action is omitted rather
+  than shipping a broken link.
+
+### Tests
+- 4 new code-action unit tests covering line-scope suppress, file-scope
+  suppress, the legacy-code skip path, and the docs-link URL shape.
+
 ## [1.8.0] - 2026-04-30
 
 ### Added

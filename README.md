@@ -93,6 +93,10 @@ code --install-extension vs-code-ssl-formatter-*.vsix
   - `default_after_parameters` — relocate `:DEFAULT` to follow `:PARAMETERS`.
   - `nested_iif` — refactor an `IIF(...)` assignment into `:IF / :ELSE / :ENDIF` (offered as a `Refactor → Rewrite` action).
   - Plus the legacy `ssl-invalid-direct-call` fix for native fallback.
+- **Universal lightbulb actions** offered alongside any rule-specific fix above:
+  - *Suppress '\<slug\>' on this line* — inserts `/* @ssl-disable-next-line <slug>; */`.
+  - *Suppress '\<slug\>' for this file* — inserts `/* @ssl-disable <slug>; */` at the top.
+  - *Show docs for '\<element\>'* — opens the ssl-docs page for the named function/class/keyword/operator.
 
 ### Editor Enhancements
 

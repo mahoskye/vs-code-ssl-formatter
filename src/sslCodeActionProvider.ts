@@ -1,4 +1,12 @@
 import * as vscode from 'vscode';
+import { SSL_DIAGNOSTIC_SLUGS } from './constants/diagnosticSlugs';
+
+/**
+ * Lowercase slug set for O(1) "is this an LSP rule slug?" checks. Used to
+ * gate the universal suppression / docs actions so they don't show up on
+ * non-LSP diagnostics (legacy native codes use a `ssl-` kebab prefix).
+ */
+const LSP_SLUG_SET = new Set<string>(SSL_DIAGNOSTIC_SLUGS as readonly string[]);
 
 /**
  * Quick-fix code actions for SSL diagnostics.
@@ -82,6 +90,23 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 			}
 			if (action) {
 				actions.push(action);
+			}
+
+			// Universal helpers offered alongside any specific fix above:
+			// - Suppress this rule (line / file)
+			// - Open the rule's docs page
+			// Only for diagnostics whose code is a known LSP rule slug; we
+			// skip the legacy `ssl-*` native codes since the LSP-side
+			// suppression directives don't apply to them.
+			if (LSP_SLUG_SET.has(code)) {
+				actions.push(
+					createSuppressLineAction(document, diagnostic, code),
+					createSuppressFileAction(document, diagnostic, code),
+				);
+				const docsAction = createOpenDocsAction(document, diagnostic, code);
+				if (docsAction) {
+					actions.push(docsAction);
+				}
 			}
 		}
 
@@ -729,4 +754,138 @@ function splitTopLevelCommas(text: string): string[] {
 		result.push(buf);
 	}
 	return result;
+}
+
+// ---- universal: suppression comments ---------------------------------------
+
+/**
+ * Builds an SSL `@ssl-disable-next-line <slug>` directive comment, indented
+ * to match the diagnostic's line, and inserts it immediately above. The LSP
+ * v0.5.0+ honors the directive at parse time so the diagnostic disappears
+ * on the next publishDiagnostics round.
+ */
+function createSuppressLineAction(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic,
+	slug: string,
+): vscode.CodeAction {
+	const line = diagnostic.range.start.line;
+	const indent = leadingIndent(document, line);
+	const insertText = `${indent}/* @ssl-disable-next-line ${slug}; */\n`;
+
+	const fix = new vscode.CodeAction(
+		`Suppress '${slug}' on this line`,
+		vscode.CodeActionKind.QuickFix,
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.insert(document.uri, new vscode.Position(line, 0), insertText);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = false;
+	return fix;
+}
+
+/**
+ * Builds a file-scope SSL `@ssl-disable <slug>` directive comment at the top
+ * of the document. We always insert at line 0 column 0 — placing it before
+ * any existing content keeps the directive's "applies to entire file"
+ * semantics unambiguous.
+ */
+function createSuppressFileAction(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic,
+	slug: string,
+): vscode.CodeAction {
+	const fix = new vscode.CodeAction(
+		`Suppress '${slug}' for this file`,
+		vscode.CodeActionKind.QuickFix,
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.insert(
+		document.uri,
+		new vscode.Position(0, 0),
+		`/* @ssl-disable ${slug}; */\n`,
+	);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = false;
+	return fix;
+}
+
+function leadingIndent(document: vscode.TextDocument, line: number): string {
+	if (line < 0 || line >= document.lineCount) {
+		return '';
+	}
+	const text = document.lineAt(line).text;
+	const m = text.match(/^(\s*)/);
+	return m ? m[1] : '';
+}
+
+// ---- universal: open docs page ---------------------------------------------
+
+/**
+ * Some diagnostics name a specific element (e.g. "function 'X' has no
+ * documented support for named SQL parameters"). When we can pull a
+ * canonical SSL identifier out of the diagnostic message, offer to jump
+ * to the corresponding ssl-docs page.
+ *
+ * We don't try to infer element type from the message — the URL form
+ * /reference/<unknown>/<X> wouldn't work. Instead we use the rule slug
+ * as a hint about which category (functions, keywords, classes,
+ * operators) is most likely. If the heuristic doesn't match, we omit the
+ * action rather than offer a broken link.
+ */
+function createOpenDocsAction(
+	_document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic,
+	slug: string,
+): vscode.CodeAction | undefined {
+	const elementName = extractElementName(diagnostic.message);
+	if (!elementName) {
+		return undefined;
+	}
+	const category = inferCategoryFromSlug(slug);
+	if (!category) {
+		return undefined;
+	}
+
+	// ssl-docs URLs follow content/reference/<category>/<name>.md.
+	const url = `https://github.com/mahoskye/starlims-ssl-reference/blob/main/content/reference/${category}/${encodeURIComponent(elementName)}.md`;
+
+	const fix = new vscode.CodeAction(
+		`Show docs for '${elementName}'`,
+		vscode.CodeActionKind.QuickFix,
+	);
+	fix.command = {
+		title: fix.title,
+		command: 'vscode.open',
+		arguments: [vscode.Uri.parse(url)],
+	};
+	fix.diagnostics = [diagnostic];
+	// Suppress the empty-edit warning; this action only opens a URL.
+	fix.edit = undefined;
+	return fix;
+}
+
+const _MESSAGE_NAME_RE = /['"`]([A-Za-z_][A-Za-z0-9_]*)['"`]/;
+
+function extractElementName(message: string): string | undefined {
+	const m = message.match(_MESSAGE_NAME_RE);
+	return m ? m[1] : undefined;
+}
+
+function inferCategoryFromSlug(slug: string): string | undefined {
+	// Slug name fragments map to ssl-docs categories. Order matters — check
+	// the more specific fragments first.
+	if (slug.includes('class')) { return 'classes'; }
+	if (slug.includes('keyword')) { return 'keywords'; }
+	if (slug.includes('operator')) { return 'operators'; }
+	if (
+		slug.includes('function') ||
+		slug.includes('procedure') ||
+		slug.includes('execfunction') ||
+		slug.includes('sql_param') ||
+		slug.includes('udobject_array_in_clause')
+	) {
+		return 'functions';
+	}
+	return undefined;
 }

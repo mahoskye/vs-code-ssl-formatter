@@ -341,6 +341,68 @@ describe('Code Actions: v1.7.0 additions', () => {
         assert.strictEqual(defaultIdx, paramsIdx + 1, ':DEFAULT should be directly after :PARAMETERS');
     });
 
+    it('universal: suppress on this line inserts @ssl-disable-next-line', async function () {
+        const doc = await openDoc(`:PROCEDURE T;\n\tnLocal := 1;\n:ENDPROC;\n`);
+        const range = new vscode.Range(1, 1, 1, 7);
+        const diag = diagnostic(range, "synthetic", 'parameters_first');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title.startsWith("Suppress 'parameters_first' on this line"));
+        assert.ok(fix, 'expected line-suppress action');
+        await vscode.workspace.applyEdit(fix.edit!);
+        const text = doc.getText();
+        // The directive should be inserted on its own line above the diagnostic line.
+        assert.ok(text.includes('@ssl-disable-next-line parameters_first'),
+            `expected directive in document, got:\n${text}`);
+    });
+
+    it('universal: suppress for this file inserts @ssl-disable at top', async function () {
+        const doc = await openDoc(`:PROCEDURE T;\n\tnLocal := 1;\n:ENDPROC;\n`);
+        const range = new vscode.Range(1, 1, 1, 7);
+        const diag = diagnostic(range, "synthetic", 'keyword_uppercase');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title.startsWith("Suppress 'keyword_uppercase' for this file"));
+        assert.ok(fix, 'expected file-suppress action');
+        await vscode.workspace.applyEdit(fix.edit!);
+        assert.ok(doc.getText().startsWith('/* @ssl-disable keyword_uppercase'),
+            `expected directive at top, got:\n${doc.getText()}`);
+    });
+
+    it('universal: suppress actions only appear for known LSP slugs', async function () {
+        const doc = await openDoc(`:PROCEDURE T;\n\tnLocal := 1;\n:ENDPROC;\n`);
+        const range = new vscode.Range(1, 1, 1, 7);
+        // Native code with kebab prefix — should NOT get the universal suppress actions.
+        const diag = diagnostic(range, "synthetic", 'ssl-invalid-direct-call');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        assert.strictEqual(
+            actions.find(a => a.title.includes('Suppress')),
+            undefined,
+            'universal suppress should not be offered for legacy native codes',
+        );
+    });
+
+    it('universal: open docs action targets ssl-docs URL when message names an element', async function () {
+        const doc = await openDoc(`:PROCEDURE T;\n\tDoProc("X", {});\n:ENDPROC;\n`);
+        const range = new vscode.Range(1, 1, 1, 7);
+        // direct_procedure_call is in the slug list; the heuristic infers
+        // category=functions from the "procedure_call" fragment.
+        const diag = diagnostic(range, "Custom procedure 'X' must be invoked via DoProc", 'direct_procedure_call');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title.startsWith("Show docs for 'X'"));
+        assert.ok(fix, `expected docs link action; got titles: ${actions.map(a => a.title).join(', ')}`);
+        assert.strictEqual(fix.command?.command, 'vscode.open');
+        const target = (fix.command?.arguments?.[0] as vscode.Uri).toString();
+        assert.ok(target.includes('content/reference/functions/X.md'),
+            `expected docs URL, got: ${target}`);
+    });
+
     it('nested_iif: rewrites assignment-form IIF into :IF/:ELSE block', async function () {
         const doc = await openDoc(`:PROCEDURE T;\n\tx := IIF(c, a, b);\n:ENDPROC;\n`);
         const lineText = doc.lineAt(1).text;
