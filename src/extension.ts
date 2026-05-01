@@ -23,6 +23,7 @@ import { WorkspaceProcedureIndex } from "./utils/procedureIndex";
 import { registerConfigureNamespacesCommand } from "./commands/configureNamespaces";
 import { registerFormatSqlCommand } from "./commands/formatSql";
 import { startClient, stopClient, restartClient, isClientRunning } from "./lspClient";
+import { loadInventory, getInventorySourceVersion } from "./utils/inventory";
 
 // Track if LSP is active for this session
 let lspActive = false;
@@ -40,6 +41,17 @@ export async function activate(context: vscode.ExtensionContext) {
 
     const config = vscode.workspace.getConfiguration("ssl");
     const lspEnabled = config.get<boolean>("languageServer.enabled", true);
+
+    // Load full SSL element inventory from the bundled LSP binary so native
+    // fallback providers see the same 330-function / 29-class catalog the LSP
+    // uses. Failures leave the loader inactive and providers fall back to the
+    // small hardcoded subset in constants/language.ts.
+    loadInventory(context).then(() => {
+        const ver = getInventorySourceVersion();
+        if (ver) {
+            Logger.info(`SSL inventory loaded from bundled LSP (${ver})`);
+        }
+    });
 
     // Try to start the LSP client if enabled
     if (lspEnabled) {

@@ -5,9 +5,9 @@ import {
 	BLOCK_END_KEYWORDS,
 	BLOCK_MIDDLE_KEYWORDS,
 	CASE_KEYWORDS,
-	LOOP_COUNTER_EXCEPTIONS,
-	SSL_BUILTIN_FUNCTIONS
+	LOOP_COUNTER_EXCEPTIONS
 } from "./constants/language";
+import { getBuiltinFunctions } from "./utils/inventory";
 import {
 	CONFIG_KEYS,
 	CONFIG_DEFAULTS
@@ -1020,7 +1020,7 @@ export class SSLDiagnosticProvider {
 		const validFunctionNames = new Set<string>();
 
 		// 1. Add Built-ins
-		SSL_BUILTIN_FUNCTIONS.forEach(f => validFunctionNames.add(f.name.toLowerCase()));
+		getBuiltinFunctions().forEach(f => validFunctionNames.add(f.name.toLowerCase()));
 
 		// 2. Add Configured Functions
 		config.configuredFunctions.forEach(f => validFunctionNames.add(f.toLowerCase()));

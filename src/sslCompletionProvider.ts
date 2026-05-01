@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
 import {
 	SSL_KEYWORDS,
-	SSL_KEYWORD_DESCRIPTIONS,
 	SSLClass,
 	SSLFunction
 } from "./constants/language";
+import { getKeywordDescriptions } from "./utils/inventory";
 import {
 	CONFIG_KEYS,
 	CONFIG_DEFAULTS
@@ -244,7 +244,7 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 	private initializeKeywords(): void {
 		this.keywords = SSL_KEYWORDS.map(kw => {
 			const item = new vscode.CompletionItem(kw, vscode.CompletionItemKind.Keyword);
-			item.detail = SSL_KEYWORD_DESCRIPTIONS[kw];
+			item.detail = getKeywordDescriptions()[kw];
 			item.insertText = kw;
 			item.filterText = `:${kw}`;
 			return item;

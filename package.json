@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.4.0",
+    "version": "1.5.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -128,19 +128,19 @@
                 "ssl.format.formatOnSave": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Automatically format document when saving"
+                    "description": "Automatically format document when saving (native providers only; when ssl.languageServer.enabled is true, use editor.formatOnSave instead)"
                 },
                 "ssl.format.trimTrailingWhitespace": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Remove trailing whitespace from all lines (native providers only; LSP handles this internally)"
+                    "description": "Remove trailing whitespace from all lines (native providers only; LSP handles this internally when ssl.languageServer.enabled is true)"
                 },
                 "ssl.format.maxConsecutiveBlankLines": {
                     "type": "number",
                     "default": 2,
                     "minimum": 1,
                     "maximum": 5,
-                    "description": "Maximum number of consecutive blank lines to preserve between statements"
+                    "description": "Maximum number of consecutive blank lines to preserve between statements (native providers only; ignored when ssl.languageServer.enabled is true)"
                 },
                 "ssl.format.sql.enabled": {
                     "type": "boolean",
@@ -192,7 +192,7 @@
                         "SQL Server style concatenation (+)"
                     ],
                     "default": "||",
-                    "description": "SQL string concatenation operator used when breaking long string literals"
+                    "description": "SQL string concatenation operator used when breaking long string literals (native providers only; ignored when ssl.languageServer.enabled is true)"
                 },
                 "ssl.documentNamespaces": {
                     "type": "object",

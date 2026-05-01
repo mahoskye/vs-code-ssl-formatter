@@ -5,6 +5,40 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-04-30
+
+### Added
+- **starlims-lsp v0.3.0**: Refreshed bundled language-server binaries (Linux/macOS/Windows, amd64/arm64) from `v0.2.0` to `v0.3.0`. The previous bundle was a `v0.2.0-19-gd23fca8-dirty` development build dated 2026-04-06.
+- **Class hover**: hovering a built-in class now lists its constructors, properties, and methods (LSP-provided).
+- **Type and special-form hover**: the 8 SSL value types (`array`, `boolean`, `codeblock`, `date`, `netobject`, `number`, `object`, `string`) and the 6 special forms (`access-modifiers`, `base`, `code-block`, `code-organization`, `constructor`, `me`) now show inline reference content (LSP-provided).
+- **Constructor signature help**: cursor inside `<ClassName>{...}` now triggers signature help for each published constructor form.
+- **Context-aware completions**:
+  - `<BuiltInClass>{` — constructor signatures
+  - `Me:` / `Base:` inside a `:CLASS Foo;` file — `Foo`'s methods and properties
+  - `<BuiltInClass>:` — that class's methods and properties
+- **New diagnostic — UDObject array in IN-clause**: warns when a UDObject array property is used inside a SQL `IN (?obj:Prop?)` placeholder, which causes the runtime error *"The current array has more than 1 dimmension."*. Fix: copy the array to a local variable first. Emitted by the LSP.
+- **New diagnostic — class-name collision**: warns when `:CLASS Foo;` declares a class whose name shadows a built-in (e.g. `Email`, `SQLConnection`).
+- **Class inventory (LSP)**: exposes 7 classes that were previously hidden — `CDataColumn`, `CDataColumns`, `CDataField`, `CDataRow`, `SQLConnection`, `SSLError`, `SSLSQLError`.
+- **Native fallback inventory now sourced from the bundled LSP.** On activation, the extension runs `<bundled-lsp> --export-signatures` once and feeds the result (330 functions, 29 classes, 38 keywords) to the native completion, hover, signature help, inlay hints, and diagnostic providers. When the LSP is enabled this is invisible — the LSP itself serves user-facing features. When `ssl.languageServer.enabled` is `false` (or the LSP fails to launch), the native providers see the same authoritative catalog instead of the small hardcoded subset. If the export call fails (binary missing, spawn error, malformed output), providers transparently fall back to the hardcoded subset in `src/constants/language.ts`.
+
+### Changed
+- **Diagnostic codes (native fallback only)** aligned to `ssl-style-guide.schema.yaml` rule slugs where an equivalent exists. The bundled LSP does not populate the LSP `code` field on its diagnostics, so this rename only affects native-emitted diagnostics:
+  | Old | New |
+  | --- | --- |
+  | `ssl-block-depth` | `ssl-max-block-depth` |
+  | `ssl-max-params` | `ssl-max-params-warning` |
+  | `ssl-keyword-case` | `ssl-keyword-uppercase` |
+  | `sql-sql-injection` | `ssl-sql-injection` |
+  Other extension diagnostic codes have no schema equivalent and are unchanged.
+- **Setting descriptions** clarified for client-only formatter options that have no LSP equivalent (`ssl.format.builtinFunctionCase`, `ssl.format.formatOnSave`, `ssl.format.trimTrailingWhitespace`, `ssl.format.maxConsecutiveBlankLines`, `ssl.format.sql.concatOperator`) — these apply only when `ssl.languageServer.enabled` is `false`.
+
+### Removed (LSP behavior)
+- The LSP's built-in function inventory shrank from 354 → 330. Calls to these legacy / licensing helpers now show "unknown function" diagnostics: `LPrint`, `TraceOn`, `TraceOff`, `SqlTraceOn`, `SqlTraceOff`, `StationName`, `UndeclaredVars`, `In64BitMode`, `NetFrameworkVersion`, `GetExecutionTrace`, `SetLocationOracle`, `SetLocationSQLServer`, `GetForbiddenAppIDs`, `GetForbiddenDesignerAppIDs`, `IsFeatureAuthorized`, `IsFeatureBasedLicense`, `IsDemoLicense`, `GetLicenseInfoAsText`, `ResetFeatures`, `GetInstallationKey`, `GetFeaturesAndNumbers`, `GetNumberOfInstrumentConnections`, `GetNumberOfNamedConcurrentUsers`, `GetNumberOfNamedUsers`. If your codebase still calls any of these, treat them as project-local declarations.
+
+### Documentation
+- `docs/ssl-sqlexecute-parameter-substitution.md`: added caveat block about UDObject array properties in `IN` clauses (this caveat tracks the same condition the LSP now flags).
+- `docs/feature-roadmap.md`: added "Upstream Proposals" section listing client-only formatter settings to migrate to the LSP.
+
 ## [1.4.0] - 2026-03-28
 
 ### Added

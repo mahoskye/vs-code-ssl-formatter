@@ -1,11 +1,10 @@
 import * as vscode from "vscode";
 import { CONFIG_DEFAULTS, CONFIG_KEYS } from "../constants/config";
 import {
-    SSL_BUILTIN_CLASSES,
-    SSL_BUILTIN_FUNCTIONS,
     SSLClass,
     SSLFunction
 } from "../constants/language";
+import { getBuiltinClasses, getBuiltinFunctions } from "./inventory";
 
 type CustomFunctionConfig = Partial<SSLFunction> & { name: string };
 type CustomClassConfig = Partial<SSLClass> & { name: string };
@@ -50,7 +49,7 @@ export function getConfiguredFunctions(config: vscode.WorkspaceConfiguration): S
     ) || [];
 
     return mergeWithConfig(
-        SSL_BUILTIN_FUNCTIONS,
+        getBuiltinFunctions(),
         customFunctions,
         (name) => ({
             name,
@@ -82,7 +81,7 @@ export function getConfiguredClasses(config: vscode.WorkspaceConfiguration): SSL
     ) || [];
 
     return mergeWithConfig(
-        SSL_BUILTIN_CLASSES,
+        getBuiltinClasses(),
         customClasses,
         (name) => ({
             name,

@@ -82,3 +82,40 @@ This document tracks the remaining GitHub feature issues and outlines how we'll 
 - Keep CHANGELOG entries grouped by workstream for the next release.
 - Consider bundling related features into minor releases (e.g., Formatter v1.2, IntelliSense v1.3).
 - Track manual verification steps in future PR descriptions to maintain history without reintroducing removed docs.
+
+## Upstream Proposals (starlims-lsp)
+
+### Settings that have no LSP equivalent
+
+These extension settings currently apply only to the native fallback path
+(when `ssl.languageServer.enabled` is `false`). Propose upstream so the LSP
+can own the behavior end-to-end:
+
+- `ssl.format.builtinFunctionCase` (`preserve` | `PascalCase`) — normalize
+  built-in function name casing during format.
+- `ssl.format.formatOnSave` — superseded by `editor.formatOnSave` when LSP is
+  active; consider removing from the extension once everyone is on LSP.
+- `ssl.format.trimTrailingWhitespace` — LSP already trims internally; expose a
+  setting to opt out if needed.
+- `ssl.format.maxConsecutiveBlankLines` — collapse runs of blank lines.
+- `ssl.format.sql.concatOperator` (`||` | `+`) — choose Oracle/Postgres vs SQL
+  Server concatenation when wrapping long string literals.
+
+### Diagnostic protocol gaps
+
+- **Add a `Code` field to the LSP `Diagnostic` struct.** Currently the LSP
+  emits diagnostics with only `Range`, `Severity`, `Message`, and
+  `Source: "ssl-lsp"`. Without a stable code, clients cannot reliably wire
+  quick-fix code actions, suppression comments, or per-rule severity
+  overrides — they would have to match on message text, which is brittle.
+  When added, prefer slugs from `ssl-style-guide.schema.yaml` `lints` (e.g.
+  `parameters_first`, `prefer_exitcase`, `udobject_array_in_clause`).
+- **Honor documented exceptions per element.** The `ssl-element-reference`
+  and the style guide call out element-specific exceptions and edge cases
+  (e.g. functions that *do* accept named SQL placeholders, keywords whose
+  context rules differ inside data sources, classes whose members bypass
+  underscore-private convention). Diagnostic checks should consult those
+  exception lists before flagging — currently several rules are applied
+  uniformly. Action: enumerate the exception fields already present in
+  `ssl-element-reference.json` and route them into the relevant diagnostic
+  checks.

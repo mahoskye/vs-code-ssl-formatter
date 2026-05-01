@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { ProcedureIndex, ProcedureInfo } from "./utils/procedureIndex";
 import { CONFIG_KEYS, CONFIG_DEFAULTS } from "./constants/config";
-import { SSL_BUILTIN_FUNCTIONS } from "./constants/language";
+import { getBuiltinFunctions } from "./utils/inventory";
 
 /**
  * SSL Inlay Hints Provider
@@ -398,7 +398,7 @@ export class SSLInlayHintsProvider implements vscode.InlayHintsProvider {
 
 	private initializeFunctionSignatures(): void {
 		// Initialize with function signatures from language constants
-		for (const func of SSL_BUILTIN_FUNCTIONS) {
+		for (const func of getBuiltinFunctions()) {
 			const params = this.extractParameterNames(func.params);
 			if (params && params.length > 0) {
 				this.functionSignatures.set(func.name.toUpperCase(), params);

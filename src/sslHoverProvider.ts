@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
 import {
-	SSL_KEYWORD_DESCRIPTIONS,
 	SSLFunction,
 	SSLClass
 } from "./constants/language";
+import { getKeywordDescriptions } from "./utils/inventory";
 import { ProcedureIndex, ProcedureInfo } from "./utils/procedureIndex";
 import { CONFIG_KEYS, CONFIG_DEFAULTS } from "./constants/config";
 import { ClassIndex } from "./utils/classIndex";
@@ -431,7 +431,7 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 	}
 
 	private initializeKeywordDocs() {
-		Object.entries(SSL_KEYWORD_DESCRIPTIONS).forEach(([k, v]) => this.keywordDocs.set(k, v));
+		Object.entries(getKeywordDescriptions()).forEach(([k, v]) => this.keywordDocs.set(k, v));
 	}
 
 	private refreshDocsFromConfig() {

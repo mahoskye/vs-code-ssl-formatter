@@ -2,6 +2,8 @@
 
 This guide complements `README.md` with deeper usage, configuration, and troubleshooting details for the STARLIMS Language Server Protocol (LSP) implementation.
 
+> **Bundled version:** `starlims-lsp` v0.3.0 (built 2026-05-01). Run `./starlims-lsp-<platform>-<arch> --version` to confirm. Source: https://github.com/mahoskye/starlims-lsp.
+
 ## Who this is for
 
 - Editors or plugin authors integrating `starlims-lsp`
