@@ -5,6 +5,50 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-04-30
+
+### Added
+- **Nine new quick-fix code actions** keyed on stable LSP rule slugs:
+  `class_instantiation_curly`, `dot_property_access`, `step_spacing`,
+  `comment_termination`, `redeclare_is_noop`, `equals_vs_strict_equals`,
+  `parameters_first`, `default_after_parameters`, and `nested_iif`. The
+  last one is offered as a `Refactor → Rewrite` action; the rest are
+  `QuickFix`-kind. Combined with the four shipped in 1.6.0, the lightbulb
+  now offers fixes for fourteen distinct LSP-emitted rules.
+- **`ssl.diagnostics.rules` autocomplete.** The settings UI now lists the
+  98 known rule slugs from the bundled LSP as `propertyNames.enum`, so
+  users get IntelliSense on rule names when configuring per-rule severity
+  overrides.
+- New `npm run generate:slugs` script (sources from
+  `../starlims-lsp/internal/providers/diagnostic_codes.go`) generates
+  `src/constants/diagnosticSlugs.ts` and patches `package.json`'s
+  `propertyNames.enum`. Run after bumping the bundled LSP.
+
+### Changed
+- **README** Feature Highlights now documents quick fixes (with a slug
+  table), per-rule overrides, source-level `@ssl-disable` suppression
+  comments, and the status-bar item.
+- The status-bar renderer (`src/utils/statusRenderer.ts`) was extracted
+  from `sslStatusBar.ts` so it can be unit-tested without resolving
+  `vscode-languageclient` through the ts-node loader chain.
+- The diagnostic-rule-overrides middleware moved to
+  `src/utils/ruleOverrides.ts` for the same reason. `lspClient.ts` now
+  imports it.
+
+### Removed
+- `INTEGRATION_STATUS.md` — planning artifact from the 1.4.0 LSP
+  integration push, superseded by `CHANGELOG.md` and
+  `docs/ARCHITECTURE.md`.
+
+### Tests
+- 9 new code-action unit tests covering each new handler.
+- 5 new `applyRuleOverrides` middleware tests covering pass-through,
+  drop-on-`off`, severity remap for `info`/`warn`/`error`, unknown
+  override values, and codeless diagnostics.
+- 4 new status-bar renderer tests covering all four state combinations.
+- 1 new end-to-end integration test exercising LSP → middleware →
+  code-action chain via `udobject_array_in_clause`.
+
 ## [1.6.0] - 2026-04-30
 
 ### Added

@@ -7,6 +7,7 @@ import {
     isInventoryLoaded
 } from './utils/inventory';
 import { Logger } from './utils/logger';
+import { renderStatus } from './utils/statusRenderer';
 
 /**
  * Compact status-bar item shown when an SSL document is the active editor.
@@ -56,33 +57,14 @@ function refresh(): void {
         return;
     }
 
-    const lspRunning = isClientRunning();
-    const lspVersion = getInventorySourceVersion();
-    const fnCount = getBuiltinFunctions().length;
-    const classCount = getBuiltinClasses().length;
-    const inventoryReady = isInventoryLoaded();
-
-    const segments: string[] = ['$(symbol-namespace) SSL'];
-    if (lspRunning) {
-        segments.push(lspVersion ? `LSP ${lspVersion}` : 'LSP');
-    } else {
-        segments.push('native');
-    }
-    if (inventoryReady) {
-        segments.push(`${fnCount} fns · ${classCount} classes`);
-    }
-    item.text = segments.join(' · ');
-
-    const tooltipLines = [
-        `STARLIMS SSL extension`,
-        lspRunning
-            ? `Language server: running${lspVersion ? ` (${lspVersion})` : ''}`
-            : `Language server: not running (using native fallback)`,
-        inventoryReady
-            ? `Inventory: ${fnCount} functions, ${classCount} classes (loaded from bundled LSP)`
-            : `Inventory: hardcoded fallback subset`,
-        `Click to open the SSL output channel.`
-    ];
-    item.tooltip = tooltipLines.join('\n');
+    const rendered = renderStatus({
+        lspRunning: isClientRunning(),
+        lspVersion: getInventorySourceVersion(),
+        fnCount: getBuiltinFunctions().length,
+        classCount: getBuiltinClasses().length,
+        inventoryReady: isInventoryLoaded()
+    });
+    item.text = rendered.text;
+    item.tooltip = rendered.tooltip;
     item.show();
 }

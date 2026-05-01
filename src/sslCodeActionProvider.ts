@@ -17,7 +17,8 @@ import * as vscode from 'vscode';
 export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 
 	public static readonly providedCodeActionKinds = [
-		vscode.CodeActionKind.QuickFix
+		vscode.CodeActionKind.QuickFix,
+		vscode.CodeActionKind.RefactorRewrite
 	];
 
 	public provideCodeActions(
@@ -50,6 +51,33 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 					break;
 				case 'prefer_exitcase':
 					action = createPreferExitCaseFix(document, diagnostic);
+					break;
+				case 'class_instantiation_curly':
+					action = createClassInstantiationCurlyFix(document, diagnostic);
+					break;
+				case 'dot_property_access':
+					action = createDotPropertyAccessFix(document, diagnostic);
+					break;
+				case 'step_spacing':
+					action = createStepSpacingFix(document, diagnostic);
+					break;
+				case 'comment_termination':
+					action = createCommentTerminationFix(document, diagnostic);
+					break;
+				case 'redeclare_is_noop':
+					action = createRedeclareIsNoopFix(document, diagnostic);
+					break;
+				case 'equals_vs_strict_equals':
+					action = createEqualsVsStrictEqualsFix(document, diagnostic);
+					break;
+				case 'parameters_first':
+					action = createParametersFirstFix(document, diagnostic);
+					break;
+				case 'default_after_parameters':
+					action = createDefaultAfterParametersFix(document, diagnostic);
+					break;
+				case 'nested_iif':
+					action = createNestedIifRefactor(document, diagnostic);
 					break;
 			}
 			if (action) {
@@ -282,4 +310,423 @@ function createPreferExitCaseFix(
 	fix.diagnostics = [diagnostic];
 	fix.isPreferred = false;
 	return fix;
+}
+
+// ---- class_instantiation_curly ---------------------------------------------
+
+/**
+ * The LSP flags `Foo(...)` calls that should be `Foo{...}` for built-in
+ * class instantiation. The diagnostic range covers the call. We rewrite
+ * the matched parens in the diagnostic range to curly braces, leaving the
+ * argument content untouched.
+ */
+function createClassInstantiationCurlyFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const original = document.getText(diagnostic.range);
+	// Replace the first `(` and the last `)` only — handles `Foo(a, b)` -> `Foo{a, b}`.
+	const openIdx = original.indexOf('(');
+	const closeIdx = original.lastIndexOf(')');
+	if (openIdx < 0 || closeIdx < 0 || closeIdx <= openIdx) {
+		return undefined;
+	}
+	const replacement =
+		original.slice(0, openIdx) +
+		'{' +
+		original.slice(openIdx + 1, closeIdx) +
+		'}' +
+		original.slice(closeIdx + 1);
+
+	const fix = new vscode.CodeAction(
+		"Use curly-brace construction '{}'",
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.replace(document.uri, diagnostic.range, replacement);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
+}
+
+// ---- dot_property_access ---------------------------------------------------
+
+/**
+ * The LSP flags `obj.prop` where SSL expects `obj:prop`. The diagnostic
+ * range covers the `.` itself (or the surrounding `obj.prop` expression
+ * depending on the LSP build). We replace any `.` in the range with `:`.
+ */
+function createDotPropertyAccessFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const original = document.getText(diagnostic.range);
+	if (!original.includes('.')) {
+		return undefined;
+	}
+	const replacement = original.replace(/\./g, ':');
+	const fix = new vscode.CodeAction(
+		"Replace '.' with ':' for property access",
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.replace(document.uri, diagnostic.range, replacement);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
+}
+
+// ---- step_spacing ----------------------------------------------------------
+
+/**
+ * `:FOR i := 1 :TO 10 :STEP 2;` requires whitespace before `:STEP`. The LSP
+ * flags the `:STEP` token range. Insert a single space immediately before
+ * the diagnostic range when there isn't already whitespace there.
+ */
+function createStepSpacingFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const start = diagnostic.range.start;
+	if (start.character === 0) {
+		return undefined;
+	}
+	const lineText = document.lineAt(start.line).text;
+	const before = lineText[start.character - 1];
+	if (before === ' ' || before === '\t') {
+		return undefined;
+	}
+	const fix = new vscode.CodeAction(
+		"Insert space before ':STEP'",
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.insert(document.uri, start, ' ');
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
+}
+
+// ---- comment_termination ---------------------------------------------------
+
+/**
+ * SSL comments are terminated with `;`, not the C-style close. The LSP
+ * flags the comment range. If the text ends in the C-style close we
+ * replace those two characters with `;`; otherwise we append `;` to the
+ * end of the diagnostic range.
+ */
+function createCommentTerminationFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const original = document.getText(diagnostic.range);
+	let replacement: string;
+	if (original.endsWith('*/')) {
+		replacement = original.slice(0, -2) + ';';
+	} else if (original.endsWith(';')) {
+		return undefined;
+	} else {
+		replacement = original + ';';
+	}
+	const fix = new vscode.CodeAction(
+		"Terminate comment with ';'",
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.replace(document.uri, diagnostic.range, replacement);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
+}
+
+// ---- redeclare_is_noop -----------------------------------------------------
+
+/**
+ * Re-declaring an already-declared variable with `:DECLARE` is a runtime
+ * no-op. The LSP flags the duplicate declaration. Drop the entire line that
+ * contains the diagnostic range, including its trailing newline so the file
+ * doesn't grow stray blank lines.
+ */
+function createRedeclareIsNoopFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const line = diagnostic.range.start.line;
+	if (line >= document.lineCount) {
+		return undefined;
+	}
+	const removeRange = new vscode.Range(
+		new vscode.Position(line, 0),
+		new vscode.Position(Math.min(line + 1, document.lineCount), 0)
+	);
+	const fix = new vscode.CodeAction(
+		'Remove redundant :DECLARE',
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.delete(document.uri, removeRange);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
+}
+
+// ---- equals_vs_strict_equals -----------------------------------------------
+
+/**
+ * The LSP flags `=` used for strict-equality string compares (where the
+ * SSL `=` operator does prefix matching). The diagnostic range covers the
+ * `=` token. Replace with `==`.
+ */
+function createEqualsVsStrictEqualsFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const original = document.getText(diagnostic.range);
+	if (original !== '=') {
+		// Defensive — only operate when the range really covers a single `=`.
+		return undefined;
+	}
+	const fix = new vscode.CodeAction(
+		"Replace '=' with '==' for exact match",
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.replace(document.uri, diagnostic.range, '==');
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
+}
+
+// ---- parameters_first ------------------------------------------------------
+
+/**
+ * SSL requires `:PARAMETERS` to appear before any other statement in a
+ * procedure body (or at the top of a script). The LSP flags the
+ * out-of-place `:PARAMETERS` line. We move that whole line up to the
+ * position immediately after the enclosing `:PROCEDURE` line, or to line 0
+ * if the document is a script.
+ */
+function createParametersFirstFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const targetLine = diagnostic.range.start.line;
+	if (targetLine >= document.lineCount) {
+		return undefined;
+	}
+	const lineText = document.lineAt(targetLine).text;
+	if (!/^\s*:PARAMETERS\b/i.test(lineText)) {
+		return undefined;
+	}
+
+	// Find the enclosing :PROCEDURE line (walking up). If none, this is a
+	// script; insert at line 0.
+	let insertAfter = -1;
+	for (let i = targetLine - 1; i >= 0; i--) {
+		if (/^\s*:PROCEDURE\b/i.test(document.lineAt(i).text)) {
+			insertAfter = i;
+			break;
+		}
+	}
+	const insertLine = insertAfter + 1; // 0 for scripts, line-after-:PROCEDURE otherwise
+	if (insertLine === targetLine) {
+		// Already adjacent — nothing to do.
+		return undefined;
+	}
+
+	// Build edit: insert the :PARAMETERS line at insertLine, then delete the
+	// original. Using a single WorkspaceEdit, edits are applied as a unit
+	// without offset-shifting between insert and delete because each edit
+	// targets disjoint ranges (the insert is a zero-width position).
+	const lineTextWithNewline = lineText + '\n';
+	const deleteRange = new vscode.Range(
+		new vscode.Position(targetLine, 0),
+		new vscode.Position(Math.min(targetLine + 1, document.lineCount), 0)
+	);
+
+	const fix = new vscode.CodeAction(
+		insertAfter >= 0
+			? "Move ':PARAMETERS' immediately after ':PROCEDURE'"
+			: "Move ':PARAMETERS' to top of script",
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.insert(document.uri, new vscode.Position(insertLine, 0), lineTextWithNewline);
+	fix.edit.delete(document.uri, deleteRange);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
+}
+
+// ---- default_after_parameters ----------------------------------------------
+
+/**
+ * `:DEFAULT` must immediately follow `:PARAMETERS`. The LSP flags
+ * out-of-place `:DEFAULT` lines. Move the flagged line to the position
+ * directly after the closest preceding `:PARAMETERS` (or after the run of
+ * `:DEFAULT` lines already there).
+ */
+function createDefaultAfterParametersFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const targetLine = diagnostic.range.start.line;
+	if (targetLine >= document.lineCount) {
+		return undefined;
+	}
+	const lineText = document.lineAt(targetLine).text;
+	if (!/^\s*:DEFAULT\b/i.test(lineText)) {
+		return undefined;
+	}
+
+	// Walk up to find :PARAMETERS, then walk down past any contiguous
+	// :DEFAULT lines so we insert at the END of the run.
+	let paramsLine = -1;
+	for (let i = targetLine - 1; i >= 0; i--) {
+		if (/^\s*:PARAMETERS\b/i.test(document.lineAt(i).text)) {
+			paramsLine = i;
+			break;
+		}
+	}
+	if (paramsLine === -1) {
+		return undefined;
+	}
+	let insertLine = paramsLine + 1;
+	while (
+		insertLine < targetLine &&
+		/^\s*:DEFAULT\b/i.test(document.lineAt(insertLine).text)
+	) {
+		insertLine++;
+	}
+	if (insertLine === targetLine) {
+		return undefined;
+	}
+
+	const lineTextWithNewline = lineText + '\n';
+	const deleteRange = new vscode.Range(
+		new vscode.Position(targetLine, 0),
+		new vscode.Position(Math.min(targetLine + 1, document.lineCount), 0)
+	);
+
+	const fix = new vscode.CodeAction(
+		"Move ':DEFAULT' immediately after ':PARAMETERS'",
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.insert(document.uri, new vscode.Position(insertLine, 0), lineTextWithNewline);
+	fix.edit.delete(document.uri, deleteRange);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
+}
+
+// ---- nested_iif (refactor) -------------------------------------------------
+
+/**
+ * Convert `lhs := IIF(cond, a, b);` into a block:
+ *
+ *     :IF cond;
+ *         lhs := a;
+ *     :ELSE;
+ *         lhs := b;
+ *     :ENDIF;
+ *
+ * We only handle the common assignment-RHS case here. For arbitrary
+ * expression contexts (a non-trivial transform requiring a temp variable
+ * with hand-tuned naming), the action is not offered and the user is left
+ * to refactor manually. The diagnostic range is expected to cover the
+ * `IIF(...)` expression.
+ */
+function createNestedIifRefactor(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const lineNum = diagnostic.range.start.line;
+	if (lineNum >= document.lineCount) {
+		return undefined;
+	}
+	const fullLine = document.lineAt(lineNum).text;
+
+	// Match the simple assignment case: optional indent, identifier,
+	// `:=`, `IIF(<cond>, <then>, <else>)`, `;`.
+	const assignMatch = fullLine.match(
+		/^(\s*)([\w:]+(?:\s*:\s*[\w]+)*)\s*:=\s*IIF\s*\(\s*([\s\S]+)\s*\)\s*;\s*$/i
+	);
+	if (!assignMatch) {
+		return undefined;
+	}
+	const indent = assignMatch[1];
+	const lhs = assignMatch[2];
+	const argsText = assignMatch[3];
+
+	// Split the IIF arguments at top-level commas.
+	const parts = splitTopLevelCommas(argsText);
+	if (parts.length !== 3) {
+		return undefined;
+	}
+	const [cond, thenExpr, elseExpr] = parts.map(s => s.trim());
+	const inner = indent + '\t';
+	const replacement =
+		`${indent}:IF ${cond};\n` +
+		`${inner}${lhs} := ${thenExpr};\n` +
+		`${indent}:ELSE;\n` +
+		`${inner}${lhs} := ${elseExpr};\n` +
+		`${indent}:ENDIF;`;
+
+	const lineRange = new vscode.Range(
+		new vscode.Position(lineNum, 0),
+		new vscode.Position(lineNum, fullLine.length)
+	);
+
+	const fix = new vscode.CodeAction(
+		'Convert IIF to :IF / :ELSE block',
+		vscode.CodeActionKind.RefactorRewrite
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.replace(document.uri, lineRange, replacement);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = false;
+	return fix;
+}
+
+function splitTopLevelCommas(text: string): string[] {
+	const result: string[] = [];
+	let depth = 0;
+	let inString: string | null = null;
+	let buf = '';
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i];
+		if (inString) {
+			buf += ch;
+			if (ch === inString) {
+				inString = null;
+			}
+			continue;
+		}
+		if (ch === '"' || ch === '\'') {
+			inString = ch;
+			buf += ch;
+			continue;
+		}
+		if (ch === '(' || ch === '[' || ch === '{') {
+			depth++;
+			buf += ch;
+			continue;
+		}
+		if (ch === ')' || ch === ']' || ch === '}') {
+			depth--;
+			buf += ch;
+			continue;
+		}
+		if (ch === ',' && depth === 0) {
+			result.push(buf);
+			buf = '';
+			continue;
+		}
+		buf += ch;
+	}
+	if (buf.length > 0) {
+		result.push(buf);
+	}
+	return result;
 }

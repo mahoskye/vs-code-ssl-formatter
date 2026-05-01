@@ -18,6 +18,7 @@ tests/**
 scripts/**
 *.ts
 tsconfig.json
+tsconfig.tsnode.json
 
 # Development documentation
 docs/**

@@ -76,7 +76,23 @@ code --install-extension vs-code-ssl-formatter-*.vsix
 
 - Live validation for block depth, procedure parameter count, Hungarian notation adherence, SQL injection risks, missing semicolons, missing OTHERWISE clauses, and other style guide rules.
 - Configurable severity levels (error, warning, info) and strict style-guide mode to convert warnings to errors.
-- Quick fixes for missing semicolons, keyword casing, built-in function casing, missing OTHERWISE clauses, and comment toggling.
+- **Per-rule overrides**: `ssl.diagnostics.rules` accepts a slug → severity map (`"off" | "info" | "warn" | "error"`). Settings UI offers slug autocomplete from the bundled LSP's published rule list (98 slugs as of v1.7.0).
+- **Source-level suppression**: `/* @ssl-disable <slug>; */` silences the named rule for the rest of the file; `/* @ssl-disable-next-line <slug>; */` silences only the line that follows. `*` matches every coded diagnostic.
+- **Quick fixes** keyed on stable rule slugs:
+  - `udobject_array_in_clause` — extract the UDObject property to a local variable and rewrite the `IN (?...?)` placeholder.
+  - `keyword_uppercase` — uppercase the flagged keyword.
+  - `not_preferred_operator` — replace `<>` or `#` with `!=`.
+  - `prefer_exitcase` — insert `:EXITCASE;` before the next `:CASE` / `:ENDCASE`.
+  - `class_instantiation_curly` — rewrite `Foo(...)` as `Foo{...}`.
+  - `dot_property_access` — replace `.` with `:` for property access.
+  - `step_spacing` — insert the missing space before `:STEP`.
+  - `comment_termination` — append `;` to terminate a comment.
+  - `redeclare_is_noop` — drop the redundant `:DECLARE` line.
+  - `equals_vs_strict_equals` — replace `=` with `==` for exact string match.
+  - `parameters_first` — move `:PARAMETERS` directly after `:PROCEDURE`.
+  - `default_after_parameters` — relocate `:DEFAULT` to follow `:PARAMETERS`.
+  - `nested_iif` — refactor an `IIF(...)` assignment into `:IF / :ELSE / :ENDIF` (offered as a `Refactor → Rewrite` action).
+  - Plus the legacy `ssl-invalid-direct-call` fix for native fallback.
 
 ### Editor Enhancements
 
@@ -84,6 +100,7 @@ code --install-extension vs-code-ssl-formatter-*.vsix
 - Comment toggling (`Ctrl+/`) for SSL block and line comments.
 - Breadcrumbs and symbol highlighting to understand scope and structure quickly.
 - Region markers (`:REGION` / `:ENDREGION` or `/* region`) for manual code organization.
+- **Status-bar item** (right side, when an SSL file is active) showing `SSL · LSP <version> · <fns> fns · <classes> classes` — or `SSL · native` when the language server is disabled. Click to open the SSL output channel.
 
 ## Commands
 
