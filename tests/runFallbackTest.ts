@@ -4,7 +4,7 @@ import { runTests } from '@vscode/test-electron';
 async function main() {
     try {
         const extensionDevelopmentPath = path.resolve(__dirname, '../../');
-        const extensionTestsPath = path.resolve(__dirname, './fallbackIndex');
+        const extensionTestsPath = path.resolve(__dirname, './fallbackIndex.js');
         const fallbackWorkspacePath = path.resolve(extensionDevelopmentPath, 'tests/fallback-workspace');
         const fallbackUserDataPath = path.resolve(extensionDevelopmentPath, 'tests/fallback-user-data');
         const fallbackExtensionsPath = path.resolve(extensionDevelopmentPath, 'tests/fallback-extensions');
