@@ -2,7 +2,6 @@ import * as vscode from "vscode";
 import { SSLFoldingProvider } from "./sslFoldingProvider";
 import { SSLFormattingProvider } from "./sslFormattingProvider";
 import { SSLSymbolProvider } from "./sslSymbolProvider";
-import { SSLFormatter } from "./formatting/formatter";
 import { SSLCompletionProvider } from "./sslCompletionProvider";
 import { SSLHoverProvider } from "./sslHoverProvider";
 import { SSLDiagnosticProvider } from "./sslDiagnosticProvider";
@@ -23,6 +22,11 @@ import { WorkspaceClassIndex } from "./utils/classIndex";
 import { WorkspaceProcedureIndex } from "./utils/procedureIndex";
 import { registerConfigureNamespacesCommand } from "./commands/configureNamespaces";
 import { registerFormatSqlCommand } from "./commands/formatSql";
+import { startClient, stopClient, restartClient, isClientRunning } from "./lspClient";
+import { loadInventory, getInventorySourceVersion } from "./utils/inventory";
+
+// Track if LSP is active for this session
+let lspActive = false;
 
 /**
  * Activates the SSL extension.
@@ -35,10 +39,69 @@ export async function activate(context: vscode.ExtensionContext) {
     Logger.initialize(context);
     Logger.info("SSL extension is now active!");
 
+    const config = vscode.workspace.getConfiguration("ssl");
+    const lspEnabled = config.get<boolean>("languageServer.enabled", true);
+
+    // Load full SSL element inventory from the bundled LSP binary so native
+    // fallback providers see the same 330-function / 29-class catalog the LSP
+    // uses. Failures leave the loader inactive and providers fall back to the
+    // small hardcoded subset in constants/language.ts.
+    loadInventory(context).then(() => {
+        const ver = getInventorySourceVersion();
+        if (ver) {
+            Logger.info(`SSL inventory loaded from bundled LSP (${ver})`);
+        }
+    });
+
+    // Try to start the LSP client if enabled
+    if (lspEnabled) {
+        try {
+            await startClient(context);
+            lspActive = true;
+            Logger.info("SSL Language Server started successfully");
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            Logger.error(`Failed to start SSL Language Server: ${message}`);
+            Logger.info("Falling back to native providers");
+            vscode.window.showWarningMessage(
+                `SSL Language Server failed to start: ${message}. Using native providers.`,
+                "Show Output"
+            ).then(selection => {
+                if (selection === "Show Output") {
+                    Logger.show();
+                }
+            });
+            lspActive = false;
+        }
+    } else {
+        Logger.info("SSL Language Server disabled, using native providers");
+        lspActive = false;
+    }
+
     const documentSelector = SSL_DOCUMENT_SELECTORS;
     registerCommentController(context);
     registerConfigureNamespacesCommand(context);
     registerFormatSqlCommand(context);
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('ssl.restartLanguageServer', async () => {
+            if (!lspActive || !isClientRunning()) {
+                vscode.window.showWarningMessage(
+                    'SSL Language Server is not active. Reload the window to start it.'
+                );
+                return;
+            }
+
+            try {
+                await restartClient(context);
+                vscode.window.showInformationMessage('SSL Language Server restarted');
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                Logger.error(`Failed to restart SSL Language Server: ${message}`);
+                vscode.window.showErrorMessage(`Failed to restart SSL Language Server: ${message}`);
+            }
+        })
+    );
 
     const classIndex = new WorkspaceClassIndex();
     context.subscriptions.push(classIndex);
@@ -48,92 +111,137 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(procedureIndex);
     await procedureIndex.initialize();
 
-    // Register the folding range provider for SSL language
-    context.subscriptions.push(
-        vscode.languages.registerFoldingRangeProvider(documentSelector, new SSLFoldingProvider())
-    );
+    // Features provided by LSP when active:
+    // - Completion, Hover, Definition, References, Document Symbols
+    // - Folding Ranges, Signature Help, Formatting, Diagnostics
+    // 
+    // When LSP is NOT active, register native providers for these features.
+    // When LSP IS active, skip registering native providers to avoid duplication.
 
-    // Register formatting providers
-    const formattingProvider = new SSLFormattingProvider();
-    context.subscriptions.push(
-        vscode.languages.registerDocumentFormattingEditProvider(documentSelector, formattingProvider)
-    );
-    context.subscriptions.push(
-        vscode.languages.registerDocumentRangeFormattingEditProvider(documentSelector, formattingProvider)
-    );
+    if (!lspActive) {
+        // Register folding range provider (LSP provides this when active)
+        context.subscriptions.push(
+            vscode.languages.registerFoldingRangeProvider(documentSelector, new SSLFoldingProvider())
+        );
 
-    // Register document symbol provider for outline and breadcrumbs
-    context.subscriptions.push(
-        vscode.languages.registerDocumentSymbolProvider(documentSelector, new SSLSymbolProvider())
-    );
+        // Register formatting providers (LSP provides this when active)
+        const formattingProvider = new SSLFormattingProvider();
+        context.subscriptions.push(
+            vscode.languages.registerDocumentFormattingEditProvider(documentSelector, formattingProvider)
+        );
+        context.subscriptions.push(
+            vscode.languages.registerDocumentRangeFormattingEditProvider(documentSelector, formattingProvider)
+        );
 
-    // Register completion provider for IntelliSense
-    context.subscriptions.push(
-        vscode.languages.registerCompletionItemProvider(
-            documentSelector,
-            new SSLCompletionProvider(classIndex, procedureIndex),
-            ":", ".", "(", '"', "'"
-        )
-    );
+        // Register document symbol provider (LSP provides this when active)
+        context.subscriptions.push(
+            vscode.languages.registerDocumentSymbolProvider(documentSelector, new SSLSymbolProvider())
+        );
 
-    // Register hover provider for symbol information
-    context.subscriptions.push(
-        vscode.languages.registerHoverProvider(documentSelector, new SSLHoverProvider(classIndex, procedureIndex))
-    );
+        // Register completion provider (LSP provides this when active)
+        context.subscriptions.push(
+            vscode.languages.registerCompletionItemProvider(
+                documentSelector,
+                new SSLCompletionProvider(classIndex, procedureIndex),
+                ":", ".", "(", '"', "'"
+            )
+        );
 
-    // Register diagnostic provider for code quality checks
-    const diagnosticProvider = new SSLDiagnosticProvider();
-    context.subscriptions.push(diagnosticProvider);
+        // Register hover provider (LSP provides this when active)
+        context.subscriptions.push(
+            vscode.languages.registerHoverProvider(documentSelector, new SSLHoverProvider(classIndex, procedureIndex))
+        );
 
-    // Update diagnostics on document changes
-    context.subscriptions.push(
-        vscode.workspace.onDidOpenTextDocument(document => {
+        // Register diagnostic provider (LSP provides this when active)
+        const diagnosticProvider = new SSLDiagnosticProvider();
+        context.subscriptions.push(diagnosticProvider);
+
+        context.subscriptions.push(
+            vscode.workspace.onDidOpenTextDocument(document => {
+                if (document.languageId === "ssl") {
+                    diagnosticProvider.updateDiagnostics(document);
+                }
+            })
+        );
+
+        context.subscriptions.push(
+            vscode.workspace.onDidChangeTextDocument(event => {
+                if (event.document.languageId === "ssl") {
+                    diagnosticProvider.updateDiagnostics(event.document);
+                }
+            })
+        );
+
+        context.subscriptions.push(
+            vscode.workspace.onDidChangeConfiguration(e => {
+                if (e.affectsConfiguration("ssl.diagnostics.onlyOpenDocuments")) {
+                    const diagConfig = vscode.workspace.getConfiguration("ssl");
+                    const onlyOpen = diagConfig.get<boolean>("diagnostics.onlyOpenDocuments", true);
+
+                    if (onlyOpen) {
+                        diagnosticProvider.clear();
+                        vscode.workspace.textDocuments.forEach(document => {
+                            if (document.languageId === "ssl") {
+                                diagnosticProvider.updateDiagnostics(document);
+                            }
+                        });
+                    }
+                }
+            })
+        );
+
+        // Run diagnostics on already open SSL documents
+        vscode.workspace.textDocuments.forEach(document => {
             if (document.languageId === "ssl") {
                 diagnosticProvider.updateDiagnostics(document);
             }
-        })
-    );
+        });
 
-    context.subscriptions.push(
-        vscode.workspace.onDidChangeTextDocument(event => {
-            if (event.document.languageId === "ssl") {
-                diagnosticProvider.updateDiagnostics(event.document);
-            }
-        })
-    );
+        // Register definition provider (LSP provides this when active)
+        context.subscriptions.push(
+            vscode.languages.registerDefinitionProvider(documentSelector, new SSLDefinitionProvider(procedureIndex))
+        );
 
-    // Handle configuration change to cleanup diagnostics if setting enabled
-    context.subscriptions.push(
-        vscode.workspace.onDidChangeConfiguration(e => {
-            if (e.affectsConfiguration("ssl.diagnostics.onlyOpenDocuments")) {
-                const config = vscode.workspace.getConfiguration("ssl");
-                const onlyOpen = config.get<boolean>("diagnostics.onlyOpenDocuments", true);
+        // Register reference provider (LSP provides this when active)
+        context.subscriptions.push(
+            vscode.languages.registerReferenceProvider(documentSelector, new SSLReferenceProvider(procedureIndex))
+        );
 
-                if (onlyOpen) {
-                    // Clear all and re-populate only for open documents
-                    diagnosticProvider.clear();
-                    vscode.workspace.textDocuments.forEach(document => {
-                        if (document.languageId === "ssl") {
-                            diagnosticProvider.updateDiagnostics(document);
-                        }
-                    });
-                }
-            }
-        })
-    );
+        // Register signature help (LSP provides this when active)
+        context.subscriptions.push(
+            vscode.languages.registerSignatureHelpProvider(
+                documentSelector,
+                new SSLSignatureHelpProvider(procedureIndex),
+                "(", ","
+            )
+        );
 
-    // Run diagnostics on already open SSL documents
-    vscode.workspace.textDocuments.forEach(document => {
-        if (document.languageId === "ssl") {
-            diagnosticProvider.updateDiagnostics(document);
-        }
-    });
+        // Register rename provider (LSP provides this when active)
+        context.subscriptions.push(
+            vscode.languages.registerRenameProvider(documentSelector, new SSLRenameProvider())
+        );
 
-    // Register format on save if enabled
+        // Register workspace symbol provider (LSP provides this when active)
+        context.subscriptions.push(
+            vscode.languages.registerWorkspaceSymbolProvider(new SSLWorkspaceSymbolProvider(procedureIndex, classIndex))
+        );
+
+        // Register inlay hints provider (LSP provides this when active)
+        const inlayHintsProvider = new SSLInlayHintsProvider(procedureIndex);
+        context.subscriptions.push(
+            vscode.languages.registerInlayHintsProvider(documentSelector, inlayHintsProvider)
+        );
+
+        Logger.info("Registered native providers (LSP not active)");
+    } else {
+        Logger.info("Using LSP for: completion, hover, definition, references, symbols, folding, signature help, formatting, diagnostics, rename, inlay hints, workspace symbols");
+    }
+
+    // Register format on save if enabled (works with both LSP and native formatting)
     context.subscriptions.push(
         vscode.workspace.onWillSaveTextDocument(event => {
-            const config = vscode.workspace.getConfiguration("ssl");
-            const formatOnSave = config.get<boolean>("format.formatOnSave", false);
+            const formatConfig = vscode.workspace.getConfiguration("ssl");
+            const formatOnSave = formatConfig.get<boolean>("format.formatOnSave", false);
 
             if (event.document.languageId === "ssl" && formatOnSave) {
                 const editor = vscode.window.activeTextEditor;
@@ -146,39 +254,25 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // Register Code Action Provider
-    const codeActionProvider = new SSLCodeActionProvider();
+    // Register command to toggle inlay hints (works with both LSP and native)
     context.subscriptions.push(
-        vscode.languages.registerCodeActionsProvider('ssl', codeActionProvider, {
+        vscode.commands.registerCommand('ssl.toggleInlayHints', async () => {
+            const config = vscode.workspace.getConfiguration("ssl");
+            const currentValue = config.get<boolean>("intellisense.inlayHints.enabled", true);
+            await config.update("intellisense.inlayHints.enabled", !currentValue, vscode.ConfigurationTarget.Global);
+            const status = !currentValue ? "enabled" : "disabled";
+            vscode.window.showInformationMessage(`SSL Inlay Hints ${status}`);
+        })
+    );
+
+    // Register Code Action Provider for quick fixes (not provided by LSP)
+    context.subscriptions.push(
+        vscode.languages.registerCodeActionsProvider('ssl', new SSLCodeActionProvider(), {
             providedCodeActionKinds: SSLCodeActionProvider.providedCodeActionKinds
         })
     );
 
-    // Register definition provider for Go to Definition
-    context.subscriptions.push(
-        vscode.languages.registerDefinitionProvider(documentSelector, new SSLDefinitionProvider(procedureIndex))
-    );
-
-    // Register reference provider for Find All References
-    context.subscriptions.push(
-        vscode.languages.registerReferenceProvider(documentSelector, new SSLReferenceProvider(procedureIndex))
-    );
-
-    // Register rename provider for symbol renaming
-    context.subscriptions.push(
-        vscode.languages.registerRenameProvider(documentSelector, new SSLRenameProvider())
-    );
-
-    // Signature help
-    context.subscriptions.push(
-        vscode.languages.registerSignatureHelpProvider(
-            documentSelector,
-            new SSLSignatureHelpProvider(procedureIndex),
-            "(", ","
-        )
-    );
-
-    // Register CodeLens provider for reference counts
+    // Register CodeLens provider for reference counts (not provided by LSP)
     const codeLensProvider = new SSLCodeLensProvider();
     context.subscriptions.push(
         vscode.languages.registerCodeLensProvider(documentSelector, codeLensProvider)
@@ -191,47 +285,14 @@ export async function activate(context: vscode.ExtensionContext) {
         })
     );
 
-    // Register code action provider for quick fixes
-    context.subscriptions.push(
-        vscode.languages.registerCodeActionsProvider(
-            documentSelector,
-            new SSLCodeActionProvider(),
-            {
-                providedCodeActionKinds: SSLCodeActionProvider.providedCodeActionKinds
-            }
-        )
-    );
-
-    // Register workspace symbol provider for global search (Ctrl+T)
-    context.subscriptions.push(
-        vscode.languages.registerWorkspaceSymbolProvider(new SSLWorkspaceSymbolProvider(procedureIndex, classIndex))
-    );
-
-    // Register document highlight provider for symbol occurrence highlighting
+    // Register document highlight provider for symbol occurrence highlighting (not provided by LSP)
     context.subscriptions.push(
         vscode.languages.registerDocumentHighlightProvider(documentSelector, new SSLDocumentHighlightProvider())
     );
 
-    // Register call hierarchy provider for procedure call trees
+    // Register call hierarchy provider for procedure call trees (not provided by LSP)
     context.subscriptions.push(
         vscode.languages.registerCallHierarchyProvider(documentSelector, new SSLCallHierarchyProvider())
-    );
-
-    // Register inlay hints provider for parameter names
-    const inlayHintsProvider = new SSLInlayHintsProvider(procedureIndex);
-    context.subscriptions.push(
-        vscode.languages.registerInlayHintsProvider(documentSelector, inlayHintsProvider)
-    );
-
-    // Register command to toggle inlay hints
-    context.subscriptions.push(
-        vscode.commands.registerCommand('ssl.toggleInlayHints', async () => {
-            const config = vscode.workspace.getConfiguration("ssl");
-            const currentValue = config.get<boolean>("intellisense.inlayHints.enabled", true);
-            await config.update("intellisense.inlayHints.enabled", !currentValue, vscode.ConfigurationTarget.Global);
-            const status = !currentValue ? "enabled" : "disabled";
-            vscode.window.showInformationMessage(`SSL Inlay Hints ${status}`);
-        })
     );
 
     Logger.info("SSL extension fully activated with all language features including workspace search, call hierarchy, and inlay hints");
@@ -242,7 +303,16 @@ export async function activate(context: vscode.ExtensionContext) {
  * This function is called when the extension is deactivated.
  * Use this to clean up your extension resources.
  */
-export function deactivate() {
+export async function deactivate() {
     Logger.info("SSL extension is being deactivated");
+
+    // Stop the LSP client
+    try {
+        await stopClient();
+        Logger.info("SSL Language Server stopped");
+    } catch (error) {
+        Logger.error(`Error stopping SSL Language Server: ${error}`);
+    }
+
     Logger.dispose();
 }

@@ -5,9 +5,9 @@ import {
 	BLOCK_END_KEYWORDS,
 	BLOCK_MIDDLE_KEYWORDS,
 	CASE_KEYWORDS,
-	LOOP_COUNTER_EXCEPTIONS,
-	SSL_BUILTIN_FUNCTIONS
+	LOOP_COUNTER_EXCEPTIONS
 } from "./constants/language";
+import { getBuiltinFunctions } from "./utils/inventory";
 import {
 	CONFIG_KEYS,
 	CONFIG_DEFAULTS
@@ -58,6 +58,7 @@ interface ValidationConfig {
 	strictMode: boolean;
 	hungarianEnabled: boolean;
 	hungarianSeverity: string;
+	hungarianPrefixes: string[];
 	preventSqlInjection: boolean;
 	requireParameterized: boolean;
 	enforceKeywordCase: boolean;
@@ -121,6 +122,7 @@ export class SSLDiagnosticProvider {
 			strictMode: config.get(CONFIG_KEYS.STRICT_STYLE_GUIDE_MODE, false),
 			hungarianEnabled: config.get(CONFIG_KEYS.NAMING_HUNGARIAN_ENABLED, false),
 			hungarianSeverity: config.get(CONFIG_KEYS.NAMING_HUNGARIAN_SEVERITY, "warning"),
+			hungarianPrefixes: config.get(CONFIG_KEYS.NAMING_HUNGARIAN_PREFIXES, ["s", "n", "b", "d", "a", "o", "fn", "v"]),
 			preventSqlInjection: config.get(CONFIG_KEYS.SECURITY_PREVENT_SQL_INJECTION, true),
 			requireParameterized: config.get(CONFIG_KEYS.SECURITY_REQUIRE_PARAMETERIZED_QUERIES, true),
 			enforceKeywordCase: config.get(CONFIG_KEYS.STYLE_GUIDE_ENFORCE_KEYWORD_CASE, false),
@@ -730,7 +732,7 @@ export class SSLDiagnosticProvider {
 				}
 
 				// Hungarian Notation
-				if (config.hungarianEnabled && hasValidHungarianNotation && !hasValidHungarianNotation(varName)) {
+				if (config.hungarianEnabled && hasValidHungarianNotation && !hasValidHungarianNotation(varName, config.hungarianPrefixes)) {
 					const severity = config.strictMode ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning;
 					diagnostics.push(this.createDiagnostic(i, match.index, varName.length,
 						`Variable '${varName}' should use Hungarian notation`, severity, "ssl-hungarian-notation"));
@@ -1018,7 +1020,7 @@ export class SSLDiagnosticProvider {
 		const validFunctionNames = new Set<string>();
 
 		// 1. Add Built-ins
-		SSL_BUILTIN_FUNCTIONS.forEach(f => validFunctionNames.add(f.name.toLowerCase()));
+		getBuiltinFunctions().forEach(f => validFunctionNames.add(f.name.toLowerCase()));
 
 		// 2. Add Configured Functions
 		config.configuredFunctions.forEach(f => validFunctionNames.add(f.toLowerCase()));

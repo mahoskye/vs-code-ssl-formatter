@@ -12,7 +12,7 @@ import { createSSLConfig, MockTextDocument, MockUri, MockFormattingOptions } fro
 // Configure for SQL formatting
 const mockConfig = createSSLConfig({
     'ssl.format.sql.enabled': true,
-    'ssl.format.sql.style': 'canonicalCompact',
+    'ssl.format.sql.style': 'standard',
     'ssl.format.sql.keywordCase': 'upper',
     'ssl.format.wrapLength': 90
 });

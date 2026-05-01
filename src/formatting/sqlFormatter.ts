@@ -1,7 +1,5 @@
-import { ALL_SQL_FUNCTIONS } from '../constants/language';
 import { SQL } from "../constants/sql";
 import { SqlToken, SqlTokenType } from '../parsing/sqlLexer';
-import { SqlFormattingState } from './sqlFormattingState';
 
 export interface SqlFormattingOptions {
     wrapLength: number;
@@ -19,7 +17,8 @@ export class SqlFormatter {
 
     constructor(options: SqlFormattingOptions) {
         this.options = options;
-        this.indentString = options.insertSpaces ? ' '.repeat(options.tabSize) : '\t';
+        const indentSize = options.indentSpaces ?? 4;
+        this.indentString = ' '.repeat(indentSize);
     }
 
     // --- Casing Helpers ---
@@ -33,6 +32,16 @@ export class SqlFormatter {
             return text;
         }
         return text.toUpperCase();
+    }
+
+    private applyTokenCasing(token: SqlToken): string {
+        if (token.type === SqlTokenType.Keyword) {
+            return this.applyKeywordCasing(token.text);
+        }
+        if (token.type === SqlTokenType.Identifier) {
+            return token.text.toLowerCase();
+        }
+        return token.text;
     }
 
     private applyIdentifierCasing(text: string, isFunction: boolean): string {
@@ -133,255 +142,164 @@ export class SqlFormatter {
 
     public formatSqlTokens(sqlTokens: SqlToken[], startChar: string, baseIndentColumn: number, baseIndentStr?: string): string {
         const closeQuote = startChar === '[' ? ']' : startChar;
-        let baseIndent = baseIndentStr !== undefined ? baseIndentStr + this.indentString : ' '.repeat(baseIndentColumn);
-        const maxLineLen = this.options.wrapLength || 90;
-        let currentLineLen = baseIndentColumn;
-
-        const breakBeforeKeywords = SQL.FORMATTING.BREAK_BEFORE;
-        const joinModifiers = SQL.FORMATTING.JOIN_MODIFIERS;
-        const indentedKeywords = SQL.FORMATTING.INDENTED;
-
-        let result = startChar;
-        let isFirstToken = true;
-
-        const tokens = sqlTokens.filter((t: SqlToken) => t.type !== SqlTokenType.Whitespace);
-
-        const isComplex = tokens.some(t => {
-            const up = t.text.toUpperCase();
-            return up === 'FROM' || up === 'WHERE' || up === 'JOIN' || up === 'GROUP' || up === 'ORDER' || up === 'UNION' || up === 'VALUES' || up === 'SET' || (up === 'SELECT' && tokens.length > 5);
-        });
-
-        if (isComplex) {
-            result += '\n' + baseIndent;
-            currentLineLen = baseIndentColumn;
+        if (sqlTokens.length === 0) {
+            return startChar + closeQuote;
         }
 
+        const baseIndent = baseIndentStr ?? ' '.repeat(baseIndentColumn);
+        const tokens = sqlTokens.filter((t: SqlToken) => t.type !== SqlTokenType.Whitespace);
         if (tokens.length === 0) {
             return startChar + closeQuote;
         }
 
-        const processedRanges = this.preprocessParenLists(tokens, baseIndent, maxLineLen);
+        if (!startChar) {
+            return this.formatSqlContent(tokens, baseIndent);
+        }
 
-        const state = new SqlFormattingState();
+        const formatted = this.formatSqlContent(tokens, baseIndent + this.indentString);
+        if (formatted.includes('\n')) {
+            return `${startChar}\n${baseIndent}${this.indentString}${formatted}\n${baseIndent}${closeQuote}`;
+        }
+
+        return `${startChar}${formatted}${closeQuote}`;
+    }
+
+    private formatSqlContent(tokens: SqlToken[], baseIndent: string): string {
+        const maxLineLength = this.options.wrapLength || 90;
+        const style = this.options.style || 'standard';
+        const isComplex = tokens.some(t => {
+            const upper = t.text.toUpperCase();
+            return upper === SQL.KEYWORDS.FROM || upper === SQL.KEYWORDS.WHERE || upper === SQL.KEYWORDS.JOIN ||
+                upper === SQL.KEYWORDS.GROUP || upper === SQL.KEYWORDS.ORDER || upper === SQL.KEYWORDS.UNION ||
+                upper === SQL.KEYWORDS.VALUES || upper === SQL.KEYWORDS.SET ||
+                (upper === SQL.KEYWORDS.SELECT && tokens.length > 5);
+        });
+
+        let result = '';
+        let currentLineLen = baseIndent.length;
+        let isFirstToken = true;
         let currentClause = '';
+        let parenDepth = 0;
+        let inSelectColumns = false;
 
         for (let i = 0; i < tokens.length; i++) {
-            const t = tokens[i];
-            const upperText = t.text.toUpperCase();
-
-            // Check if this is a pre-processed VALUES/INSERT list
-            if (processedRanges.has(i)) {
-                const formattedList = processedRanges.get(i)!;
-                const prev = i > 0 ? tokens[i - 1] : null;
-                if (prev && this.shouldAddSqlSpace(prev, t)) {
-                    result += ' ';
-                }
-                result += '(\n' + baseIndent + '    ' + formattedList + '\n' + baseIndent + ')';
-
-                let depth = 1;
-                i++;
-                while (i < tokens.length && depth > 0) {
-                    if (tokens[i].text === '(') { depth++; }
-                    else if (tokens[i].text === ')') { depth--; }
-                    i++;
-                }
-                i--;
-
-                currentLineLen = baseIndentColumn + 1;
-                isFirstToken = false;
-                continue;
-            }
-
-            // Track clause
-            if (t.type === SqlTokenType.Keyword) {
-                if (SQL.FORMATTING.BREAK_BEFORE.has(upperText) || upperText === 'SET' || upperText === 'SELECT' || upperText === 'UPDATE' || upperText === 'INSERT') {
-                    currentClause = upperText;
-                }
-            }
-
+            const token = tokens[i];
+            const upperText = token.text.toUpperCase();
             const prev = i > 0 ? tokens[i - 1] : null;
-            let currentIterOffset = state.lineHasExtraIndent ? 4 : 0;
 
-            state.poppedClosingIndent = -1;
-
-            let isInsertParen = false;
-            if (t.text === '(') {
-                if (state.inInsertColumnList && prev && prev.type === SqlTokenType.Identifier) {
-                    isInsertParen = true;
-                } else if (prev && (prev.text.toUpperCase() === SQL.KEYWORDS.VALUES || prev.text.toUpperCase() === SQL.KEYWORDS.SET)) {
-                    isInsertParen = true;
+            if (token.type === SqlTokenType.Keyword) {
+                switch (upperText) {
+                    case SQL.KEYWORDS.SELECT:
+                        currentClause = SQL.KEYWORDS.SELECT;
+                        inSelectColumns = true;
+                        break;
+                    case SQL.KEYWORDS.UPDATE:
+                        currentClause = SQL.KEYWORDS.UPDATE;
+                        break;
+                    case SQL.KEYWORDS.INSERT:
+                        currentClause = SQL.KEYWORDS.INSERT;
+                        break;
+                    case SQL.KEYWORDS.FROM:
+                        inSelectColumns = false;
+                        currentClause = SQL.KEYWORDS.FROM;
+                        break;
+                    case SQL.KEYWORDS.WHERE:
+                        currentClause = SQL.KEYWORDS.WHERE;
+                        break;
+                    case SQL.KEYWORDS.SET:
+                        currentClause = SQL.KEYWORDS.SET;
+                        break;
+                    case SQL.KEYWORDS.VALUES:
+                        currentClause = SQL.KEYWORDS.VALUES;
+                        break;
+                    case SQL.KEYWORDS.ORDER:
+                    case SQL.KEYWORDS.GROUP:
+                        currentClause = upperText;
+                        break;
                 }
             }
 
-            // Handle paren stack
-            if (t.text === '(') {
-                let extraOffset = isInsertParen ? 4 : 0;
-                const prevToken = i > 0 ? tokens[i - 1] : null;
-                const nextToken = i + 1 < tokens.length ? tokens[i + 1] : null;
-                if (prevToken && prevToken.text === '=' && nextToken && nextToken.text.toUpperCase() === SQL.KEYWORDS.SELECT) {
-                    extraOffset = 4;
-                } else if (nextToken && nextToken.text.toUpperCase() === SQL.KEYWORDS.SELECT) {
-                    extraOffset = 4;
+            if (token.text === '(') {
+                parenDepth++;
+            } else if (token.text === ')') {
+                parenDepth--;
+                if (parenDepth < 0) {
+                    parenDepth = 0;
                 }
-
-                const currentStackOffset = state.getCurrentStackOffset();
-                const inlineIndent = (state.parenDepth * 4) + currentStackOffset + extraOffset + (state.lineHasExtraIndent ? 4 : 0);
-                state.pushParen(currentIterOffset + extraOffset, inlineIndent);
             }
 
-            const isClosingParen = t.text === ')';
-            let tokenText = t.text;
-
-            state.updateContext(t);
-
-            // Apply casing
-            if (t.type === SqlTokenType.Keyword) {
-                tokenText = this.applyKeywordCasing(tokenText);
-            } else if (t.type === SqlTokenType.Identifier) {
-                const next = i + 1 < tokens.length ? tokens[i + 1] : null;
-                const isFunction = next && next.text === '(' && !state.inInsertColumnList;
-                tokenText = this.applyIdentifierCasing(tokenText, !!isFunction);
-            } else if (t.type === SqlTokenType.Placeholder) {
-                tokenText = t.text;
-            }
-
-            // Check for break conditions
+            const tokenText = this.applyTokenCasing(token);
             let needsBreak = false;
             let extraIndent = '';
-            const next = i < tokens.length - 1 ? tokens[i + 1] : null;
 
-            if (!isFirstToken) {
-                if (i > 0) {
-                    const prevToken = tokens[i - 1];
-                    const prevUpper = prevToken.text.toUpperCase();
+            if (!isFirstToken && isComplex) {
+                const prevUpper = prev ? prev.text.toUpperCase() : '';
 
-                    if (prevToken.text === ',' && currentClause === 'SET' && state.parenDepth === 0) {
-                        needsBreak = true;
-                        extraIndent = this.options.indentSpaces ? ' '.repeat(this.options.indentSpaces) : this.indentString;
-                    }
-
-                    if ((prevUpper === 'SET' || prevUpper === 'VALUES') && state.parenDepth === 0) {
-                        needsBreak = true;
-                        extraIndent = this.options.indentSpaces ? ' '.repeat(this.options.indentSpaces) : this.indentString;
-                    }
-                }
-
-                if (t.text === '(') {
-                    if ((currentClause === 'VALUES' || currentClause === 'INTO' || currentClause === 'INSERT') && state.parenDepth === 0) {
-                        needsBreak = true;
-                        extraIndent = this.options.indentSpaces ? ' '.repeat(this.options.indentSpaces) : this.indentString;
-                    } else if (next && next.text.toUpperCase() === SQL.KEYWORDS.SELECT) {
-                        needsBreak = true;
-                        extraIndent = '   ';
-                    }
-                }
-
-                if (isClosingParen) {
-                    const ctx = state.popParen();
-                    if (ctx && ctx.isMultiline) {
-                        needsBreak = true;
-                    }
-                } else if (upperText === SQL.KEYWORDS.SET && state.afterUpdate) {
-                    needsBreak = false;
-                } else if (prev && prev.text.toUpperCase() === SQL.KEYWORDS.SET) {
-                    needsBreak = true;
-                } else if (upperText === SQL.KEYWORDS.SELECT && prev && prev.text === '(') {
-                    needsBreak = true;
-                } else if (upperText === SQL.KEYWORDS.SELECT && state.inInsert && prev && prev.text === ')') {
-                    needsBreak = true;
-                } else if (upperText === SQL.KEYWORDS.JOIN && prev && joinModifiers.has(prev.text.toUpperCase())) {
-                    needsBreak = false;
-                } else if (upperText === SQL.KEYWORDS.INTO && prev && prev.text.toUpperCase() === SQL.KEYWORDS.INSERT) {
-                    needsBreak = false;
-                } else if (prev && prev.text.toUpperCase() === SQL.KEYWORDS.VALUES && t.text === '(') {
-                    needsBreak = true;
-                } else if (state.inInsertColumnList && t.text === '(' && prev && prev.type === SqlTokenType.Identifier) {
-                    needsBreak = true;
-                } else if (state.inInsertColumnList && prev && prev.text === '(') {
-                    needsBreak = true;
-                } else if (upperText === 'SET' && prev && prev.text === ')') {
-                    needsBreak = true;
-                } else if (t.text === '(' && prev && prev.text.toUpperCase() === 'SET') {
-                    needsBreak = true;
-                    extraIndent = '    ';
-                } else if (prev && prev.text === '(' && (currentClause === 'SET' || currentClause === 'INSERT' || currentClause === 'VALUES' || currentClause === 'INTO')) {
-                    needsBreak = true;
-                } else if (breakBeforeKeywords.has(upperText)) {
-                    needsBreak = true;
-                    if (upperText === SQL.KEYWORDS.ON) {
-                        extraIndent = '    ';
-                    }
-                } else if (indentedKeywords.has(upperText)) {
-                    needsBreak = true;
-                    if (this.options.indentSpaces) {
-                        extraIndent = ' '.repeat(this.options.indentSpaces);
+                if (style !== 'compact' && token.type === SqlTokenType.Keyword && SQL.FORMATTING.BREAK_BEFORE.has(upperText)) {
+                    if (upperText === SQL.KEYWORDS.JOIN && prev && SQL.FORMATTING.JOIN_MODIFIERS.has(prevUpper)) {
+                        needsBreak = false;
+                    } else if (upperText === SQL.KEYWORDS.INTO && prevUpper === SQL.KEYWORDS.INSERT) {
+                        needsBreak = false;
                     } else {
+                        needsBreak = true;
+                        if (upperText === SQL.KEYWORDS.ON && style === 'canonicalCompact') {
+                            extraIndent = this.indentString;
+                        }
+                    }
+                }
+
+                if ((style === 'canonicalCompact' || style === 'expanded') &&
+                    token.type === SqlTokenType.Keyword &&
+                    SQL.FORMATTING.INDENTED.has(upperText)) {
+                    needsBreak = true;
+                    extraIndent = this.indentString;
+                }
+
+                if (style !== 'compact' && prev && prevUpper === SQL.KEYWORDS.SET && parenDepth === 0) {
+                    needsBreak = true;
+                    if (style === 'canonicalCompact' || style === 'expanded') {
                         extraIndent = this.indentString;
                     }
                 }
-            } else {
-                if (t.text === ')') { state.parenDepth--; }
-            }
 
-            // Check for Table.Column pattern
-            const tableCol = this.combineTableColumn(tokens, i);
-            if (tableCol) {
-                tokenText = tableCol.text;
-                i += tableCol.skip;
-            }
-
-            // Check for || concatenation in SELECT
-            if (!needsBreak && t.text === '||' && state.inSelectColumns && prev) {
-                needsBreak = true;
-                extraIndent = '       ';
-            }
-
-            // Proactive wrapping
-            if (!needsBreak && prev) {
-                const wouldNeedSpace = this.shouldAddSqlSpace(prev, t);
-                const spaceLen = wouldNeedSpace ? 1 : 0;
-                const projectedLen = currentLineLen + spaceLen + tokenText.length;
-
-                const canBreak = (prev.text === ',' || (t.type === SqlTokenType.Keyword || t.type === SqlTokenType.Identifier) || t.text === '||') && prev.text !== '.';
-
-                if (projectedLen > maxLineLen && canBreak && prev.text !== '(') {
+                if (style !== 'compact' && prev && prev.text === ',' && currentClause === SQL.KEYWORDS.SET && parenDepth === 0) {
                     needsBreak = true;
-                    if (state.inSelectColumns) {
-                        extraIndent = '       ';
-                    } else if (!state.inInsert) {
-                        extraIndent = '    ';
+                    if (style === 'canonicalCompact' || style === 'expanded') {
+                        extraIndent = this.indentString;
+                    }
+                }
+
+                if (style !== 'compact' && token.text === '(' && prevUpper === SQL.KEYWORDS.VALUES) {
+                    needsBreak = true;
+                    if (style === 'canonicalCompact' || style === 'expanded') {
+                        extraIndent = this.indentString;
+                    }
+                }
+
+                if (style !== 'compact' && upperText === SQL.KEYWORDS.SELECT && prev && prev.text === '(') {
+                    needsBreak = true;
+                    extraIndent = this.indentString;
+                }
+
+                if (!needsBreak && prev && maxLineLength > 0 && (style === 'canonicalCompact' || style === 'expanded')) {
+                    const spaceLen = this.shouldAddSqlSpace(prev, token) ? 1 : 0;
+                    const projectedLen = currentLineLen + spaceLen + tokenText.length;
+
+                    const canBreak = prev.text === ',' ||
+                        ((token.type === SqlTokenType.Keyword || token.type === SqlTokenType.Identifier) && prev.text !== '.');
+
+                    if (projectedLen > maxLineLength && canBreak && prev.text !== '(') {
+                        needsBreak = true;
+                        extraIndent = inSelectColumns ? '       ' : this.indentString;
                     }
                 }
             }
 
-            if (needsBreak && state.parenStack.length > 0) {
-                state.parenStack[state.parenStack.length - 1].isMultiline = true;
-            }
-
-            // Add spacing or line break
             if (needsBreak) {
-                state.lineHasExtraIndent = extraIndent.length > 0;
-                let stackOffset = state.getCurrentStackOffset();
-
-                if (t.text === '(' && state.parenStack.length > 0) {
-                    stackOffset -= state.parenStack[state.parenStack.length - 1].indentOffset;
-                    const newIndent = (state.parenDepth * 4) + stackOffset + extraIndent.length;
-                    state.parenStack[state.parenStack.length - 1].closingIndent = newIndent;
-                }
-
-                let indentStr = '';
-                if (isClosingParen && state.poppedClosingIndent !== -1) {
-                    indentStr = ' '.repeat(state.poppedClosingIndent);
-                } else {
-                    const parenIndent = '    '.repeat(Math.max(0, state.parenDepth));
-                    const structIndent = ' '.repeat(stackOffset);
-                    indentStr = parenIndent + structIndent + extraIndent;
-                }
-
-                const indent = baseIndent + indentStr;
-                result += '\n' + indent;
-                currentLineLen = baseIndentColumn + indentStr.length;
-            } else if (prev && this.shouldAddSqlSpace(prev, t)) {
+                const parenIndent = this.indentString.repeat(parenDepth);
+                result += `\n${baseIndent}${parenIndent}${extraIndent}`;
+                currentLineLen = baseIndent.length + parenIndent.length + extraIndent.length;
+            } else if (prev && this.shouldAddSqlSpace(prev, token)) {
                 result += ' ';
                 currentLineLen += 1;
             }
@@ -391,10 +309,6 @@ export class SqlFormatter {
             isFirstToken = false;
         }
 
-        if (isComplex) {
-            result += '\n' + baseIndent;
-        }
-        result += closeQuote;
         return result;
     }
 
@@ -520,7 +434,6 @@ export class SqlFormatter {
             if ((prev.text === '-' || prev.text === '+') && curr.type === SqlTokenType.Number) {
                 return false;
             }
-            if (prev.text === '||') { return true; }
             return true;
         }
 

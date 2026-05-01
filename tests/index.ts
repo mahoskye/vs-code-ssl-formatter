@@ -1,6 +1,9 @@
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import Mocha = require('mocha');
 import { glob } from 'glob';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function run(): Promise<void> {
     // Create the mocha test

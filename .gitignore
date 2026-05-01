@@ -99,3 +99,10 @@ dist/
 
 # VS Code Extension Quick Start guide
 vsc-extension-quickstart.md
+
+# Local development references
+dev/
+status_keywords.txt
+
+# Fallback test VS Code user data (generated)
+tests/fallback-user-data/

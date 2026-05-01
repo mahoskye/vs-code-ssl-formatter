@@ -4,14 +4,14 @@
  */
 
 export const HUNGARIAN_PREFIXES = [
-    "s", // string
-    "n", // number
-    "b", // boolean/logical
-    "l", // logical (alternative)
-    "d", // date
-    "a", // array
-    "o", // object
-    "u"  // user-defined object
+    "s",  // string
+    "n",  // number
+    "b",  // boolean
+    "d",  // date
+    "a",  // array
+    "o",  // object
+    "fn", // code block
+    "v"   // variant/any
 ] as const;
 
 export type HungarianPrefix = typeof HUNGARIAN_PREFIXES[number];
@@ -29,7 +29,7 @@ export const HUNGARIAN_VALID_EXCEPTIONS = new Set(HUNGARIAN_EXCEPTIONS);
 /**
  * Check if a variable name follows valid Hungarian notation
  */
-export function hasValidHungarianNotation(name: string): boolean {
+export function hasValidHungarianNotation(name: string, prefixes: readonly string[] = HUNGARIAN_PREFIXES): boolean {
     // Exceptions for loop counters and constants
     if (HUNGARIAN_VALID_EXCEPTIONS.has(name as typeof HUNGARIAN_EXCEPTIONS[number])) {
         return true;
@@ -45,12 +45,26 @@ export function hasValidHungarianNotation(name: string): boolean {
         return false;
     }
 
-    const prefix = name[0].toLowerCase();
+    if (prefixes.length === 0) {
+        return true;
+    }
 
-    // Check if first char is valid prefix and second char is uppercase
-    // Cast strict type for Set lookup check
-    return HUNGARIAN_VALID_PREFIXES.has(prefix as HungarianPrefix) &&
-        name[1] === name[1].toUpperCase();
+    const lowerName = name.toLowerCase();
+    const prefixList = prefixes === HUNGARIAN_PREFIXES
+        ? [...HUNGARIAN_PREFIXES]
+        : prefixes.map(value => value.toLowerCase());
+
+    // Sort by length descending so multi-char prefixes (e.g. "fn") are checked first
+    const sorted = [...prefixList].sort((a, b) => b.length - a.length);
+
+    for (const prefix of sorted) {
+        if (lowerName.startsWith(prefix) && name.length > prefix.length) {
+            // Character after prefix must be uppercase
+            return name[prefix.length] === name[prefix.length].toUpperCase();
+        }
+    }
+
+    return false;
 }
 
 /**

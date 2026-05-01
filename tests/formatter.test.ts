@@ -3,11 +3,14 @@
  * Tests the formatting provider using mock VSCode API
  */
 
-import { describe, it, before, after } from 'mocha';
+import { describe, it, before, after, beforeEach } from 'mocha';
 import { expect } from 'chai';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import * as vscode from 'vscode';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 import { SSLFormattingProvider } from '../src/sslFormattingProvider';
 import {
 	createDocument,
@@ -452,6 +455,11 @@ Parameters:
 describe('SSL Formatter - String Literal Preservation (Bug #28, #27, #24)', () => {
 	const formatter = new SSLFormattingProvider();
 	const options = createFormattingOptions();
+
+	beforeEach(() => {
+		const config = vscode.workspace.getConfiguration('ssl');
+		config.update('ssl.format.sql.enabled', false);
+	});
 
 	it('should not modify SQL spacing inside string literals - AND ( spacing', () => {
 		const input = `query := SQLExecute("

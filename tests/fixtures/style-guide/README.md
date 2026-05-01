@@ -21,7 +21,7 @@ This directory contains comprehensive test fixtures for the STARLIMS SSL Style G
 - **05-keywords-case** - Keywords must be UPPERCASE with `:` prefix
 
 #### Naming Conventions (3 tests)
-- **06-naming-hungarian-notation** - Hungarian notation prefixes (s, n, b, a, d, o, l)
+- **06-naming-hungarian-notation** - Hungarian notation prefixes (s, n, b, d, a, o, u)
 - **07-naming-procedure-pascal-case** - Procedure names in PascalCase
 - **08-naming-variable-camel-case** - Variable names in camelCase with Hungarian prefix
 

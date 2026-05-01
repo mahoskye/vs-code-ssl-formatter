@@ -4,6 +4,16 @@
 
 A comprehensive Visual Studio Code extension providing language support for STARLIMS Scripting Language (SSL). This plugin addresses the limitations of the integrated STARLIMS IDE by enabling developers to work with SSL code in VS Code with full IDE features including syntax highlighting, code intelligence, formatting, and diagnostics.
 
+### Sibling Projects (Sources of Truth)
+
+The extension does not own SSL semantics. Three sibling repositories define them, and the extension is a consumer:
+
+- **[`ssl-style-guide`](../../ssl-style-guide)** — canonical machine-readable rules. `ssl-style-guide.schema.yaml` enumerates lint rules with severities; `ssl-element-reference.json` is the authoritative inventory of keywords, operators, types, classes, functions, and special forms. When extension diagnostic codes correspond to a schema rule, they use that rule's slug.
+- **[`starlims-lsp`](../../starlims-lsp)** — the language server bundled in `server/`. Provides completion, hover, signature help, definition/references, formatting, diagnostics, rename, inlay hints, semantic and constructor signature help, and context-aware completions. **Note:** the LSP does not populate the LSP `code` field on its diagnostics — it identifies findings by message text and `Source: "ssl-lsp"`.
+- **[`ssl-docs`](../../ssl-docs)** — mkdocs-built reference site under `content/reference/{classes,functions,keywords,literals,operators,special-forms,types}`. Useful as a deep-link target for users; not consumed at build time.
+
+The native TypeScript providers in `src/ssl*Provider.ts` are intentionally minimal — they exist as a fallback when `ssl.languageServer.enabled` is `false` or the LSP fails to launch, not as a parallel implementation of the LSP's inventory.
+
 ### Supported File Extensions
 - `.ssl`
 - `.srvscr`
@@ -447,10 +457,10 @@ Create/update the root `package.json`:
           "default": "off",
           "description": "Traces communication between VS Code and language server"
         },
-        "ssl.format.indentSize": {
+        "ssl.format.indentWidth": {
           "type": "number",
-          "default": 4,
-          "description": "Number of spaces for indentation"
+          "default": 1,
+          "description": "Number of tabs/spaces per indent level"
         }
       }
     }

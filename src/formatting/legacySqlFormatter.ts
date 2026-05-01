@@ -38,6 +38,7 @@ const SQL_GENERAL_KEYWORDS = [
 ];
 
 export type SqlFormattingStyle =
+    | "standard"
     | "compact"
     | "canonicalCompact"
     | "expanded"

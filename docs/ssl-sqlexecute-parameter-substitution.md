@@ -67,6 +67,8 @@ aResults := SQLExecute(sSQL);
 - Empty arrays generate a single NULL placeholder
 - Ideal for dynamic `IN` clauses
 
+> **Caveat:** Array expansion for `IN` clauses (`?arrayVar?`) requires a local variable. UDObject array properties used directly (e.g., `?oObj:ArrayProp?`) cause a runtime error: *"The current array has more than 1 dimmension."* Copy the array to a local variable first. Scalar UDObject properties are not affected.
+
 ---
 
 ### 3. Array Index Access (`ArrayIndex`)

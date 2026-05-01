@@ -1,6 +1,11 @@
 /**
  * SSL Diagnostic Constants
- * Centralized diagnostic messages and codes for SSL language analysis
+ * Centralized diagnostic messages and codes for SSL language analysis.
+ *
+ * Codes used by native (client-side) diagnostics only. The bundled starlims-lsp
+ * does not populate the LSP `code` field on its diagnostics, so these constants
+ * are not used to identify LSP-emitted findings. Where a code corresponds to a
+ * lint rule in ssl-style-guide.schema.yaml, the name aligns with that rule slug.
  */
 
 export const DIAGNOSTIC_CODES = {
@@ -9,22 +14,23 @@ export const DIAGNOSTIC_CODES = {
     INVALID_SQL_PARAM: "ssl-invalid-sql-param",
     INVALID_EXEC_TARGET: "ssl-invalid-exec-target",
     INVALID_SQL_PLACEHOLDER_STYLE: "ssl-invalid-sql-placeholder-style",
-    BLOCK_DEPTH: "ssl-block-depth",
-    MAX_PARAMS: "ssl-max-params",
+    BLOCK_DEPTH: "ssl-max-block-depth",
+    MAX_PARAMS: "ssl-max-params-warning",
     HUNGARIAN_NOTATION: "ssl-hungarian-notation",
-    SQL_INJECTION: "sql-sql-injection",
+    SQL_INJECTION: "ssl-sql-injection",
     MISSING_SEMICOLON: "ssl-missing-semicolon",
 
     INVALID_DECLARE: "ssl-invalid-declare",
     INVALID_CONST: "ssl-invalid-const",
     MISSING_OTHERWISE: "ssl-missing-otherwise",
-    KEYWORD_CASE: "ssl-keyword-case",
+    KEYWORD_CASE: "ssl-keyword-uppercase",
     COMMENT_SYNTAX: "ssl-comment-syntax",
     MISSING_PARAMS: "ssl-missing-params",
     MISMATCHED_BLOCK_END: "ssl-mismatched-block-end",
     UNMATCHED_BLOCK_END: "ssl-unmatched-block-end",
     KEYWORD_WITHOUT_CONTEXT: "ssl-keyword-without-context",
-    COMMENT_TEXT_AFTER_TERMINATOR: "ssl-comment-text-after-terminator"
+    COMMENT_TEXT_AFTER_TERMINATOR: "ssl-comment-text-after-terminator",
+    UDOBJECT_ARRAY_IN_CLAUSE: "ssl-udobject-array-in-clause"
 } as const;
 
 export type SSLDiagnosticCode = typeof DIAGNOSTIC_CODES[keyof typeof DIAGNOSTIC_CODES];
@@ -84,8 +90,11 @@ export const DIAGNOSTIC_MESSAGES = {
     KEYWORD_WITHOUT_CONTEXT: (keyword: string, requiredContext: string) =>
         `:${keyword} requires :${requiredContext} but none was found`,
 
-    COMMENT_TEXT_AFTER_TERMINATOR: 
-        "Text after ';' will not be part of the comment. Consider placing comments after code or on separate lines."
+    COMMENT_TEXT_AFTER_TERMINATOR:
+        "Text after ';' will not be part of the comment. Consider placing comments after code or on separate lines.",
+
+    UDOBJECT_ARRAY_IN_CLAUSE: (propName: string) =>
+        `UDObject array property '?${propName}?' in IN clause causes runtime error 'The current array has more than 1 dimmension.' — copy the array to a local variable first.`
 } as const;
 
 export const DIAGNOSTIC_SEVERITIES = {

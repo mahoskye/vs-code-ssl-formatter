@@ -30,11 +30,13 @@ x := 1;
                 // :ENDPROC (0)
                 const expectedContent = `
 :PROCEDURE TestFormat;
+
 	:IF .T.;
 		:DECLARE x;
 
 		x := 1;
 	:ENDIF;
+
 :ENDPROC;
 `;
                 const doc = await vscode.workspace.openTextDocument({ language: 'ssl', content: initialContent });
@@ -63,7 +65,7 @@ x := 1;
 RunSQL("SELECT * FROM table WHERE id = 1");
 :ENDPROC;
 `;
-                // Expect standard formatting (canonical compact is default)
+                // Expect standard formatting (standard is default)
                 // SELECT * FROM table WHERE id = 1  -->  SELECT * FROM table WHERE id = 1 (might stay one line if short)
                 // Let's try a strict expected output. The formatter usually upper-cases keywords.
                 // It might not wrap if it's short.

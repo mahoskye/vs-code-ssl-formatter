@@ -3,7 +3,6 @@
  * Mocks the VSCode API for unit testing
  */
 
-import { Module } from 'module';
 import {
 	MockPosition,
 	MockRange,
@@ -272,11 +271,35 @@ Object.defineProperty(mockVscode.window, 'activeTextEditor', {
 	get: () => activeTextEditor
 });
 
-// Override require() to return our mock when 'vscode' is imported
-const originalRequire = Module.prototype.require;
-(Module.prototype.require as any) = function (id: string) {
-	if (id === 'vscode') {
-		return mockVscode;
-	}
-	return originalRequire.apply(this, arguments as any);
-};
+export const workspace = mockVscode.workspace;
+export const window = mockVscode.window;
+export const commands = mockVscode.commands;
+export const CodeActionTriggerKind = mockVscode.CodeActionTriggerKind;
+export const Range = mockVscode.Range;
+export const Position = mockVscode.Position;
+export const TextEdit = mockVscode.TextEdit;
+export const WorkspaceEdit = mockVscode.WorkspaceEdit;
+export const Location = mockVscode.Location;
+export const MarkdownString = mockVscode.MarkdownString;
+export const Hover = mockVscode.Hover;
+export const CompletionItem = mockVscode.CompletionItem;
+export const CompletionItemKind = mockVscode.CompletionItemKind;
+export const SnippetString = mockVscode.SnippetString;
+export const EventEmitter = mockVscode.EventEmitter;
+export const InlayHint = mockVscode.InlayHint;
+export const InlayHintKind = mockVscode.InlayHintKind;
+export const DocumentSymbol = mockVscode.DocumentSymbol;
+export const SymbolKind = mockVscode.SymbolKind;
+export const Uri = mockVscode.Uri;
+export const EndOfLine = mockVscode.EndOfLine;
+export const DiagnosticSeverity = mockVscode.DiagnosticSeverity;
+export const Diagnostic = mockVscode.Diagnostic;
+export const FoldingRange = mockVscode.FoldingRange;
+export const FoldingRangeKind = mockVscode.FoldingRangeKind;
+export const CodeActionKind = mockVscode.CodeActionKind;
+export const CodeAction = mockVscode.CodeAction;
+export const CodeLens = mockVscode.CodeLens;
+export const CancellationTokenSource = mockVscode.CancellationTokenSource;
+export const CancellationToken = mockVscode.CancellationToken;
+export const languages = mockVscode.languages;
+export const ExtensionContext = mockVscode.ExtensionContext;

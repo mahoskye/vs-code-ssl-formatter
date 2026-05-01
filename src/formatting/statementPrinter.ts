@@ -69,7 +69,7 @@ export class StatementPrinter {
             }
 
             const preserveCase = (prev && prev.type === TokenType.Identifier && token.type === TokenType.Keyword && token.text.startsWith(':'));
-            let formattedToken = this.formatToken(token, currentLineLen, customIndent, preserveCase);
+            let formattedToken = this.formatToken(token, currentLineLen, customIndent, preserveCase, baseIndentStr);
 
             // Handle long string splitting
             if (token.type === TokenType.String && !formattedToken.includes('\n')) {
@@ -380,10 +380,10 @@ export class StatementPrinter {
 
     // --- Token Formatting ---
 
-    private formatToken(token: Token, currentColumn: number = 0, customBaseIndent?: number, preserveCase: boolean = false): string {
+    private formatToken(token: Token, currentColumn: number = 0, customBaseIndent?: number, preserveCase: boolean = false, baseIndentStr?: string): string {
         if (this.options['ssl.format.sql.enabled'] && token.sqlTokens && token.sqlTokens.length > 0) {
             const baseIndent = customBaseIndent !== undefined ? customBaseIndent : Math.max(0, currentColumn + 1 - 8);
-            return this.sqlFormatter.formatSqlTokens(token.sqlTokens, token.text.charAt(0), baseIndent, undefined);
+            return this.sqlFormatter.formatSqlTokens(token.sqlTokens, token.text.charAt(0), baseIndent, baseIndentStr);
         }
 
         if (token.type === TokenType.Comment) {
@@ -412,14 +412,18 @@ export class StatementPrinter {
     private shouldAddSpace(prev: Token, curr: Token, prePrev?: Token): boolean {
         if (curr.text === ';') { return false; }
 
+        const operatorSpacing = this.options['ssl.format.operatorSpacing'] !== false;
+        const commaSpacing = this.options['ssl.format.commaSpacing'] !== false;
+
         if (prev.text === ',') {
             if (curr.text === ',') { return false; }
-            return true;
+            return commaSpacing;
         }
         if (prev.text === ';') { return true; }
 
         // Operator Spacing
         if (curr.type === TokenType.Operator || prev.type === TokenType.Operator) {
+            if (!operatorSpacing) { return false; }
             return this.handleOperatorSpacing(prev, curr, prePrev);
         }
 
