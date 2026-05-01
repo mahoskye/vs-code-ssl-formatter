@@ -96,6 +96,10 @@ export class MockUri {
 		return new MockUri(path);
 	}
 
+	static parse(value: string): MockUri {
+		return new MockUri(value);
+	}
+
 	toString(): string {
 		return this.fsPath;
 	}
