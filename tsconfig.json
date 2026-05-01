@@ -7,7 +7,9 @@
         "sourceMap": true,
         "rootDir": ".",
         "strict": false,
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true
     },
     "include": [
         "src/**/*",

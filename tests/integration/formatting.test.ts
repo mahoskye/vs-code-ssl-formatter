@@ -60,11 +60,6 @@ x := 1;
                 const config = vscode.workspace.getConfiguration('ssl');
                 await config.update('format.sql.enabled', true, vscode.ConfigurationTarget.Global);
 
-                const initialContent = `
-:PROCEDURE TestSqlFormat;
-RunSQL("SELECT * FROM table WHERE id = 1");
-:ENDPROC;
-`;
                 // Expect standard formatting (standard is default)
                 // SELECT * FROM table WHERE id = 1  -->  SELECT * FROM table WHERE id = 1 (might stay one line if short)
                 // Let's try a strict expected output. The formatter usually upper-cases keywords.

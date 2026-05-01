@@ -23,13 +23,6 @@ PR
         );
 
         assert.ok(list && list.items.length > 0, 'Should provide completions');
-        const item = list.items.find(i => i.label === 'PROCEDURE'); // Or :PROCEDURE depending on how provider returns it
-        // Keywords usually returned as names.
-        // Actually, if we are inside PROCEDURE, maybe relevant keywords?
-        // But 'PR' matches PROCEDURE.
-        // Also PRINT?
-
-        // Let's look for known keywords
         assert.ok(list.items.some(i => i.label === 'PROCEDURE' || i.label === ':PROCEDURE'), 'Should suggest PROCEDURE');
     });
 

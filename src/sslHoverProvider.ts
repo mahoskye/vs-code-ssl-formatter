@@ -1,11 +1,10 @@
 import * as vscode from "vscode";
 import {
-	SSLFunction,
-	SSLClass
+	SSLFunction
 } from "./constants/language";
 import { getKeywordDescriptions } from "./utils/inventory";
 import { ProcedureIndex, ProcedureInfo } from "./utils/procedureIndex";
-import { CONFIG_KEYS, CONFIG_DEFAULTS } from "./constants/config";
+import { CONFIG_KEYS } from "./constants/config";
 import { ClassIndex } from "./utils/classIndex";
 import { getConfiguredClasses, getConfiguredFunctions } from "./utils/intellisense";
 
@@ -31,7 +30,7 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 	public provideHover(
 		document: vscode.TextDocument,
 		position: vscode.Position,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.Hover | null {
 		// 1. Fast Context Check (String/Comment)
 		const context = this.getFastContext(document, position);
@@ -114,7 +113,6 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 	// --- Context Analysis ---
 
 	private getFastContext(document: vscode.TextDocument, position: vscode.Position): { insideString: boolean; insideComment: boolean; stringRange?: vscode.Range } {
-		const text = document.getText(); // Taking full text is expensive? 
 		// We only really need to check if we are in a comment/string at this specific point.
 		// A full scan from 0 is safest for multiline comments, but we can optimize.
 		// Since VSCode doesn't give token info, we unfortunately still have to scan or rely on a "best guess".
@@ -194,7 +192,7 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		return new vscode.Hover(md, range);
 	}
 
-	private createFunctionHover(word: string, doc: SSLFunction, range: vscode.Range): vscode.Hover {
+	private createFunctionHover(_word: string, doc: SSLFunction, range: vscode.Range): vscode.Hover {
 		const md = new vscode.MarkdownString();
 		const sig = doc.signature || `${doc.name}(${doc.params})`;
 		md.appendCodeblock(sig, "ssl");
@@ -228,7 +226,7 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 
 	// --- String & SQL Logic ---
 
-	private getStringReferenceHover(document: vscode.TextDocument, position: vscode.Position, lineText: string, stringRange?: vscode.Range): vscode.Hover | null {
+	private getStringReferenceHover(_document: vscode.TextDocument, position: vscode.Position, lineText: string, _stringRange?: vscode.Range): vscode.Hover | null {
 		// Find the full string literal including quotes on the current line locally
 		const stringInfo = this.findLocalStringAtPosition(lineText, position.character);
 		if (!stringInfo) {
@@ -314,11 +312,6 @@ export class SSLHoverProvider implements vscode.HoverProvider {
 		// Let's iterate all '?' and checks types
 		const queryCharIndex = position.character;
 		if (lineText[queryCharIndex] === '?') {
-			// Check if it is part of a named param
-			// Check immediate surroundings
-			const prevChar = queryCharIndex > 0 ? lineText[queryCharIndex - 1] : '';
-			const nextChar = queryCharIndex < lineText.length - 1 ? lineText[queryCharIndex + 1] : '';
-
 			// If looks like ?Var or Var?, it is named.
 			// Ideally we reuse the regex logic or scan cleaner.
 			// Let's just check if we are inside a ?...? range found by the regex above.

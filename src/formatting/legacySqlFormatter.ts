@@ -259,10 +259,10 @@ function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentStr
     });
 
     // 7. Format Subqueries (EXISTS/IN)
-    result = result.replace(/(EXISTS|IN)\s*(\()(\s*)(SELECT\b)/gi, (_match, keyword, paren, space, selectKw) => {
+    result = result.replace(/(EXISTS|IN)\s*(\()(\s*)(SELECT\b)/gi, (_match, keyword, paren, _space, selectKw) => {
         return `${keyword.toUpperCase()} ${paren}\n${applySqlKeywordCase("SELECT", keywordCase, selectKw)}`;
     });
-    result = result.replace(/([^A-Z])(\()(\s*)(SELECT\b)/gi, (_match, before, paren, space, selectKw) => {
+    result = result.replace(/([^A-Z])(\()(\s*)(SELECT\b)/gi, (_match, before, paren, _space, selectKw) => {
         return `${before}${paren}\n${applySqlKeywordCase("SELECT", keywordCase, selectKw)}`;
     });
 
@@ -316,7 +316,7 @@ function formatExpandedStyle(sql: string, keywordCase: string, indentString: str
     return result.trim();
 }
 
-function formatHangingOperatorsStyle(sql: string, keywordCase: string, indentString: string): string {
+function formatHangingOperatorsStyle(sql: string, keywordCase: string, _indentString: string): string {
     const hangingIndent = "  "; // 2 spaces for hanging operators
 
     let result = sql;
@@ -459,7 +459,7 @@ function formatKnrConditions(condition: string, keywordCase: string, indent: str
 
 // --- Helpers for Canonical Compact ---
 
-function formatCanonicalSelect(sql: string, keywordCase: string, wrapLength: number): string {
+function formatCanonicalSelect(sql: string, keywordCase: string, _wrapLength: number): string {
     const columnAlignIndent = 7;
     let result = sql;
     const selectStartMatch = result.match(/^(SELECT\s+(?:DISTINCT\s+)?)/i);
@@ -621,7 +621,7 @@ function formatCanonicalSet(sql: string, keywordCase: string, indentString: stri
     let result = sql;
     result = result.replace(/\s+SET\b/gi, ' SET');
     const setRegex = /(\bSET\b)([\s\S]+?)(?=\b(WHERE|FROM|JOIN|INNER|LEFT|RIGHT|FULL|CROSS|GROUP|ORDER|HAVING|UNION|EXCEPT|INTERSECT|$))/gi;
-    result = result.replace(setRegex, (match, setKw, content, lookahead) => {
+    result = result.replace(setRegex, (match, _setKw, content, _lookahead) => {
         const assignments = parseColumns(content);
         if (assignments.length > 0) {
             const formattedAssignments = assignments.map(a => indentString + a.trim());
@@ -636,7 +636,7 @@ function formatCanonicalInsert(sql: string, keywordCase: string, indentString: s
     let result = sql;
     const insertRegex = /(\bINSERT\s+INTO\b[\s\S]+?\))\s*(\b(?:VALUES|SELECT)\b)([\s\S]+?)(?=(?:\b(UPDATE|DELETE|WHERE|GROUP|ORDER|HAVING|UNION|EXCEPT|INTERSECT)\b)|$|;)/gi;
 
-    result = result.replace(insertRegex, (match, insertPart, keywordKw, contentPart) => {
+    result = result.replace(insertRegex, (_match, insertPart, keywordKw, contentPart) => {
         let formattedInsert = insertPart.trim();
         const parenStart = formattedInsert.indexOf('(');
         let insertBlock = "";

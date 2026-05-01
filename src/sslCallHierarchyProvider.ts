@@ -16,7 +16,7 @@ export class SSLCallHierarchyProvider implements vscode.CallHierarchyProvider {
 	public prepareCallHierarchy(
 		document: vscode.TextDocument,
 		position: vscode.Position,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.CallHierarchyItem | undefined {
 		// Use the centralized parser to find procedures
 		const procedures = this.parseProcedures(document);
@@ -69,7 +69,7 @@ export class SSLCallHierarchyProvider implements vscode.CallHierarchyProvider {
 
 	public provideCallHierarchyIncomingCalls(
 		item: vscode.CallHierarchyItem,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.CallHierarchyIncomingCall[] {
 		const incomingCalls: vscode.CallHierarchyIncomingCall[] = [];
 		const procedureName = item.name;
@@ -137,7 +137,7 @@ export class SSLCallHierarchyProvider implements vscode.CallHierarchyProvider {
 
 	public provideCallHierarchyOutgoingCalls(
 		item: vscode.CallHierarchyItem,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.CallHierarchyOutgoingCall[] {
 		const outgoingCalls: vscode.CallHierarchyOutgoingCall[] = [];
 

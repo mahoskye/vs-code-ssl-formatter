@@ -11,7 +11,7 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 	public prepareRename(
 		document: vscode.TextDocument,
 		position: vscode.Position,
-		token: vscode.CancellationToken
+		_token: vscode.CancellationToken
 	): vscode.Range | null {
 		const range = document.getWordRangeAtPosition(position);
 		if (!range) {
@@ -125,7 +125,6 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 		startPos: vscode.Position,
 		token: vscode.CancellationToken
 	): ScanResult | null {
-		const text = document.getText();
 		const occurrences: SymbolOccurrence[] = [];
 		let sourceScope: string | null = null;
 		let sourceIsProcedure = false;
@@ -291,10 +290,7 @@ export class SSLRenameProvider implements vscode.RenameProvider {
 
 		if (inString) {
 			// Exception: SQL Parameters ?param?
-			// Check immediate context around position
-			const line = document.lineAt(position.line).text;
-			const charPos = position.character;
-			// We need to check if we are surrounded by ?...?. 
+			// We need to check if we are surrounded by ?...?.
 			// We know we are inside string.
 			// This check is a bit tricky if we only have one point.
 			// prepareRename is usually on the word.
