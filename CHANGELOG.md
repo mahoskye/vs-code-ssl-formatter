@@ -5,6 +5,12 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-04-30
+
+### Changed
+- **starlims-lsp bumped to v0.4.0.** The LSP now populates the LSP `Diagnostic.code` field on every emitted diagnostic with a stable, machine-readable slug (e.g. `parameters_first`, `prefer_exitcase`, `udobject_array_in_clause`, `exitfor_in_finally`). Slugs match `ssl-style-guide.schema.yaml` `lints` rule names where the schema defines them; parser/lexer-level findings carry slugs derived from the producing check. This unblocks future client-side quick-fix code actions, suppression comments, and per-rule severity overrides keyed on `diagnostic.code`.
+- **`InitializeResult.serverInfo.version`** now reports the real build version (was previously hardcoded to "0.2.0" regardless of the actual binary).
+
 ## [1.5.0] - 2026-04-30
 
 ### Added
