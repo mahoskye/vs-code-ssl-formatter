@@ -3,7 +3,6 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import { describe, it } from 'mocha';
 import { SSLCodeActionProvider } from '../src/sslCodeActionProvider';
-import { SSLDiagnosticProvider } from '../src/sslDiagnosticProvider'; // Need to trigger diagnostic generation logic if possible, or manually create diagnostic
 
 describe('Code Action: Convert to DoProc', () => {
 

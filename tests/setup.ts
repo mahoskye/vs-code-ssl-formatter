@@ -29,7 +29,6 @@ import {
 	MockFoldingRange,
 	MockFoldingRangeKind,
 	MockTextDocument,
-	createDocument,
 	MockCodeActionKind,
 	MockCodeLens,
 	MockCancellationTokenSource,
@@ -51,10 +50,10 @@ const mockVscode = {
 	workspace: {
 		textDocuments: openDocuments,
 		configuration: createSSLConfig(),
-		getConfiguration(section?: string): MockWorkspaceConfiguration {
+		getConfiguration(_section?: string): MockWorkspaceConfiguration {
 			return this.configuration;
 		},
-		asRelativePath(pathOrUri: string | any, includeWorkspaceFolder?: boolean): string {
+		asRelativePath(pathOrUri: string | any, _includeWorkspaceFolder?: boolean): string {
 			if (typeof pathOrUri === 'string') {
 				return pathOrUri;
 			}
@@ -139,9 +138,9 @@ const mockVscode = {
 	},
 	window: {
 		activeTextEditor: undefined as any, // getter below
-		showErrorMessage(message: string): void { },
-		showWarningMessage(message: string): void { },
-		showInformationMessage(message: string): void { },
+		showErrorMessage(_message: string): void { },
+		showWarningMessage(_message: string): void { },
+		showInformationMessage(_message: string): void { },
 		createOutputChannel(name: string): any {
 			return {
 				name,
@@ -153,7 +152,7 @@ const mockVscode = {
 				dispose: () => { }
 			};
 		},
-		onDidChangeTextEditorSelection(listener: (e: any) => any): any {
+		onDidChangeTextEditorSelection(_listener: (e: any) => any): any {
 			return { dispose: () => { } };
 		},
 		showTextDocument(document: MockTextDocument): Promise<any> {
@@ -162,7 +161,7 @@ const mockVscode = {
 		}
 	},
 	commands: {
-		executeCommand(command: string, ...args: any[]): Promise<any> {
+		executeCommand(command: string, ..._args: any[]): Promise<any> {
 			if (command === 'workbench.action.closeActiveEditor') {
 				if (activeTextEditor) {
 					const doc = activeTextEditor.document;
@@ -177,10 +176,10 @@ const mockVscode = {
 			}
 			return Promise.resolve();
 		},
-		registerCommand(command: string, callback: (...args: any[]) => any): any {
+		registerCommand(_command: string, _callback: (...args: any[]) => any): any {
 			return { dispose: () => { } };
 		},
-		registerTextEditorCommand(command: string, callback: (...args: any[]) => any): any { // Added this
+		registerTextEditorCommand(_command: string, _callback: (...args: any[]) => any): any { // Added this
 			return { dispose: () => { } };
 		}
 	},
@@ -230,7 +229,7 @@ const mockVscode = {
 	CancellationToken: MockCancellationToken,
 
 	languages: {
-		createDiagnosticCollection(name: string): MockDiagnosticCollection {
+		createDiagnosticCollection(_name: string): MockDiagnosticCollection {
 			const collection = new MockDiagnosticCollection();
 			diagnosticCollections.push(collection);
 			return collection;
