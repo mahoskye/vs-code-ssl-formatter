@@ -210,8 +210,13 @@ const mockVscode = {
 	FoldingRangeKind: MockFoldingRangeKind,
 	CodeActionKind: class MockCodeActionKind {
 		static QuickFix = new MockCodeActionKind('quickfix');
+		static Refactor = new MockCodeActionKind('refactor');
+		static RefactorRewrite = new MockCodeActionKind('refactor.rewrite');
 		public value: string;
 		constructor(value: string) { this.value = value; }
+		contains(other: { value: string }): boolean {
+			return this.value === other.value || this.value.startsWith(other.value + '.');
+		}
 	},
 	CodeAction: class MockCodeAction {
 		edit?: MockWorkspaceEdit;
