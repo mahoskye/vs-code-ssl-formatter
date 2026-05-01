@@ -5,6 +5,22 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 2026-05-01
+
+### Fixed
+- **LSP server no longer dies on internal panics.** A v1.10.0 Windows user
+  reported `fatal error: all goroutines are asleep - deadlock` after
+  upgrading; the symptom matched a panic in a diagnostic check function
+  killing the LSP process. Bundled `starlims-lsp` v0.7.1 wraps the
+  diagnostic-collection path in `recover()` so any future panic surfaces
+  as a single `internal_error` diagnostic plus a stack trace in the LSP
+  output channel — the editor stays usable and bug reports include
+  actionable detail.
+- **Statically link the Linux amd64 server binary.** The host build was
+  linking against the build runner's glibc; cross-compiled targets were
+  already static. All targets now build with `CGO_ENABLED=0` so users on
+  systems with older glibc no longer hit silent startup failures.
+
 ## [1.10.0] - 2026-05-01
 
 ### Added
