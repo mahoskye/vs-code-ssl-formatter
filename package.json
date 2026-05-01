@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.9.0",
+    "version": "1.10.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -324,6 +324,7 @@
                             "one_class_per_file",
                             "parameters_first",
                             "prefer_exitcase",
+                            "procedure_declaration_syntax",
                             "redeclare_is_noop",
                             "region_legacy",
                             "return_from_constructor",
@@ -331,7 +332,6 @@
                             "scientific_notation",
                             "single_catch",
                             "single_finally",
-                            "skipped_param_spacing",
                             "sql_injection",
                             "step_spacing",
                             "try_requires_handler",
@@ -604,6 +604,7 @@
         "test:format-fix": "node ./scripts/assert-format-fix.js",
         "test:comments-preserved": "node ./scripts/assert-comments-preserved.js",
         "package": "vsce package",
+        "smoke": "node scripts/smoke-vsix.mjs",
         "publish": "vsce publish"
     },
     "dependencies": {

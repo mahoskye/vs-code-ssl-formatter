@@ -5,6 +5,58 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-05-01
+
+### Added
+- **`procedure_declaration_syntax` rule.** Bundled `starlims-lsp` v0.7.0 ships
+  a new error-level diagnostic that catches two common procedure-declaration
+  typos:
+  - `PROCEDURE Name(...)` (missing the leading colon) — previously misfired
+    `direct_procedure_call` on the procedure name. The new rule explains the
+    actual problem: definitions are `:PROCEDURE Name;` (colon prefix, trailing
+    semicolon, no parens; arguments via `:PARAMETERS`).
+  - `:PROCEDURE Name(...)` — parens after a valid keyword. Same fix, same
+    message.
+  Slug `procedure_declaration_syntax` is now in `ssl.diagnostics.rules`.
+
+### Changed
+- **`mixed_type_operator` no longer false-fires** on three common patterns
+  that the v0.6.0 inferencer mishandled:
+  - **Uppercase-leading identifiers.** `DCUparseCat` (capital `D` is the
+    start of an acronym) was being read as a `d`-prefixed Hungarian date.
+    Type inference now requires a strict-case lowercase prefix before an
+    uppercase rune; the lenient match still drives the `hungarian_notation`
+    enforcer rule for `Sname`-style mistakes.
+  - **Indexed access (`arr[i]`).** Was typed as the array, not the element.
+    Now treated as opaque element type — no warning.
+  - **Member access (`Me:Foo`, `obj:bar`).** Same treatment — opaque.
+  Regression-guard: `"abc" + 5` still emits the warning, so the rule isn't
+  silenced for genuine literal mismatches.
+- **`class_member_order` no longer enforces Constructor position.** Real
+  legacy classes routinely place the constructor first; the rule now only
+  enforces `:INHERIT` < `:DECLARE` < methods.
+
+### Removed
+- **`skipped_param_spacing` rule.** Pure stylistic noise about whether
+  `{a, , b}` should be `{a,,b}`. Removed in `starlims-lsp` v0.7.0; the slug
+  is also gone from `ssl.diagnostics.rules`.
+
+### Internal
+- `npm run smoke` fixture updated to valid SSL (`:PROCEDURE Smoke; …
+  :ENDPROC;`); the old fixture would now (correctly) trip the new
+  `procedure_declaration_syntax` rule and confuse the smoke check.
+- Bundled LSP binaries refreshed to v0.7.0.
+
+## [1.9.1] - 2026-05-01
+
+### Fixed
+- **Packaged VSIX missing `vscode-languageclient`.** `.vscodeignore` had a
+  blanket `node_modules/**` entry which excluded all runtime dependencies
+  from the published `.vsix`. On a fresh install this surfaced as
+  `Cannot find module 'vscode-languageclient/node'` from `lspClient.js`,
+  preventing the extension from activating. Removed the blanket ignore;
+  `vsce` now bundles production dependencies (and only those) as intended.
+
 ## [1.9.0] - 2026-04-30
 
 ### Added

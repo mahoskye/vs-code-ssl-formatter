@@ -1,7 +1,6 @@
 # Build and test directories
 .vscode/**
 .vscode-test/**
-node_modules/**
 out/test/**
 out/tests/**
 out/scripts/**
@@ -22,6 +21,7 @@ tsconfig.tsnode.json
 
 # Development documentation
 docs/**
+dev/**
 .claude/**
 
 # CI/CD
