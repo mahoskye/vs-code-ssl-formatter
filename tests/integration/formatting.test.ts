@@ -53,10 +53,13 @@ x := 1;
                 await config.update('format.sql.enabled', true, vscode.ConfigurationTarget.Global);
 
                 // Use lowercase input so we can verify the formatter
-                // canonicalized the SQL keywords to uppercase.
+                // canonicalized the SQL keywords to uppercase. The string
+                // must be long enough to exceed wrapLength — as of
+                // starlims-lsp v0.7.3 (issue #64) the inline SQL formatter
+                // intentionally leaves short single-line SQL untouched.
                 const inputLower = `
 :PROCEDURE TestSqlFormat;
-RunSQL("select * from table where id = 1");
+RunSQL("select column_one, column_two, column_three, column_four from some_table where id = 1 and status = 'active' and created_date > '2020-01-01'");
 :ENDPROC;
 `;
 
