@@ -31,6 +31,28 @@ describe('SSL Comment Toggle', () => {
 		expect(commented.lines).to.deep.equal(['\t   /* ;']);
 	});
 
+	it('round-trips a single blank line', () => {
+		const original = [''];
+		const commented = toggleCommentLines(original);
+		expect(commented.lines).to.deep.equal(['/* ;']);
+		const uncommented = toggleCommentLines(commented.lines);
+		expect(uncommented.lines).to.deep.equal(original);
+	});
+
+	it('round-trips an indented blank line preserving indent', () => {
+		const original = ['\t   '];
+		const commented = toggleCommentLines(original);
+		const uncommented = toggleCommentLines(commented.lines);
+		expect(uncommented.lines).to.deep.equal(['\t   ']);
+	});
+
+	it('round-trips a mixed selection containing a leading blank line', () => {
+		const original = ['', ':IF Empty(a);', '  :RETURN b;', ':ENDIF;'];
+		const commented = toggleCommentLines(original);
+		const uncommented = toggleCommentLines(commented.lines);
+		expect(uncommented.lines).to.deep.equal(original);
+	});
+
 	it('uncomments multiple inline-commented lines when selected together', () => {
 		const commented = ['\t/* :IF nValue > 0;', '\t/* nValue := 1;', '\t/* :ENDIF;'];
 		const uncommented = toggleCommentLines(commented);

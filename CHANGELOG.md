@@ -5,6 +5,32 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.3] - 2026-05-02
+
+### Fixed
+- **Toggle-comment on a blank line is now round-trip safe (#65).** Commenting
+  a blank line still produces `/* ;`, but uncommenting now restores the
+  original blank line instead of leaving a stray `;`. `removeInlineComment`
+  recognizes the bare `";"` shape produced by `addInlineComment`'s blank-line
+  branch and reverses it back to the indented blank. New round-trip tests
+  cover single blank, indented blank, and the mixed-selection repro from the
+  issue.
+- **Bundled `starlims-lsp` v0.7.3.** Picks up the user-reported LSP fixes:
+  - **#55** — `ssl.globals` workspace setting is now applied at
+    initialization (was silently dropped until a later
+    `workspace/didChangeConfiguration`).
+  - **#56** — `:INCLUDE File_Helpers.FileWork;` no longer flags the dotted
+    segments as undeclared variables.
+  - **#63** — `equals_vs_strict_equals` info diagnostic reworded to lead
+    with what the user is doing right (`'!=' is exact-match negation`)
+    instead of reading like `!=` is being flagged as wrong.
+  - **#64** — inline SQL formatter leaves short single-line SQL alone, and
+    when wrapping is required keeps the opening `"` glued to `:=`/`(`/`,`
+    and the closing `"` on the line that owns the trailing punctuation.
+  - SQL formatter rule A–F regression fixes (JOIN line breaks,
+    `AND`/`OR`-in-`CASE` indentation, projection/alias splitting, arg-list
+    hang indents, opening/closing-quote attachment).
+
 ## [1.10.2] - 2026-05-01
 
 ### Fixed

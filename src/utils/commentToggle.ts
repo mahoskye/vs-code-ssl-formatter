@@ -52,6 +52,13 @@ function removeInlineComment(line: string): string {
 		remainder = remainder.slice(1);
 	}
 
+	// Round-trip the blank-line shape "/* ;" emitted by addInlineComment
+	// back to a blank line — every non-blank path leaves a separating space
+	// before the trailing ";", so a bare ";" here unambiguously came from a blank.
+	if (remainder === ";") {
+		return indent;
+	}
+
 	// Remove trailing semicolon if present (inline comments often end with ;)
 	// But be careful not to remove needed semicolons for code.
 	// However, the toggle logic usually adds ' ;' at the end.
