@@ -141,12 +141,16 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.languages.registerDocumentSymbolProvider(documentSelector, new SSLSymbolProvider())
         );
 
-        // Register completion provider (LSP provides this when active)
+        // Register completion provider (LSP provides this when active).
+        // Trigger characters mirror the LSP server defaults: ':' only.
+        // '.', '(', ',', '"', and "'" used to be triggers but caused noisy
+        // popups during list/decimal/expression entry — see issue #8 in
+        // starlims-lsp.
         context.subscriptions.push(
             vscode.languages.registerCompletionItemProvider(
                 documentSelector,
                 new SSLCompletionProvider(classIndex, procedureIndex),
-                ":", ".", "(", '"', "'"
+                ":"
             )
         );
 
@@ -210,12 +214,18 @@ export async function activate(context: vscode.ExtensionContext) {
             vscode.languages.registerReferenceProvider(documentSelector, new SSLReferenceProvider(procedureIndex))
         );
 
-        // Register signature help (LSP provides this when active)
+        // Register signature help (LSP provides this when active).
+        // Trigger characters mirror the LSP server defaults: none unless
+        // the user opts in via ssl.intellisense.signatureHelp.autoTrigger.
+        // Hover and explicit invocation (Ctrl+Shift+Space) work either way.
+        // See issue #9 in starlims-lsp.
+        const sigAutoTrigger = vscode.workspace.getConfiguration("ssl").get<boolean>("intellisense.signatureHelp.autoTrigger", false);
+        const sigTriggers: string[] = sigAutoTrigger ? ["(", ","] : [];
         context.subscriptions.push(
             vscode.languages.registerSignatureHelpProvider(
                 documentSelector,
                 new SSLSignatureHelpProvider(procedureIndex),
-                "(", ","
+                ...sigTriggers
             )
         );
 

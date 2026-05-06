@@ -5,6 +5,41 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.4] - 2026-05-06
+
+### Changed
+- **Bundled `starlims-lsp` v0.7.4.** New LSP behavior visible in the editor:
+  - **Completion popup is much quieter while typing.** `,`, `.`, and `(` no
+    longer auto-trigger completion. Only `:` does — and on `:` with no
+    member-context match, only keyword completions are returned (not the
+    full inventory). Use `Ctrl+Space` for the full list. Closes
+    starlims-lsp#8.
+  - **Signature help no longer auto-pops by default.** It remains available
+    on hover and explicit invocation (`Ctrl+Shift+Space`). Set the new
+    `ssl.intellisense.signatureHelp.autoTrigger` setting to `true` to
+    restore the previous always-on behavior. Closes starlims-lsp#9.
+  - **UDObject shape inference + `clone()` propagation.** Property
+    completions now fire on `oVar:` for variables initialized via
+    `CreateUDObject({...})`, and clones inherit the source's shape. Closes
+    starlims-lsp#7.
+  - **`comment_text_after_terminator` false-positive fix.** The multi-line
+    "broken-out keyword" heuristic no longer fires when there's a blank
+    line or another standalone comment between the suspect comment and the
+    alleged code. The original positive case still fires. Closes
+    starlims-lsp#6.
+
+### Added
+- `ssl.intellisense.signatureHelp.autoTrigger` (default `false`). Forwarded
+  to the LSP at initialization; window reload required for changes to take
+  effect because LSP capability advertisements are fixed at init time.
+
+### Changed (extension internals)
+- Native-fallback completion provider trigger chars trimmed to `:` only,
+  matching the LSP server defaults (`src/extension.ts`).
+- Native-fallback signature help provider registers `(` / `,` as triggers
+  only when `ssl.intellisense.signatureHelp.autoTrigger` is `true`
+  (`src/extension.ts`).
+
 ## [1.10.3] - 2026-05-02
 
 ### Fixed
