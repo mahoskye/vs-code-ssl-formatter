@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.10.3",
+    "version": "1.10.4",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -384,6 +384,11 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Show parameter hints while typing function calls"
+                },
+                "ssl.intellisense.signatureHelp.autoTrigger": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Auto-open the signature help popup while typing inside a function call. When false (default), signature help is available on hover and explicit invocation (Ctrl+Shift+Space) only. Changes take effect after reloading the window."
                 },
                 "ssl.intellisense.inlayHints.enabled": {
                     "type": "boolean",

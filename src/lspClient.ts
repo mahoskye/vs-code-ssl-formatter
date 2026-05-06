@@ -118,6 +118,11 @@ function getSSLConfiguration(): object {
             inlayHints: {
                 enabled: config.get<boolean>('intellisense.inlayHints.enabled', true),
                 minParameterCount: config.get<number>('intellisense.inlayHints.minParameterCount', 2)
+            },
+            intellisense: {
+                signatureHelp: {
+                    autoTrigger: config.get<boolean>('intellisense.signatureHelp.autoTrigger', false)
+                }
             }
         }
     };
@@ -196,6 +201,7 @@ export async function startClient(context: vscode.ExtensionContext): Promise<Lan
                 e.affectsConfiguration('ssl.naming') ||
                 e.affectsConfiguration('ssl.globals') ||
                 e.affectsConfiguration('ssl.intellisense.inlayHints') ||
+                e.affectsConfiguration('ssl.intellisense.signatureHelp') ||
                 e.affectsConfiguration('ssl.styleGuide') ||
                 e.affectsConfiguration('ssl.diagnostics.rules')
             ) {
