@@ -79,7 +79,12 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 			return this.getProcedureCompletions(document, analysis, partialInput);
 		}
 
-		// Check if this is an object member completion (after ':')
+		// ':' trigger handling
+		// Two distinct cases:
+		//   1. obj:    -> member completions (object member access)
+		//   2. ^:  /  WS:  -> keyword completions (':' starts a new token)
+		// Anything else (e.g. trailing ':' after non-whitespace, non-object) must
+		// not surface keyword/function/class/snippet completions — see #68.
 		if (context.triggerCharacter === ':') {
 			const textBeforeColon = lineText.substring(0, position.character - 1);
 			const objectMatch = textBeforeColon.match(/(\w+)\s*$/);
@@ -90,6 +95,17 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 				if (memberCompletions.length > 0) {
 					return memberCompletions;
 				}
+				return [];
+			}
+
+			// Only offer keywords when ':' begins a new token (preceded by
+			// whitespace or at start of line).
+			const charBeforeColon = textBeforeColon.length > 0
+				? textBeforeColon.charAt(textBeforeColon.length - 1)
+				: '';
+			const colonStartsToken = charBeforeColon === '' || /\s/.test(charBeforeColon);
+			if (!colonStartsToken) {
+				return [];
 			}
 		}
 

@@ -1,43 +1,41 @@
-# Build and test directories
-.vscode/**
-.vscode-test/**
-out/test/**
-out/tests/**
-out/scripts/**
-out/docs/**
-out/dev docs/**
-out/ssl-style-guide/**
+# Ship only the bundled extension entry + LSP binaries + static assets.
+# Anything not explicitly re-included with `!` below is excluded.
 
-# Ensure LSP server binaries are included
-!server/**
+# Build artifacts
+out/**
+node_modules/**
+*.vsix
+*.tsbuildinfo
 
-# Source files (only ship compiled JS)
+# Source files
 src/**
 tests/**
 scripts/**
+formatter-tests/**
+snapshots/**
 *.ts
 tsconfig.json
 tsconfig.tsnode.json
 
-# Development documentation
-docs/**
-dev/**
-.claude/**
-
-# CI/CD
-.github/**
-
-# Git files
-.git/**
-.gitignore
-.gitattributes
-
-# NPM files
-.npmignore
-
-# Editor files
+# Editor / VS Code
+.vscode/**
+.vscode-test/**
 .editorconfig
 .eslintrc.json
 
-# Documentation (keep README.md and CHANGELOG.md)
+# Development docs
+docs/**
+dev/**
+.claude/**
+status_keywords.txt
 vsc-extension-quickstart.md
+
+# CI/CD + git + npm
+.github/**
+.git/**
+.gitignore
+.gitattributes
+.npmignore
+
+# Re-include LSP server binaries (must be shipped despite broad excludes above)
+!server/**
