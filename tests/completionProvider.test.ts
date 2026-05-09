@@ -121,3 +121,44 @@ describe('SSL Completion Provider - Custom definitions', () => {
 		expect(memberCompletions.some(item => item.label === 'State')).to.be.true;
 	});
 });
+
+describe("SSL Completion Provider - ':' trigger gating (#68)", () => {
+	const provider = new SSLCompletionProvider();
+
+	it('returns no keywords when ":" follows non-whitespace and is not an object member', () => {
+		// e.g. user types "abc:" where "abc" is not a known object — keywords
+		// should NOT bleed in.
+		const doc = createDocument('abc:');
+		const completions = provider.provideCompletionItems(
+			doc as any,
+			positionAt(0, 4),
+			{} as any,
+			{ triggerCharacter: ':' } as any
+		);
+		expect(completions).to.have.length(0);
+	});
+
+	it('offers keyword completions when ":" begins a new token', () => {
+		const doc = createDocument(':');
+		const completions = provider.provideCompletionItems(
+			doc as any,
+			positionAt(0, 1),
+			{} as any,
+			{ triggerCharacter: ':' } as any
+		);
+		const keywordItems = completions.filter(item => item.kind === vscode.CompletionItemKind.Keyword);
+		expect(keywordItems.length).to.be.greaterThan(0);
+	});
+
+	it('offers keyword completions when ":" is preceded by whitespace', () => {
+		const doc = createDocument('   :');
+		const completions = provider.provideCompletionItems(
+			doc as any,
+			positionAt(0, 4),
+			{} as any,
+			{ triggerCharacter: ':' } as any
+		);
+		const keywordItems = completions.filter(item => item.kind === vscode.CompletionItemKind.Keyword);
+		expect(keywordItems.length).to.be.greaterThan(0);
+	});
+});

@@ -5,6 +5,47 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.5] - 2026-05-08
+
+### Changed
+- **Bundled `starlims-lsp` v0.7.5.** New LSP behavior visible in the editor:
+  - **`:` trigger no longer floods the popup with keywords in member
+    positions.** Typing `foo:` (or any non-class/UDObject identifier
+    followed by `:`) returns no completions instead of falling through to
+    the keyword inventory. Closes starlims-lsp#11 (issue #68 here).
+  - **Accepting a keyword from the `:` popup no longer duplicates the
+    colon.** The LSP now ships a `TextEdit` covering the typed `:`, so the
+    result is always `:IF` (not `::IF`) regardless of editor word-boundary
+    heuristics. Closes starlims-lsp#12 (issue #69 here).
+- **Auto-closing pair audit.** `(`, `[`, `{` no longer auto-close while
+  the cursor is inside a string or comment scope; backtick was removed
+  (not part of SSL syntax). The block-comment open `/*` still pairs to
+  `;`. Closes #70.
+
+### Changed (packaging)
+- **Extension bundled with esbuild.** `vsce package` now ships **16 files
+  (~21.6 MB, ~13 MB of which is per-platform LSP binaries)** instead of
+  the previous 429 unbundled files. Cold-activation should be faster on
+  first install and on every editor cold start. Closes part of #67.
+- **`.vscodeignore` tightened** to a near-whitelist (everything excluded
+  except the bundled `dist/extension.js`, server binaries, manifests, and
+  static assets).
+
+### Changed (CI)
+- GitHub Actions bumped to Node.js 24-compatible versions
+  (`actions/checkout@v5`, `actions/setup-node@v5`,
+  `actions/upload-artifact@v5`); CI Node matrix moved from `[18, 20]` to
+  `[20, 22]`; publish workflow now uses Node 22. Addresses the GH-Actions
+  Node 20 deprecation warning surfaced during the v1.10.4 publish (closes
+  the rest of #67).
+
+### Fixed
+- **Native completion fallback** (used only when
+  `ssl.languageServer.enabled` is `false`): the `:` trigger now matches
+  the LSP behavior — keyword completions are gated on whitespace before
+  `:` and `obj:` with no member match returns `[]` instead of bleeding
+  the full inventory. Mirrors the LSP fixes for #68/#69.
+
 ## [1.10.4] - 2026-05-06
 
 ### Changed

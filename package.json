@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.10.4",
+    "version": "1.10.5",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -594,9 +594,12 @@
             }
         ]
     },
-    "main": "./out/src/extension.js",
+    "main": "./dist/extension.js",
     "scripts": {
-        "vscode:prepublish": "npm run compile",
+        "vscode:prepublish": "npm run check-types && npm run bundle -- --production",
+        "bundle": "node scripts/build.mjs",
+        "bundle:watch": "node scripts/build.mjs --watch",
+        "check-types": "tsc -p ./ --noEmit",
         "compile": "tsc -p ./ && node -e \"require('fs').mkdirSync('out',{recursive:true});require('fs').writeFileSync('out/package.json',JSON.stringify({type:'commonjs'},null,2))\"",
         "generate:slugs": "node scripts/generate-diagnostic-slugs.mjs",
         "watch": "tsc -watch -p ./",
@@ -627,6 +630,7 @@
         "@vscode/vsce": "^3.2.1",
         "chai": "^4.5.0",
         "cross-env": "^10.1.0",
+        "esbuild": "^0.28.0",
         "eslint": "^8.39.0",
         "glob": "^11.0.0",
         "mocha": "^10.8.2",
