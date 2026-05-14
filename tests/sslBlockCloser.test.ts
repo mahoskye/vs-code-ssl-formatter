@@ -196,6 +196,26 @@ describe("SSL Block Closer — decideBlockCloser", () => {
         });
     });
 
+    describe("look-alikes that are NOT openers", () => {
+        it(":LABEL is not an opener", () => {
+            // SSL labels use the form `:LABEL Name;` but are jump targets,
+            // not block headers — no closer to insert.
+            expect(decideBlockCloser([":LABEL Done;", ""], 0, 1)).to.be.null;
+        });
+
+        it(":DECLARE / :PARAMETERS / :DEFAULT / :RETURN are not openers", () => {
+            expect(decideBlockCloser([":DECLARE x, y;", ""], 0, 1)).to.be.null;
+            expect(decideBlockCloser([":PARAMETERS p;", ""], 0, 1)).to.be.null;
+            expect(decideBlockCloser([":DEFAULT p, \"\";", ""], 0, 1)).to.be.null;
+            expect(decideBlockCloser([":RETURN nValue;", ""], 0, 1)).to.be.null;
+        });
+
+        it(":INHERIT and :PUBLIC are not openers", () => {
+            expect(decideBlockCloser([":INHERIT BaseClass;", ""], 0, 1)).to.be.null;
+            expect(decideBlockCloser([":PUBLIC sFoo;", ""], 0, 1)).to.be.null;
+        });
+    });
+
     describe("families registry sanity", () => {
         it("includes every documented family", () => {
             const closers = FAMILIES.map(f => f.closerText).sort();
