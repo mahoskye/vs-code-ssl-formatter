@@ -125,6 +125,11 @@
                     "maximum": 5,
                     "description": "Number of blank lines to insert between procedures"
                 },
+                "ssl.editor.autoInsertBlockClosers": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Automatically insert the matching :END... keyword (e.g. :ENDIF, :ENDCASE) when pressing Enter on a block-opening line such as :IF, :WHILE, :FOR, :BEGINCASE, :TRY, :PROCEDURE, :CLASS, :REGION."
+                },
                 "ssl.format.formatOnSave": {
                     "type": "boolean",
                     "default": false,

@@ -151,6 +151,7 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 - `ssl.format.semicolonEnforcement`: Ensure statements end with semicolons (default: `true`).
 - `ssl.format.blankLinesBetweenProcs`: Blank lines between procedures (default: `1`).
 - `ssl.format.formatOnSave`: Automatically format on save (default: `false`).
+- `ssl.editor.autoInsertBlockClosers`: When you press Enter on a line like `:IF cond;`, `:WHILE`, `:FOR`, `:BEGINCASE`, `:TRY`, `:PROCEDURE`, `:CLASS`, or `:REGION`, automatically insert the matching `:ENDIF;`/`:ENDWHILE;`/`:NEXT;`/`:ENDCASE;`/`:ENDTRY;`/`:ENDPROC;`/`:ENDCLASS;`/`:ENDREGION;` on the line below (default: `true`).
 - `ssl.format.trimTrailingWhitespace`: Remove trailing whitespace (default: `true`).
 - `ssl.format.sql.enabled`: Format inline SQL string literals (default: `true`).
 - `ssl.format.sql.keywordCase`: `preserve`, `upper`, or `lower` for SQL keywords (default: `upper`).
