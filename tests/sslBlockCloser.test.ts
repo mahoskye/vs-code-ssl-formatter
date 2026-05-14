@@ -167,6 +167,22 @@ describe("SSL Block Closer — decideBlockCloser", () => {
         });
     });
 
+    describe("less-obvious opener shapes", () => {
+        it("recognises an opener with a trailing inline comment", () => {
+            // `^\s*:IF\b.*;\s*$` — `.*;` greedily eats the inline comment
+            // ending in its own `;`. The line still terminates with `;`.
+            const decision = decideBlockCloser([":IF cond; /* note ;", ""], 0, 1);
+            expect(decision, "trailing-comment opener should still match").to.not.be.null;
+            expect(decision!.family.closerText).to.equal(":ENDIF;");
+        });
+
+        it("accepts an opener with trailing whitespace", () => {
+            const decision = decideBlockCloser([":IF cond;   ", ""], 0, 1);
+            expect(decision).to.not.be.null;
+            expect(decision!.family.closerText).to.equal(":ENDIF;");
+        });
+    });
+
     describe("cursor position guard", () => {
         it("returns null if the cursor is not on the line immediately after the opener", () => {
             const lines = [":IF cond;", "", ""];
