@@ -98,6 +98,7 @@ export const SSL_DIAGNOSTIC_SLUGS = [
     "unknown_token",
     "unmatched_block_end",
     "unmatched_delimiter",
+    "unqualified_field_assignment",
     "unused_variable",
     "visibility_annotation",
     "zero_based_array_index"

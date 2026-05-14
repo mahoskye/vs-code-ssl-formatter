@@ -5,6 +5,37 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.7] - 2026-05-13
+
+### Added
+- **`ssl.diagnostics.endpointPatterns` setting.** New workspace setting
+  (list of case-insensitive path substrings) that marks matching scripts
+  as SSL endpoints. In endpoint scripts the `Request` / `Response`
+  runtime ambients are pre-injected — they stop triggering
+  `undeclared_variable`, hover surfaces their docs, and completion
+  offers them. A leading `/* … Endpoint: …;` docblock in the first ~30
+  lines also activates endpoint mode without configuration. Forwarded
+  to the LSP via initializationOptions.
+
+### Changed
+- **Bundled `starlims-lsp` v0.7.7.** New LSP behavior visible in the
+  editor:
+  - **`unqualified_field_assignment` diagnostic.** Warns when a class
+    method assigns to a bare identifier matching a `:DECLARE`d class
+    field — in SSL that creates a method-local and silently leaves
+    the field untouched. Fix is `Me:fieldName := …` (or `Base:`).
+    Suppressed when a method-local `:DECLARE` / `:PARAMETERS` of the
+    same name shadows the field. Covers `:=`, `+=`, `-=`, `*=`, `/=`,
+    `^=`, `%=`.
+  - **`Request` / `Response` endpoint ambients.** See new setting
+    above; non-endpoint files still flag `Request` / `Response` as
+    undeclared, which is correct (they fail at runtime there).
+  - **Terminology: `:CLASS DECLARE` slots are "fields", not
+    "properties."** Doc-comment fix on the `Me:` / `Base:` completion
+    context description; all other "property" usage in the LSP refers
+    to built-in class accessors / SSLExpando / AddProperty /
+    CreateUdObject members and is unchanged.
+
 ## [1.10.6] - 2026-05-13
 
 ### Added

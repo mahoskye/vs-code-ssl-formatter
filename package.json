@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.10.6",
+    "version": "1.10.7",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -349,12 +349,21 @@
                             "unknown_token",
                             "unmatched_block_end",
                             "unmatched_delimiter",
+                            "unqualified_field_assignment",
                             "unused_variable",
                             "visibility_annotation",
                             "zero_based_array_index"
                         ],
                         "description": "Stable rule slug emitted by starlims-lsp. See diagnostic_codes.go."
                     }
+                },
+                "ssl.diagnostics.endpointPatterns": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "markdownDescription": "Case-insensitive path substrings that mark a script as an SSL endpoint. Endpoint scripts get `Request` and `Response` as pre-injected ambients (no `undeclared_variable`, hover and completion both surface them). A leading `/* … Endpoint: …;` docblock in the first ~30 lines also activates endpoint mode without configuration."
                 },
                 "ssl.styleGuide.limitBlockDepth": {
                     "type": "number",

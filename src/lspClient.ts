@@ -89,6 +89,7 @@ function getSSLConfiguration(): object {
     const indentSize = indentStyle === 'tab' ? tabSize : indentWidth;
     const hungarianPrefixes = config.get<string[]>('naming.hungarianNotation.prefixes', ['s', 'n', 'b', 'd', 'a', 'o', 'fn', 'v']);
     const rules = config.get<Record<string, string>>('diagnostics.rules', {});
+    const endpointPatterns = config.get<string[]>('diagnostics.endpointPatterns', []);
 
     return {
         ssl: {
@@ -113,7 +114,8 @@ function getSSLConfiguration(): object {
                 hungarianPrefixes,
                 globals: config.get<string[]>('globals', []),
                 maxBlockDepth: config.get<number>('styleGuide.limitBlockDepth', 4),
-                rules
+                rules,
+                endpointPatterns
             },
             inlayHints: {
                 enabled: config.get<boolean>('intellisense.inlayHints.enabled', true),
@@ -203,7 +205,8 @@ export async function startClient(context: vscode.ExtensionContext): Promise<Lan
                 e.affectsConfiguration('ssl.intellisense.inlayHints') ||
                 e.affectsConfiguration('ssl.intellisense.signatureHelp') ||
                 e.affectsConfiguration('ssl.styleGuide') ||
-                e.affectsConfiguration('ssl.diagnostics.rules')
+                e.affectsConfiguration('ssl.diagnostics.rules') ||
+                e.affectsConfiguration('ssl.diagnostics.endpointPatterns')
             ) {
                 sendConfigurationUpdate();
             }
