@@ -1,13 +1,13 @@
 import * as vscode from "vscode";
 
-interface BlockFamily {
+export interface BlockFamily {
     openerLine: RegExp;
     openerKeyword: RegExp;
     closerKeyword: RegExp;
     closerText: string;
 }
 
-const FAMILIES: ReadonlyArray<BlockFamily> = [
+export const FAMILIES: ReadonlyArray<BlockFamily> = [
     {
         openerLine: /^\s*:IF\b.*;\s*$/i,
         openerKeyword: /^\s*:IF\b/i,
@@ -60,31 +60,31 @@ const FAMILIES: ReadonlyArray<BlockFamily> = [
 
 const inFlightDocs = new WeakSet<vscode.TextDocument>();
 
-function familyForOpener(line: string): BlockFamily | undefined {
+export function familyForOpener(line: string): BlockFamily | undefined {
     return FAMILIES.find(f => f.openerLine.test(line));
 }
 
-function leadingIndent(line: string): string {
+export function leadingIndent(line: string): string {
     const match = line.match(/^\s*/);
     return match ? match[0] : "";
 }
 
 /**
  * Returns true if a matching closer for the opener at `openerLineNumber` already exists
- * later in the document, accounting for nested same-family blocks.
+ * later in `lines`, accounting for nested same-family blocks.
  *
  * Starts with balance = 1 (the just-typed opener). Walks forward; each same-family opener
  * increments the balance, each same-family closer decrements it. If balance hits 0, the
  * closer that brought it there matches our opener — so a closer is already present.
  */
-function closerAlreadyExists(
-    document: vscode.TextDocument,
+export function closerAlreadyExistsInLines(
+    lines: ReadonlyArray<string>,
     family: BlockFamily,
     openerLineNumber: number
 ): boolean {
     let balance = 1;
-    for (let i = openerLineNumber + 1; i < document.lineCount; i++) {
-        const line = document.lineAt(i).text;
+    for (let i = openerLineNumber + 1; i < lines.length; i++) {
+        const line = lines[i];
         // Closer check first so a line that is both (impossible in practice) errs toward "exists".
         if (family.closerKeyword.test(line)) {
             balance--;
@@ -98,6 +98,46 @@ function closerAlreadyExists(
         }
     }
     return false;
+}
+
+/**
+ * Pure decision function: given a snapshot of document lines, the opener
+ * line number, and a candidate cursor position, return the text the
+ * extension should insert (and the family that fired), or null if no
+ * insertion should occur.
+ *
+ * Inputs are deliberately primitive so this can be exercised from unit
+ * tests without spinning up a real `vscode.TextDocument` / `TextEditor`.
+ */
+export interface BlockCloserDecision {
+    family: BlockFamily;
+    insertText: string;
+}
+
+export function decideBlockCloser(
+    lines: ReadonlyArray<string>,
+    openerLineNumber: number,
+    cursorLine: number
+): BlockCloserDecision | null {
+    if (openerLineNumber < 0 || openerLineNumber >= lines.length) {
+        return null;
+    }
+    if (cursorLine !== openerLineNumber + 1) {
+        return null;
+    }
+    const openerLine = lines[openerLineNumber];
+    const family = familyForOpener(openerLine);
+    if (!family) {
+        return null;
+    }
+    if (closerAlreadyExistsInLines(lines, family, openerLineNumber)) {
+        return null;
+    }
+    const indent = leadingIndent(openerLine);
+    return {
+        family,
+        insertText: `\n${indent}${family.closerText}`,
+    };
 }
 
 export function registerBlockCloser(context: vscode.ExtensionContext): void {
@@ -132,23 +172,17 @@ export function registerBlockCloser(context: vscode.ExtensionContext): void {
             }
 
             const openerLineNumber = change.range.start.line;
-            const openerLine = event.document.lineAt(openerLineNumber).text;
-            const family = familyForOpener(openerLine);
-            if (!family) {
-                return;
-            }
-
             const cursor = editor.selection.active;
-            if (cursor.line !== openerLineNumber + 1) {
+
+            const lines: string[] = [];
+            for (let i = 0; i < event.document.lineCount; i++) {
+                lines.push(event.document.lineAt(i).text);
+            }
+            const decision = decideBlockCloser(lines, openerLineNumber, cursor.line);
+            if (!decision) {
                 return;
             }
-
-            if (closerAlreadyExists(event.document, family, openerLineNumber)) {
-                return;
-            }
-
-            const indent = leadingIndent(openerLine);
-            const insertText = `\n${indent}${family.closerText}`;
+            const insertText = decision.insertText;
 
             inFlightDocs.add(event.document);
             try {
