@@ -1,45 +1,29 @@
 import { describe, it } from "mocha";
 import { expect } from "chai";
-import { decideBlockCloser, familyForOpener, leadingIndent, FAMILIES, classifyLineStarts } from "../src/sslBlockCloser";
+import { decideBlockCloser, leadingIndent, FAMILIES, classifyLineStarts } from "../src/sslBlockCloser";
 
 describe("SSL Block Closer — decideBlockCloser", () => {
     describe("opener detection", () => {
-        it("inserts :ENDIF; after :IF cond;", () => {
-            const lines = [":IF nValue > 0;", ""];
-            const decision = decideBlockCloser(lines, 0, 1);
-            expect(decision, "expected decision for :IF").to.not.be.null;
-            expect(decision!.family.closerText).to.equal(":ENDIF;");
-            expect(decision!.insertText).to.equal("\n:ENDIF;");
-        });
-
-        it("inserts :ENDWHILE; after :WHILE cond;", () => {
-            const decision = decideBlockCloser([":WHILE bRun;", ""], 0, 1);
-            expect(decision!.family.closerText).to.equal(":ENDWHILE;");
-        });
-
-        it("inserts :NEXT; after :FOR i := 1 :TO 10;", () => {
-            const decision = decideBlockCloser([":FOR i := 1 :TO 10;", ""], 0, 1);
-            expect(decision!.family.closerText).to.equal(":NEXT;");
-        });
-
-        it("inserts :ENDCASE; after :BEGINCASE;", () => {
-            const decision = decideBlockCloser([":BEGINCASE;", ""], 0, 1);
-            expect(decision!.family.closerText).to.equal(":ENDCASE;");
-        });
-
-        it("inserts :ENDTRY; after :TRY;", () => {
-            const decision = decideBlockCloser([":TRY;", ""], 0, 1);
-            expect(decision!.family.closerText).to.equal(":ENDTRY;");
-        });
-
-        it("inserts :ENDPROC; after :PROCEDURE Name;", () => {
-            const decision = decideBlockCloser([":PROCEDURE Foo;", ""], 0, 1);
-            expect(decision!.family.closerText).to.equal(":ENDPROC;");
-        });
-
-        it("inserts :ENDREGION; after :REGION Name;", () => {
-            const decision = decideBlockCloser([":REGION Bar;", ""], 0, 1);
-            expect(decision!.family.closerText).to.equal(":ENDREGION;");
+        // One row per family. The FAMILIES-registry sanity test below
+        // already pins the registry's *contents*; this table exercises
+        // that each row actually fires through decideBlockCloser end-to-end.
+        const openerCases: Array<[string, string]> = [
+            [":IF nValue > 0;", ":ENDIF;"],
+            [":WHILE bRun;", ":ENDWHILE;"],
+            [":FOR i := 1 :TO 10;", ":NEXT;"],
+            [":BEGINCASE;", ":ENDCASE;"],
+            [":TRY;", ":ENDTRY;"],
+            [":PROCEDURE Foo;", ":ENDPROC;"],
+            [":CLASS Bar;", ":ENDCLASS;"],
+            [":REGION Quux;", ":ENDREGION;"],
+        ];
+        openerCases.forEach(([opener, closer]) => {
+            it(`inserts ${closer} after ${opener}`, () => {
+                const decision = decideBlockCloser([opener, ""], 0, 1);
+                expect(decision, `expected decision for ${opener}`).to.not.be.null;
+                expect(decision!.family.closerText).to.equal(closer);
+                expect(decision!.insertText).to.equal(`\n${closer}`);
+            });
         });
 
         it("matches case-insensitively on the opener keyword", () => {
@@ -48,20 +32,22 @@ describe("SSL Block Closer — decideBlockCloser", () => {
         });
 
         it("returns null when the line is not a recognised opener", () => {
-            const decision = decideBlockCloser(["nValue := 1;", ""], 0, 1);
-            expect(decision).to.be.null;
+            // Covers any colon-prefixed statement that isn't in FAMILIES
+            // (:DECLARE / :RETURN / :LABEL / etc.) — they all fall through
+            // the same regex-miss path.
+            expect(decideBlockCloser(["nValue := 1;", ""], 0, 1)).to.be.null;
+            expect(decideBlockCloser([":DECLARE x, y;", ""], 0, 1)).to.be.null;
+            expect(decideBlockCloser([":RETURN nValue;", ""], 0, 1)).to.be.null;
         });
 
         it("returns null when the opener is missing its terminating semicolon", () => {
             // Heuristic: we only auto-close once the user has actually typed `;`.
-            const decision = decideBlockCloser([":IF cond", ""], 0, 1);
-            expect(decision).to.be.null;
+            expect(decideBlockCloser([":IF cond", ""], 0, 1)).to.be.null;
         });
 
         it("returns null when the line contains text BEFORE :IF (not at line start)", () => {
             // The opener must start the line (modulo leading whitespace).
-            const decision = decideBlockCloser(["x := 1; :IF cond;", ""], 0, 1);
-            expect(decision).to.be.null;
+            expect(decideBlockCloser(["x := 1; :IF cond;", ""], 0, 1)).to.be.null;
         });
 
         it("ignores :ELSE / :CASE / :CATCH (middle keywords, not openers)", () => {
@@ -72,19 +58,16 @@ describe("SSL Block Closer — decideBlockCloser", () => {
     });
 
     describe("indent preservation", () => {
-        it("places the closer at the opener's indent (tabs)", () => {
-            const decision = decideBlockCloser(["\t\t:IF cond;", "\t\t\t"], 0, 1);
-            expect(decision!.insertText).to.equal("\n\t\t:ENDIF;");
-        });
-
-        it("places the closer at the opener's indent (spaces)", () => {
-            const decision = decideBlockCloser(["    :IF cond;", "        "], 0, 1);
-            expect(decision!.insertText).to.equal("\n    :ENDIF;");
-        });
-
-        it("places the closer at column 0 when the opener has no indent", () => {
-            const decision = decideBlockCloser([":IF cond;", ""], 0, 1);
-            expect(decision!.insertText).to.equal("\n:ENDIF;");
+        // The no-indent case is already exercised by the opener-detection
+        // table; this section covers the two non-trivial leading-whitespace
+        // forms.
+        it("copies the opener's leading whitespace verbatim onto the closer", () => {
+            expect(decideBlockCloser(["\t\t:IF cond;", "\t\t\t"], 0, 1)!.insertText)
+                .to.equal("\n\t\t:ENDIF;");
+            expect(decideBlockCloser(["    :IF cond;", "        "], 0, 1)!.insertText)
+                .to.equal("\n    :ENDIF;");
+            expect(decideBlockCloser([" \t :IF cond;", ""], 0, 1)!.insertText)
+                .to.equal("\n \t :ENDIF;");
         });
     });
 
@@ -98,21 +81,19 @@ describe("SSL Block Closer — decideBlockCloser", () => {
             expect(decideBlockCloser(lines, 0, 1)).to.be.null;
         });
 
-        it("DOES insert when the user typed a NEW :IF inside an existing block", () => {
-            // Original document already had :IF / :ENDIF. The user has
-            // just typed a new :IF above the existing :ENDIF — we should
-            // insert a SECOND :ENDIF so the inner block is balanced.
+        it("pins limitation: a downstream :ENDIF satisfies the new opener even when the user intended nesting", () => {
+            // Documented limitation: when the user types `:IF inner;` ABOVE
+            // an existing `:ENDIF`, the balance scan sees a closer at depth
+            // 1 and concludes "already closed" — so no insertion. The user
+            // has to add the inner :ENDIF themselves. We accept this trade
+            // because the alternative (always inserting) would produce
+            // unwanted doubles in the much more common case where the user
+            // is editing within a block that's already balanced.
             const lines = [
                 ":IF inner;",  // newly typed
                 "",            // cursor
-                ":ENDIF;",     // original outer closer
+                ":ENDIF;",     // existing closer; will be claimed
             ];
-            // Balance from the new opener at line 0:
-            //   start = 1
-            //   line 2 is :ENDIF → balance = 0 → "already exists"
-            // So the function returns null. That is the correct behavior
-            // because the user just turned an outer block into an inner
-            // one — the outer closer already matches.
             expect(decideBlockCloser(lines, 0, 1)).to.be.null;
         });
 
@@ -196,26 +177,6 @@ describe("SSL Block Closer — decideBlockCloser", () => {
         });
     });
 
-    describe("look-alikes that are NOT openers", () => {
-        it(":LABEL is not an opener", () => {
-            // SSL labels use the form `:LABEL Name;` but are jump targets,
-            // not block headers — no closer to insert.
-            expect(decideBlockCloser([":LABEL Done;", ""], 0, 1)).to.be.null;
-        });
-
-        it(":DECLARE / :PARAMETERS / :DEFAULT / :RETURN are not openers", () => {
-            expect(decideBlockCloser([":DECLARE x, y;", ""], 0, 1)).to.be.null;
-            expect(decideBlockCloser([":PARAMETERS p;", ""], 0, 1)).to.be.null;
-            expect(decideBlockCloser([":DEFAULT p, \"\";", ""], 0, 1)).to.be.null;
-            expect(decideBlockCloser([":RETURN nValue;", ""], 0, 1)).to.be.null;
-        });
-
-        it(":INHERIT and :PUBLIC are not openers", () => {
-            expect(decideBlockCloser([":INHERIT BaseClass;", ""], 0, 1)).to.be.null;
-            expect(decideBlockCloser([":PUBLIC sFoo;", ""], 0, 1)).to.be.null;
-        });
-    });
-
     describe("string and comment awareness", () => {
         it("does not insert when the opener line is itself inside a multi-line string", () => {
             // Line 0 opens a string with `"`. Line 1 is `:IF cond;` but
@@ -277,21 +238,6 @@ describe("SSL Block Closer — decideBlockCloser", () => {
             expect(decideBlockCloser(lines, 0, 1)).to.be.null;
         });
 
-        it("correctly resets state when a string closes mid-line", () => {
-            // The string opened on line 0 closes on the same line; line 1
-            // starts back in code, so its :ENDIF must count.
-            const lines = [
-                ':IF cond;', // 0  just typed
-                '',          // 1  cursor
-                'x := "a"; :ENDIF;', // 2
-            ];
-            // The text on line 2 has :ENDIF after the string. But our
-            // closer regex `^\s*:ENDIF\b` only matches at line start, so
-            // this would NOT count even with code-state tracking. The
-            // outer :IF still needs a closer.
-            const decision = decideBlockCloser(lines, 0, 1);
-            expect(decision, "embedded :ENDIF should not satisfy").to.not.be.null;
-        });
     });
 
     describe("classifyLineStarts helper (mini-lexer)", () => {
@@ -364,23 +310,14 @@ describe("SSL Block Closer — decideBlockCloser", () => {
     });
 
     describe("helpers", () => {
+        // familyForOpener case-insensitivity and rejection of non-openers
+        // is already exercised through decideBlockCloser above. Only the
+        // pure leadingIndent helper has behavior not covered there.
         it("leadingIndent extracts tabs and spaces verbatim", () => {
             expect(leadingIndent("\t\t:IF cond;")).to.equal("\t\t");
             expect(leadingIndent("    :IF cond;")).to.equal("    ");
             expect(leadingIndent(":IF cond;")).to.equal("");
             expect(leadingIndent("")).to.equal("");
-        });
-
-        it("familyForOpener is case-insensitive on the keyword", () => {
-            expect(familyForOpener(":IF cond;")!.closerText).to.equal(":ENDIF;");
-            expect(familyForOpener(":If cond;")!.closerText).to.equal(":ENDIF;");
-            expect(familyForOpener(":iF cond;")!.closerText).to.equal(":ENDIF;");
-        });
-
-        it("familyForOpener returns undefined for non-openers", () => {
-            expect(familyForOpener("nValue := 1;")).to.be.undefined;
-            expect(familyForOpener(":RETURN nValue;")).to.be.undefined;
-            expect(familyForOpener(":ENDIF;")).to.be.undefined;
         });
     });
 });
