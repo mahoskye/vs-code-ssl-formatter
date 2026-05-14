@@ -5,6 +5,25 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.6] - 2026-05-13
+
+### Added
+- **Auto-insert block closers on Enter (#72).** Pressing Enter on a
+  line that opens a block (`:IF cond;`, `:WHILE`, `:FOR`, `:BEGINCASE`,
+  `:TRY`, `:PROCEDURE`, `:CLASS`, `:REGION`) now drops the matching
+  `:END...` keyword on the next line at the opener's indent. The
+  insertion is suppressed when a matching closer already exists later in
+  the file (a balanced scan handles arbitrary nesting), and the whole
+  behavior can be toggled off via `ssl.editor.autoInsertBlockClosers`.
+
+### Notes
+- LSP-side improvements (procedure docblock hover, `DoProc` in-string
+  completion, formatter spacing/wrap fixes, `!=` diagnostic removal,
+  UDObject property tracking across procedures) live in
+  `starlims-lsp` v0.7.6 and will be bundled by a follow-up patch
+  release. Tracked in vs-code-ssl-formatter#73-#78 and
+  starlims-lsp#14-#19.
+
 ## [1.10.5] - 2026-05-08
 
 ### Changed
