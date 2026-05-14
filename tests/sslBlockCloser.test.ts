@@ -1,6 +1,6 @@
 import { describe, it } from "mocha";
 import { expect } from "chai";
-import { decideBlockCloser, familyForOpener, leadingIndent, FAMILIES } from "../src/sslBlockCloser";
+import { decideBlockCloser, familyForOpener, leadingIndent, FAMILIES, classifyLineStarts } from "../src/sslBlockCloser";
 
 describe("SSL Block Closer — decideBlockCloser", () => {
     describe("opener detection", () => {
@@ -213,6 +213,135 @@ describe("SSL Block Closer — decideBlockCloser", () => {
         it(":INHERIT and :PUBLIC are not openers", () => {
             expect(decideBlockCloser([":INHERIT BaseClass;", ""], 0, 1)).to.be.null;
             expect(decideBlockCloser([":PUBLIC sFoo;", ""], 0, 1)).to.be.null;
+        });
+    });
+
+    describe("string and comment awareness", () => {
+        it("does not insert when the opener line is itself inside a multi-line string", () => {
+            // Line 0 opens a string with `"`. Line 1 is `:IF cond;` but
+            // sits inside that string — it's literal text, not a header.
+            const lines = [
+                'x := "',
+                ':IF cond;',
+                '";',
+            ];
+            expect(decideBlockCloser(lines, 1, 2)).to.be.null;
+        });
+
+        it("does not insert when the opener line is inside a block comment", () => {
+            const lines = [
+                "/* commentary that wraps:",
+                ":IF cond;",
+                "across lines ;",
+            ];
+            expect(decideBlockCloser(lines, 1, 2)).to.be.null;
+        });
+
+        it("ignores a :ENDIF; that appears inside a string when balancing", () => {
+            // The visible :ENDIF; on line 2 is inside the string. The
+            // outer :IF still needs a real closer, so the function
+            // should insert one.
+            const lines = [
+                ":IF cond;",      // 0  just typed
+                "",               // 1  cursor
+                'x := "',         // 2  opens string
+                ":ENDIF;",        // 3  text inside the string
+                '";',             // 4  closes string
+                // no real :ENDIF anywhere
+            ];
+            const decision = decideBlockCloser(lines, 0, 1);
+            expect(decision, "string-trapped :ENDIF must not satisfy outer opener").to.not.be.null;
+            expect(decision!.family.closerText).to.equal(":ENDIF;");
+        });
+
+        it("ignores a :ENDIF; that appears inside a block comment when balancing", () => {
+            const lines = [
+                ":IF cond;",
+                "",
+                "/* documenting:",
+                ":ENDIF;",
+                "purposes ;",
+            ];
+            const decision = decideBlockCloser(lines, 0, 1);
+            expect(decision, "comment-trapped :ENDIF must not satisfy outer opener").to.not.be.null;
+        });
+
+        it("recognises a real :ENDIF on a line that contains a trailing comment", () => {
+            // The closer is real; the comment after `;` is decoration.
+            // The line STARTS in code, so it counts.
+            const lines = [
+                ":IF cond;",
+                "",
+                ":ENDIF; /* end of guard ;",
+            ];
+            expect(decideBlockCloser(lines, 0, 1)).to.be.null;
+        });
+
+        it("correctly resets state when a string closes mid-line", () => {
+            // The string opened on line 0 closes on the same line; line 1
+            // starts back in code, so its :ENDIF must count.
+            const lines = [
+                ':IF cond;', // 0  just typed
+                '',          // 1  cursor
+                'x := "a"; :ENDIF;', // 2
+            ];
+            // The text on line 2 has :ENDIF after the string. But our
+            // closer regex `^\s*:ENDIF\b` only matches at line start, so
+            // this would NOT count even with code-state tracking. The
+            // outer :IF still needs a closer.
+            const decision = decideBlockCloser(lines, 0, 1);
+            expect(decision, "embedded :ENDIF should not satisfy").to.not.be.null;
+        });
+    });
+
+    describe("classifyLineStarts helper (mini-lexer)", () => {
+        it("flags every line as code when no multi-line strings/comments are used", () => {
+            const mask = classifyLineStarts([
+                ":PROCEDURE Foo;",
+                ":DECLARE x;",
+                ":ENDPROC;",
+            ]);
+            expect(mask).to.deep.equal([true, true, true]);
+        });
+
+        it("marks lines inside a multi-line double-quoted string as non-code", () => {
+            const mask = classifyLineStarts([
+                'x := "',  // 0 opens string in code
+                "inside",  // 1 inside string
+                'closing";', // 2 closes string mid-line
+                "after;",  // 3 back to code
+            ]);
+            expect(mask).to.deep.equal([true, false, false, true]);
+        });
+
+        it("marks lines inside a block comment as non-code", () => {
+            const mask = classifyLineStarts([
+                "/* multi",
+                "line",
+                "comment ;",
+                "after;",
+            ]);
+            expect(mask).to.deep.equal([true, false, false, true]);
+        });
+
+        it("handles single-quoted strings the same way", () => {
+            const mask = classifyLineStarts([
+                "x := '",
+                "still in string",
+                "';",
+                "after;",
+            ]);
+            expect(mask).to.deep.equal([true, false, false, true]);
+        });
+
+        it("does not start a comment when /* appears inside a string", () => {
+            // `"/* not a comment "` — the /* is literal text in the
+            // string. After the closing quote, state must still be code.
+            const mask = classifyLineStarts([
+                'x := "/* not a comment ";',
+                ":ENDIF;",
+            ]);
+            expect(mask).to.deep.equal([true, true]);
         });
     });
 

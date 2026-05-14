@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   insertion is suppressed when a matching closer already exists later in
   the file (a balanced scan handles arbitrary nesting), and the whole
   behavior can be toggled off via `ssl.editor.autoInsertBlockClosers`.
+  The balance scan is string- and comment-aware: a `:ENDIF;` that sits
+  inside a multi-line `"…"` / `'…'` string or a `/* … ;` block comment is
+  text and does NOT satisfy an open `:IF`. A matching mini-lexer also
+  prevents an opener line that is itself trapped inside such a string or
+  comment from triggering a spurious insertion.
 
 ### Notes
 - LSP-side improvements (procedure docblock hover, `DoProc` in-string
