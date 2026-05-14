@@ -5,6 +5,51 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.6] - 2026-05-13
+
+### Added
+- **Auto-insert block closers on Enter (#72).** Pressing Enter on a
+  line that opens a block (`:IF cond;`, `:WHILE`, `:FOR`, `:BEGINCASE`,
+  `:TRY`, `:PROCEDURE`, `:CLASS`, `:REGION`) now drops the matching
+  `:END...` keyword on the next line at the opener's indent. The
+  insertion is suppressed when a matching closer already exists later in
+  the file (a balanced scan handles arbitrary nesting), and the whole
+  behavior can be toggled off via `ssl.editor.autoInsertBlockClosers`.
+  The balance scan is string- and comment-aware: a `:ENDIF;` that sits
+  inside a multi-line `"…"` / `'…'` string or a `/* … ;` block comment is
+  text and does NOT satisfy an open `:IF`. A matching mini-lexer also
+  prevents an opener line that is itself trapped inside such a string or
+  comment from triggering a spurious insertion.
+
+### Changed
+- **Bundled `starlims-lsp` v0.7.6.** New LSP behavior visible in the editor:
+  - **#73 (LSP #19) — UDObject property tracking across procedures.** When
+    `oVar := CreateUDObject(...)` is later passed via `DoProc("Bar", {oVar})`,
+    Bar's first parameter inherits oVar's property shape so completions
+    inside Bar see the same properties the caller built up. Property
+    assignments (`oVar:newProp := …`) also augment the shape live; the
+    augmentation propagates onward through subsequent calls.
+  - **#74 (LSP #18) — In-script procedure completion inside DoProc /
+    ExecFunction string arguments.** Typing inside `DoProc("…")` or
+    `ExecFunction("…")` offers the procedures defined in the current
+    script (bare-name insert; the editor handles prefix filtering).
+  - **#75 (LSP #17) — Procedure docblock surfaces in hover + completion.**
+    The leading `/* Description: … Parameters: name - desc Returns: … ;`
+    block above a `:PROCEDURE` is parsed and woven into hover and
+    completion documentation panels.
+  - **#76 (LSP #16) — Wrap no longer splits `oVar:property`.** The
+    formatter treats the member-access `:` as atomic; long lines wrap at
+    valid commas or operators instead.
+  - **#77 (LSP #15) — Blank line between sibling control-flow blocks.**
+    Adjacent `:IF / :ENDIF` blocks (and `:WHILE`, `:FOR`, `:BEGINCASE`,
+    `:TRY`) at the same indent are now separated by a blank line for
+    readability. Gated server-side by `BlankLineBetweenBlocks` (default
+    on); the extension's existing format settings forward to it.
+  - **#78 (LSP #14) — `equals_vs_strict_equals` no longer fires on `!=`.**
+    `:IF oCurrent:status != "Done";` is a valid, non-misleading SSL
+    pattern; the diagnostic was removed. The companion `=` prefix-matching
+    warning still fires.
+
 ## [1.10.5] - 2026-05-08
 
 ### Changed

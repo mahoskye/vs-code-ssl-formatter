@@ -25,6 +25,7 @@ import { registerFormatSqlCommand } from "./commands/formatSql";
 import { startClient, stopClient, restartClient, isClientRunning } from "./lspClient";
 import { loadInventory, getInventorySourceVersion } from "./utils/inventory";
 import { registerStatusBar, refreshStatusBar } from "./sslStatusBar";
+import { registerBlockCloser } from "./sslBlockCloser";
 
 // Track if LSP is active for this session
 let lspActive = false;
@@ -307,6 +308,11 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.languages.registerCallHierarchyProvider(documentSelector, new SSLCallHierarchyProvider())
     );
+
+    // Auto-insert matching :END... for :IF/:WHILE/:FOR/:BEGINCASE/:TRY/:PROCEDURE/:CLASS/:REGION
+    // when the user hits Enter on the opener line. Works alongside the LSP — it operates on
+    // text events only, not language services.
+    registerBlockCloser(context);
 
     Logger.info("SSL extension fully activated with all language features including workspace search, call hierarchy, and inlay hints");
 }
