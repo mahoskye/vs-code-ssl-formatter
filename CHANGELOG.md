@@ -21,13 +21,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prevents an opener line that is itself trapped inside such a string or
   comment from triggering a spurious insertion.
 
-### Notes
-- LSP-side improvements (procedure docblock hover, `DoProc` in-string
-  completion, formatter spacing/wrap fixes, `!=` diagnostic removal,
-  UDObject property tracking across procedures) live in
-  `starlims-lsp` v0.7.6 and will be bundled by a follow-up patch
-  release. Tracked in vs-code-ssl-formatter#73-#78 and
-  starlims-lsp#14-#19.
+### Changed
+- **Bundled `starlims-lsp` v0.7.6.** New LSP behavior visible in the editor:
+  - **#73 (LSP #19) — UDObject property tracking across procedures.** When
+    `oVar := CreateUDObject(...)` is later passed via `DoProc("Bar", {oVar})`,
+    Bar's first parameter inherits oVar's property shape so completions
+    inside Bar see the same properties the caller built up. Property
+    assignments (`oVar:newProp := …`) also augment the shape live; the
+    augmentation propagates onward through subsequent calls.
+  - **#74 (LSP #18) — In-script procedure completion inside DoProc /
+    ExecFunction string arguments.** Typing inside `DoProc("…")` or
+    `ExecFunction("…")` offers the procedures defined in the current
+    script (bare-name insert; the editor handles prefix filtering).
+  - **#75 (LSP #17) — Procedure docblock surfaces in hover + completion.**
+    The leading `/* Description: … Parameters: name - desc Returns: … ;`
+    block above a `:PROCEDURE` is parsed and woven into hover and
+    completion documentation panels.
+  - **#76 (LSP #16) — Wrap no longer splits `oVar:property`.** The
+    formatter treats the member-access `:` as atomic; long lines wrap at
+    valid commas or operators instead.
+  - **#77 (LSP #15) — Blank line between sibling control-flow blocks.**
+    Adjacent `:IF / :ENDIF` blocks (and `:WHILE`, `:FOR`, `:BEGINCASE`,
+    `:TRY`) at the same indent are now separated by a blank line for
+    readability. Gated server-side by `BlankLineBetweenBlocks` (default
+    on); the extension's existing format settings forward to it.
+  - **#78 (LSP #14) — `equals_vs_strict_equals` no longer fires on `!=`.**
+    `:IF oCurrent:status != "Done";` is a valid, non-misleading SSL
+    pattern; the diagnostic was removed. The companion `=` prefix-matching
+    warning still fires.
 
 ## [1.10.5] - 2026-05-08
 
