@@ -5,6 +5,27 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-07-03
+
+### Changed
+- **Bundled `starlims-lsp` v0.9.0** — cross-file navigation:
+  - **Go-to-definition across files.** Dotted `DoProc`/`ExecFunction`
+    targets and `:INCLUDE` paths jump to the defining script:
+    `ExecFunction("Cat.Script")` lands on the entry-point `:PARAMETERS`,
+    `"Cat.Script.Proc"` on the procedure. Works with the canonical
+    STARLIMS export layout (`Server Scripts/CATEGORY/…`,
+    `Applications/APP/MODULE/Server Scripts/…`) and degrades gracefully
+    to flat checkouts (basename matching, workspace-unique procedure
+    fallback). Ambiguous targets open the peek list.
+  - **Cross-file hover.** Hovering a dispatch-target string shows the
+    target procedure's signature and docblock ("defined in
+    `Cat.Script`"); hovering an `:INCLUDE` shows the resolved script's
+    summary.
+  - **Smarter completion inside dispatch strings.** Category names
+    before any dot, a category's scripts after `Category.`, and a
+    script's procedures after `Category.Script.` — private
+    (`/*@private;`/`/*@protected;`) procedures excluded.
+
 ## [1.11.0] - 2026-07-02
 
 ### Added
