@@ -5,6 +5,27 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.13.0] - 2026-07-03
+
+### Changed
+- **Bundled `starlims-lsp` v0.11.0** (includes v0.10.0):
+  - **RunDS navigation.** Go-to-definition and hover inside
+    `RunDS("Category.DataSource")` strings resolve to the data-source
+    file, landing on its `:PARAMETERS` line; bare `RunDS("Name")`
+    resolves by basename. Dispatch/`:INCLUDE` resolution no longer
+    returns data-source files.
+  - **`:INCLUDE`-aware diagnostics.** Variables declared by included
+    scripts (`:DECLARE`/`:PUBLIC`/`:PARAMETERS`) count as declared in
+    the including file for the undeclared-variable and SQL-parameter
+    checks — transitively, following the full-splice semantics of
+    `:INCLUDE`.
+  - **UDObject member hover and go-to-definition.** Hovering `Prop` in
+    `oObj:Prop` (where `oObj` has a CreateUDObject-inferred shape) shows
+    the property's inferred type and definition line; go-to-definition
+    jumps to the initializer key or the first `oObj:Prop := …`
+    assignment. Unknown members on shaped receivers return null rather
+    than matching unrelated symbols.
+
 ## [1.12.0] - 2026-07-03
 
 ### Changed
