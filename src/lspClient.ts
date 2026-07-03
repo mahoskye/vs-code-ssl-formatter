@@ -90,6 +90,7 @@ function getSSLConfiguration(): object {
     const hungarianPrefixes = config.get<string[]>('naming.hungarianNotation.prefixes', ['s', 'n', 'b', 'd', 'a', 'o', 'fn', 'v']);
     const rules = config.get<Record<string, string>>('diagnostics.rules', {});
     const endpointPatterns = config.get<string[]>('diagnostics.endpointPatterns', []);
+    const unusedVariables = config.get<boolean>('diagnostics.unusedVariables', false);
 
     return {
         ssl: {
@@ -115,7 +116,8 @@ function getSSLConfiguration(): object {
                 globals: config.get<string[]>('globals', []),
                 maxBlockDepth: config.get<number>('styleGuide.limitBlockDepth', 4),
                 rules,
-                endpointPatterns
+                endpointPatterns,
+                unusedVariables
             },
             inlayHints: {
                 enabled: config.get<boolean>('intellisense.inlayHints.enabled', true),
@@ -206,7 +208,8 @@ export async function startClient(context: vscode.ExtensionContext): Promise<Lan
                 e.affectsConfiguration('ssl.intellisense.signatureHelp') ||
                 e.affectsConfiguration('ssl.styleGuide') ||
                 e.affectsConfiguration('ssl.diagnostics.rules') ||
-                e.affectsConfiguration('ssl.diagnostics.endpointPatterns')
+                e.affectsConfiguration('ssl.diagnostics.endpointPatterns') ||
+                e.affectsConfiguration('ssl.diagnostics.unusedVariables')
             ) {
                 sendConfigurationUpdate();
             }
