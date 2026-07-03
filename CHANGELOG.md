@@ -5,6 +5,47 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-07-02
+
+### Added
+- **`ssl.diagnostics.unusedVariables` setting.** Opt-in for the LSP's
+  unused_variable check (hint severity): reports declared variables
+  that are never used. Off by default — usage counting is name-based
+  and deliberately conservative. Forwarded via initializationOptions
+  and hot-reloaded on change.
+
+### Changed
+- **Bundled `starlims-lsp` v0.8.0** — the behavior-catalog release.
+  Every diagnostic, feature contract, and formatter decision now has a
+  normative, executable spec in the LSP repo. Visible changes:
+  - **Quieter diagnostics.** `region_legacy` removed (`:REGION` /
+    `:ENDREGION` are current, supported SSL); false positives fixed for
+    `class_instantiation_curly` (`oSvc:Email(...)`) and
+    `me_outside_class` (`oObj:Me`).
+  - **New `region_end_mismatch` diagnostic** (warning): an
+    `/* endregion;` with no open `/* region;` to close. Region folding
+    also improved: unclosed `:PROCEDURE` folds to end of file,
+    single-line blocks produce no range.
+  - **Constructor signature help** (`Email{`) now actually works over
+    LSP, and DoProc/ExecFunction argument arrays get parameter-name
+    inlay hints when the target procedure is a same-file string
+    literal.
+  - **References/rename respect code context**: no more matches inside
+    comments or unrelated strings (DoProc dispatch strings are still
+    updated on rename — that is intended); `includeDeclaration: false`
+    honored from use sites.
+  - **Seven formatter fixes**, including `trimTrailingWhitespace:
+    false` and `maxConsecutiveBlankLines: 0` now actually working, and
+    doc comments staying attached to their procedures.
+  - New orphaned-prose comment-termination signal; `include_early` vs
+    `include_in_procedure` are now separately configurable in
+    `ssl.diagnostics.rules`.
+- **Diagnostic slug list regenerated** (96 slugs): gains
+  `region_end_mismatch`; drops removed `region_legacy`,
+  `identifier_too_short`, `return_from_constructor`,
+  `inherit_qualified_name` (existing `ssl.diagnostics.rules` overrides
+  for dropped slugs become harmless no-ops).
+
 ## [1.10.7] - 2026-05-13
 
 ### Added

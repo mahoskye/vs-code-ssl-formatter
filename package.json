@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.10.7",
+    "version": "1.11.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -299,10 +299,8 @@
                             "global_assignment",
                             "hungarian_notation",
                             "identifier_too_long",
-                            "identifier_too_short",
                             "include_early",
                             "include_in_procedure",
-                            "inherit_qualified_name",
                             "inline_code_naming",
                             "invalid_operator_sequence",
                             "invalid_sql_param",
@@ -331,8 +329,7 @@
                             "prefer_exitcase",
                             "procedure_declaration_syntax",
                             "redeclare_is_noop",
-                            "region_legacy",
-                            "return_from_constructor",
+                            "region_end_mismatch",
                             "return_in_finally",
                             "scientific_notation",
                             "single_catch",
@@ -364,6 +361,11 @@
                         "type": "string"
                     },
                     "markdownDescription": "Case-insensitive path substrings that mark a script as an SSL endpoint. Endpoint scripts get `Request` and `Response` as pre-injected ambients (no `undeclared_variable`, hover and completion both surface them). A leading `/* … Endpoint: …;` docblock in the first ~30 lines also activates endpoint mode without configuration."
+                },
+                "ssl.diagnostics.unusedVariables": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Report declared variables that are never used (hint severity, code unused_variable). Off by default: usage counting is name-based and deliberately conservative."
                 },
                 "ssl.styleGuide.limitBlockDepth": {
                     "type": "number",
