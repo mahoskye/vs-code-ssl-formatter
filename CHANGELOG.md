@@ -5,6 +5,22 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-07-22
+
+### Changed
+- **Bundled `starlims-lsp` v0.12.0**:
+  - **Same-file `DoProc` hover.** Hovering the procedure-name string in
+    `DoProc("Proc", {...})` — or a bare 1-part `ExecFunction` target —
+    shows the local procedure's docblock hover (description, parameters,
+    returns, declaration location), matched case-insensitively. Mirrors
+    the existing go-to-definition behavior for same-file targets.
+  - **No SSL diagnostics on plain-SQL data sources.** A `.ds`/`.ds.txt`
+    file whose content is a plain SQL statement now produces zero
+    diagnostics — SQL's `table.column` qualified names no longer trigger
+    false "SSL uses colon ':' for property access" errors, and bare
+    `AND`/`OR` and missing-semicolon noise is gone. Data sources written
+    in SSL keep their full diagnostic set.
+
 ## [1.13.0] - 2026-07-03
 
 ### Changed
