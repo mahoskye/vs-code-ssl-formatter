@@ -5,6 +5,20 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1] - 2026-07-25
+
+### Changed
+- **Bundled `starlims-lsp` v0.14.1**:
+  - **Element data refresh.** The vendored element reference and
+    metadata pick up the latest reference-content fixes: nine expanded
+    summaries and five newly parseable return descriptions now show in
+    hover and member completion.
+
+### Added
+- **Third-party notices.** The extension now ships the LSP's
+  `THIRD-PARTY-NOTICES.md` alongside the bundled server binaries,
+  covering the licenses of the Go modules statically linked into them.
+
 ## [1.15.0] - 2026-07-25
 
 ### Changed
