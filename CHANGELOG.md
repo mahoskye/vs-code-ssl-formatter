@@ -5,6 +5,42 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-07-25
+
+### Changed
+- **Bundled `starlims-lsp` v0.14.0** (includes v0.13.0):
+  - **Cross-file references and rename.** Find-references on a procedure
+    returns its dotted `DoProc`/`ExecFunction` call sites across the
+    whole workspace; renaming a procedure produces a workspace-wide edit
+    covering the declaration, identifier uses, and the procedure segment
+    of every dispatch string that unambiguously resolves to it.
+    Prepare-rename now works on the last segment of a dotted dispatch
+    string. Conservative by design: ambiguous call sites are skipped and
+    class-file procedures refuse cross-file rename (their
+    `obj:Method()` callers are invisible to the LSP).
+  - **Returns-object member surface.** Hover and completion for the 12
+    returns-category objects (`HttpClient`, `HttpResponse`,
+    `SoapClient`, …); in endpoint scripts, `Request:` / `Response:`
+    complete from their real member sets. Variables assigned from
+    producer chains (`oClient := WebServices{}:CreateHttpClient()`,
+    follow-on hops, class-returning builtins) get typed member
+    completion and hover.
+  - **77 repaired method-name completions.** 42 class methods previously
+    completed with empty labels and 35 inserted their full signature
+    text (e.g. `IsRunning(vBatchId)`) — all now insert the bare name.
+  - **OVER() window-spec layout.** Long window specs format per
+    sql-canonical-compact-reference §3.1 — `OVER (` spaced, clauses
+    indented from the window function's column, `) AS alias` aligned
+    beneath it; short specs stay inline.
+  - **Formatter hardening (v0.13.0).** All findings from the adversarial
+    conformance review closed: corruption-class fixes (bracket-string
+    reflow, English prose misdetected as SQL, glued dot-operator number
+    consumption, SQL-mode data source mangling), format-on-save
+    idempotence guarantees, canonical SQL layout conformance
+    (INSERT/VALUES block style, DECODE alignment, MERGE, CTEs, INSERT
+    ALL, WITHIN GROUP), and a rebuilt line-wrap engine with a
+    conformance guarantee.
+
 ## [1.14.0] - 2026-07-22
 
 ### Changed
