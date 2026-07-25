@@ -2,7 +2,7 @@
 
 This guide complements `README.md` with deeper usage, configuration, and troubleshooting details for the STARLIMS Language Server Protocol (LSP) implementation.
 
-> **Bundled version:** `starlims-lsp` v0.7.6 (built 2026-05-13). Run `./starlims-lsp-<platform>-<arch> --version` to confirm. Source: https://github.com/mahoskye/starlims-lsp.
+> **Bundled version:** `starlims-lsp` v0.14.0 (built 2026-07-25). Run `./starlims-lsp-<platform>-<arch> --version` to confirm. Source: https://github.com/mahoskye/starlims-lsp.
 
 ## Who this is for
 
@@ -38,7 +38,10 @@ The server communicates over stdin/stdout using LSP. `--stdio` is the default.
 
 ### Workspace scope notes
 
-Workspace symbols are limited to open documents. The server does not index the entire workspace yet.
+A background workspace index powers cross-file navigation: workspace
+symbols, go-to-definition/hover/completion for dotted
+`DoProc`/`ExecFunction` targets, `RunDS` data sources, and `:INCLUDE`
+paths, plus cross-file references and rename for procedures.
 
 ## Editor integration
 
