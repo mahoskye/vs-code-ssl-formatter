@@ -30,6 +30,10 @@ if (spawnSync(codeBin, ["--version"], { stdio: "ignore" }).status !== 0) {
         await import("@vscode/test-electron");
     const exe = await downloadAndUnzipVSCode("stable");
     [codeBin, ...codeBaseArgs] = resolveCliArgsFromVSCodeExecutablePath(exe);
+    // We pass our own isolated dirs; drop the defaults the resolver adds.
+    codeBaseArgs = codeBaseArgs.filter(
+        (a) => !a.startsWith("--user-data-dir") && !a.startsWith("--extensions-dir")
+    );
 }
 
 function run(cmd, args, opts = {}) {
@@ -84,30 +88,43 @@ try {
         sslFile,
     ], { stdio: "ignore", detached: true });
     child.unref();
-    // Give the window time to boot, load the SSL file, and run extension activation.
-    await sleep(20_000);
+
+    // Wait for the extension host log to appear (cold starts on CI runners
+    // are far slower than local), then give activation a moment to finish.
+    const logsRoot = join(userData, "logs");
+    const findExthostLogs = () => {
+        if (!existsSync(logsRoot)) { return []; }
+        const logs = [];
+        for (const session of readdirSync(logsRoot)) {
+            const sessionDir = join(logsRoot, session);
+            if (!statSync(sessionDir).isDirectory()) { continue; }
+            for (const win of readdirSync(sessionDir)) {
+                const candidate = join(sessionDir, win, "exthost", "exthost.log");
+                if (existsSync(candidate)) { logs.push(candidate); }
+            }
+        }
+        return logs;
+    };
+    const deadline = Date.now() + 120_000;
+    let exthostLogs = [];
+    while (exthostLogs.length === 0 && Date.now() < deadline) {
+        await sleep(2_000);
+        exthostLogs = findExthostLogs();
+    }
+    if (exthostLogs.length > 0) {
+        await sleep(10_000); // let activation run and flush to the log
+    }
     // VS Code spawns many descendant processes that escape the initial group;
     // match by the unique user-data-dir path to clean them all up reliably.
     spawnSync("pkill", ["-TERM", "-f", userData], { stdio: "ignore" });
     await sleep(1_500);
     spawnSync("pkill", ["-KILL", "-f", userData], { stdio: "ignore" });
 
-    const logsRoot = join(userData, "logs");
-    if (!existsSync(logsRoot)) {
-        throw new Error(`no logs directory at ${logsRoot}`);
+    exthostLogs = findExthostLogs();
+    if (exthostLogs.length === 0) {
+        throw new Error(`no extension host log appeared under ${logsRoot}`);
     }
-    const sessions = readdirSync(logsRoot)
-        .map((n) => ({ n, p: join(logsRoot, n) }))
-        .filter((e) => statSync(e.p).isDirectory())
-        .sort((a, b) => b.n.localeCompare(a.n));
-    if (sessions.length === 0) {
-        throw new Error("no log sessions recorded");
-    }
-    const exthostLog = join(sessions[0].p, "window1", "exthost", "exthost.log");
-    if (!existsSync(exthostLog)) {
-        throw new Error(`extension host log missing at ${exthostLog}`);
-    }
-    const log = readFileSync(exthostLog, "utf8");
+    const log = exthostLogs.map((p) => readFileSync(p, "utf8")).join("\n");
 
     const fatalPatterns = [
         /Cannot find module/i,
@@ -122,8 +139,11 @@ try {
         failed = true;
         console.error("[smoke] FAIL — extension host log contains:");
         for (const h of hits.slice(0, 10)) console.error("  ", h);
+    } else if (!/mahoskye\.vs-code-ssl-formatter/i.test(log)) {
+        failed = true;
+        console.error("[smoke] FAIL — extension host log never mentions the extension; activation did not happen");
     } else {
-        console.log("[smoke] OK — no activation errors in extension host log");
+        console.log("[smoke] OK — extension activated with no errors in extension host log");
     }
 } finally {
     rmSync(profile, { recursive: true, force: true });
