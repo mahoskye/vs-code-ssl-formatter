@@ -13,7 +13,7 @@
 
 import { spawn, spawnSync } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync, statSync } from "node:fs";
+import { mkdtempSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -79,14 +79,23 @@ try {
     ]);
 
     console.log("[smoke] launching VS Code to trigger activation…");
+    const launchErrLog = join(profile, "launch-stderr.log");
     const child = spawn(codeBin, [
         ...codeBaseArgs,
         "--user-data-dir", userData,
         "--extensions-dir", extDir,
         "--disable-workspace-trust",
+        // CI runners restrict unprivileged user namespaces, which breaks
+        // Electron's sandbox; these flags are no-ops for the check itself.
+        "--no-sandbox",
+        "--disable-gpu",
+        "--disable-telemetry",
+        "--disable-updates",
+        "--skip-welcome",
+        "--skip-release-notes",
         "--wait",
         sslFile,
-    ], { stdio: "ignore", detached: true });
+    ], { stdio: ["ignore", "ignore", openSync(launchErrLog, "w")], detached: true });
     child.unref();
 
     // Wait for the extension host log to appear (cold starts on CI runners
@@ -122,6 +131,13 @@ try {
 
     exthostLogs = findExthostLogs();
     if (exthostLogs.length === 0) {
+        if (existsSync(launchErrLog)) {
+            const err = readFileSync(launchErrLog, "utf8").trim();
+            if (err) {
+                console.error("[smoke] VS Code launch stderr:");
+                console.error(err.split("\n").slice(-40).join("\n"));
+            }
+        }
         throw new Error(`no extension host log appeared under ${logsRoot}`);
     }
     const log = exthostLogs.map((p) => readFileSync(p, "utf8")).join("\n");
