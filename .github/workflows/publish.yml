@@ -50,7 +50,7 @@ jobs:
     - name: Smoke-test the linux-x64 package
       uses: coactions/setup-xvfb@b6b4fcfb9f5a895edadc3bc76318fae0ac17c8b3 # v1
       with:
-        run: node scripts/smoke-vsix.mjs dist-vsix/vs-code-ssl-formatter-$(node -p "require('./package.json').version")-linux-x64.vsix
+        run: node scripts/smoke-vsix.mjs linux-x64
 
     - name: Publish tested packages to VS Code Marketplace
       if: github.event_name == 'release'

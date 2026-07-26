@@ -5,9 +5,11 @@
 // packaging regressions (missing runtime deps, broken main entry, etc.) that
 // the Run Extension debug launcher misses because it loads from source.
 //
-// Usage: node scripts/smoke-vsix.mjs [path/to/file.vsix]
-// With a path, that exact artifact is tested (as CI/publish do); with no
-// arguments, the script packages first and tests the result.
+// Usage: node scripts/smoke-vsix.mjs [path/to/file.vsix | target]
+// With a vsix path, that exact artifact is tested; with a target name like
+// `linux-x64`, tests dist-vsix/<name>-<version>-<target>.vsix (the CI form —
+// no shell interpolation needed); with no arguments, packages first and
+// tests the result.
 
 import { spawn, spawnSync } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -38,6 +40,9 @@ function run(cmd, args, opts = {}) {
 }
 
 let vsixPath = process.argv[2];
+if (vsixPath && !vsixPath.endsWith(".vsix")) {
+    vsixPath = join(repoRoot, "dist-vsix", `${pkg.name}-${pkg.version}-${vsixPath}.vsix`);
+}
 if (vsixPath) {
     if (!existsSync(vsixPath)) {
         throw new Error(`vsix not found: ${vsixPath}`);
