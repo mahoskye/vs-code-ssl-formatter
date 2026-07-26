@@ -9,10 +9,15 @@ on:
         description: 'Version to publish (leave empty to use package.json version)'
         required: false
 
+permissions:
+  contents: read
+
 jobs:
   publish:
     name: Publish to VS Code Marketplace
     runs-on: ubuntu-latest
+    # Pre-releases are for testing; only a full release may publish.
+    if: github.event_name == 'workflow_dispatch' || github.event.release.prerelease == false
 
     steps:
     - name: Checkout code
@@ -27,25 +32,31 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
+    - name: Verify tag matches package.json version
+      if: github.event_name == 'release'
+      run: |
+        TAG="${{ github.event.release.tag_name }}"
+        PKG_VERSION="$(node -p "require('./package.json').version")"
+        if [ "$TAG" != "v$PKG_VERSION" ]; then
+          echo "::error::Release tag $TAG does not match package.json version v$PKG_VERSION — refusing to publish."
+          exit 1
+        fi
+
     - name: Run tests
       run: |
         npm run lint
         npm run compile
         npm run test:unit
 
-    - name: Install vsce
-      run: npm install -g @vscode/vsce
-
     - name: Publish to VS Code Marketplace
       if: github.event_name == 'release'
       env:
         VSCE_PAT: ${{ secrets.VSCE_PAT }}
-      run: |
-        vsce publish -p $VSCE_PAT
+      run: npx vsce publish
 
     - name: Package extension (manual dispatch)
       if: github.event_name == 'workflow_dispatch'
-      run: vsce package
+      run: npx vsce package
 
     - name: Upload VSIX (manual dispatch)
       if: github.event_name == 'workflow_dispatch'
