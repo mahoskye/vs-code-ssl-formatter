@@ -48,9 +48,9 @@ jobs:
       run: node scripts/package-platforms.mjs
 
     - name: Smoke-test the linux-x64 package
-      uses: coactions/setup-xvfb@b6b4fcfb9f5a895edadc3bc76318fae0ac17c8b3 # v1
-      with:
-        run: node scripts/smoke-vsix.mjs linux-x64
+      run: |
+        sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+        xvfb-run --auto-servernum node scripts/smoke-vsix.mjs linux-x64
 
     - name: Publish tested packages to VS Code Marketplace
       if: github.event_name == 'release'
