@@ -12,11 +12,13 @@ This directory contains automated CI/CD workflows for the SSL VS Code Extension.
 
 **What it does:**
 - Tests on multiple platforms: Ubuntu, Windows, macOS
-- Tests on Node.js versions: 18, 20
+- Tests on Node.js versions: 20, 22
 - Runs linting, compilation, and unit tests
 - Checks for console.log in production code
 - Checks for TODO/FIXME comments
-- Packages the extension and uploads as artifact
+- Packages every platform target (`scripts/package-platforms.mjs`),
+  smoke-tests the linux-x64 vsix in a clean VS Code profile, and
+  uploads all packages as artifacts
 
 **Status Badge:**
 ```markdown
@@ -30,9 +32,14 @@ This directory contains automated CI/CD workflows for the SSL VS Code Extension.
 - Manual: Via workflow dispatch in GitHub Actions UI
 
 **What it does:**
-- Runs full test suite before publishing
-- Publishes to VS Code Marketplace (on release)
-- Creates VSIX package (on manual dispatch)
+- Refuses to run for pre-releases, and refuses to publish if the
+  release tag does not match the `package.json` version
+- Runs lint, compile, and unit tests before publishing
+- Packages every platform target plus the universal fallback,
+  smoke-tests the linux-x64 vsix, then publishes those exact files
+  to the VS Code Marketplace (on release)
+- Creates the VSIX packages and uploads them as artifacts (on manual
+  dispatch)
 
 **Setup Required:**
 1. Create a Personal Access Token (PAT) for VS Code Marketplace:
@@ -95,11 +102,8 @@ grep -r "TODO\|FIXME" src/ --include="*.ts"
 To create a VSIX package locally:
 
 ```bash
-# Install vsce globally
-npm install -g @vscode/vsce
-
-# Package the extension
-vsce package
+# Package the extension (uses the repo's pinned @vscode/vsce)
+npm run package
 
 # This creates a .vsix file you can install manually in VS Code
 ```

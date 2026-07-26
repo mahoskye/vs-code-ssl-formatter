@@ -46,6 +46,12 @@ function getServerBinaryName(): string {
             throw new Error(`Unsupported architecture: ${arch}`);
     }
 
+    // No windows-arm64 binary is shipped; Windows on ARM runs the
+    // amd64 build through x64 emulation.
+    if (platform === 'win32') {
+        archStr = 'amd64';
+    }
+
     const ext = platform === 'win32' ? '.exe' : '';
     return `starlims-lsp-${platformStr}-${archStr}${ext}`;
 }
@@ -102,6 +108,9 @@ function getSSLConfiguration(): object {
                 commaSpacing: config.get<boolean>('format.commaSpacing', true),
                 semicolonEnforcement: config.get<boolean>('format.semicolonEnforcement', true),
                 blankLinesBetweenProcs: config.get<number>('format.blankLinesBetweenProcs', 1),
+                trimTrailingWhitespace: config.get<boolean>('format.trimTrailingWhitespace', true),
+                builtinFunctionCase: config.get<string>('format.builtinFunctionCase', 'PascalCase'),
+                maxConsecutiveBlankLines: config.get<number>('format.maxConsecutiveBlankLines', 0),
                 sql: {
                     enabled: config.get<boolean>('format.sql.enabled', true),
                     style: config.get<string>('format.sql.style', 'canonicalCompact'),

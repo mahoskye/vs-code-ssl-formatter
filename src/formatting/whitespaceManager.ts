@@ -31,7 +31,10 @@ export class WhitespaceManager {
         // Calculate existing blank lines (preservation of intent)
         // startLine is 1-based, so if prev ends on 10 and curr starts on 12, there is 1 blank line (line 11).
         const existingBlankLines = Math.max(0, curr.startLine - prev.endLine - 1);
-        const preservedLines = Math.min(existingBlankLines, this.maxConsecutiveBlankLines);
+        // 0 disables the cap (mirrors the LSP formatter's semantics).
+        const preservedLines = this.maxConsecutiveBlankLines > 0
+            ? Math.min(existingBlankLines, this.maxConsecutiveBlankLines)
+            : existingBlankLines;
 
         // Inline Comments - append to same line
         if (curr.type === NodeType.Comment && prev.endLine === curr.startLine) {

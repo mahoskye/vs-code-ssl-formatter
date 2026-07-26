@@ -31,7 +31,7 @@ export class SSLFormatter {
             indentSpaces: options['ssl.format.sql.indentSpaces'] as number,
             style: options['ssl.format.sql.style'] as string
         });
-        const maxConsecutiveBlankLines = (options['ssl.format.maxConsecutiveBlankLines'] as number) || 2;
+        const maxConsecutiveBlankLines = (options['ssl.format.maxConsecutiveBlankLines'] as number | undefined) ?? 2;
         this.whitespaceManager = new WhitespaceManager(maxConsecutiveBlankLines);
         this.statementPrinter = new StatementPrinter(options, this.sqlFormatter);
     }

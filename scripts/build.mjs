@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { build } from 'esbuild';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 
 const watch = process.argv.includes('--watch');
 const production = process.argv.includes('--production');
@@ -26,12 +26,20 @@ function writeDistManifest() {
     writeFileSync('dist/package.json', JSON.stringify({ type: 'commonjs' }, null, 2) + '\n');
 }
 
+// Stale files in dist/ (e.g. a dev-build sourcemap left before a
+// production package) would otherwise be shipped in the vsix, since
+// .vscodeignore includes dist/ wholesale.
+function cleanDist() {
+    rmSync('dist', { recursive: true, force: true });
+}
+
 if (watch) {
     const ctx = await (await import('esbuild')).context(config);
     await ctx.watch();
     writeDistManifest();
     console.log('esbuild: watching for changes…');
 } else {
+    cleanDist();
     await build(config);
     writeDistManifest();
 }

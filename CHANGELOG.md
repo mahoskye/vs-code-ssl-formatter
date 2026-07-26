@@ -5,6 +5,67 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.1] - 2026-07-25
+
+### Changed
+- **Bundled `starlims-lsp` v0.14.1**:
+  - **Element data refresh.** The vendored element reference and
+    metadata pick up the latest reference-content fixes: nine expanded
+    summaries and five newly parseable return descriptions now show in
+    hover and member completion.
+
+### Added
+- **Third-party notices.** The extension now ships the LSP's
+  `THIRD-PARTY-NOTICES.md` alongside the bundled server binaries,
+  covering the licenses of the Go modules statically linked into them.
+- **`ssl.security.requireParameterizedQueries` declared.** The setting
+  was already honored by the native diagnostics provider but missing
+  from the Settings UI.
+
+### Fixed
+- **Windows on ARM.** The client asked for a `windows-arm64` server
+  binary that is never shipped; it now uses the amd64 binary, which
+  Windows on ARM runs through x64 emulation.
+- **`ssl.format.trimTrailingWhitespace` and
+  `ssl.format.builtinFunctionCase` now reach the language server.**
+  Both were visible in Settings but silently ignored; they are now
+  forwarded to the LSP formatter (defaults unchanged).
+- **Stale build artifacts no longer ship.** The bundler cleans `dist/`
+  before building, so a leftover dev-build sourcemap can no longer be
+  packaged into the vsix.
+- **README corrections.** Fixed the documented defaults for
+  `ssl.format.sql.style` (`canonicalCompact`), Hungarian prefixes
+  (`fn`, `v` included), and inlay hints (enabled by default); removed a
+  reference to a nonexistent `sql-formats.md`; refreshed the diagnostic
+  slug count.
+- **`ssl.intellisense.signatureHelp.enabled` now works.** The native
+  signature-help provider previously ignored it.
+- **`ssl.format.maxConsecutiveBlankLines` now reaches the language
+  server.** Default changed from 2 to 0 (0 = no cap), matching the LSP
+  formatter's existing behavior, so default formatting output is
+  unchanged; set 1–5 to opt into collapsing blank-line runs.
+
+### Removed
+- **`ssl.format.sql.concatOperator`.** The setting was declared but no
+  formatter (native or LSP) ever implemented it. It remains on the
+  roadmap and will return with an implementation.
+
+### Infrastructure
+- **Platform-specific packages.** The Marketplace now receives one vsix
+  per platform (win32 x64/arm64, linux x64/arm64, darwin x64/arm64),
+  each bundling only its own server binary (~5 MB instead of ~23 MB),
+  plus a universal fallback for other targets.
+- **Verified LSP binary fetches.** `scripts/fetch-lsp-release.mjs`
+  downloads server binaries and verifies each file's SHA-256 against
+  the digest GitHub records for the release asset.
+- **The published artifact is the tested artifact.** CI and the publish
+  workflow both package all targets and smoke-test the result in a
+  clean VS Code profile; publish uploads those exact files via
+  `vsce publish --packagePath`.
+- **Workflow hygiene.** All GitHub Actions pinned to commit SHAs,
+  read-only token permissions everywhere, CodeQL now also scans
+  `develop`, and the local `npm run publish` bypass was removed.
+
 ## [1.15.0] - 2026-07-25
 
 ### Changed
