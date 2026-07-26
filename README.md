@@ -76,7 +76,7 @@ code --install-extension vs-code-ssl-formatter-*.vsix
 
 - Live validation for block depth, procedure parameter count, Hungarian notation adherence, SQL injection risks, missing semicolons, missing OTHERWISE clauses, and other style guide rules.
 - Configurable severity levels (error, warning, info) and strict style-guide mode to convert warnings to errors.
-- **Per-rule overrides**: `ssl.diagnostics.rules` accepts a slug → severity map (`"off" | "info" | "warn" | "error"`). Settings UI offers slug autocomplete from the bundled LSP's published rule list (98 slugs as of v1.7.0).
+- **Per-rule overrides**: `ssl.diagnostics.rules` accepts a slug → severity map (`"off" | "info" | "warn" | "error"`). Settings UI offers slug autocomplete from the bundled LSP's published rule list (96 slugs as of v1.15.1).
 - **Source-level suppression**: `/* @ssl-disable <slug>; */` silences the named rule for the rest of the file; `/* @ssl-disable-next-line <slug>; */` silences only the line that follows. `*` matches every coded diagnostic.
 - **Quick fixes** keyed on stable rule slugs:
   - `udobject_array_in_clause` — extract the UDObject property to a local variable and rewrite the `IN (?...?)` placeholder.
@@ -156,7 +156,7 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 - `ssl.format.sql.enabled`: Format inline SQL string literals (default: `true`).
 - `ssl.format.sql.keywordCase`: `preserve`, `upper`, or `lower` for SQL keywords (default: `upper`).
 - `ssl.format.sql.indentSpaces`: Spaces to indent formatted SQL clauses (default: `4`).
-- `ssl.format.sql.style`: SQL layout style. Options: `standard`, `canonicalCompact`, `compact`, `expanded` (default: `standard`). See `sql-formats.md` for examples of each style, and change the default in your user/workspace settings.
+- `ssl.format.sql.style`: SQL layout style. Options: `standard`, `canonicalCompact`, `compact`, `expanded` (default: `canonicalCompact`, per the official STARLIMS style guide). Each option's behavior is described in the Settings UI.
 
 **Note:** SSL keywords (`:IF`, `:WHILE`, `:PROCEDURE`, etc.) are always normalized to UPPERCASE per the SSL style guide. This is not configurable.
 
@@ -164,7 +164,7 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 
 - `ssl.naming.hungarianNotation.enabled`: Enforce Hungarian notation (default: `true`).
 - `ssl.naming.hungarianNotation.severity`: `warn`, `error`, or `info` (default: `warn`).
-- `ssl.naming.hungarianNotation.prefixes`: Allowed Hungarian prefixes (default: `s, n, b, d, a, o, u`).
+- `ssl.naming.hungarianNotation.prefixes`: Allowed Hungarian prefixes (default: `s, n, b, d, a, o, fn, v`).
 - `ssl.styleGuide.limitBlockDepth`: Maximum nested block depth (default: `4`, `0` disables).
 
 - `ssl.styleGuide.maxParamsPerProcedure`: Limit on procedure parameters (default: `8`, `0` disables).
@@ -181,8 +181,8 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 - `ssl.intellisense.codeLens.enabled`: Show reference counts above procedures (default: `true`).
 - `ssl.intellisense.signatureHelp.enabled`: Show parameter hints while typing (default: `true`).
 - `ssl.intellisense.signatureHelp.autoTrigger`: Auto-open the signature help popup while typing inside a function call (default: `false`). When `false`, signature help is available on hover and explicit invocation (`Ctrl+Shift+Space`) only. Window reload required for changes to take effect.
-- `ssl.intellisense.inlayHints.enabled`: Enable experimental inline parameter hints (default: `false`).
-- `ssl.intellisense.inlayHints.parameterNames`: Show parameter names inline (default: `false`).
+- `ssl.intellisense.inlayHints.enabled`: Enable inline parameter hints (default: `true`).
+- `ssl.intellisense.inlayHints.parameterNames`: Show parameter names inline (default: `true`).
 - `ssl.intellisense.completion.enableKeywords` / `.enableBuiltinFunctions` / `.enableBuiltinClasses` / `.enableSnippets`: Toggle individual completion categories (default: `true`).
 - `ssl.intellisense.customFunctions`: Add or override built-in functions for completion, hover details, diagnostics, and formatting (default: `[]`). Each entry supports `name`, `description`, `params`, `signature`, `returnType`, `category`, and `untypedSignature`.
 - `ssl.intellisense.customClasses`: Add or override built-in classes for completion and member lists (default: `[]`). Each entry supports `name`, `description`, `instantiation`, `usage`, `methods`, and `properties`.
@@ -209,7 +209,7 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
   "ssl.format.formatOnSave": true,
   "ssl.format.builtinFunctionCase": "PascalCase",
   "ssl.naming.hungarianNotation.enabled": true,
-  "ssl.naming.hungarianNotation.prefixes": ["s", "n", "b", "d", "a", "o", "u"],
+  "ssl.naming.hungarianNotation.prefixes": ["s", "n", "b", "d", "a", "o", "fn", "v"],
   "ssl.styleGuide.limitBlockDepth": 4,
   "ssl.security.preventSqlInjection": true,
   "ssl.globals": ["sUserName"],

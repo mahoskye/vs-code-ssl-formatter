@@ -94,7 +94,7 @@
                         "PascalCase"
                     ],
                     "default": "PascalCase",
-                    "description": "Casing for built-in function names. PascalCase normalizes to canonical casing, preserve keeps user's choice. (native providers only; LSP uses canonical inventory)"
+                    "description": "Casing for built-in function names when formatting. PascalCase normalizes to canonical casing, preserve keeps user's choice."
                 },
                 "ssl.format.wrapLength": {
                     "type": "number",
@@ -138,7 +138,7 @@
                 "ssl.format.trimTrailingWhitespace": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Remove trailing whitespace from all lines (native providers only; LSP handles this internally when ssl.languageServer.enabled is true)"
+                    "description": "Remove trailing whitespace from all lines when formatting"
                 },
                 "ssl.format.maxConsecutiveBlankLines": {
                     "type": "number",
@@ -385,6 +385,11 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Warn about non-parameterized SQL queries (native providers only; LSP always checks)"
+                },
+                "ssl.security.requireParameterizedQueries": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Require ?PARAM? placeholders in SQL passed to SQL helper functions (native providers only; LSP always checks)"
                 },
                 "ssl.intellisense.enabled": {
                     "type": "boolean",

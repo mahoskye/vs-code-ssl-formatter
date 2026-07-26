@@ -18,6 +18,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Third-party notices.** The extension now ships the LSP's
   `THIRD-PARTY-NOTICES.md` alongside the bundled server binaries,
   covering the licenses of the Go modules statically linked into them.
+- **`ssl.security.requireParameterizedQueries` declared.** The setting
+  was already honored by the native diagnostics provider but missing
+  from the Settings UI.
+
+### Fixed
+- **Windows on ARM.** The client asked for a `windows-arm64` server
+  binary that is never shipped; it now uses the amd64 binary, which
+  Windows on ARM runs through x64 emulation.
+- **`ssl.format.trimTrailingWhitespace` and
+  `ssl.format.builtinFunctionCase` now reach the language server.**
+  Both were visible in Settings but silently ignored; they are now
+  forwarded to the LSP formatter (defaults unchanged).
+- **Stale build artifacts no longer ship.** The bundler cleans `dist/`
+  before building, so a leftover dev-build sourcemap can no longer be
+  packaged into the vsix.
+- **README corrections.** Fixed the documented defaults for
+  `ssl.format.sql.style` (`canonicalCompact`), Hungarian prefixes
+  (`fn`, `v` included), and inlay hints (enabled by default); removed a
+  reference to a nonexistent `sql-formats.md`; refreshed the diagnostic
+  slug count.
 
 ## [1.15.0] - 2026-07-25
 
