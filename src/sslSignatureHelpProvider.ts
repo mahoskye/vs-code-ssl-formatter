@@ -35,6 +35,11 @@ export class SSLSignatureHelpProvider implements vscode.SignatureHelpProvider {
 		_token: vscode.CancellationToken,
 		_context: vscode.SignatureHelpContext
 	): vscode.SignatureHelp | null {
+		const config = vscode.workspace.getConfiguration("ssl");
+		if (!config.get<boolean>("intellisense.signatureHelp.enabled", true)) {
+			return null;
+		}
+
 		// Fast path: Identify if we are in a function call
 		// We scan backwards from cursor to find opening parenthesis.
 		const lineText = document.lineAt(position.line).text;

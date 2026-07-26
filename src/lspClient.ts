@@ -110,6 +110,7 @@ function getSSLConfiguration(): object {
                 blankLinesBetweenProcs: config.get<number>('format.blankLinesBetweenProcs', 1),
                 trimTrailingWhitespace: config.get<boolean>('format.trimTrailingWhitespace', true),
                 builtinFunctionCase: config.get<string>('format.builtinFunctionCase', 'PascalCase'),
+                maxConsecutiveBlankLines: config.get<number>('format.maxConsecutiveBlankLines', 0),
                 sql: {
                     enabled: config.get<boolean>('format.sql.enabled', true),
                     style: config.get<string>('format.sql.style', 'canonicalCompact'),

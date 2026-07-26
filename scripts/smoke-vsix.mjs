@@ -1,9 +1,13 @@
 #!/usr/bin/env node
 // Clean-profile install check for the packaged VSIX.
-// Runs `vsce package`, installs into an isolated user-data + extensions dir,
-// opens a .ssl file, then scans the extension-host log for activation failures.
-// Catches packaging regressions (missing runtime deps, broken main entry, etc.)
-// that the Run Extension debug launcher misses because it loads from source.
+// Installs the vsix into an isolated user-data + extensions dir, opens a .ssl
+// file, then scans the extension-host log for activation failures. Catches
+// packaging regressions (missing runtime deps, broken main entry, etc.) that
+// the Run Extension debug launcher misses because it loads from source.
+//
+// Usage: node scripts/smoke-vsix.mjs [path/to/file.vsix]
+// With a path, that exact artifact is tested (as CI/publish do); with no
+// arguments, the script packages first and tests the result.
 
 import { spawn, spawnSync } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -13,10 +17,18 @@ import { join } from "node:path";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
 const pkg = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
-const vsixName = `${pkg.name}-${pkg.version}.vsix`;
-const vsixPath = join(repoRoot, vsixName);
 
-const codeBin = process.env.VSCODE_BIN || "code";
+// Resolve the VS Code CLI: $VSCODE_BIN, then `code` on PATH, then download a
+// copy via @vscode/test-electron (the CI path — runners have no VS Code).
+let codeBin = process.env.VSCODE_BIN || "code";
+let codeBaseArgs = [];
+if (spawnSync(codeBin, ["--version"], { stdio: "ignore" }).status !== 0) {
+    console.log("[smoke] no VS Code CLI found — downloading via @vscode/test-electron…");
+    const { downloadAndUnzipVSCode, resolveCliArgsFromVSCodeExecutablePath } =
+        await import("@vscode/test-electron");
+    const exe = await downloadAndUnzipVSCode("stable");
+    [codeBin, ...codeBaseArgs] = resolveCliArgsFromVSCodeExecutablePath(exe);
+}
 
 function run(cmd, args, opts = {}) {
     const r = spawnSync(cmd, args, { stdio: "inherit", cwd: repoRoot, ...opts });
@@ -25,10 +37,20 @@ function run(cmd, args, opts = {}) {
     }
 }
 
-console.log(`[smoke] packaging ${vsixName}…`);
-run("npx", ["vsce", "package"]);
-if (!existsSync(vsixPath)) {
-    throw new Error(`expected ${vsixPath} after vsce package`);
+let vsixPath = process.argv[2];
+if (vsixPath) {
+    if (!existsSync(vsixPath)) {
+        throw new Error(`vsix not found: ${vsixPath}`);
+    }
+    console.log(`[smoke] testing existing artifact ${vsixPath}`);
+} else {
+    const vsixName = `${pkg.name}-${pkg.version}.vsix`;
+    vsixPath = join(repoRoot, vsixName);
+    console.log(`[smoke] packaging ${vsixName}…`);
+    run("npx", ["vsce", "package"]);
+    if (!existsSync(vsixPath)) {
+        throw new Error(`expected ${vsixPath} after vsce package`);
+    }
 }
 
 const profile = mkdtempSync(join(tmpdir(), "ssl-smoke-"));
@@ -41,6 +63,7 @@ let failed = false;
 try {
     console.log(`[smoke] installing into ${profile}…`);
     run(codeBin, [
+        ...codeBaseArgs,
         "--user-data-dir", userData,
         "--extensions-dir", extDir,
         "--install-extension", vsixPath,
@@ -48,6 +71,7 @@ try {
 
     console.log("[smoke] launching VS Code to trigger activation…");
     const child = spawn(codeBin, [
+        ...codeBaseArgs,
         "--user-data-dir", userData,
         "--extensions-dir", extDir,
         "--disable-workspace-trust",

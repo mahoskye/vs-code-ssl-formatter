@@ -4,10 +4,6 @@ on:
   release:
     types: [published]
   workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version to publish (leave empty to use package.json version)'
-        required: false
 
 permissions:
   contents: read
@@ -21,10 +17,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: 22
         cache: 'npm'
@@ -48,19 +44,23 @@ jobs:
         npm run compile
         npm run test:unit
 
-    - name: Publish to VS Code Marketplace
+    - name: Package all platform targets
+      run: node scripts/package-platforms.mjs
+
+    - name: Smoke-test the linux-x64 package
+      uses: coactions/setup-xvfb@b6b4fcfb9f5a895edadc3bc76318fae0ac17c8b3 # v1
+      with:
+        run: node scripts/smoke-vsix.mjs dist-vsix/vs-code-ssl-formatter-$(node -p "require('./package.json').version")-linux-x64.vsix
+
+    - name: Publish tested packages to VS Code Marketplace
       if: github.event_name == 'release'
       env:
         VSCE_PAT: ${{ secrets.VSCE_PAT }}
-      run: npx vsce publish
+      run: npx vsce publish --packagePath dist-vsix/*.vsix
 
-    - name: Package extension (manual dispatch)
+    - name: Upload VSIX artifacts (manual dispatch)
       if: github.event_name == 'workflow_dispatch'
-      run: npx vsce package
-
-    - name: Upload VSIX (manual dispatch)
-      if: github.event_name == 'workflow_dispatch'
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
       with:
         name: ssl-extension-manual
-        path: '*.vsix'
+        path: 'dist-vsix/*.vsix'

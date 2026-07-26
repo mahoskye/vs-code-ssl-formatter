@@ -38,6 +38,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`fn`, `v` included), and inlay hints (enabled by default); removed a
   reference to a nonexistent `sql-formats.md`; refreshed the diagnostic
   slug count.
+- **`ssl.intellisense.signatureHelp.enabled` now works.** The native
+  signature-help provider previously ignored it.
+- **`ssl.format.maxConsecutiveBlankLines` now reaches the language
+  server.** Default changed from 2 to 0 (0 = no cap), matching the LSP
+  formatter's existing behavior, so default formatting output is
+  unchanged; set 1–5 to opt into collapsing blank-line runs.
+
+### Removed
+- **`ssl.format.sql.concatOperator`.** The setting was declared but no
+  formatter (native or LSP) ever implemented it. It remains on the
+  roadmap and will return with an implementation.
+
+### Infrastructure
+- **Platform-specific packages.** The Marketplace now receives one vsix
+  per platform (win32 x64/arm64, linux x64/arm64, darwin x64/arm64),
+  each bundling only its own server binary (~5 MB instead of ~23 MB),
+  plus a universal fallback for other targets.
+- **Verified LSP binary fetches.** `scripts/fetch-lsp-release.mjs`
+  downloads server binaries and verifies each file's SHA-256 against
+  the digest GitHub records for the release asset.
+- **The published artifact is the tested artifact.** CI and the publish
+  workflow both package all targets and smoke-test the result in a
+  clean VS Code profile; publish uploads those exact files via
+  `vsce publish --packagePath`.
+- **Workflow hygiene.** All GitHub Actions pinned to commit SHAs,
+  read-only token permissions everywhere, CodeQL now also scans
+  `develop`, and the local `npm run publish` bypass was removed.
 
 ## [1.15.0] - 2026-07-25
 

@@ -1,11 +1,15 @@
 # Ship only the bundled extension entry + LSP binaries + static assets.
-# Anything not explicitly re-included with `!` below is excluded.
+# NOTE: .vscodeignore is a BLOCKLIST — anything not matched below ships in
+# the vsix by default, so new repo-root files must be excluded here unless
+# they belong in the package.
 
 # Build artifacts
 out/**
 node_modules/**
 *.vsix
 *.tsbuildinfo
+dist-vsix/**
+dist/**/*.map
 
 # Source files
 src/**

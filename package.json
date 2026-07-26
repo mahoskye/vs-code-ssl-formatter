@@ -142,10 +142,10 @@
                 },
                 "ssl.format.maxConsecutiveBlankLines": {
                     "type": "number",
-                    "default": 2,
-                    "minimum": 1,
+                    "default": 0,
+                    "minimum": 0,
                     "maximum": 5,
-                    "description": "Maximum number of consecutive blank lines to preserve between statements (native providers only; ignored when ssl.languageServer.enabled is true)"
+                    "description": "Collapse runs of more than this many consecutive blank lines when formatting. 0 (default) disables the cap and preserves blank lines as written."
                 },
                 "ssl.format.sql.enabled": {
                     "type": "boolean",
@@ -185,19 +185,6 @@
                     ],
                     "default": "canonicalCompact",
                     "description": "SQL formatting style. 'canonicalCompact' follows the official STARLIMS Style Guide."
-                },
-                "ssl.format.sql.concatOperator": {
-                    "type": "string",
-                    "enum": [
-                        "||",
-                        "+"
-                    ],
-                    "enumDescriptions": [
-                        "Oracle/PostgreSQL style concatenation (||)",
-                        "SQL Server style concatenation (+)"
-                    ],
-                    "default": "||",
-                    "description": "SQL string concatenation operator used when breaking long string literals (native providers only; ignored when ssl.languageServer.enabled is true)"
                 },
                 "ssl.documentNamespaces": {
                     "type": "object",
@@ -404,7 +391,7 @@
                 "ssl.intellisense.signatureHelp.enabled": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Show parameter hints while typing function calls"
+                    "description": "Show parameter hints while typing function calls (native providers only; when the language server is active, signature help is always available — use ssl.intellisense.signatureHelp.autoTrigger to control the popup)"
                 },
                 "ssl.intellisense.signatureHelp.autoTrigger": {
                     "type": "boolean",
@@ -636,7 +623,8 @@
         "test:comments-preserved": "node ./scripts/assert-comments-preserved.js",
         "package": "vsce package",
         "smoke": "node scripts/smoke-vsix.mjs",
-        "publish": "vsce publish"
+        "package:platforms": "node scripts/package-platforms.mjs",
+        "fetch-lsp": "node scripts/fetch-lsp-release.mjs"
     },
     "dependencies": {
         "vscode-languageclient": "^9.0.1"

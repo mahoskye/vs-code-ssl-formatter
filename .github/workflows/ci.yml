@@ -7,6 +7,9 @@ on:
     branches: [ master, develop ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test on ${{ matrix.os }} with Node ${{ matrix.node }}
@@ -19,10 +22,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
     - name: Setup Node.js ${{ matrix.node }}
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: ${{ matrix.node }}
         cache: 'npm'
@@ -40,7 +43,7 @@ jobs:
       run: npm run test:unit
 
     - name: Run integration tests
-      uses: coactions/setup-xvfb@v1
+      uses: coactions/setup-xvfb@b6b4fcfb9f5a895edadc3bc76318fae0ac17c8b3 # v1
       with:
         run: npm run test:integration
 
@@ -71,10 +74,10 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v5
+      uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: 22
         cache: 'npm'
@@ -82,15 +85,17 @@ jobs:
     - name: Install dependencies
       run: npm ci
 
-    - name: Install vsce
-      run: npm install -g @vscode/vsce
+    - name: Package all platform targets
+      run: node scripts/package-platforms.mjs
 
-    - name: Package extension
-      run: vsce package
+    - name: Smoke-test the linux-x64 package
+      uses: coactions/setup-xvfb@b6b4fcfb9f5a895edadc3bc76318fae0ac17c8b3 # v1
+      with:
+        run: node scripts/smoke-vsix.mjs dist-vsix/vs-code-ssl-formatter-$(node -p "require('./package.json').version")-linux-x64.vsix
 
-    - name: Upload VSIX artifact
-      uses: actions/upload-artifact@v5
+    - name: Upload VSIX artifacts
+      uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
       with:
         name: ssl-extension-${{ github.sha }}
-        path: '*.vsix'
+        path: 'dist-vsix/*.vsix'
         retention-days: 30

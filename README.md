@@ -179,7 +179,7 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 
 - `ssl.intellisense.enabled`: Master toggle for IntelliSense (default: `true`).
 - `ssl.intellisense.codeLens.enabled`: Show reference counts above procedures (default: `true`).
-- `ssl.intellisense.signatureHelp.enabled`: Show parameter hints while typing (default: `true`).
+- `ssl.intellisense.signatureHelp.enabled`: Show parameter hints while typing (default: `true`; native providers only — with the language server active, signature help is always available and `autoTrigger` controls the popup).
 - `ssl.intellisense.signatureHelp.autoTrigger`: Auto-open the signature help popup while typing inside a function call (default: `false`). When `false`, signature help is available on hover and explicit invocation (`Ctrl+Shift+Space`) only. Window reload required for changes to take effect.
 - `ssl.intellisense.inlayHints.enabled`: Enable inline parameter hints (default: `true`).
 - `ssl.intellisense.inlayHints.parameterNames`: Show parameter names inline (default: `true`).

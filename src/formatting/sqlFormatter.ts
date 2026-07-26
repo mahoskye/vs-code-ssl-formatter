@@ -8,7 +8,6 @@ export interface SqlFormattingOptions {
     keywordCase?: 'upper' | 'lower' | 'title' | 'preserve';
     indentSpaces?: number;
     style?: string;
-    concatOperator?: '||' | '+';
 }
 
 export class SqlFormatter {

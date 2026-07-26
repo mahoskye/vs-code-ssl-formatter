@@ -16,7 +16,9 @@ This directory contains automated CI/CD workflows for the SSL VS Code Extension.
 - Runs linting, compilation, and unit tests
 - Checks for console.log in production code
 - Checks for TODO/FIXME comments
-- Packages the extension and uploads as artifact
+- Packages every platform target (`scripts/package-platforms.mjs`),
+  smoke-tests the linux-x64 vsix in a clean VS Code profile, and
+  uploads all packages as artifacts
 
 **Status Badge:**
 ```markdown
@@ -33,8 +35,11 @@ This directory contains automated CI/CD workflows for the SSL VS Code Extension.
 - Refuses to run for pre-releases, and refuses to publish if the
   release tag does not match the `package.json` version
 - Runs lint, compile, and unit tests before publishing
-- Publishes to VS Code Marketplace (on release)
-- Creates VSIX package (on manual dispatch)
+- Packages every platform target plus the universal fallback,
+  smoke-tests the linux-x64 vsix, then publishes those exact files
+  to the VS Code Marketplace (on release)
+- Creates the VSIX packages and uploads them as artifacts (on manual
+  dispatch)
 
 **Setup Required:**
 1. Create a Personal Access Token (PAT) for VS Code Marketplace:
