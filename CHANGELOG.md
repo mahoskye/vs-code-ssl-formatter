@@ -5,6 +5,38 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.16.0] - 2026-08-07
+
+### Changed
+- **Bundled `starlims-lsp` v0.15.0**:
+  - **Three new diagnostics.** `declare_initializer` flags `:DECLARE x
+    := 1;` (SSL accepts only a comma-separated identifier list);
+    `raiseerror_in_catch` warns when `RaiseError(` runs inside a
+    `:CATCH` block; `execfunction_class_target` errors when an
+    `ExecFunction` dispatch string resolves to class files only (the
+    LSP's first cross-file diagnostic). All three appear in the
+    `ssl.diagnostics.rules` setting.
+  - **`prefer_exitcase` accepts `:RETURN` terminators.** A `:CASE`/
+    `:OTHERWISE` clause ending in `:RETURN` no longer demands an
+    unreachable `:EXITCASE`.
+  - **SQL formatter fixes.** `KEEP (DENSE_RANK ...)` compounds stay
+    glued to their aggregate with a correctly anchored `OVER (...)`;
+    SQL-string assignments split across lines now converge to the
+    canonical layout.
+  - **Element data refresh.** Hover and completion pick up the
+    error-handling and logging doctrine sweeps (caveats coverage
+    363→400 elements, best practices 409→458).
+
+### Fixed
+- **"Show docs" quick fix pointed at the wrong category for
+  `execfunction_class_target`.** The slug's `class` fragment steered
+  the link to `reference/classes/ExecFunction.md`, which doesn't
+  exist; it now resolves to the functions category.
+
+### Added
+- **"Show docs" quick fix for `raiseerror_in_catch`.** The diagnostic
+  now offers a link to the `RaiseError` reference page.
+
 ## [1.15.1] - 2026-07-25
 
 ### Changed

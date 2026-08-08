@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.15.1",
+    "version": "1.16.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -265,6 +265,7 @@
                             "constructor_return_value",
                             "createudobject_builtin_misuse",
                             "datasource_default_required",
+                            "declare_initializer",
                             "default_after_parameters",
                             "default_on_declare_line",
                             "deprecated_keyword",
@@ -276,6 +277,7 @@
                             "endfor_invalid",
                             "equals_vs_strict_equals",
                             "error_handler_structure",
+                            "execfunction_class_target",
                             "execfunction_missing_quotes",
                             "exitfor_in_finally",
                             "exitfor_outside_loop",
@@ -315,6 +317,7 @@
                             "parameters_first",
                             "prefer_exitcase",
                             "procedure_declaration_syntax",
+                            "raiseerror_in_catch",
                             "redeclare_is_noop",
                             "region_end_mismatch",
                             "return_in_finally",

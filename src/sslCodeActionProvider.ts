@@ -874,14 +874,16 @@ function extractElementName(message: string): string | undefined {
 
 function inferCategoryFromSlug(slug: string): string | undefined {
 	// Slug name fragments map to ssl-docs categories. Order matters — check
-	// the more specific fragments first.
+	// the more specific fragments first ('execfunction_class_target' names
+	// the ExecFunction function even though the slug mentions class files).
+	if (slug.includes('execfunction')) { return 'functions'; }
 	if (slug.includes('class')) { return 'classes'; }
 	if (slug.includes('keyword')) { return 'keywords'; }
 	if (slug.includes('operator')) { return 'operators'; }
 	if (
 		slug.includes('function') ||
 		slug.includes('procedure') ||
-		slug.includes('execfunction') ||
+		slug.includes('raiseerror') ||
 		slug.includes('sql_param') ||
 		slug.includes('udobject_array_in_clause')
 	) {
