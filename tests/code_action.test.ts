@@ -403,6 +403,40 @@ describe('Code Actions: v1.7.0 additions', () => {
             `expected docs URL, got: ${target}`);
     });
 
+    it('universal: execfunction_class_target docs action targets the functions category', async function () {
+        const doc = await openDoc(`:PROCEDURE T;\n\tExecFunction("Lib.Helper", {});\n:ENDPROC;\n`);
+        const range = new vscode.Range(1, 1, 1, 13);
+        // The slug contains 'class' (the invalid target) but the quoted
+        // element is ExecFunction itself — the link must not land in classes/.
+        const diag = diagnostic(range,
+            "'ExecFunction' cannot run 'Lib.Helper' - the target is a class file, which has no script entry point (and class methods are not invokable this way). Instantiate with CreateUdObject and call the method on the instance.",
+            'execfunction_class_target');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title.startsWith("Show docs for 'ExecFunction'"));
+        assert.ok(fix, `expected docs link action; got titles: ${actions.map(a => a.title).join(', ')}`);
+        const target = (fix.command?.arguments?.[0] as vscode.Uri).toString();
+        assert.ok(target.includes('content/reference/functions/ExecFunction.md'),
+            `expected functions-category docs URL, got: ${target}`);
+    });
+
+    it('universal: raiseerror_in_catch docs action targets the RaiseError functions page', async function () {
+        const doc = await openDoc(`:PROCEDURE T;\n:TRY;\n:CATCH;\n\tRaiseError("boom");\n:ENDTRY;\n:ENDPROC;\n`);
+        const range = new vscode.Range(3, 1, 3, 11);
+        const diag = diagnostic(range,
+            "'RaiseError' inside ':CATCH' - the error handler should not raise; move the raise into the ':TRY' block it belongs to",
+            'raiseerror_in_catch');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title.startsWith("Show docs for 'RaiseError'"));
+        assert.ok(fix, `expected docs link action; got titles: ${actions.map(a => a.title).join(', ')}`);
+        const target = (fix.command?.arguments?.[0] as vscode.Uri).toString();
+        assert.ok(target.includes('content/reference/functions/RaiseError.md'),
+            `expected RaiseError docs URL, got: ${target}`);
+    });
+
     it('nested_iif: rewrites assignment-form IIF into :IF/:ELSE block', async function () {
         const doc = await openDoc(`:PROCEDURE T;\n\tx := IIF(c, a, b);\n:ENDPROC;\n`);
         const lineText = doc.lineAt(1).text;
