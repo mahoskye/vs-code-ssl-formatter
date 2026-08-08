@@ -10,6 +10,8 @@ async function main() {
         const fallbackExtensionsPath = path.resolve(extensionDevelopmentPath, 'tests/fallback-extensions');
 
         await runTests({
+            // Pinned alongside runTest.ts — see issue #92.
+            version: '1.131.0',
             extensionDevelopmentPath,
             extensionTestsPath,
             launchArgs: [

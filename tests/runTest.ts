@@ -13,6 +13,10 @@ async function main() {
 
         // Download VS Code, unzip it and run the integration test
         await runTests({
+            // Pinned: the 1.132.0 darwin-arm64 archive unpacks without the
+            // expected Electron binary (spawn ENOENT) under
+            // @vscode/test-electron 2.5.2 — see issue #92 for unpinning.
+            version: '1.131.0',
             extensionDevelopmentPath,
             extensionTestsPath,
             launchArgs: ['--disable-workspace-trust'] // Helper to avoid trust dialogs
