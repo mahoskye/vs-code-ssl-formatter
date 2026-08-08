@@ -5,6 +5,45 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.17.0] - 2026-08-08
+
+### Changed
+- **Bundled `starlims-lsp` v0.16.0** — a SQL data-source hardening batch:
+  - **`.ds` files classify as SQL by default.** The SQL-vs-SSL detector
+    was inverted: a data-source file is now treated as SQL unless its
+    body carries a strong, SQL-exclusive SSL marker (a non-directive
+    colon keyword, a `:=` assignment, or a leading unterminated `/*`
+    comment). This stops SSL diagnostics such as `bare_logical_operator`
+    from leaking onto legitimate SQL (e.g. a `SELECT` list with implicit
+    `col alias` aliases, or SQL `and`). Genuine SSL data sources keep the
+    full diagnostic set.
+  - **Zero-based indexing on .NET objects is now a warning, not an
+    error.** The pattern is valid against .NET collections, so it no
+    longer blocks.
+  - **`undeclared_variable` / `dot_property_access` false positives on
+    declaration names.** The qualified base name in `:INHERIT
+    Category.ScriptName;` and the class name in `:CLASS Name;` are
+    declarations, not variable uses, and no longer flag; the dots in an
+    `:INHERIT` base name are path separators, not property access.
+
+### Added
+- **Two new data-source diagnostics** (surface in the
+  `ssl.diagnostics.rules` setting):
+  - `datasource_undeclared_placeholder` — a `@name` placeholder in a
+    SQL-mode data-source body with no matching `:PARAMETERS` declaration
+    warns; it is not substituted and fails when the query executes.
+    `@@` system functions, declared placeholders, `@name` inside string
+    literals and SQL comments, and `DECLARE`-scripted bodies stay silent.
+  - `datasource_sql_semicolon` — a bare `;` outside comments and string
+    literals in a SQL-mode data-source body warns; the body runs as a
+    single SQL command and `;` separators may fail on some database
+    platforms.
+
+### Removed
+- **`datasource_default_required` rule.** The data-source builder accepts
+  `:PARAMETERS` without inline `:=` defaults, so no default-related
+  diagnostic fires on a defaultless data-source parameter.
+
 ## [1.16.0] - 2026-08-07
 
 ### Changed
