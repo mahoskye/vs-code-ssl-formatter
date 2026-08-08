@@ -52,6 +52,19 @@ jobs:
       if: runner.os != 'Linux'
       run: npm run test:integration
 
+    # TEMPORARY (issue #92): diagnose the macOS ENOENT on the extracted VS Code app
+    - name: Debug .vscode-test layout on failure (macOS)
+      if: failure() && runner.os == 'macOS'
+      run: |
+        which unzip && unzip -v | head -2
+        ls -la .vscode-test/ || true
+        for d in .vscode-test/vscode-darwin-*; do
+          echo "== $d =="
+          ls -la "$d" || true
+          ls -la "$d/Visual Studio Code.app/Contents/MacOS/" || true
+          find "$d" -maxdepth 3 -print | head -40
+        done
+
     - name: Check for console.log in production code
       if: runner.os == 'Linux'
       run: |
