@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.16.0",
+    "version": "1.17.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -264,7 +264,8 @@
                             "constructor_outside_class",
                             "constructor_return_value",
                             "createudobject_builtin_misuse",
-                            "datasource_default_required",
+                            "datasource_sql_semicolon",
+                            "datasource_undeclared_placeholder",
                             "declare_initializer",
                             "default_after_parameters",
                             "default_on_declare_line",
