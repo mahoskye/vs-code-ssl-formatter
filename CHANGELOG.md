@@ -5,6 +5,43 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.18.0] - 2026-08-12
+
+### Changed
+- **Bundled `starlims-lsp` v0.17.0** — a real-world-corpus false-positive
+  batch (eight false-positive classes fixed, issues #164–#171):
+  - **`:REGION` bodies are now opaque.** Everything between
+    `:REGION <name>;` and `:ENDREGION` is treated as stored raw text —
+    no diagnostics fire inside, and the formatter passes region bodies
+    through verbatim. Scripts wrapping HTML/JS/XML/SQL templates in
+    regions now validate clean. An unclosed region still reports
+    `unclosed_block`.
+  - **`direct_procedure_call` severity is tiered.** Calling a
+    `:PROCEDURE` declared in the same file remains an error; an unknown
+    bare callable (possibly an unpublished vendor built-in) now warns
+    instead.
+  - **`me_outside_class` warns in include-library files.** A classless
+    file made solely of `:PROCEDURE` blocks — the shape of an `:INCLUDE`
+    library — warns instead of erroring, since `Me` is valid there at
+    runtime.
+  - **`zero_based_array_index` tracks .NET derivation.** Indexing `[0]`
+    on a variable last assigned from a colon member call or
+    `LimsNetConnect`/`LimsNetCast` result downgrades to the .NET
+    warning.
+  - **`bare_logical_operator` is position-aware.** Identifiers named
+    `And`/`Or`/`Not` (e.g. WSDL-generated proxy members) no longer flag
+    in declarations, assignment targets, or member access.
+  - **Inline comments no longer break `:PARAMETERS` placement checks.**
+    Multi-line parameter lists with interleaved comments no longer
+    trigger `default_after_parameters` / `parameters_first`.
+  - **`parameters_first` no longer contradicts `include_early`.**
+    `:INCLUDE` is placement-transparent, and `:BEGININLINECODE` blocks
+    are judged as their own scope.
+  - **`global_assignment` respects in-file declarations.** Declared
+    locals that case-insensitively collide with status keywords, and
+    scripts assigning a `:PUBLIC` global they just declared, no longer
+    flag.
+
 ## [1.17.0] - 2026-08-08
 
 ### Changed
