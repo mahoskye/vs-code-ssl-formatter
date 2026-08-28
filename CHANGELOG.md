@@ -5,6 +5,67 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.19.0] - 2026-08-28
+
+### Added
+- **New setting `ssl.diagnostics.infoDiagnostics`** (default `false`) —
+  enables the LSP's new opt-in info severity tier: 18 advisory rules
+  (style observations and idiom notes, e.g. `sql_comma_join`,
+  `c_style_comment_closer`, `negative_logic`) aimed at assistant/LLM
+  consumers and teams that want the full picture. Off by default so the
+  everyday surface stays errors/warnings/hints; a rule listed explicitly
+  in `ssl.diagnostics.rules` always shows regardless of the gate (the
+  per-rule promotion path).
+- **New setting `ssl.format.sql.identifierCase`**
+  (`preserve` | `lower` | `upper`, default `preserve`) — casing applied
+  to table/column/alias identifiers in reflowed SQL. `preserve` is the
+  new default because force-folding breaks queries on SQL Server
+  case-sensitive collations; the old always-lowercase behavior is now
+  the `lower` opt-in. Double-quoted identifiers and ODBC `{…}` escape
+  interiors are always preserved.
+- **Three new quick fixes** for LSP v0.18.0 rule codes:
+  `trailing_skip_commas` (remove the redundant comma run),
+  `exitcase_after_return` (remove the unreachable `:EXITCASE`), and
+  `invalid_limstypeex_comparison` (replace the impossible literal with the
+  nearest valid `LimsTypeEx` result string, e.g. `"NUMBER"` → `"NUMERIC"`).
+
+### Changed
+- **Bundled `starlims-lsp` v0.18.0** — the production-corpus release,
+  validated against a 6,228-script production corpus:
+  - **Twelve new diagnostics** from the runtime-verification batch,
+    including `step_zero_literal` (`:STEP 0` never terminates),
+    `invalid_limstypeex_comparison` (comparison against an impossible
+    `LimsTypeEx` result string, e.g. `"NUMBER"` for `"NUMERIC"`),
+    `builtin_excess_arguments` (silently dropped surplus arguments),
+    `format_arg_not_array`, `runsql_non_dml` (discarded SELECT result),
+    `mixed_error_handling_families` (`:ERROR`/`:RESUME` mixed with
+    `:TRY`/`:CATCH`), `exitcase_after_return`, `trailing_skip_commas`,
+    and info-tier notes.
+  - **Seven info-tier SQL advisories** (`sql_comma_join`,
+    `sql_legacy_outer_join`, `sql_inconsistent_alias`,
+    `sql_literal_splice`, `sql_dialect_mix`, `sql_select_star`,
+    `sql_suspect_placeholder`), all gated by
+    `ssl.diagnostics.infoDiagnostics`.
+  - **Four advisory rules reclassified to the info tier**
+    (`max_block_depth`, `limit_public_vars`, `max_params_warning`,
+    `negative_logic`) — they no longer show by default; re-enable via
+    the info tier or promote per rule in `ssl.diagnostics.rules`.
+  - **Formatter hardening from an adversarial review:** idempotent over
+    the full corpus (1,008 unstable files → 0), multiple end-of-line
+    comments on one line all survive, ODBC `{fn …}` escapes and `?…?`
+    placeholders are atomic and byte-preserved,
+    concatenation-continued SQL literals are byte-preserved, trailing
+    whitespace inside multi-line strings is untouched, no forced
+    semicolon after a bare `:PARAMETERS`/`:DECLARE` keyword, and SQL
+    `--` comments in reflowed strings always end their line. Zero
+    formatting-introduced diagnostics across the corpus.
+  - **SQL style decisions:** the `compact` SQL style is retired in the
+    LSP formatter (accepted as a deprecated alias for
+    `canonicalCompact`), and the `standard` style now respects
+    `ssl.format.wrapLength` with fixed continuation indent.
+  - **`nil_method_call` understands qualification** — eliminated the
+    corpus's largest false-positive class (1,391 hits).
+
 ## [1.18.0] - 2026-08-12
 
 ### Changed

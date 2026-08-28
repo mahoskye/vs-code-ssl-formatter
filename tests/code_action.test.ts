@@ -461,3 +461,136 @@ describe('Code Actions: v1.7.0 additions', () => {
         assert.ok(!text.includes('IIF('));
     });
 });
+
+describe('Code Actions: v1.19.0 additions (LSP v0.18.0 rules)', () => {
+
+    function diagnostic(range: vscode.Range, message: string, code: string): vscode.Diagnostic {
+        const d = new vscode.Diagnostic(range, message, vscode.DiagnosticSeverity.Warning);
+        d.code = code;
+        return d;
+    }
+
+    function context(diag: vscode.Diagnostic): vscode.CodeActionContext {
+        return {
+            diagnostics: [diag],
+            only: undefined,
+            triggerKind: vscode.CodeActionTriggerKind.Invoke
+        };
+    }
+
+    async function openDoc(content: string): Promise<vscode.TextDocument> {
+        return vscode.workspace.openTextDocument({
+            language: 'ssl',
+            content,
+            fileName: `/test-${Math.random()}.ssl`
+        } as any);
+    }
+
+    it('trailing_skip_commas: deletes the trailing comma run', async function () {
+        const doc = await openDoc(`Foo(a,,);\n`);
+        const lineText = doc.lineAt(0).text;
+        const start = lineText.indexOf(',,');
+        const range = new vscode.Range(0, start, 0, start + 2);
+        const diag = diagnostic(range, 'trailing skipped arguments', 'trailing_skip_commas');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title === 'Remove trailing skipped arguments');
+        assert.ok(fix, 'expected trailing-skip-commas fix');
+        await vscode.workspace.applyEdit(fix.edit!);
+        assert.ok(doc.getText().includes('Foo(a);'), `got: ${doc.getText()}`);
+    });
+
+    it('trailing_skip_commas: handles spaced comma runs', async function () {
+        const doc = await openDoc(`Foo(a, , );\n`);
+        const lineText = doc.lineAt(0).text;
+        const start = lineText.indexOf(', ,');
+        const range = new vscode.Range(0, start, 0, start + 3);
+        const diag = diagnostic(range, 'trailing skipped arguments', 'trailing_skip_commas');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title === 'Remove trailing skipped arguments');
+        assert.ok(fix, 'expected trailing-skip-commas fix');
+        await vscode.workspace.applyEdit(fix.edit!);
+        assert.ok(doc.getText().includes('Foo(a );'), `got: ${doc.getText()}`);
+    });
+
+    it('exitcase_after_return: removes a whole-line :EXITCASE;', async function () {
+        const doc = await openDoc(`:BEGINCASE;\n:CASE x = 1;\n\t:RETURN 1;\n\t:EXITCASE;\n:ENDCASE;\n`);
+        const lineText = doc.lineAt(3).text;
+        const start = lineText.indexOf(':EXITCASE');
+        const range = new vscode.Range(3, start, 3, start + ':EXITCASE'.length);
+        const diag = diagnostic(range, 'unreachable exitcase', 'exitcase_after_return');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title === "Remove unreachable ':EXITCASE'");
+        assert.ok(fix, 'expected exitcase fix');
+        await vscode.workspace.applyEdit(fix.edit!);
+        const text = doc.getText();
+        assert.ok(!text.includes(':EXITCASE'), `got: ${text}`);
+        assert.ok(text.includes(':RETURN 1;\n:ENDCASE;') || text.includes(':RETURN 1;'), 'return survives');
+        assert.strictEqual(doc.lineCount, 5, 'line removed entirely');
+    });
+
+    it('exitcase_after_return: removes keyword and semicolon on a shared line', async function () {
+        const doc = await openDoc(`:BEGINCASE;\n:CASE x = 1;\n\t:RETURN 1; :EXITCASE;\n:ENDCASE;\n`);
+        const lineText = doc.lineAt(2).text;
+        const start = lineText.indexOf(':EXITCASE');
+        const range = new vscode.Range(2, start, 2, start + ':EXITCASE'.length);
+        const diag = diagnostic(range, 'unreachable exitcase', 'exitcase_after_return');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title === "Remove unreachable ':EXITCASE'");
+        assert.ok(fix, 'expected exitcase fix');
+        await vscode.workspace.applyEdit(fix.edit!);
+        const text = doc.getText();
+        assert.ok(!text.includes(':EXITCASE'), `got: ${text}`);
+        assert.ok(text.includes(':RETURN 1;'), 'return survives');
+    });
+
+    it('invalid_limstypeex_comparison: suggests the nearest valid result string', async function () {
+        const doc = await openDoc(`:IF LimsTypeEx(x) == "NUMBER";\n:ENDIF;\n`);
+        const lineText = doc.lineAt(0).text;
+        const start = lineText.indexOf('"NUMBER"');
+        const range = new vscode.Range(0, start, 0, start + '"NUMBER"'.length);
+        const diag = diagnostic(range, 'LimsTypeEx never returns "NUMBER"', 'invalid_limstypeex_comparison');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title === 'Replace with "NUMERIC"');
+        assert.ok(fix, `expected NUMERIC suggestion; got titles: ${actions.map(a => a.title).join(', ')}`);
+        await vscode.workspace.applyEdit(fix.edit!);
+        assert.ok(doc.getText().includes('== "NUMERIC"'), `got: ${doc.getText()}`);
+    });
+
+    it('invalid_limstypeex_comparison: preserves single-quote style', async function () {
+        const doc = await openDoc(`:IF LimsTypeEx(x) == 'CODE BLOCK';\n:ENDIF;\n`);
+        const lineText = doc.lineAt(0).text;
+        const start = lineText.indexOf("'CODE BLOCK'");
+        const range = new vscode.Range(0, start, 0, start + "'CODE BLOCK'".length);
+        const diag = diagnostic(range, 'LimsTypeEx never returns "CODE BLOCK"', 'invalid_limstypeex_comparison');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title === "Replace with 'CODEBLOCK'");
+        assert.ok(fix, `expected CODEBLOCK suggestion; got titles: ${actions.map(a => a.title).join(', ')}`);
+        await vscode.workspace.applyEdit(fix.edit!);
+        assert.ok(doc.getText().includes("== 'CODEBLOCK'"), `got: ${doc.getText()}`);
+    });
+
+    it('invalid_limstypeex_comparison: no rewrite for a wildly different literal', async function () {
+        const doc = await openDoc(`:IF LimsTypeEx(x) == "WIDGET_HANDLE";\n:ENDIF;\n`);
+        const lineText = doc.lineAt(0).text;
+        const start = lineText.indexOf('"WIDGET_HANDLE"');
+        const range = new vscode.Range(0, start, 0, start + '"WIDGET_HANDLE"'.length);
+        const diag = diagnostic(range, 'LimsTypeEx never returns "WIDGET_HANDLE"', 'invalid_limstypeex_comparison');
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title.startsWith('Replace with'));
+        assert.ok(!fix, `expected no rewrite; got: ${fix?.title}`);
+    });
+});

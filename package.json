@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.18.0",
+    "version": "1.19.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -162,6 +162,21 @@
                     "default": "upper",
                     "description": "Preferred casing for SQL keywords when SQL formatting is enabled"
                 },
+                "ssl.format.sql.identifierCase": {
+                    "type": "string",
+                    "enum": [
+                        "preserve",
+                        "lower",
+                        "upper"
+                    ],
+                    "enumDescriptions": [
+                        "Preserve - Keep the author's casing (safe on every dialect; default)",
+                        "Lower - Community-guide look (safe on Oracle and case-insensitive MSSQL collations only)",
+                        "Upper - Match the STARLIMS data dictionary"
+                    ],
+                    "default": "preserve",
+                    "markdownDescription": "Casing applied to table/column/alias identifiers in reflowed SQL (LSP formatter). Force-folding can break queries on SQL Server case-sensitive collations, so `preserve` is the default. Double-quoted identifiers and ODBC `{…}` escape interiors are always preserved."
+                },
                 "ssl.format.sql.indentSpaces": {
                     "type": "number",
                     "default": 4,
@@ -178,13 +193,13 @@
                         "expanded"
                     ],
                     "enumDescriptions": [
-                        "Standard - Simple clause breaks",
+                        "Standard - Simple clause breaks, wraps long lines at ssl.format.wrapLength",
                         "Canonical Compact - Balanced formatting with indented AND/OR and smart wrapping (default, per official style guide)",
-                        "Compact - Minimal breaks, fits on fewer lines",
+                        "Compact - Deprecated: treated as an alias for canonicalCompact by the LSP formatter",
                         "Expanded - Maximum readability, each column/condition on own line"
                     ],
                     "default": "canonicalCompact",
-                    "description": "SQL formatting style. 'canonicalCompact' follows the official STARLIMS Style Guide."
+                    "description": "SQL formatting style. 'canonicalCompact' follows the official STARLIMS Style Guide. 'compact' is retired and accepted as a deprecated alias for canonicalCompact."
                 },
                 "ssl.documentNamespaces": {
                     "type": "object",
@@ -250,6 +265,8 @@
                             "begincase_requires_case",
                             "branch_target_label",
                             "builder_directive_case",
+                            "builtin_excess_arguments",
+                            "c_style_comment_closer",
                             "catch_clause_form",
                             "catch_order_before_finally",
                             "class_instantiation_curly",
@@ -280,18 +297,21 @@
                             "error_handler_structure",
                             "execfunction_class_target",
                             "execfunction_missing_quotes",
+                            "exitcase_after_return",
                             "exitfor_in_finally",
                             "exitfor_outside_loop",
                             "exitwhile_in_finally",
                             "exitwhile_outside_loop",
                             "finally_empty",
                             "for_numeric_values",
+                            "format_arg_not_array",
                             "global_assignment",
                             "hungarian_notation",
                             "identifier_too_long",
                             "include_early",
                             "include_in_procedure",
                             "inline_code_naming",
+                            "invalid_limstypeex_comparison",
                             "invalid_operator_sequence",
                             "invalid_sql_param",
                             "keyword_uppercase",
@@ -305,6 +325,7 @@
                             "mismatched_block_end",
                             "mismatched_delimiter",
                             "missing_otherwise",
+                            "mixed_error_handling_families",
                             "mixed_type_operator",
                             "named_sql_param_unsupported",
                             "negative_logic",
@@ -322,17 +343,30 @@
                             "redeclare_is_noop",
                             "region_end_mismatch",
                             "return_in_finally",
+                            "runsql_non_dml",
                             "scientific_notation",
                             "single_catch",
                             "single_finally",
+                            "spaced_skip_commas",
+                            "sql_comma_join",
+                            "sql_dialect_mix",
+                            "sql_inconsistent_alias",
                             "sql_injection",
+                            "sql_legacy_outer_join",
+                            "sql_literal_splice",
+                            "sql_select_star",
+                            "sql_suspect_placeholder",
                             "step_spacing",
+                            "step_zero_literal",
+                            "trailing_skip_commas",
                             "try_requires_handler",
                             "try_structure",
                             "udobject_array_in_clause",
                             "unclosed_block",
                             "unclosed_delimiter",
                             "undeclared_variable",
+                            "unicode_literal_prefix",
+                            "unjustified_collate",
                             "unknown_keyword",
                             "unknown_token",
                             "unmatched_block_end",
@@ -340,6 +374,7 @@
                             "unqualified_field_assignment",
                             "unused_variable",
                             "visibility_annotation",
+                            "visibility_annotation_usage",
                             "zero_based_array_index"
                         ],
                         "description": "Stable rule slug emitted by starlims-lsp. See diagnostic_codes.go."
@@ -357,6 +392,11 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Report declared variables that are never used (hint severity, code unused_variable). Off by default: usage counting is name-based and deliberately conservative."
+                },
+                "ssl.diagnostics.infoDiagnostics": {
+                    "type": "boolean",
+                    "default": false,
+                    "markdownDescription": "Enable the info severity tier: advisory style observations and idiom notes (18 rules, e.g. `sql_comma_join`, `c_style_comment_closer`, `negative_logic`) aimed at assistant/LLM consumers and teams that want the full picture. Off by default so the everyday surface stays errors/warnings/hints. A rule listed explicitly in `ssl.diagnostics.rules` always shows regardless of this gate."
                 },
                 "ssl.styleGuide.limitBlockDepth": {
                     "type": "number",
