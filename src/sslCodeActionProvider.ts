@@ -87,6 +87,15 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 				case 'nested_iif':
 					action = createNestedIifRefactor(document, diagnostic);
 					break;
+				case 'trailing_skip_commas':
+					action = createTrailingSkipCommasFix(document, diagnostic);
+					break;
+				case 'exitcase_after_return':
+					action = createExitCaseAfterReturnFix(document, diagnostic);
+					break;
+				case 'invalid_limstypeex_comparison':
+					action = createInvalidLimsTypeExComparisonFix(document, diagnostic);
+					break;
 			}
 			if (action) {
 				actions.push(action);
@@ -754,6 +763,160 @@ function splitTopLevelCommas(text: string): string[] {
 		result.push(buf);
 	}
 	return result;
+}
+
+// ---- trailing_skip_commas --------------------------------------------------
+
+/**
+ * The LSP flags a run of skip-commas directly before a call's closing
+ * parenthesis — the runtime NIL-pads missing trailing arguments, so they
+ * add nothing. The diagnostic range covers the comma run; deleting it is
+ * the whole fix.
+ */
+function createTrailingSkipCommasFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const text = document.getText(diagnostic.range);
+	if (!/^[,\s]+$/.test(text) || !text.includes(',')) {
+		// Defensive — only operate when the range really is a comma run.
+		return undefined;
+	}
+	const fix = new vscode.CodeAction(
+		'Remove trailing skipped arguments',
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.delete(document.uri, diagnostic.range);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
+}
+
+// ---- exitcase_after_return -------------------------------------------------
+
+/**
+ * The LSP flags an `:EXITCASE` that directly follows a branch-level
+ * `:RETURN` — the `:RETURN` already leaves the procedure, so the
+ * `:EXITCASE` is unreachable. The diagnostic range covers the `:EXITCASE`
+ * keyword; its terminating `;` is separate. If the statement is alone on
+ * its line, drop the whole line; otherwise delete the keyword plus its
+ * immediately-following semicolon.
+ */
+function createExitCaseAfterReturnFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const startLine = diagnostic.range.start.line;
+	const endLine = diagnostic.range.end.line;
+	if (endLine >= document.lineCount || startLine !== endLine) {
+		return undefined;
+	}
+	const lineText = document.lineAt(startLine).text;
+	if (!/^:EXITCASE$/i.test(document.getText(diagnostic.range))) {
+		return undefined;
+	}
+
+	const fix = new vscode.CodeAction(
+		"Remove unreachable ':EXITCASE'",
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+
+	if (/^\s*:EXITCASE\s*;?\s*$/i.test(lineText)) {
+		// Statement alone on its line — remove the whole line including
+		// its newline so the file doesn't grow stray blank lines.
+		fix.edit.delete(document.uri, new vscode.Range(
+			new vscode.Position(startLine, 0),
+			new vscode.Position(Math.min(startLine + 1, document.lineCount), 0)
+		));
+	} else {
+		// Extend through an immediately-following `;` (plus surrounding
+		// whitespace) on the same line.
+		let endChar = diagnostic.range.end.character;
+		let i = endChar;
+		while (i < lineText.length && /\s/.test(lineText[i])) { i++; }
+		if (lineText[i] === ';') {
+			endChar = i + 1;
+		}
+		fix.edit.delete(document.uri, new vscode.Range(
+			new vscode.Position(startLine, diagnostic.range.start.character),
+			new vscode.Position(startLine, endChar)
+		));
+	}
+
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
+}
+
+// ---- invalid_limstypeex_comparison -----------------------------------------
+
+/**
+ * LimsTypeEx returns exactly one of a fixed result set; the LSP errors on a
+ * comparison against any other string literal (the chronic bug is "NUMBER"
+ * for "NUMERIC"). The diagnostic range covers the string literal. Offer the
+ * nearest valid result string when one is plausibly what was meant.
+ */
+const LIMS_TYPE_EX_RESULTS = [
+	'NIL', 'STRING', 'NUMERIC', 'LOGIC', 'DATE',
+	'ARRAY', 'CODEBLOCK', 'OBJECT', 'SSLVALUE'
+] as const;
+
+function levenshtein(a: string, b: string): number {
+	const prev = new Array<number>(b.length + 1);
+	for (let j = 0; j <= b.length; j++) { prev[j] = j; }
+	for (let i = 1; i <= a.length; i++) {
+		let diag = prev[0];
+		prev[0] = i;
+		for (let j = 1; j <= b.length; j++) {
+			const tmp = prev[j];
+			prev[j] = Math.min(
+				prev[j] + 1,
+				prev[j - 1] + 1,
+				diag + (a[i - 1] === b[j - 1] ? 0 : 1)
+			);
+			diag = tmp;
+		}
+	}
+	return prev[b.length];
+}
+
+function createInvalidLimsTypeExComparisonFix(
+	document: vscode.TextDocument,
+	diagnostic: vscode.Diagnostic
+): vscode.CodeAction | undefined {
+	const literal = document.getText(diagnostic.range);
+	const quote = literal[0];
+	if ((quote !== '"' && quote !== "'") || literal[literal.length - 1] !== quote) {
+		return undefined;
+	}
+	const inner = literal.slice(1, -1).trim().toUpperCase();
+
+	let best: string | undefined;
+	let bestDistance = Number.MAX_SAFE_INTEGER;
+	for (const candidate of LIMS_TYPE_EX_RESULTS) {
+		const d = levenshtein(inner, candidate);
+		if (d < bestDistance) {
+			bestDistance = d;
+			best = candidate;
+		}
+	}
+	// Only suggest when the literal is a plausible near-miss ("NUMBER" →
+	// "NUMERIC" is distance 2); a wildly different string gets no rewrite.
+	if (!best || bestDistance > 3) {
+		return undefined;
+	}
+
+	const fix = new vscode.CodeAction(
+		`Replace with ${quote}${best}${quote}`,
+		vscode.CodeActionKind.QuickFix
+	);
+	fix.edit = new vscode.WorkspaceEdit();
+	fix.edit.replace(document.uri, diagnostic.range, `${quote}${best}${quote}`);
+	fix.diagnostics = [diagnostic];
+	fix.isPreferred = true;
+	return fix;
 }
 
 // ---- universal: suppression comments ---------------------------------------

@@ -115,6 +115,7 @@ function getSSLConfiguration(): object {
                     enabled: config.get<boolean>('format.sql.enabled', true),
                     style: config.get<string>('format.sql.style', 'canonicalCompact'),
                     keywordCase: config.get<string>('format.sql.keywordCase', 'upper'),
+                    identifierCase: config.get<string>('format.sql.identifierCase', 'preserve'),
                     indentSize: config.get<number>('format.sql.indentSpaces', 4),
                     maxLineLength: config.get<number>('format.wrapLength', 90)
                 }
@@ -126,7 +127,8 @@ function getSSLConfiguration(): object {
                 maxBlockDepth: config.get<number>('styleGuide.limitBlockDepth', 4),
                 rules,
                 endpointPatterns,
-                unusedVariables
+                unusedVariables,
+                infoDiagnostics: config.get<boolean>('diagnostics.infoDiagnostics', false)
             },
             inlayHints: {
                 enabled: config.get<boolean>('intellisense.inlayHints.enabled', true),
@@ -218,7 +220,8 @@ export async function startClient(context: vscode.ExtensionContext): Promise<Lan
                 e.affectsConfiguration('ssl.styleGuide') ||
                 e.affectsConfiguration('ssl.diagnostics.rules') ||
                 e.affectsConfiguration('ssl.diagnostics.endpointPatterns') ||
-                e.affectsConfiguration('ssl.diagnostics.unusedVariables')
+                e.affectsConfiguration('ssl.diagnostics.unusedVariables') ||
+                e.affectsConfiguration('ssl.diagnostics.infoDiagnostics')
             ) {
                 sendConfigurationUpdate();
             }
