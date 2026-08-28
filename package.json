@@ -663,6 +663,8 @@
         "test:integration": "node ./out/tests/runTest.js",
         "pretest:integration-fallback": "npm run bundle",
         "test:integration-fallback": "node ./out/tests/runFallbackTest.js",
+        "test:corpus": "bun scripts/corpus-test.ts",
+        "test:corpus:update": "bun scripts/corpus-test.ts --update-baseline",
         "test:format-fix": "node ./scripts/assert-format-fix.js",
         "test:comments-preserved": "node ./scripts/assert-comments-preserved.js",
         "package": "vsce package",

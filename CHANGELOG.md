@@ -5,6 +5,16 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **`npm run test:corpus`** — opt-in harness that runs the bundled LSP over a
+  local corpus of real SSL and checks that formatting never fails, is
+  idempotent, and never introduces diagnostics, then diffs corpus-wide
+  diagnostic counts per rule slug against `tests/corpus-baseline.json`.
+  Intended for reviewing an LSP bundle bump. See
+  [docs/CORPUS_TESTING.md](docs/CORPUS_TESTING.md).
+
 ## [1.19.0] - 2026-08-28
 
 ### Added
