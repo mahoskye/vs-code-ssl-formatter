@@ -80,7 +80,11 @@ Len("test");
         assert.ok(hints !== undefined, 'Inlay hints should work in fallback mode');
     });
 
-    test('Formatting works when LSP is disabled', async () => {
+    test('Formatting is not offered when LSP is disabled', async () => {
+        // Formatting is LSP-only by design: there is no native fallback
+        // formatter, so VS Code reports that no formatter is installed rather
+        // than rewriting the document with a second implementation. See the
+        // note in src/extension.ts.
         const content = `
 :PROCEDURE FallbackFormat;
 :IF .T.;
@@ -92,8 +96,7 @@ Len("test");
         await vscode.window.showTextDocument(doc);
 
         await vscode.commands.executeCommand('editor.action.formatDocument');
-        const text = doc.getText();
 
-        assert.ok(text.includes('\t:IF') || text.includes('    :IF'), 'Formatting should indent in fallback mode');
+        assert.strictEqual(doc.getText(), content, 'Document should be left untouched in fallback mode');
     });
 });
