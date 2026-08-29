@@ -122,6 +122,11 @@ function getSSLConfiguration(): object {
             },
             diagnostics: {
                 hungarianNotation: config.get<boolean>('naming.hungarianNotation.enabled', true),
+                // Separately gated since starlims-lsp v0.21.0: the prefix
+                // audit and the prefix-vs-expression type check are
+                // different findings, and only the latter is useful on a
+                // codebase that does not follow the convention.
+                hungarianTypes: config.get<boolean>('naming.hungarianNotation.checkTypes', true),
                 hungarianPrefixes,
                 globals: config.get<string[]>('globals', []),
                 maxBlockDepth: config.get<number>('styleGuide.limitBlockDepth', 4),
