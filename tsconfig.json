@@ -18,7 +18,8 @@
         "tests/runFallbackTest.ts",
         "tests/index.ts",
         "tests/fallbackIndex.ts",
-        "tests/integration/**/*"
+        "tests/integration/**/*",
+        "tests/integration-fallback/**/*"
     ],
     "exclude": ["node_modules", ".vscode-test", "dev"]
 }

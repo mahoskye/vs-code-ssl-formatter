@@ -20,6 +20,11 @@ This directory contains documentation for developers contributing to the SSL VS 
 - Testing infrastructure
 - Publishing workflow
 
+**[CORPUS_TESTING.md](CORPUS_TESTING.md)**
+- Running the bundled LSP against thousands of real SSL files
+- Formatter idempotency and safety invariants
+- Diagnostic baselines for reviewing an LSP bundle bump
+
 ### Language Reference
 
 **[grammar/ssl-ebnf.md](grammar/ssl-ebnf.md)**
@@ -41,6 +46,13 @@ This directory contains documentation for developers contributing to the SSL VS 
 npm run compile
 npm run lint
 npm run test:unit
+```
+
+Optionally, against a local corpus of real SSL — see
+[CORPUS_TESTING.md](CORPUS_TESTING.md):
+
+```bash
+npm run test:corpus
 ```
 
 ### Building the Extension

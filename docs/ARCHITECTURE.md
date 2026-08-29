@@ -14,6 +14,8 @@ The extension does not own SSL semantics. Three sibling repositories define them
 
 The native TypeScript providers in `src/ssl*Provider.ts` are intentionally minimal — they exist as a fallback when `ssl.languageServer.enabled` is `false` or the LSP fails to launch, not as a parallel implementation of the LSP's inventory.
 
+Document formatting has no native fallback: it is provided only by the LSP. Every native provider is read-only, but a formatter rewrites the user's file, and a second implementation inevitably drifts from the server's — see [CORPUS_TESTING.md](CORPUS_TESTING.md). The SQL formatters remaining in `src/formatting/` back the **Format SQL** command, which is independent of the language server.
+
 ### Supported File Extensions
 - `.ssl`
 - `.srvscr`

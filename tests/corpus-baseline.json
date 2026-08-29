@@ -1,0 +1,143 @@
+{
+    "lspVersion": "0.18.0",
+    "corpusFiles": 6228,
+    "totals": {
+        "warning": 7485,
+        "hint": 1190,
+        "error": 119
+    },
+    "codes": {
+        "arithmetic_type_mismatch": {
+            "warning": 281
+        },
+        "assignment_in_condition": {
+            "warning": 3
+        },
+        "bare_logical_operator": {
+            "error": 5
+        },
+        "builtin_excess_arguments": {
+            "warning": 97
+        },
+        "class_name_collision": {
+            "warning": 1
+        },
+        "comment_termination": {
+            "error": 1
+        },
+        "comment_text_after_terminator": {
+            "warning": 67,
+            "error": 2
+        },
+        "datasource_sql_semicolon": {
+            "warning": 10
+        },
+        "datasource_undeclared_placeholder": {
+            "warning": 1
+        },
+        "default_after_parameters": {
+            "error": 35
+        },
+        "deprecated_keyword": {
+            "warning": 127
+        },
+        "direct_procedure_call": {
+            "warning": 190,
+            "error": 2
+        },
+        "dollar_string_only": {
+            "warning": 4
+        },
+        "dot_property_access": {
+            "error": 19
+        },
+        "exitcase_after_return": {
+            "hint": 152
+        },
+        "for_numeric_values": {
+            "warning": 2
+        },
+        "global_assignment": {
+            "error": 16
+        },
+        "include_in_procedure": {
+            "warning": 1
+        },
+        "invalid_limstypeex_comparison": {
+            "error": 1
+        },
+        "me_outside_class": {
+            "error": 11,
+            "warning": 52
+        },
+        "mismatched_delimiter": {
+            "error": 1
+        },
+        "missing_otherwise": {
+            "hint": 372
+        },
+        "mixed_error_handling_families": {
+            "warning": 7
+        },
+        "mixed_type_operator": {
+            "warning": 3723
+        },
+        "named_sql_param_unsupported": {
+            "warning": 2
+        },
+        "nil_method_call": {
+            "warning": 5
+        },
+        "no_default_statements_in_datasource": {
+            "error": 10
+        },
+        "parameters_first": {
+            "error": 4
+        },
+        "prefer_exitcase": {
+            "warning": 840
+        },
+        "raiseerror_in_catch": {
+            "warning": 27
+        },
+        "redeclare_is_noop": {
+            "hint": 634
+        },
+        "region_end_mismatch": {
+            "warning": 10
+        },
+        "sql_injection": {
+            "warning": 1702
+        },
+        "trailing_skip_commas": {
+            "hint": 32
+        },
+        "udobject_array_in_clause": {
+            "warning": 1
+        },
+        "unclosed_block": {
+            "error": 3
+        },
+        "unclosed_delimiter": {
+            "error": 6
+        },
+        "unknown_keyword": {
+            "warning": 3
+        },
+        "unknown_token": {
+            "warning": 70
+        },
+        "unmatched_block_end": {
+            "error": 2
+        },
+        "unmatched_delimiter": {
+            "error": 1
+        },
+        "unqualified_field_assignment": {
+            "warning": 14
+        },
+        "zero_based_array_index": {
+            "warning": 245
+        }
+    }
+}

@@ -5,6 +5,40 @@ All notable changes to the "STARLIMS Scripting Language" extension will be docum
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Removed
+- **The native TypeScript document formatter.** Formatting is now provided
+  solely by the bundled `starlims-lsp`. The fallback formatter that ran when
+  the language server was disabled or failed to launch has been deleted along
+  with its tests and fixtures (`src/sslFormattingProvider.ts` and the
+  document-formatting half of `src/formatting/`). Running it over a 6,228-file
+  production corpus showed it was non-idempotent on 18% of files — formatting
+  twice produced different output — and appended stray semicolons to SQL in
+  `.ds` documents. Every other native fallback provider is read-only; a
+  formatter rewrites the user's file, so a second implementation that drifts
+  from the server's is worse than none. With no formatter registered, VS Code
+  now reports that plainly instead of damaging the document.
+  - The **Format SQL** command is unaffected — it has always used its own
+    formatter and is not gated on the language server.
+  - Also removed the vacuous `test:format-fix` and `test:comments-preserved`
+    scripts (both asserted against no-op or missing functions) and the debug
+    and fixture-regeneration scripts for the deleted formatter.
+
+### Fixed
+- **The fallback integration suite was silently running zero tests.**
+  `tests/integration-fallback/**/*` was missing from the tsconfig `include`, so
+  it never compiled and `npm run test:integration-fallback` reported success
+  against an empty suite. It now compiles and runs (4 tests).
+
+### Added
+- **`npm run test:corpus`** — opt-in harness that runs the bundled LSP over a
+  local corpus of real SSL and checks that formatting never fails, is
+  idempotent, and never introduces diagnostics, then diffs corpus-wide
+  diagnostic counts per rule slug against `tests/corpus-baseline.json`.
+  Intended for reviewing an LSP bundle bump. See
+  [docs/CORPUS_TESTING.md](docs/CORPUS_TESTING.md).
+
 ## [1.19.0] - 2026-08-28
 
 ### Added

@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import { SSLFoldingProvider } from "./sslFoldingProvider";
-import { SSLFormattingProvider } from "./sslFormattingProvider";
 import { SSLSymbolProvider } from "./sslSymbolProvider";
 import { SSLCompletionProvider } from "./sslCompletionProvider";
 import { SSLHoverProvider } from "./sslHoverProvider";
@@ -118,23 +117,22 @@ export async function activate(context: vscode.ExtensionContext) {
     // Features provided by LSP when active:
     // - Completion, Hover, Definition, References, Document Symbols
     // - Folding Ranges, Signature Help, Formatting, Diagnostics
-    // 
+    //
     // When LSP is NOT active, register native providers for these features.
     // When LSP IS active, skip registering native providers to avoid duplication.
+    //
+    // Document formatting is the exception: it is LSP-only, with no native
+    // fallback. Every other native provider is read-only, but a formatter
+    // rewrites the user's file, and a second implementation that drifts from
+    // the server's is worse than none — running the old TypeScript formatter
+    // over a corpus of real SSL showed it was non-idempotent on 18% of files
+    // and appended stray semicolons to SQL in .ds documents. With no formatter
+    // registered, VS Code reports that plainly instead of damaging the file.
 
     if (!lspActive) {
         // Register folding range provider (LSP provides this when active)
         context.subscriptions.push(
             vscode.languages.registerFoldingRangeProvider(documentSelector, new SSLFoldingProvider())
-        );
-
-        // Register formatting providers (LSP provides this when active)
-        const formattingProvider = new SSLFormattingProvider();
-        context.subscriptions.push(
-            vscode.languages.registerDocumentFormattingEditProvider(documentSelector, formattingProvider)
-        );
-        context.subscriptions.push(
-            vscode.languages.registerDocumentRangeFormattingEditProvider(documentSelector, formattingProvider)
         );
 
         // Register document symbol provider (LSP provides this when active)
