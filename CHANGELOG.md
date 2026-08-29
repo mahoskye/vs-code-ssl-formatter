@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.21.0] - 2026-08-29
+
+Bundles **starlims-lsp v0.21.0**, which splits the two Hungarian checks
+onto separate switches.
+
+### Added
+- **New setting `ssl.naming.hungarianNotation.checkTypes`** (default
+  `true`) — gates `hungarian_type_mismatch`, the check that warns when a
+  variable's prefix promises one type while its assigned expression
+  produces another (`nCode := SubStr(sText, 1, 4)`). It is independent of
+  `ssl.naming.hungarianNotation.enabled`, and defaults on so the check
+  keeps working for anyone who had it via that setting before v0.21.0.
+
+### Changed
+- **`ssl.naming.hungarianNotation.enabled` no longer controls
+  `hungarian_type_mismatch`**; use the new `checkTypes` setting. The two
+  are different findings: `enabled` audits every declared name against the
+  convention and reports the ones without a prefix — on a codebase that
+  does not use the convention, that is most of the file — while
+  `checkTypes` reports a name contradicting its own prefix and only ever
+  inspects names that already carry one. Users who want the correctness
+  check without the convention audit can now set `enabled` to `false` and
+  leave `checkTypes` on.
+
 ## [1.20.0] - 2026-08-29
 
 Bundles **starlims-lsp v0.19.0** — the expression-AST release, which closes

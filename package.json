@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.20.0",
+    "version": "1.21.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -213,6 +213,11 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Enable Hungarian notation validation"
+                },
+                "ssl.naming.hungarianNotation.checkTypes": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Warn when a variable's Hungarian prefix promises one type but its assigned expression produces another (diagnostic hungarian_type_mismatch), e.g. nCode := SubStr(sText, 1, 4). Independent of ssl.naming.hungarianNotation.enabled: this reports a name that contradicts its own prefix, and only ever inspects names that already carry one, so it stays quiet on code that does not use the convention."
                 },
                 "ssl.naming.hungarianNotation.severity": {
                     "type": "string",
