@@ -7,6 +7,65 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.20.0] - 2026-08-29
+
+Bundles **starlims-lsp v0.19.0** — the expression-AST release, which closes
+the LSP's issue #184. The server gained an expression tree in v0.18.0 with
+no consumers; v0.19.0 is what it was for, and most of what this bump
+delivers is server-side behavior that needs no configuration.
+
+### Added
+- **New diagnostic rule slug `hungarian_type_mismatch`** in
+  `ssl.diagnostics.rules` autocomplete (and `src/constants/diagnosticSlugs.ts`).
+  The rule cross-checks the type a variable's Hungarian prefix promises
+  against the type its assigned expression actually produces —
+  `nCode := SubStr(sText, 1, 4)` stores a string in a number-named
+  variable, `:DEFAULT bFlag, ""` gives a boolean a string default. It is
+  opt-in under the **existing** `ssl.diagnostics.hungarianNotation`
+  setting (default off), so this bump adds **no new settings**; per-rule
+  severity or silencing goes through `ssl.diagnostics.rules` as usual.
+
+- **`npm run test:corpus`** — opt-in harness that runs the bundled LSP over a
+  local corpus of real SSL and checks that formatting never fails, is
+  idempotent, and never introduces diagnostics, then diffs corpus-wide
+  diagnostic counts per rule slug against `tests/corpus-baseline.json`.
+  Intended for reviewing an LSP bundle bump. See
+  [docs/CORPUS_TESTING.md](docs/CORPUS_TESTING.md).
+
+### Changed
+- `builtin_excess_arguments` and `format_arg_not_array` now run on the
+  server's expression tree instead of token scanning. `format_arg_not_array`
+  gains multi-token arguments it previously could not judge
+  (`sFmt:Format(tpl, sA + sB)`), and both are output-identical on the
+  6,228-file production corpus.
+
+### Fixed
+- **Rename no longer rewrites unrelated symbols that share a name.**
+  Renaming a variable `sName` also edited the property in `oRec:sName` and
+  a `:PROCEDURE sName;` header, silently corrupting code the user never
+  meant to touch. Occurrences are now classified by role from the
+  expression tree, so only the symbol under the cursor is renamed. The
+  same classification fixes **go-to-definition** on a member name (it
+  jumped to a like-named local) and **hover** (it reported that local's
+  declaration).
+
+- **A bare `:DECLARE` no longer hides every name it declares.** A
+  declaration whose keyword stands alone on its line, with names on the
+  following lines, registered none of its names — so they were invisible
+  to `undeclared_variable` (each name flagged itself at its own
+  declaration), to **document symbols**, to **rename**, and to the
+  workspace index. Declarations are now read as statements.
+
+- **`builtin_excess_arguments` no longer crashes** on a surplus argument
+  run ending in skipped slots (`Left(sText, nA, nB,,)`), which previously
+  replaced the file's entire diagnostic output with a single internal
+  error.
+
+- **The fallback integration suite was silently running zero tests.**
+  `tests/integration-fallback/**/*` was missing from the tsconfig `include`, so
+  it never compiled and `npm run test:integration-fallback` reported success
+  against an empty suite. It now compiles and runs (4 tests).
+
 ### Removed
 - **The native TypeScript document formatter.** Formatting is now provided
   solely by the bundled `starlims-lsp`. The fallback formatter that ran when
@@ -24,20 +83,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Also removed the vacuous `test:format-fix` and `test:comments-preserved`
     scripts (both asserted against no-op or missing functions) and the debug
     and fixture-regeneration scripts for the deleted formatter.
-
-### Fixed
-- **The fallback integration suite was silently running zero tests.**
-  `tests/integration-fallback/**/*` was missing from the tsconfig `include`, so
-  it never compiled and `npm run test:integration-fallback` reported success
-  against an empty suite. It now compiles and runs (4 tests).
-
-### Added
-- **`npm run test:corpus`** — opt-in harness that runs the bundled LSP over a
-  local corpus of real SSL and checks that formatting never fails, is
-  idempotent, and never introduces diagnostics, then diffs corpus-wide
-  diagnostic counts per rule slug against `tests/corpus-baseline.json`.
-  Intended for reviewing an LSP bundle bump. See
-  [docs/CORPUS_TESTING.md](docs/CORPUS_TESTING.md).
 
 ## [1.19.0] - 2026-08-28
 

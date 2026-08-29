@@ -54,6 +54,7 @@ export const SSL_DIAGNOSTIC_SLUGS = [
     "format_arg_not_array",
     "global_assignment",
     "hungarian_notation",
+    "hungarian_type_mismatch",
     "identifier_too_long",
     "include_early",
     "include_in_procedure",

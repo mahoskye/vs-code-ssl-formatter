@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.19.0",
+    "version": "1.20.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -307,6 +307,7 @@
                             "format_arg_not_array",
                             "global_assignment",
                             "hungarian_notation",
+                            "hungarian_type_mismatch",
                             "identifier_too_long",
                             "include_early",
                             "include_in_procedure",
