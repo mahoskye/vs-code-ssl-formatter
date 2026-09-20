@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.23.0] - 2026-09-20
+
+Bundles **starlims-lsp v0.23.0**, a small correction release.
+
+### Fixed
+- **An explicit `+` sign in a scientific-notation exponent is valid SSL,
+  and the bundled server now reads it.** `9.0E+1` and `1.5e+3` lex as one
+  number; previously the server stopped at `9.0` and reported nothing on
+  the rest. `scientific_notation`'s suggestion for the missing-decimal
+  form keeps the sign you wrote (`9E+1` → `9.0E+1`), and a well-formed
+  number glued to a stray `E` (`2.0E+nVar`) is now reported by
+  `unexpected_token` instead of passing silently. The style guide's
+  matching correction shipped as schema 1.7.2.
+- `x := +5;` is pinned as an `unexpected_token` finding: SSL has no
+  unary plus.
+
+No new slugs, no new settings.
+
 ## [1.22.0] - 2026-09-20
 
 Bundles **starlims-lsp v0.22.0**, which closes the silence behind
