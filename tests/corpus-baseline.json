@@ -1,10 +1,10 @@
 {
-    "lspVersion": "0.21.0",
+    "lspVersion": "0.22.0",
     "corpusFiles": 6228,
     "totals": {
-        "warning": 7485,
+        "warning": 7482,
         "hint": 1190,
-        "error": 119
+        "error": 125
     },
     "codes": {
         "arithmetic_type_mismatch": {
@@ -121,8 +121,8 @@
         "unclosed_delimiter": {
             "error": 6
         },
-        "unknown_keyword": {
-            "warning": 3
+        "unexpected_token": {
+            "error": 5
         },
         "unknown_token": {
             "warning": 70
@@ -135,6 +135,9 @@
         },
         "unqualified_field_assignment": {
             "warning": 14
+        },
+        "unterminated_string": {
+            "error": 1
         },
         "zero_based_array_index": {
             "warning": 245

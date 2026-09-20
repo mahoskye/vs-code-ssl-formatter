@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.22.0] - 2026-09-20
+
+Bundles **starlims-lsp v0.22.0**, which closes the silence behind
+starlims-lsp issue #240: four kinds of broken statement, and any
+unterminated string, used to validate clean.
+
+### Added
+- **`unexpected_token`** (error, always on) — the first token in a
+  statement that the SSL grammar cannot accept, anchored on that token
+  with a message naming it and what was expected
+  (`Unexpected identifier 'is' - expected an operator or ';'`). It catches
+  `:FOR EACH x IN y;` (and says SSL has no such form), a line of prose,
+  `foo bar baz;`, and a statement missing its `;` before the next line.
+  It never consults declarations: an undeclared name inside a well-formed
+  expression remains the opt-in undeclared-variable check's business.
+- **`unterminated_string`** (error, always on) — a string literal that
+  reaches end of file without its closing `"`, `'`, or `]`, reported on
+  the opening delimiter. SSL strings span lines, so an unclosed one
+  swallows the rest of the file; until now nothing said so.
+- Both slugs are in the `ssl.diagnostics.rules` enum, so either can be
+  remapped or turned off like any other rule. No new settings: both are
+  default-on errors with no switch.
+
+### Fixed
+- **A call chain continued on the next line is no longer mangled.**
+  `txt:ToString()` followed by `:Replace(...)` on its own line lexed
+  `:Replace` as a keyword: the editor warned "unknown keyword" on every
+  such line, and formatting recased it to `:REPLACE` and inserted a `;`
+  after the receiver line, splitting one statement into three. The colon
+  after a receiver is now member access even across a line break, and
+  the formatter indents the continuation one level and leaves it alone.
+
 ## [1.21.0] - 2026-08-29
 
 Bundles **starlims-lsp v0.21.0**, which splits the two Hungarian checks
