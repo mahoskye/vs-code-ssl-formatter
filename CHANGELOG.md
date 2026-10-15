@@ -40,6 +40,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   operator in the SSL reference is highlighted (#113, #108).
 
 ### Removed
+- **Native fallback mode.** The bundled starlims-lsp server now provides
+  every language feature, with no second implementation behind it:
+  completion, hover, definition, references, symbols, folding, signature
+  help, rename, inlay hints, formatting and diagnostics. Fallback mode
+  duplicated the server in about 5,800 lines of TypeScript. Its hover and
+  completion data had drifted from the SSL reference (#102), it scanned the
+  workspace at startup even while the server ran, and CI never tested it.
+  The server ships for every platform the extension is packaged for, so
+  fallback mode only ran when something was already broken (#106).
+  - If the server fails to start, an error says why and offers **Show
+    Output** and **Retry**. The status bar shows `SSL · server stopped`, and
+    **SSL: Restart Language Server** starts a stopped server.
+  - These fallback-only settings are removed: `ssl.languageServer.enabled`,
+    `ssl.strictStyleGuideMode`, `ssl.maxNumberOfProblems`,
+    `ssl.security.preventSqlInjection`,
+    `ssl.security.requireParameterizedQueries`,
+    `ssl.naming.hungarianNotation.severity`,
+    `ssl.styleGuide.maxParamsPerProcedure`, `ssl.intellisense.enabled`,
+    `ssl.intellisense.completion.*`, `ssl.intellisense.customFunctions`,
+    `ssl.intellisense.customClasses`,
+    `ssl.intellisense.signatureHelp.enabled` and
+    `ssl.intellisense.inlayHints.parameterNames`. The server's own settings
+    and `ssl.diagnostics.rules` cover what they did.
+  - `ssl.documentNamespaces` and **SSL: Configure Document Namespaces** are
+    removed. Only the fallback providers read the mapping. The server
+    resolves `DoProc` and `ExecFunction` targets from its own workspace
+    index.
+  - The status bar shows the version the server reports instead of an
+    inventory count.
+  - Code actions, CodeLens, document highlights, call hierarchy, the block
+    closer, comment toggling and the Format SQL commands stay. The server
+    does not provide them.
 - **The retired `compact` SQL style** is no longer offered by
   `ssl.format.sql.style` or the **Format SQL (Pick Style)** command. It has
   been an alias for `canonicalCompact` since the 2026-08-28 SQL style
@@ -56,6 +88,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   server reports that as a `comment_text_after_terminator` error. The
   actions now insert `/* @ssl-disable-next-line <rule>;`, and the README
   shows the correct form.
+- **Settings reach the server once, with the right names.** The client
+  also synchronized the raw `ssl` settings section, whose key names
+  (`wrapLength`, `naming.*` and so on) are the extension's, not the
+  server's, alongside the mapped tree it sends itself. Only the mapped tree
+  is sent now, through one listener that no longer multiplies when the
+  server restarts. Changing `editor.tabSize`, which sets the indent size in
+  tab mode, now reaches the server too (#107).
+- **`ssl.diagnostics.rules` is applied once, by the server.** The client
+  re-applied it to every diagnostic batch, though the server has done so
+  since starlims-lsp v0.5.0, and its copy did not know `hint`. `hint` is
+  now offered (#107).
+- **`ssl.trace.server` traces the language server.** It only set the
+  extension's own log level. It now also traces LSP messages in the **SSL
+  Language Server** output channel (#107).
 - **Pressing Enter after `:CLASS Name;` no longer inserts `:ENDCLASS;`.**
   SSL has no `:ENDCLASS` keyword: a class runs to the end of its file, and
   the bundled server reports `:ENDCLASS` as an `endclass_invalid` error. The

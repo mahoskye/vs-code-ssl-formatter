@@ -9,9 +9,6 @@
 export interface StatusBarState {
     lspRunning: boolean;
     lspVersion: string | null;
-    fnCount: number;
-    classCount: number;
-    inventoryReady: boolean;
 }
 
 export interface RenderedStatus {
@@ -20,26 +17,24 @@ export interface RenderedStatus {
 }
 
 export function renderStatus(state: StatusBarState): RenderedStatus {
-    const segments: string[] = ['$(symbol-namespace) SSL'];
-    if (state.lspRunning) {
-        segments.push(state.lspVersion ? `LSP ${state.lspVersion}` : 'LSP');
-    } else {
-        segments.push('native');
+    if (!state.lspRunning) {
+        return {
+            text: "$(warning) SSL · server stopped",
+            tooltip: [
+                "STARLIMS SSL extension",
+                "Language server: not running, so SSL language features are unavailable.",
+                "Run \"SSL: Restart Language Server\" to try again, or click to open the SSL output channel.",
+            ].join("\n"),
+        };
     }
-    if (state.inventoryReady) {
-        segments.push(`${state.fnCount} fns · ${state.classCount} classes`);
-    }
-    const text = segments.join(' · ');
 
-    const tooltipLines = [
-        `STARLIMS SSL extension`,
-        state.lspRunning
-            ? `Language server: running${state.lspVersion ? ` (${state.lspVersion})` : ''}`
-            : `Language server: not running (using native fallback)`,
-        state.inventoryReady
-            ? `Inventory: ${state.fnCount} functions, ${state.classCount} classes (loaded from bundled LSP)`
-            : `Inventory: hardcoded fallback subset`,
-        `Click to open the SSL output channel.`
-    ];
-    return { text, tooltip: tooltipLines.join('\n') };
+    const version = state.lspVersion ? ` ${state.lspVersion}` : "";
+    return {
+        text: `$(symbol-namespace) SSL · LSP${version}`,
+        tooltip: [
+            "STARLIMS SSL extension",
+            `Language server: running${state.lspVersion ? ` (starlims-lsp ${state.lspVersion})` : ""}`,
+            "Click to open the SSL output channel.",
+        ].join("\n"),
+    };
 }
