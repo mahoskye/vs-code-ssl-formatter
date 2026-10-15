@@ -4,7 +4,7 @@
 of **real** SSL — thousands of production `.srvscr` and `.ds` files — and checks
 that a new server build does not change how it behaves on that code.
 
-Hand-written fixtures in `tests/fixtures/` cover the rules we thought to write
+Hand-written unit and integration tests cover the rules we thought to write
 down. The corpus covers the code people actually ship: legacy comment blocks,
 hand-wrapped SQL, decades-old formatting conventions, and constructs nobody
 would think to invent for a test.
@@ -140,4 +140,4 @@ non-idempotent on 18% of real files and appending stray semicolons to SQL in
 implementation that drifts from the server's.
 
 The SQL formatters that remain in `src/formatting/` back the **Format SQL**
-command, which is a separate always-on feature and is not exercised here.
+commands, which reflow one SQL string on request and are not exercised here.

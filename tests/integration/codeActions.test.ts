@@ -7,7 +7,7 @@ import * as vscode from 'vscode';
  * coded diagnostic, asks VS Code for code actions at the diagnostic
  * range, applies the first one, and asserts the resulting document.
  *
- * Picks `udobject_array_in_clause` as the canary because:
+ * The first test picks `udobject_array_in_clause` as the canary because:
  *   - it's a single-emit diagnostic with a stable slug,
  *   - the fix produces a unique signature in the output (`:DECLARE` + a new
  *     placeholder name) we can assert without hand-tracing the LSP's range,
@@ -65,6 +65,48 @@ SqlExecute("SELECT * FROM t WHERE id IN (?o:Items?)");
             `After fix, the SQL placeholder should reference the local. Got:\n${after}`);
         assert.ok(!after.includes('?o:Items?'),
             `Original placeholder should be gone. Got:\n${after}`);
+    });
+
+    test('direct_procedure_call: converts a direct call to a same-file procedure into DoProc', async function () {
+        this.timeout(20000);
+
+        const content = `:PROCEDURE Tally;
+:PARAMETERS nA, nB;
+:RETURN nA + nB;
+:ENDPROC;
+
+:PROCEDURE Main;
+:DECLARE nTotal;
+nTotal := Tally(1, 2);
+:RETURN nTotal;
+:ENDPROC;
+`;
+        const doc = await vscode.workspace.openTextDocument({ language: 'ssl', content });
+        await vscode.window.showTextDocument(doc);
+
+        const deadline = Date.now() + 10000;
+        let target: vscode.Diagnostic | undefined;
+        while (Date.now() < deadline) {
+            target = vscode.languages.getDiagnostics(doc.uri)
+                .find(d => stringifyCode(d.code) === 'direct_procedure_call');
+            if (target) {
+                break;
+            }
+            await new Promise(r => setTimeout(r, 200));
+        }
+        assert.ok(target, `LSP should emit a 'direct_procedure_call' diagnostic within 10s`);
+
+        const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+            'vscode.executeCodeActionProvider',
+            doc.uri,
+            target!.range
+        );
+        const fix = actions.find(a => a.title.startsWith('Convert to DoProc'));
+        assert.ok(fix, 'expected the Convert to DoProc fix to be offered');
+
+        await vscode.workspace.applyEdit(fix.edit!);
+        assert.ok(doc.getText().includes('nTotal := DoProc("Tally", {1, 2});'),
+            `After fix, the call should use DoProc. Got:\n${doc.getText()}`);
     });
 });
 

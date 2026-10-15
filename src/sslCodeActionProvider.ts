@@ -11,13 +11,9 @@ const LSP_SLUG_SET = new Set<string>(SSL_DIAGNOSTIC_SLUGS as readonly string[]);
 /**
  * Quick-fix code actions for SSL diagnostics.
  *
- * Two parallel dispatch paths:
- *
- * 1. Extension-emitted native diagnostics (kebab-case codes like
- *    `ssl-invalid-direct-call`) — fixes for legacy native checks.
- * 2. LSP-emitted diagnostics (snake_case slugs like `udobject_array_in_clause`,
- *    `keyword_uppercase`) — fixes keyed on the stable rule slugs introduced
- *    by starlims-lsp v0.4.0.
+ * Fixes are keyed on the stable rule slugs the language server emits
+ * (`udobject_array_in_clause`, `keyword_uppercase`, …), introduced in
+ * starlims-lsp v0.4.0.
  *
  * Codes from `diagnostic.code` arrive as `string | number | { value }` from
  * vscode-languageclient. We normalize via `getDiagnosticCode`.
@@ -45,8 +41,13 @@ export class SSLCodeActionProvider implements vscode.CodeActionProvider {
 
 			let action: vscode.CodeAction | undefined;
 			switch (code) {
-				case 'ssl-invalid-direct-call':
-					action = createDoProcFix(document, diagnostic);
+				case 'direct_procedure_call':
+					// The error tier is a call to a procedure declared in this
+					// file. The warning tier is an unknown name that may be a
+					// built-in missing from the inventory, where DoProc is wrong.
+					if (diagnostic.severity === vscode.DiagnosticSeverity.Error) {
+						action = createDoProcFix(document, diagnostic);
+					}
 					break;
 				case 'udobject_array_in_clause':
 					action = createUDObjectInClauseFix(document, diagnostic);
@@ -138,17 +139,23 @@ function getDiagnosticCode(diagnostic: vscode.Diagnostic): string | undefined {
 	return undefined;
 }
 
-// ---- ssl-invalid-direct-call ------------------------------------------------
+// ---- direct_procedure_call ---------------------------------------------------
 
 function createDoProcFix(
 	document: vscode.TextDocument,
 	diagnostic: vscode.Diagnostic
 ): vscode.CodeAction | undefined {
 	const lineText = document.lineAt(diagnostic.range.start.line).text;
-	const name = document.getText(diagnostic.range);
+	// The procedure name is the identifier at the diagnostic's start; the
+	// server's range is not relied on to cover exactly the name.
+	const nameRange = document.getWordRangeAtPosition(diagnostic.range.start, /[A-Za-z_][A-Za-z0-9_]*/)
+		?? diagnostic.range;
+	const name = document.getText(nameRange);
 
-	const openParenIndex = lineText.indexOf('(', diagnostic.range.end.character);
-	if (openParenIndex === -1) { return undefined; }
+	const openParenIndex = lineText.indexOf('(', nameRange.end.character);
+	if (openParenIndex === -1 || lineText.slice(nameRange.end.character, openParenIndex).trim() !== '') {
+		return undefined;
+	}
 
 	let balance = 1;
 	let closeParenIndex = -1;
@@ -176,9 +183,9 @@ function createDoProcFix(
 	);
 	fix.edit = new vscode.WorkspaceEdit();
 	const fullRange = new vscode.Range(
-		diagnostic.range.start.line,
-		diagnostic.range.start.character,
-		diagnostic.range.start.line,
+		nameRange.start.line,
+		nameRange.start.character,
+		nameRange.start.line,
 		closeParenIndex + 1
 	);
 	fix.edit.replace(document.uri, fullRange, replacement);
