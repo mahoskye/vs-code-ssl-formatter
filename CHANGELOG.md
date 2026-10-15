@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **The retired `compact` SQL style** is no longer offered by
+  `ssl.format.sql.style` or the **Format SQL (Pick Style)** command. It has
+  been an alias for `canonicalCompact` since the 2026-08-28 SQL style
+  review. A stored `compact` is rewritten to `canonicalCompact` on startup,
+  in user, workspace and folder settings, with a one-time notice, so
+  formatted output does not change. This is step 1 of starlims-lsp's
+  removal plan: the next starlims-lsp minor release drops the alias, after
+  which an unrecognized style formats as `standard` (#115).
+
 ### Fixed
 - **Pressing Enter after `:CLASS Name;` no longer inserts `:ENDCLASS;`.**
   SSL has no `:ENDCLASS` keyword: a class runs to the end of its file, and
