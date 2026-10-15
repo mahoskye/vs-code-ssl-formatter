@@ -1,14 +1,14 @@
 {
-    "lspVersion": "0.23.0",
+    "lspVersion": "0.28.0",
     "corpusFiles": 6228,
     "totals": {
-        "warning": 7482,
-        "hint": 1190,
-        "error": 125
+        "warning": 3431,
+        "hint": 1168,
+        "error": 236
     },
     "codes": {
         "arithmetic_type_mismatch": {
-            "warning": 281
+            "warning": 10
         },
         "assignment_in_condition": {
             "warning": 3
@@ -22,15 +22,17 @@
         "class_name_collision": {
             "warning": 1
         },
+        "comment_swallows_code": {
+            "warning": 248
+        },
         "comment_termination": {
             "error": 1
         },
         "comment_text_after_terminator": {
-            "warning": 67,
             "error": 2
         },
         "datasource_sql_semicolon": {
-            "warning": 10
+            "error": 20
         },
         "datasource_undeclared_placeholder": {
             "warning": 1
@@ -38,18 +40,20 @@
         "default_after_parameters": {
             "error": 35
         },
+        "default_on_declare_line": {
+            "error": 35
+        },
         "deprecated_keyword": {
             "warning": 127
         },
         "direct_procedure_call": {
-            "warning": 190,
-            "error": 2
-        },
-        "dollar_string_only": {
-            "warning": 4
+            "warning": 192
         },
         "dot_property_access": {
             "error": 19
+        },
+        "equals_empty_string": {
+            "warning": 2
         },
         "exitcase_after_return": {
             "hint": 152
@@ -58,20 +62,17 @@
             "warning": 2
         },
         "global_assignment": {
-            "error": 16
+            "warning": 16
         },
         "include_in_procedure": {
             "warning": 1
         },
         "invalid_limstypeex_comparison": {
-            "error": 1
+            "error": 2
         },
         "me_outside_class": {
             "error": 11,
             "warning": 52
-        },
-        "mismatched_delimiter": {
-            "error": 1
         },
         "missing_otherwise": {
             "hint": 372
@@ -80,19 +81,26 @@
             "warning": 7
         },
         "mixed_type_operator": {
-            "warning": 3723
+            "warning": 108
         },
         "named_sql_param_unsupported": {
-            "warning": 2
+            "error": 2
         },
         "nil_method_call": {
-            "warning": 5
+            "warning": 1
         },
         "no_default_statements_in_datasource": {
             "error": 10
         },
         "parameters_first": {
             "error": 4
+        },
+        "parenthesize_mixed_logical": {
+            "warning": 3
+        },
+        "parenthesize_negated_comparison": {
+            "error": 4,
+            "warning": 1
         },
         "prefer_exitcase": {
             "warning": 840
@@ -104,28 +112,25 @@
             "hint": 634
         },
         "region_end_mismatch": {
-            "warning": 10
+            "hint": 10
         },
         "sql_injection": {
-            "warning": 1702
-        },
-        "trailing_skip_commas": {
-            "hint": 32
+            "warning": 1652
         },
         "udobject_array_in_clause": {
             "warning": 1
         },
         "unclosed_block": {
-            "error": 3
+            "error": 2
         },
         "unclosed_delimiter": {
             "error": 6
         },
         "unexpected_token": {
-            "error": 5
+            "error": 4
         },
         "unknown_token": {
-            "warning": 70
+            "error": 70
         },
         "unmatched_block_end": {
             "error": 2
@@ -134,13 +139,13 @@
             "error": 1
         },
         "unqualified_field_assignment": {
-            "warning": 14
+            "warning": 15
+        },
+        "unqualified_field_read": {
+            "warning": 24
         },
         "unterminated_string": {
             "error": 1
-        },
-        "zero_based_array_index": {
-            "warning": 245
         }
     }
 }

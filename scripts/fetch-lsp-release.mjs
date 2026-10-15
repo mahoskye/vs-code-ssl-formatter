@@ -5,10 +5,14 @@
 // tampered or truncated download can never be committed unnoticed.
 //
 // Usage: node scripts/fetch-lsp-release.mjs v0.14.1
+//
+// On success it records the bundled tag in server/LSP_VERSION, which
+// scripts/generate-diagnostic-slugs.mjs reads, and stamps the "Bundled
+// version" line in server/DOCUMENTATION.md.
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -70,3 +74,19 @@ if (failed) {
     process.exit(1);
 }
 console.log(`\nAll ${assets.length} assets verified against GitHub release digests.`);
+
+writeFileSync(join(serverDir, "LSP_VERSION"), `${version}\n`, "utf8");
+
+const docPath = join(serverDir, "DOCUMENTATION.md");
+const doc = readFileSync(docPath, "utf8");
+const built = (release.published_at ?? "").slice(0, 10);
+const stamped = doc.replace(
+    /`starlims-lsp` v\d+\.\d+\.\d+ \(built [^)]*\)/,
+    `\`starlims-lsp\` ${version} (built ${built})`
+);
+if (stamped === doc && !doc.includes(`\`starlims-lsp\` ${version} `)) {
+    console.error("Could not find the \"Bundled version\" line in server/DOCUMENTATION.md to stamp.");
+    process.exit(1);
+}
+writeFileSync(docPath, stamped, "utf8");
+console.log(`Recorded ${version} in server/LSP_VERSION and server/DOCUMENTATION.md.`);

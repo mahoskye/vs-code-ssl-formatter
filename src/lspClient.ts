@@ -110,7 +110,7 @@ function getSSLConfiguration(): object {
                 blankLinesBetweenProcs: config.get<number>('format.blankLinesBetweenProcs', 1),
                 trimTrailingWhitespace: config.get<boolean>('format.trimTrailingWhitespace', true),
                 builtinFunctionCase: config.get<string>('format.builtinFunctionCase', 'PascalCase'),
-                maxConsecutiveBlankLines: config.get<number>('format.maxConsecutiveBlankLines', 0),
+                maxConsecutiveBlankLines: config.get<number>('format.maxConsecutiveBlankLines', 2),
                 sql: {
                     enabled: config.get<boolean>('format.sql.enabled', true),
                     style: config.get<string>('format.sql.style', 'canonicalCompact'),
@@ -133,7 +133,10 @@ function getSSLConfiguration(): object {
                 rules,
                 endpointPatterns,
                 unusedVariables,
-                infoDiagnostics: config.get<boolean>('diagnostics.infoDiagnostics', false)
+                infoDiagnostics: config.get<boolean>('diagnostics.infoDiagnostics', false),
+                maxProcedureCodeLines: config.get<number>('diagnostics.maxProcedureCodeLines', 80),
+                maxScriptCodeLines: config.get<number>('diagnostics.maxScriptCodeLines', 400),
+                maxScriptProcedures: config.get<number>('diagnostics.maxScriptProcedures', 12)
             },
             inlayHints: {
                 enabled: config.get<boolean>('intellisense.inlayHints.enabled', true),
@@ -226,7 +229,10 @@ export async function startClient(context: vscode.ExtensionContext): Promise<Lan
                 e.affectsConfiguration('ssl.diagnostics.rules') ||
                 e.affectsConfiguration('ssl.diagnostics.endpointPatterns') ||
                 e.affectsConfiguration('ssl.diagnostics.unusedVariables') ||
-                e.affectsConfiguration('ssl.diagnostics.infoDiagnostics')
+                e.affectsConfiguration('ssl.diagnostics.infoDiagnostics') ||
+                e.affectsConfiguration('ssl.diagnostics.maxProcedureCodeLines') ||
+                e.affectsConfiguration('ssl.diagnostics.maxScriptCodeLines') ||
+                e.affectsConfiguration('ssl.diagnostics.maxScriptProcedures')
             ) {
                 sendConfigurationUpdate();
             }

@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.24.0] - 2026-10-14
+
+Bundles **starlims-lsp v0.28.0**, up from v0.23.0. This picks up five
+server releases at once: v0.24.0 (the strict profile), v0.25.0 (the drift
+audit), v0.26.0 (the formatter release), v0.27.0 (the verified-behavior
+release) and v0.28.0 (the atoms-of-confusion release). Each is described in
+starlims-lsp's CHANGELOG.
+
+### Formatting changes: read before upgrading
+
+Formatted output changes for most files. On a 6,228-file production
+corpus, formatting with this release rewrites 5,350 files. Formatting stays
+idempotent and adds no errors. The largest changes:
+- brackets and declaration lists align their contents;
+- one blank line separates the logical sections of a body (after the
+  declarations, around control blocks, before a section comment and before
+  a procedure's final `:RETURN`);
+- embedded SQL packs within the line limit, and MERGE `UPDATE SET` lays out
+  like a plain `UPDATE`;
+- unary operators attach to their operands (`! Empty(x)` → `!Empty(x)`);
+- formatting a selection gives exactly what a full format does.
+
+To adopt it:
+1. Reformat each codebase in one commit that contains nothing else.
+2. Add that commit's hash to `.git-blame-ignore-revs`, so `git blame`
+   skips it.
+3. Only then turn on `ssl.format.formatOnSave`.
+
+### Added
+- **28 diagnostic codes** are in the `ssl.diagnostics.rules` enum, so each
+  can be remapped or turned off:
+  - v0.24.0: `comment_swallows_code`
+  - v0.25.0: `builder_directive_outside_datasource`,
+    `datasource_default_required`, `datasource_sql_question_placeholder`,
+    `empty_parameters`, `endclass_invalid`, `equals_empty_string`,
+    `exitcase_last_in_branch`, `include_quoted_target`, `inherit_position`,
+    `inherit_qualified_name`, `inline_default_outside_datasource`,
+    `internal_error`, `invalid_native_member`,
+    `invariant_date_columns_quoted`, `nullasblank_value`,
+    `stray_block_keyword`, `unqualified_field_read`
+  - v0.27.0: `array_index_whole_number`, `branch_literal_target`,
+    `non_logical_condition`, `parenthesize_negated_comparison`,
+    `procedure_length_review`, `script_size_review`
+  - v0.28.0: `increment_as_statement`, `one_assignment_per_statement`,
+    `parenthesize_mixed_logical`, `prefer_explicit_trim_concat`
+- **Size review settings** for the two info-tier review rules:
+  - `ssl.diagnostics.maxProcedureCodeLines` (default `80`):
+    `procedure_length_review`.
+  - `ssl.diagnostics.maxScriptCodeLines` (default `400`) and
+    `ssl.diagnostics.maxScriptProcedures` (default `12`):
+    `script_size_review`.
+
+  Blank and comment-only lines do not count, and `0` disables each. Both
+  rules are prompts to review, not limits, so they show only with
+  `ssl.diagnostics.infoDiagnostics` on or an explicit
+  `ssl.diagnostics.rules` entry.
+
+### Changed
+- **Some files that were clean now show errors.** Each of these reports
+  code that does not compile or fails at run time:
+  - New error codes: `branch_literal_target` (a computed `Branch()` target
+    never jumps), `non_logical_condition`, `array_index_whole_number`,
+    most of the v0.25.0 codes above, and `parenthesize_negated_comparison`
+    when the negated operand is a literal.
+  - Raised to error: `datasource_sql_semicolon`, `code_block_structure`,
+    `unknown_token`, `scientific_notation`, `named_sql_param_unsupported`
+    and `comment_text_after_terminator`.
+  - Lowered: `global_assignment` is a warning.
+
+  On the production corpus, errors go from 125 to 236 and warnings from
+  7,482 to 3,431, most of the drop being `mixed_type_operator` and
+  `zero_based_array_index` false positives that the server no longer
+  reports.
+- **`ssl.format.maxConsecutiveBlankLines` defaults to `2`** (was `0`,
+  disabled), matching the server. Runs of three or more blank lines
+  collapse to two. Set it to `0` to keep the old behavior.
+- **Blank lines between sections** are always on. The server's
+  `blankLinesBetweenSections` option is not exposed as a setting: the
+  server adds new formatter options only for compatibility or
+  accessibility, not as style preferences, and applies its default (on)
+  when the extension doesn't send one.
+
+### Maintenance
+- `scripts/fetch-lsp-release.mjs` records the bundled tag in
+  `server/LSP_VERSION` and stamps the version in `server/DOCUMENTATION.md`,
+  which had still said v0.14.0.
+- `scripts/generate-diagnostic-slugs.mjs` reads the diagnostic codes at
+  the bundled tag rather than at whatever `../starlims-lsp` has checked out,
+  so the slug list always matches the shipped binaries.
+- `tests/corpus-baseline.json` is re-stamped for v0.28.0.
+
 ## [1.23.0] - 2026-09-20
 
 Bundles **starlims-lsp v0.23.0**, a small correction release.
