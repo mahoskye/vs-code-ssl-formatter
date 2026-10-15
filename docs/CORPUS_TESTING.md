@@ -68,10 +68,10 @@ it, the corpus file count, and diagnostic counts per rule slug:
 
 ```json
 {
-    "lspVersion": "0.28.0",
+    "lspVersion": "0.28.1",
     "corpus": "starlims-corpus/script-codebase",
     "corpusFiles": 10170,
-    "filesGainingErrors": 2,
+    "filesGainingErrors": 1,
     "totals": { "warning": 5355, "hint": 1721, "error": 325 },
     "codes": {
         "sql_injection": { "warning": 3022 }
@@ -85,9 +85,11 @@ the file is an aggregate count; it never names a file.
 
 `filesGainingErrors` accepts a known server defect that makes formatting add
 errors to some files. The check then fails only when that number changes, and
-still lists the files on every run. With v0.28.0 it is 2: raw SQL written
-outside any string gets a `;` per line (mahoskye/starlims-lsp#351). Drop the
-field once the server is fixed.
+still lists the files on every run. With v0.28.1 it is 1: a `;` added after
+a stray `}` makes the next line a statement of its own
+(mahoskye/starlims-lsp#355). v0.28.1 fixed the other file, raw SQL written
+outside any string (mahoskye/starlims-lsp#351). Drop the field once the
+server is fixed.
 
 Regenerate it after reviewing a change:
 
