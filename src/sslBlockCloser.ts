@@ -45,12 +45,6 @@ export const FAMILIES: ReadonlyArray<BlockFamily> = [
         closerText: ":ENDPROC;",
     },
     {
-        openerLine: /^\s*:CLASS\b.*;\s*$/i,
-        openerKeyword: /^\s*:CLASS\b/i,
-        closerKeyword: /^\s*:ENDCLASS\b/i,
-        closerText: ":ENDCLASS;",
-    },
-    {
         openerLine: /^\s*:REGION\b.*;\s*$/i,
         openerKeyword: /^\s*:REGION\b/i,
         closerKeyword: /^\s*:ENDREGION\b/i,
