@@ -926,6 +926,10 @@ function createInvalidLimsTypeExComparisonFix(
  * to match the diagnostic's line, and inserts it immediately above. The LSP
  * v0.5.0+ honors the directive at parse time so the diagnostic disappears
  * on the next publishDiagnostics round.
+ *
+ * An SSL comment ends at its first `;`, so the directive has no closing
+ * `*\/`: one would be code after the comment, which the server reports as
+ * `comment_text_after_terminator` (an error since starlims-lsp v0.27.0).
  */
 function createSuppressLineAction(
 	document: vscode.TextDocument,
@@ -934,7 +938,7 @@ function createSuppressLineAction(
 ): vscode.CodeAction {
 	const line = diagnostic.range.start.line;
 	const indent = leadingIndent(document, line);
-	const insertText = `${indent}/* @ssl-disable-next-line ${slug}; */\n`;
+	const insertText = `${indent}/* @ssl-disable-next-line ${slug};\n`;
 
 	const fix = new vscode.CodeAction(
 		`Suppress '${slug}' on this line`,
@@ -966,7 +970,7 @@ function createSuppressFileAction(
 	fix.edit.insert(
 		document.uri,
 		new vscode.Position(0, 0),
-		`/* @ssl-disable ${slug}; */\n`,
+		`/* @ssl-disable ${slug};\n`,
 	);
 	fix.diagnostics = [diagnostic];
 	fix.isPreferred = false;

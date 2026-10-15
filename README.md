@@ -76,7 +76,7 @@ code --install-extension vs-code-ssl-formatter-*.vsix
 - Live validation for block depth, procedure parameter count, Hungarian notation adherence, SQL injection risks, missing semicolons, missing OTHERWISE clauses, and other style guide rules.
 - Configurable severity levels (error, warning, info) and strict style-guide mode to convert warnings to errors.
 - **Per-rule overrides**: `ssl.diagnostics.rules` accepts a slug → severity map (`"off" | "hint" | "info" | "warn" | "error"`), applied by the language server. Settings UI offers slug autocomplete from the bundled LSP's published rule list (96 slugs as of v1.15.1).
-- **Source-level suppression**: `/* @ssl-disable <slug>; */` silences the named rule for the rest of the file; `/* @ssl-disable-next-line <slug>; */` silences only the line that follows. `*` matches every coded diagnostic.
+- **Source-level suppression**: `/* @ssl-disable <slug>;` silences the named rule for the rest of the file; `/* @ssl-disable-next-line <slug>;` silences only the line that follows. An SSL comment ends at its first `;`, so the directive has no closing `*/`, and text after the `;` would be code. A reason may follow the rule after `--`, `—` or `:`. `*` matches every coded diagnostic.
 - **Quick fixes** keyed on stable rule slugs:
   - `udobject_array_in_clause` — extract the UDObject property to a local variable and rewrite the `IN (?...?)` placeholder.
   - `keyword_uppercase` — uppercase the flagged keyword.
@@ -92,8 +92,8 @@ code --install-extension vs-code-ssl-formatter-*.vsix
   - `default_after_parameters` — relocate `:DEFAULT` to follow `:PARAMETERS`.
   - `nested_iif` — refactor an `IIF(...)` assignment into `:IF / :ELSE / :ENDIF` (offered as a `Refactor → Rewrite` action).
 - **Universal lightbulb actions** offered alongside any rule-specific fix above:
-  - *Suppress '\<slug\>' on this line* — inserts `/* @ssl-disable-next-line <slug>; */`.
-  - *Suppress '\<slug\>' for this file* — inserts `/* @ssl-disable <slug>; */` at the top.
+  - *Suppress '\<slug\>' on this line* — inserts `/* @ssl-disable-next-line <slug>;`.
+  - *Suppress '\<slug\>' for this file* — inserts `/* @ssl-disable <slug>;` at the top.
   - *Show docs for '\<element\>'* — opens the ssl-docs page for the named function/class/keyword/operator.
 
 ### Editor Enhancements
