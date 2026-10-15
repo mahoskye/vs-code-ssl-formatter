@@ -1,78 +1,20 @@
 # Developer Documentation
 
-This directory contains documentation for developers contributing to the SSL VS Code extension.
+Start with [AGENTS.md](../AGENTS.md): what the extension is, the decisions to
+keep, how to build and test, and the release process.
 
-## 📚 Documentation Files
+| Document | Contents |
+| --- | --- |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | How the extension is put together: the language client, the extension's own providers, settings flow, the grammar sync, and the tests. |
+| [CORPUS_TESTING.md](CORPUS_TESTING.md) | Running the bundled server over the private corpus to review a server bump. |
+| [../.github/workflows/README.md](../.github/workflows/README.md) | The CI, publish and CodeQL workflows. |
+| [archive/](archive/README.md) | Historical documents that no longer describe the extension. |
 
-### Architecture & Development
+User documentation is the [README](../README.md); release history is the
+[CHANGELOG](../CHANGELOG.md). The extension is MIT-licensed ([LICENSE](../LICENSE)).
 
-**[ARCHITECTURE.md](ARCHITECTURE.md)**
-- Complete extension architecture and design
-- Feature implementation details
-- Build and development guide
-- Configuration reference
-
-### CI/CD & Testing
-
-**[CI_SETUP.md](CI_SETUP.md)**
-- GitHub Actions workflow documentation
-- CI/CD pipeline setup
-- Testing infrastructure
-- Publishing workflow
-
-**[CORPUS_TESTING.md](CORPUS_TESTING.md)**
-- Running the bundled LSP against thousands of real SSL files
-- Formatter idempotency and safety invariants
-- Diagnostic baselines for reviewing an LSP bundle bump
-
-### Language Reference
-
-**[grammar/ssl-ebnf.md](grammar/ssl-ebnf.md)**
-- Complete EBNF grammar for SSL v11
-- Language syntax reference
-- Parser implementation guide
-
-## 🚀 Quick Start
-
-### For Contributors
-
-1. Read [ARCHITECTURE.md](ARCHITECTURE.md) to understand the codebase
-2. Check [CI_SETUP.md](CI_SETUP.md) for testing and CI information
-3. See [grammar/ssl-ebnf.md](grammar/ssl-ebnf.md) for language details
-
-### Running Tests
-
-```bash
-npm run compile
-npm run lint
-npm run test:unit
-```
-
-Optionally, against a local corpus of real SSL — see
-[CORPUS_TESTING.md](CORPUS_TESTING.md):
-
-```bash
-npm run test:corpus
-```
-
-### Building the Extension
-
-```bash
-npm run package
-```
-
-Creates a `.vsix` file you can install locally.
-
-## 📖 Additional Resources
-
-- [README.md](../README.md) - User-facing documentation
-- [CHANGELOG.md](../CHANGELOG.md) - Version history
-- [LICENSE.txt](../LICENSE.txt) - MIT License
-
-## 🤝 Contributing
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for:
-- Project structure
-- Coding conventions
-- Testing guidelines
-- Pull request process
+For the SSL language itself, see the
+[SSL reference](https://github.com/mahoskye/starlims-ssl-reference) (written for
+STARLIMS 11, verified on STARLIMS 12) and
+[ssl-style-guide](https://github.com/mahoskye/ssl-style-guide) for the style
+rules and grammars.

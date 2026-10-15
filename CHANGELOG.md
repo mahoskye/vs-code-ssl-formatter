@@ -82,6 +82,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which an unrecognized style formats as `standard` (#115).
 
 ### Fixed
+- **The Convert to DoProc quick fix works again.** It was keyed on a code
+  only the old fallback diagnostics emitted, so with the language server it
+  never appeared. It now fixes the server's `direct_procedure_call` when the
+  called procedure is declared in the same file (the error tier). It is not
+  offered for an unknown name, which may be a built-in (#109).
 - **Settings reach the server once, with the right names.** The client
   also synchronized the raw `ssl` settings section, whose key names
   (`wrapLength`, `naming.*` and so on) are the extension's, not the
@@ -103,6 +108,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `:ENDTRY`, `:ENDPROC`, `:ENDREGION`) were checked against the SSL
   reference and are unchanged. `:CLASS` also no longer opens a folding
   marker that nothing closes (#105).
+
+### Documentation
+- **Documentation describes the extension as it is** (#109):
+  - The README is rewritten. It documents every setting and command, states
+    the language target (written for STARLIMS 11, verified on STARLIMS 12),
+    and says which features come from the server.
+  - `AGENTS.md` covers the design decisions, build and test commands, data
+    rules for this public repository, the sibling repositories, and the
+    release process.
+  - `docs/ARCHITECTURE.md` is a short current-state description. The
+    original language-server design, the 2025 roadmap, the CI setup note and
+    the old language notes move to `docs/archive/`.
+  - `server/DOCUMENTATION.md`, which ships in the package, now describes the
+    bundled server and links to its documentation.
+  - The CHANGELOG has release links for every tagged version.
 
 ### Maintenance
 - **Dependencies:**
@@ -1701,8 +1721,38 @@ For issues, feature requests, or questions:
 
 ---
 
-**[Unreleased]**: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.1.0...HEAD
-**[1.1.0]**: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.0.2...v1.1.0
-**[1.0.2]**: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.0.1...v1.0.2
-**[1.0.1]**: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.0.0...v1.0.1
-**[1.0.0]**: https://github.com/mahoskye/vs-code-ssl-formatter/releases/tag/v1.0.0
+<!-- Release links. Versions without one were never tagged: 1.20.0, 1.14.0, 1.9.1, 1.8.0, 1.7.0, 1.6.0, 1.5.1, 1.5.0, 1.4.0, 1.3.1, 1.3.0, 1.2.5, 1.1.0, 0.4.0, 0.1.0. -->
+[Unreleased]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.24.0...HEAD
+[1.24.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.23.0...v1.24.0
+[1.23.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.22.0...v1.23.0
+[1.22.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.21.0...v1.22.0
+[1.21.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.19.0...v1.21.0
+[1.19.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.18.0...v1.19.0
+[1.18.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.17.0...v1.18.0
+[1.17.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.16.0...v1.17.0
+[1.16.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.15.1...v1.16.0
+[1.15.1]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.15.0...v1.15.1
+[1.15.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.13.0...v1.15.0
+[1.13.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.12.0...v1.13.0
+[1.12.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.11.0...v1.12.0
+[1.11.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.10.7...v1.11.0
+[1.10.7]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.10.6...v1.10.7
+[1.10.6]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.10.5...v1.10.6
+[1.10.5]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.10.4...v1.10.5
+[1.10.4]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.10.3...v1.10.4
+[1.10.3]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.10.2...v1.10.3
+[1.10.2]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.10.1...v1.10.2
+[1.10.1]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.10.0...v1.10.1
+[1.10.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.9.0...v1.10.0
+[1.9.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.3.3...v1.9.0
+[1.3.3]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.3.2...v1.3.3
+[1.3.2]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.2.4...v1.3.2
+[1.2.4]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.2.3...v1.2.4
+[1.2.3]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.2.2...v1.2.3
+[1.2.2]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.2.0...v1.2.2
+[1.2.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.0.2...v1.2.0
+[1.0.2]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.0.1...v1.0.2
+[1.0.1]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v0.3.0...v1.0.0
+[0.3.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v0.2.0...v0.3.0
+[0.2.0]: https://github.com/mahoskye/vs-code-ssl-formatter/releases/tag/v0.2.0

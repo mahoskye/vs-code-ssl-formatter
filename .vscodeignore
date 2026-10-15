@@ -30,6 +30,7 @@ knip.json
 media/*.svg
 
 # Development docs
+AGENTS.md
 docs/**
 dev/**
 .claude/**
