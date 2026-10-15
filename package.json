@@ -217,11 +217,12 @@
                 "ssl.diagnostics.rules": {
                     "type": "object",
                     "default": {},
-                    "description": "Per-rule severity overrides for LSP-emitted diagnostics. Keys are stable rule slugs (e.g. parameters_first, prefer_exitcase, udobject_array_in_clause); values are 'off', 'info', 'warn', or 'error'. Rules set to 'off' are dropped on the client; other values remap the LSP-supplied severity. Forwarded to the LSP via initializationOptions for future server-side support.",
+                    "description": "Per-rule severity overrides, applied by the language server. Keys are stable rule slugs (e.g. parameters_first, prefer_exitcase, udobject_array_in_clause); values are 'off' (drop the rule), 'hint', 'info', 'warn' or 'error'. A rule listed here shows even when it is info tier and ssl.diagnostics.infoDiagnostics is off.",
                     "additionalProperties": {
                         "type": "string",
                         "enum": [
                             "off",
+                            "hint",
                             "info",
                             "warn",
                             "error"
@@ -457,7 +458,7 @@
                         "verbose"
                     ],
                     "default": "off",
-                    "description": "Trace communication with the language server"
+                    "description": "Trace the messages exchanged with the language server (in the 'SSL Language Server' output channel) and set how much the extension logs (in the 'SSL Extension' output channel). 'messages' traces requests and logs info; 'verbose' also traces payloads and logs debug detail."
                 }
             }
         },

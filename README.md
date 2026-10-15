@@ -75,7 +75,7 @@ code --install-extension vs-code-ssl-formatter-*.vsix
 
 - Live validation for block depth, procedure parameter count, Hungarian notation adherence, SQL injection risks, missing semicolons, missing OTHERWISE clauses, and other style guide rules.
 - Configurable severity levels (error, warning, info) and strict style-guide mode to convert warnings to errors.
-- **Per-rule overrides**: `ssl.diagnostics.rules` accepts a slug → severity map (`"off" | "info" | "warn" | "error"`). Settings UI offers slug autocomplete from the bundled LSP's published rule list (96 slugs as of v1.15.1).
+- **Per-rule overrides**: `ssl.diagnostics.rules` accepts a slug → severity map (`"off" | "hint" | "info" | "warn" | "error"`), applied by the language server. Settings UI offers slug autocomplete from the bundled LSP's published rule list (96 slugs as of v1.15.1).
 - **Source-level suppression**: `/* @ssl-disable <slug>; */` silences the named rule for the rest of the file; `/* @ssl-disable-next-line <slug>; */` silences only the line that follows. `*` matches every coded diagnostic.
 - **Quick fixes** keyed on stable rule slugs:
   - `udobject_array_in_clause` — extract the UDObject property to a local variable and rewrite the `IN (?...?)` placeholder.
