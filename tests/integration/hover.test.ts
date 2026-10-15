@@ -56,6 +56,10 @@ RunSQL("...");
 
         assert.ok(hovers && hovers.length > 0, 'Should provide hover for RunSQL');
         const hoverContent = hovers[0].contents[0] as vscode.MarkdownString;
-        assert.ok(hoverContent.value.includes('Executes a SQL command'), 'Hover should contain function description');
+        // The server renders built-in docs from the SSL reference (starlims-lsp
+        // v0.25.0+), whose wording is revised over time, so check that a
+        // description and the parameter docs are present rather than exact prose.
+        assert.match(hoverContent.value, /Executes a\b.*SQL/, 'Hover should contain function description');
+        assert.ok(hoverContent.value.includes('**Parameters:**'), 'Hover should document parameters');
     });
 });
