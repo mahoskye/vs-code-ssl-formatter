@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { describe, it } from 'mocha';
-import { renderStatus, StatusBarState } from '../src/utils/statusRenderer';
+import { renderStatus, type StatusBarState } from '../src/utils/statusRenderer';
 
 /**
  * The runtime renderer takes the server state (running, version) and

@@ -56,8 +56,6 @@ export const CONFIG_KEYS = {
     TRACE_SERVER: "ssl.trace.server"
 } as const;
 
-export type SSLConfigKey = typeof CONFIG_KEYS[keyof typeof CONFIG_KEYS];
-
 export const CONFIG_DEFAULTS = {
     [CONFIG_KEYS.DIAGNOSTICS_ENDPOINT_PATTERNS]: [],
     [CONFIG_KEYS.DIAGNOSTICS_INFO_DIAGNOSTICS]: false,

@@ -155,5 +155,3 @@ export const SSL_DIAGNOSTIC_SLUGS = [
     "visibility_annotation_usage",
     "zero_based_array_index"
 ] as const;
-
-export type SSLDiagnosticSlug = typeof SSL_DIAGNOSTIC_SLUGS[number];

@@ -1,0 +1,16 @@
+{
+    "$schema": "https://unpkg.com/knip@6/schema.json",
+    "entry": [
+        "src/extension.ts",
+        "tests/**/*.test.ts",
+        "tests/runTest.ts",
+        "tests/index.ts",
+        "tests/setup.ts",
+        "scripts/*.{mjs,ts}"
+    ],
+    "project": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.{mjs,ts}"],
+    "ignoreBinaries": ["pkill"],
+    "rules": {
+        "enumMembers": "off"
+    }
+}

@@ -351,12 +351,6 @@ export const MockInlayHintKind = {
 	Parameter: 0
 } as const;
 
-export interface MockFormattingOptions {
-	tabSize: number;
-	insertSpaces: boolean;
-	[key: string]: boolean | number | string | undefined;
-}
-
 export class MockWorkspaceConfiguration {
 	private values: Map<string, any> = new Map();
 	private section: string;
@@ -457,56 +451,12 @@ export class MockDiagnosticCollection {
 	}
 }
 
-/**
- * Create a mock document from text content
- */
-export function createDocument(content: string, languageId: string = 'ssl', filePath: string = '/test.ssl'): MockTextDocument {
-	return new MockTextDocument(
-		MockUri.file(filePath),
-		languageId,
-		content
-	);
-}
-
-/**
- * Apply text edits to content
- */
-export function applyEdits(text: string, edits: MockTextEdit[]): string {
-	// Sort edits in reverse order to apply from end to start
-	const sortedEdits = edits.sort((a, b) => {
-		const aStart = a.range.start;
-		const bStart = b.range.start;
-		if (aStart.line !== bStart.line) {
-			return bStart.line - aStart.line;
-		}
-		return bStart.character - aStart.character;
-	});
-
-	let result = text;
-	const lines = text.split('\n');
-
-	for (const edit of sortedEdits) {
-		const startOffset = getOffset(lines, edit.range.start);
-		const endOffset = getOffset(lines, edit.range.end);
-		result = result.substring(0, startOffset) + edit.newText + result.substring(endOffset);
-	}
-
-	return result;
-}
-
 function getOffset(lines: string[], position: MockPosition): number {
 	let offset = 0;
 	for (let i = 0; i < position.line && i < lines.length; i++) {
 		offset += lines[i].length + 1; // +1 for newline
 	}
 	return offset + position.character;
-}
-
-/**
- * Create default formatting options
- */
-export function createFormattingOptions(tabSize: number = 1, insertSpaces: boolean = false): MockFormattingOptions {
-	return { tabSize, insertSpaces };
 }
 
 /**

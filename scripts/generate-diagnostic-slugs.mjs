@@ -52,8 +52,6 @@ function writeTsConstant(slugs, tag) {
 export const SSL_DIAGNOSTIC_SLUGS = [
 ${slugs.map(s => `    "${s}"`).join(',\n')}
 ] as const;
-
-export type SSLDiagnosticSlug = typeof SSL_DIAGNOSTIC_SLUGS[number];
 `;
     writeFileSync(TS_OUTPUT, body, 'utf-8');
 }

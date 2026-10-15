@@ -4,8 +4,8 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import {
     LanguageClient,
-    LanguageClientOptions,
-    ServerOptions,
+    type LanguageClientOptions,
+    type ServerOptions,
     Trace,
     TransportKind
 } from 'vscode-languageclient/node';
@@ -13,6 +13,7 @@ import { replaceRetiredValue } from './utils/settingsMigration';
 
 let client: LanguageClient | undefined;
 let configListener: vscode.Disposable | undefined;
+let serverOutputChannel: vscode.LogOutputChannel | undefined;
 
 /**
  * Gets the platform-specific binary name for the starlims-lsp server.
@@ -156,8 +157,18 @@ function getSSLConfiguration(): object {
 /**
  * Creates client options for the language client.
  */
-function createClientOptions(): LanguageClientOptions {
+function createClientOptions(context: vscode.ExtensionContext): LanguageClientOptions {
+    // One output channel for the session, shared by every client: a client
+    // disposes a channel it created when it stops, and the server process can
+    // still write to it while exiting (seen on Windows), which throws
+    // "Channel has been closed". Restarts also no longer add channels.
+    if (!serverOutputChannel) {
+        serverOutputChannel = vscode.window.createOutputChannel('SSL Language Server', { log: true });
+        context.subscriptions.push(serverOutputChannel);
+    }
     return {
+        outputChannel: serverOutputChannel,
+        traceOutputChannel: serverOutputChannel,
         documentSelector: [
             { scheme: 'file', language: 'ssl' },
             { scheme: 'untitled', language: 'ssl' }
@@ -208,7 +219,7 @@ export async function startClient(context: vscode.ExtensionContext): Promise<Lan
     }
 
     const serverOptions = createServerOptions(serverPath);
-    const clientOptions = createClientOptions();
+    const clientOptions = createClientOptions(context);
 
     client = new LanguageClient(
         'sslLanguageServer',
@@ -296,13 +307,6 @@ export async function stopClient(): Promise<void> {
 export async function restartClient(context: vscode.ExtensionContext): Promise<void> {
     await stopClient();
     await startClient(context);
-}
-
-/**
- * Gets the current language client instance.
- */
-export function getClient(): LanguageClient | undefined {
-    return client;
 }
 
 /**
