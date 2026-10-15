@@ -19,6 +19,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test fixtures are synthetic.** A handful of unit-test fixtures carried
   text from real deployments. They are rewritten with made-up names, and
   `docs/CORPUS_TESTING.md` states the rule (#110).
+- **Syntax highlighting now comes from ssl-style-guide's canonical TextMate
+  grammar.** `syntaxes/ssl.tmLanguage.json` is a synced copy of it
+  (`npm run sync:grammar`). It records the upstream commit, and CI fails if
+  the copy is edited by hand. Highlighting improves throughout:
+  - `.T.` and `.F.` are highlighted after whitespace (`x := .T.;`).
+  - An array index such as `aRows[i, 1]` is no longer colored as a bracket
+    string.
+  - Procedure, class, constructor and label names, `:INCLUDE` and
+    `:INHERIT` targets, and code-block parameters are named.
+  - `{|| ...}`, which does not compile, is marked invalid.
+  - Colon keywords are matched case-sensitively, as the STARLIMS 12 lexer
+    reads them, so `:try` is not highlighted as a keyword.
+
+  SQL placeholders (`?nId?`) and ODBC escapes (`{fn ...}`) inside strings
+  are still highlighted. They moved upstream first
+  (mahoskye/ssl-style-guide#133). Themes see the same top-level scopes, but
+  quote and comment delimiters no longer carry a separate punctuation scope.
+  New grammar tests check that every keyword, built-in function, class and
+  operator in the SSL reference is highlighted (#113, #108).
+
+### Removed
+- **The retired `compact` SQL style** is no longer offered by
+  `ssl.format.sql.style` or the **Format SQL (Pick Style)** command. It has
+  been an alias for `canonicalCompact` since the 2026-08-28 SQL style
+  review. A stored `compact` is rewritten to `canonicalCompact` on startup,
+  in user, workspace and folder settings, with a one-time notice, so
+  formatted output does not change. This is step 1 of starlims-lsp's
+  removal plan: the next starlims-lsp minor release drops the alias, after
+  which an unrecognized style formats as `standard` (#115).
 
 ### Fixed
 - **Pressing Enter after `:CLASS Name;` no longer inserts `:ENDCLASS;`.**

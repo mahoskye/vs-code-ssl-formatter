@@ -37,6 +37,10 @@ jobs:
     - name: Run linter
       run: npm run lint
 
+    - name: Check the grammar matches ssl-style-guide
+      if: runner.os == 'Linux'
+      run: npm run check:grammar
+
     - name: Compile TypeScript
       run: npm run compile
 

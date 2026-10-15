@@ -76,29 +76,14 @@ describe('SQL Format Command - Content Formatting', () => {
 		expect(lines[0]).to.include('SELECT');
 	});
 
-	it('should indent clause keywords', () => {
-		const input = 'SELECT id FROM users WHERE active = 1';
+	it('should start clauses on their own lines and indent AND/OR under them', () => {
+		const input = 'SELECT id FROM users WHERE active = 1 AND deleted = 0';
 		const result = formatSqlContent(input, 'upper', 4);
 
 		const lines = result.split('\n');
-		// FROM and WHERE should be indented
-		const fromLine = lines.find(l => l.trim().startsWith('FROM'));
-		const whereLine = lines.find(l => l.trim().startsWith('WHERE'));
-
-		expect(fromLine).to.match(/^\s+FROM/);
-		expect(whereLine).to.match(/^\s+WHERE/);
-	});
-
-	it('should keep AND/OR inline in compact style', () => {
-		const input = 'SELECT id FROM users WHERE active = 1 AND name IS NOT NULL';
-		const result = formatSqlContent(input, 'upper', 4);
-
-		// In compact style, AND/OR stay inline with WHERE clause
-		const lines = result.split('\n');
-		const whereLine = lines.find(l => l.trim().startsWith('WHERE'));
-
-		expect(whereLine).to.exist;
-		expect(whereLine).to.include('AND'); // AND should be on same line as WHERE
+		expect(lines.find(l => l.startsWith('FROM'))).to.exist;
+		expect(lines.find(l => l.startsWith('WHERE'))).to.exist;
+		expect(lines.find(l => l.trim().startsWith('AND'))).to.match(/^\s+AND/);
 	});
 
 	it('should handle complex JOINs', () => {
@@ -146,16 +131,16 @@ describe('SQL Format Command - Content Formatting', () => {
 	});
 
 	it('should use specified indent size', () => {
-		const input = 'SELECT id FROM users WHERE active = 1';
+		const input = 'SELECT id FROM users WHERE active = 1 AND deleted = 0';
 		const result2 = formatSqlContent(input, 'upper', 2);
 		const result4 = formatSqlContent(input, 'upper', 4);
 
 		// 4-space indent should have more leading spaces than 2-space
-		const fromLine2 = result2.split('\n').find(l => l.trim().startsWith('FROM'));
-		const fromLine4 = result4.split('\n').find(l => l.trim().startsWith('FROM'));
+		const andLine2 = result2.split('\n').find(l => l.trim().startsWith('AND'));
+		const andLine4 = result4.split('\n').find(l => l.trim().startsWith('AND'));
 
-		const indent2 = fromLine2?.match(/^\s*/)?.[0].length || 0;
-		const indent4 = fromLine4?.match(/^\s*/)?.[0].length || 0;
+		const indent2 = andLine2?.match(/^\s*/)?.[0].length || 0;
+		const indent4 = andLine4?.match(/^\s*/)?.[0].length || 0;
 
 		expect(indent4).to.be.greaterThan(indent2);
 	});
@@ -223,20 +208,6 @@ describe('SQL Format Command - Output Styles', () => {
 describe('SQL Format Command - Formatting Styles', () => {
 	const testSql = 'SELECT u.id, u.name, u.email FROM users u INNER JOIN orders o ON o.user_id = u.id WHERE u.active = 1 AND u.deleted_at IS NULL ORDER BY u.name';
 
-	it('should format with compact style - single-line clauses', () => {
-		const result = formatSqlWithStyleImpl(testSql, 'compact', 'upper', 4);
-
-		// Compact keeps AND/OR inline
-		const lines = result.split('\n');
-		expect(lines.find(l => l.trim().startsWith('SELECT'))).to.exist;
-		expect(lines.find(l => l.trim().startsWith('FROM'))).to.exist;
-		expect(lines.find(l => l.trim().startsWith('WHERE'))).to.exist;
-
-		// AND should be inline with WHERE in compact
-		const whereLine = lines.find(l => l.trim().startsWith('WHERE'));
-		expect(whereLine).to.include('AND');
-	});
-
 	it('should format with expanded style - vertical columns', () => {
 		const result = formatSqlWithStyleImpl(testSql, 'expanded', 'upper', 4);
 
@@ -300,21 +271,26 @@ describe('SQL Format Command - Formatting Styles', () => {
 	});
 
 	it('should respect keyword case in all styles', () => {
-		const result = formatSqlWithStyleImpl('select id from users', 'compact', 'lower', 4);
+		const result = formatSqlWithStyleImpl('select id from users', 'canonicalCompact', 'lower', 4);
 		expect(result).to.include('select');
 		expect(result).to.include('from');
 		expect(result).to.not.include('SELECT');
 	});
 
+	it('formats an unknown or retired style (the old compact) as canonicalCompact', () => {
+		const retired = formatSqlWithStyleImpl(testSql, 'compact' as SqlFormattingStyle, 'upper', 4);
+		expect(retired).to.equal(formatSqlWithStyleImpl(testSql, 'canonicalCompact', 'upper', 4));
+	});
+
 	it('should respect indent spaces in all styles', () => {
-		const result2 = formatSqlWithStyleImpl(testSql, 'compact', 'upper', 2);
-		const result4 = formatSqlWithStyleImpl(testSql, 'compact', 'upper', 4);
+		const result2 = formatSqlWithStyleImpl(testSql, 'canonicalCompact', 'upper', 2);
+		const result4 = formatSqlWithStyleImpl(testSql, 'canonicalCompact', 'upper', 4);
 
-		const fromLine2 = result2.split('\n').find(l => l.trim().startsWith('FROM'));
-		const fromLine4 = result4.split('\n').find(l => l.trim().startsWith('FROM'));
+		const andLine2 = result2.split('\n').find(l => l.trim().startsWith('AND'));
+		const andLine4 = result4.split('\n').find(l => l.trim().startsWith('AND'));
 
-		const indent2 = fromLine2?.match(/^\s*/)?.[0].length || 0;
-		const indent4 = fromLine4?.match(/^\s*/)?.[0].length || 0;
+		const indent2 = andLine2?.match(/^\s*/)?.[0].length || 0;
+		const indent4 = andLine4?.match(/^\s*/)?.[0].length || 0;
 
 		expect(indent4).to.be.greaterThan(indent2);
 	});

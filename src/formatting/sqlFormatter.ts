@@ -140,7 +140,7 @@ export class SqlFormatter {
             if (!isFirstToken && isComplex) {
                 const prevUpper = prev ? prev.text.toUpperCase() : '';
 
-                if (style !== 'compact' && token.type === SqlTokenType.Keyword && SQL.FORMATTING.BREAK_BEFORE.has(upperText)) {
+                if (token.type === SqlTokenType.Keyword && SQL.FORMATTING.BREAK_BEFORE.has(upperText)) {
                     if (upperText === SQL.KEYWORDS.JOIN && prev && SQL.FORMATTING.JOIN_MODIFIERS.has(prevUpper)) {
                         needsBreak = false;
                     } else if (upperText === SQL.KEYWORDS.INTO && prevUpper === SQL.KEYWORDS.INSERT) {
@@ -160,28 +160,28 @@ export class SqlFormatter {
                     extraIndent = this.indentString;
                 }
 
-                if (style !== 'compact' && prev && prevUpper === SQL.KEYWORDS.SET && parenDepth === 0) {
+                if (prev && prevUpper === SQL.KEYWORDS.SET && parenDepth === 0) {
                     needsBreak = true;
                     if (style === 'canonicalCompact' || style === 'expanded') {
                         extraIndent = this.indentString;
                     }
                 }
 
-                if (style !== 'compact' && prev && prev.text === ',' && currentClause === SQL.KEYWORDS.SET && parenDepth === 0) {
+                if (prev && prev.text === ',' && currentClause === SQL.KEYWORDS.SET && parenDepth === 0) {
                     needsBreak = true;
                     if (style === 'canonicalCompact' || style === 'expanded') {
                         extraIndent = this.indentString;
                     }
                 }
 
-                if (style !== 'compact' && token.text === '(' && prevUpper === SQL.KEYWORDS.VALUES) {
+                if (token.text === '(' && prevUpper === SQL.KEYWORDS.VALUES) {
                     needsBreak = true;
                     if (style === 'canonicalCompact' || style === 'expanded') {
                         extraIndent = this.indentString;
                     }
                 }
 
-                if (style !== 'compact' && upperText === SQL.KEYWORDS.SELECT && prev && prev.text === '(') {
+                if (upperText === SQL.KEYWORDS.SELECT && prev && prev.text === '(') {
                     needsBreak = true;
                     extraIndent = this.indentString;
                 }
