@@ -82,6 +82,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which an unrecognized style formats as `standard` (#115).
 
 ### Fixed
+- **Settings reach the server once, with the right names.** The client
+  also synchronized the raw `ssl` settings section, whose key names
+  (`wrapLength`, `naming.*` and so on) are the extension's, not the
+  server's, alongside the mapped tree it sends itself. Only the mapped tree
+  is sent now, through one listener that no longer multiplies when the
+  server restarts. Changing `editor.tabSize`, which sets the indent size in
+  tab mode, now reaches the server too (#107).
+- **`ssl.diagnostics.rules` is applied once, by the server.** The client
+  re-applied it to every diagnostic batch, though the server has done so
+  since starlims-lsp v0.5.0, and its copy did not know `hint`. `hint` is
+  now offered (#107).
+- **`ssl.trace.server` traces the language server.** It only set the
+  extension's own log level. It now also traces LSP messages in the **SSL
+  Language Server** output channel (#107).
 - **Pressing Enter after `:CLASS Name;` no longer inserts `:ENDCLASS;`.**
   SSL has no `:ENDCLASS` keyword: a class runs to the end of its file, and
   the bundled server reports `:ENDCLASS` as an `endclass_invalid` error. The

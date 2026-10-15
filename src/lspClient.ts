@@ -6,12 +6,13 @@ import {
     LanguageClient,
     LanguageClientOptions,
     ServerOptions,
+    Trace,
     TransportKind
 } from 'vscode-languageclient/node';
-import { applyRuleOverrides } from './utils/ruleOverrides';
 import { replaceRetiredValue } from './utils/settingsMigration';
 
 let client: LanguageClient | undefined;
+let configListener: vscode.Disposable | undefined;
 
 /**
  * Gets the platform-specific binary name for the starlims-lsp server.
@@ -161,16 +162,15 @@ function createClientOptions(): LanguageClientOptions {
             { scheme: 'file', language: 'ssl' },
             { scheme: 'untitled', language: 'ssl' }
         ],
+        // Settings reach the server only as the tree getSSLConfiguration()
+        // builds: in initializationOptions and in the didChangeConfiguration
+        // notifications sent by the listener in startClient. The raw `ssl`
+        // section is not synchronized, because its key names are the
+        // extension's, not the server's.
         synchronize: {
-            configurationSection: 'ssl',
             fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{ssl,srvscr,ds}')
         },
-        initializationOptions: getSSLConfiguration(),
-        middleware: {
-            handleDiagnostics: (uri, diagnostics, next) => {
-                next(uri, applyRuleOverrides(diagnostics));
-            }
-        }
+        initializationOptions: getSSLConfiguration()
     };
 }
 
@@ -217,28 +217,21 @@ export async function startClient(context: vscode.ExtensionContext): Promise<Lan
         clientOptions
     );
 
-    // Register configuration change listener
-    context.subscriptions.push(
-        vscode.workspace.onDidChangeConfiguration(e => {
-            if (
-                e.affectsConfiguration('ssl.format') ||
-                e.affectsConfiguration('ssl.naming') ||
-                e.affectsConfiguration('ssl.globals') ||
-                e.affectsConfiguration('ssl.intellisense.inlayHints') ||
-                e.affectsConfiguration('ssl.intellisense.signatureHelp') ||
-                e.affectsConfiguration('ssl.styleGuide') ||
-                e.affectsConfiguration('ssl.diagnostics.rules') ||
-                e.affectsConfiguration('ssl.diagnostics.endpointPatterns') ||
-                e.affectsConfiguration('ssl.diagnostics.unusedVariables') ||
-                e.affectsConfiguration('ssl.diagnostics.infoDiagnostics') ||
-                e.affectsConfiguration('ssl.diagnostics.maxProcedureCodeLines') ||
-                e.affectsConfiguration('ssl.diagnostics.maxScriptCodeLines') ||
-                e.affectsConfiguration('ssl.diagnostics.maxScriptProcedures')
-            ) {
+    // One listener for the session, however often the client restarts.
+    // Any `ssl` change, or a tab-size change (it sets the server's indent size
+    // in tab mode), resends the whole settings tree; ssl.trace.server also
+    // sets the client's message tracing.
+    if (!configListener) {
+        configListener = vscode.workspace.onDidChangeConfiguration(e => {
+            if (e.affectsConfiguration('ssl.trace.server')) {
+                applyTrace();
+            }
+            if (e.affectsConfiguration('ssl') || e.affectsConfiguration('editor.tabSize')) {
                 sendConfigurationUpdate();
             }
-        })
-    );
+        });
+        context.subscriptions.push(configListener);
+    }
 
     // Start the client. A client that failed to start is dropped, so a later
     // start (the Retry action or the restart command) creates a fresh one.
@@ -254,8 +247,20 @@ export async function startClient(context: vscode.ExtensionContext): Promise<Lan
         }
         throw error;
     }
+    applyTrace();
 
     return client;
+}
+
+/**
+ * Sets the client's LSP message tracing from ssl.trace.server. The trace goes
+ * to the "SSL Language Server" output channel.
+ */
+function applyTrace(): void {
+    if (client && client.isRunning()) {
+        const value = vscode.workspace.getConfiguration('ssl').get<string>('trace.server', 'off');
+        void client.setTrace(Trace.fromString(value));
+    }
 }
 
 /**
