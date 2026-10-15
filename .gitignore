@@ -105,5 +105,3 @@ vsc-extension-quickstart.md
 dev/
 status_keywords.txt
 
-# Fallback test VS Code user data (generated)
-tests/fallback-user-data/

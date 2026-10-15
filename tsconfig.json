@@ -15,11 +15,8 @@
     "include": [
         "src/**/*",
         "tests/runTest.ts",
-        "tests/runFallbackTest.ts",
         "tests/index.ts",
-        "tests/fallbackIndex.ts",
-        "tests/integration/**/*",
-        "tests/integration-fallback/**/*"
+        "tests/integration/**/*"
     ],
     "exclude": ["node_modules", ".vscode-test", "dev"]
 }

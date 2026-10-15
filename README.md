@@ -56,7 +56,6 @@ code --install-extension vs-code-ssl-formatter-*.vsix
 - Full TextMate grammar for SSL, including keywords with colon prefixes, built-in functions, string literals (double, single, and bracket notation), SQL snippets inside strings, and both single-line and multi-line comments.
 - Folding ranges for procedure blocks, loops, conditional structures, exception handling, regions, and comment blocks to simplify navigation.
 - Hover documentation for keywords, language constructs, Hungarian notation hints, and inline SQL placeholder guidance (`?param?` vs positional `?`). For built-in functions and classes, hover also lists the **documented exceptions** (trigger + canonical exception message), caveats, and anti-pattern guidance pulled from the official ssl-docs reference (covers 263 elements with exceptions, 343 with caveats, 397 with Do/Don't lists).
-- Namespace-aware `Go to Definition`/hover for `DoProc`/`ExecFunction` strings when `ssl.documentNamespaces` is configured.
 
 ### Formatting & Style Guide
 
@@ -92,7 +91,6 @@ code --install-extension vs-code-ssl-formatter-*.vsix
   - `parameters_first` — move `:PARAMETERS` directly after `:PROCEDURE`.
   - `default_after_parameters` — relocate `:DEFAULT` to follow `:PARAMETERS`.
   - `nested_iif` — refactor an `IIF(...)` assignment into `:IF / :ELSE / :ENDIF` (offered as a `Refactor → Rewrite` action).
-  - Plus the legacy `ssl-invalid-direct-call` fix for native fallback.
 - **Universal lightbulb actions** offered alongside any rule-specific fix above:
   - *Suppress '\<slug\>' on this line* — inserts `/* @ssl-disable-next-line <slug>; */`.
   - *Suppress '\<slug\>' for this file* — inserts `/* @ssl-disable <slug>; */` at the top.
@@ -104,7 +102,7 @@ code --install-extension vs-code-ssl-formatter-*.vsix
 - Comment toggling (`Ctrl+/`) for SSL block and line comments.
 - Breadcrumbs and symbol highlighting to understand scope and structure quickly.
 - Region markers (`:REGION` / `:ENDREGION` or `/* region`) for manual code organization.
-- **Status-bar item** (right side, when an SSL file is active) showing `SSL · LSP <version> · <fns> fns · <classes> classes` — or `SSL · native` when the language server is disabled. Click to open the SSL output channel.
+- **Status-bar item** (right side, when an SSL file is active) showing `SSL · LSP <version>`, or `SSL · server stopped` when the language server is not running. Click to open the SSL output channel.
 
 ## Commands
 
@@ -136,8 +134,6 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 
 ### General
 
-- `ssl.strictStyleGuideMode`: Elevates all style warnings to errors (default: `false`).
-- `ssl.maxNumberOfProblems`: Limits diagnostics reported per file (default: `100`).
 - `ssl.globals`: Array of variable names that should always be treated as declared globals (default: `[]`).
 
 ### Formatting
@@ -164,16 +160,11 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 ### Naming & Style
 
 - `ssl.naming.hungarianNotation.enabled`: Enforce Hungarian notation (default: `true`).
-- `ssl.naming.hungarianNotation.severity`: `warn`, `error`, or `info` (default: `warn`).
 - `ssl.naming.hungarianNotation.prefixes`: Allowed Hungarian prefixes (default: `s, n, b, d, a, o, fn, v`).
 - `ssl.styleGuide.limitBlockDepth`: Maximum nested block depth (default: `4`, `0` disables).
 
-- `ssl.styleGuide.maxParamsPerProcedure`: Limit on procedure parameters (default: `8`, `0` disables).
+### Diagnostics
 
-### Security & Diagnostics
-
-- `ssl.security.preventSqlInjection`: Warn about concatenated SQL queries (default: `true`).
-- `ssl.security.requireParameterizedQueries`: Require `?PARAM?` placeholders (default: `true`).
 - `ssl.diagnostics.maxProcedureCodeLines`: Code lines in a procedure before `procedure_length_review` suggests a review (default: `80`, `0` disables).
 - `ssl.diagnostics.maxScriptCodeLines` / `ssl.diagnostics.maxScriptProcedures`: Code lines (default: `400`) or local procedures (default: `12`) in a script before `script_size_review` suggests a review (`0` disables each).
   Both review rules are info tier: they show only with `ssl.diagnostics.infoDiagnostics` on or an explicit `ssl.diagnostics.rules` entry.
@@ -181,48 +172,20 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 
 ### IntelliSense
 
-- `ssl.intellisense.enabled`: Master toggle for IntelliSense (default: `true`).
 - `ssl.intellisense.codeLens.enabled`: Show reference counts above procedures (default: `true`).
-- `ssl.intellisense.signatureHelp.enabled`: Show parameter hints while typing (default: `true`; native providers only — with the language server active, signature help is always available and `autoTrigger` controls the popup).
 - `ssl.intellisense.signatureHelp.autoTrigger`: Auto-open the signature help popup while typing inside a function call (default: `false`). When `false`, signature help is available on hover and explicit invocation (`Ctrl+Shift+Space`) only. Window reload required for changes to take effect.
 - `ssl.intellisense.inlayHints.enabled`: Enable inline parameter hints (default: `true`).
-- `ssl.intellisense.inlayHints.parameterNames`: Show parameter names inline (default: `true`).
-- `ssl.intellisense.completion.enableKeywords` / `.enableBuiltinFunctions` / `.enableBuiltinClasses` / `.enableSnippets`: Toggle individual completion categories (default: `true`).
-- `ssl.intellisense.customFunctions`: Add or override built-in functions for completion, hover details, diagnostics, and formatting (default: `[]`). Each entry supports `name`, `description`, `params`, `signature`, `returnType`, `category`, and `untypedSignature`.
-- `ssl.intellisense.customClasses`: Add or override built-in classes for completion and member lists (default: `[]`). Each entry supports `name`, `description`, `instantiation`, `usage`, `methods`, and `properties`.
-
-### Navigation
-
-- `ssl.documentNamespaces`: Object mapping namespace prefixes (as they appear in `ExecFunction`/`DoProc` strings) to workspace-relative folders. Example:
-  ```jsonc
-  {
-    "ssl.documentNamespaces": {
-      "Services": "server/services",
-      "API": "src/api"
-    }
-  }
-  ```
-  With this mapping, strings like `ExecFunction("Services.Orders.ProcessOrder")` resolve directly to `server/services/Orders.ssl`.
-  Use the command palette entry **“SSL: Configure Document Namespaces”** to interactively add aliases without hand-editing `.vscode/settings.json`.
 
 ### Example `settings.json`
 
 ```jsonc
 {
-  "ssl.strictStyleGuideMode": false,
   "ssl.format.formatOnSave": true,
   "ssl.format.builtinFunctionCase": "PascalCase",
   "ssl.naming.hungarianNotation.enabled": true,
   "ssl.naming.hungarianNotation.prefixes": ["s", "n", "b", "d", "a", "o", "fn", "v"],
   "ssl.styleGuide.limitBlockDepth": 4,
-  "ssl.security.preventSqlInjection": true,
-  "ssl.globals": ["sUserName"],
-  "ssl.intellisense.customFunctions": [
-    { "name": "MyHelper", "description": "Project helper", "params": "(value)" }
-  ],
-  "ssl.intellisense.customClasses": [
-    { "name": "ApiClient", "methods": ["Get", "Post"], "properties": ["BaseUrl"] }
-  ]
+  "ssl.globals": ["sUserName"]
 }
 ```
 

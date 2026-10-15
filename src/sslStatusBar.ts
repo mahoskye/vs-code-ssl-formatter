@@ -1,11 +1,5 @@
 import * as vscode from 'vscode';
-import { isClientRunning } from './lspClient';
-import {
-    getBuiltinFunctions,
-    getBuiltinClasses,
-    getInventorySourceVersion,
-    isInventoryLoaded
-} from './utils/inventory';
+import { getServerVersion, isClientRunning } from './lspClient';
 import { Logger } from './utils/logger';
 import { renderStatus } from './utils/statusRenderer';
 
@@ -13,9 +7,8 @@ import { renderStatus } from './utils/statusRenderer';
  * Compact status-bar item shown when an SSL document is the active editor.
  *
  * Conveys at a glance:
- *   - whether the LSP is running, or the extension is in native-fallback mode
- *   - the LSP version (when running)
- *   - whether the bundled-LSP-sourced inventory loaded (and how many entries)
+ *   - whether the language server is running
+ *   - the server version it reports (when running)
  *
  * Clicking opens the SSL output channel so users can see startup logs.
  */
@@ -59,10 +52,7 @@ function refresh(): void {
 
     const rendered = renderStatus({
         lspRunning: isClientRunning(),
-        lspVersion: getInventorySourceVersion(),
-        fnCount: getBuiltinFunctions().length,
-        classCount: getBuiltinClasses().length,
-        inventoryReady: isInventoryLoaded()
+        lspVersion: getServerVersion() ?? null
     });
     item.text = rendered.text;
     item.tooltip = rendered.tooltip;
