@@ -14,7 +14,6 @@ describe("SSL Block Closer — decideBlockCloser", () => {
             [":BEGINCASE;", ":ENDCASE;"],
             [":TRY;", ":ENDTRY;"],
             [":PROCEDURE Foo;", ":ENDPROC;"],
-            [":CLASS Bar;", ":ENDCLASS;"],
             [":REGION Quux;", ":ENDREGION;"],
         ];
         openerCases.forEach(([opener, closer]) => {
@@ -24,6 +23,10 @@ describe("SSL Block Closer — decideBlockCloser", () => {
                 expect(decision!.family.closerText).to.equal(closer);
                 expect(decision!.insertText).to.equal(`\n${closer}`);
             });
+        });
+
+        it("inserts nothing after :CLASS, which has no closer (a class runs to end of file)", () => {
+            expect(decideBlockCloser([":CLASS Bar;", ""], 0, 1)).to.be.null;
         });
 
         it("matches case-insensitively on the opener keyword", () => {
@@ -297,7 +300,6 @@ describe("SSL Block Closer — decideBlockCloser", () => {
             expect(closers).to.deep.equal(
                 [
                     ":ENDCASE;",
-                    ":ENDCLASS;",
                     ":ENDIF;",
                     ":ENDPROC;",
                     ":ENDREGION;",

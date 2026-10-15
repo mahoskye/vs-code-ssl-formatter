@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   removal plan: the next starlims-lsp minor release drops the alias, after
   which an unrecognized style formats as `standard` (#115).
 
+### Fixed
+- **Pressing Enter after `:CLASS Name;` no longer inserts `:ENDCLASS;`.**
+  SSL has no `:ENDCLASS` keyword: a class runs to the end of its file, and
+  the bundled server reports `:ENDCLASS` as an `endclass_invalid` error. The
+  other block closers (`:ENDIF`, `:ENDWHILE`, `:NEXT`, `:ENDCASE`,
+  `:ENDTRY`, `:ENDPROC`, `:ENDREGION`) were checked against the SSL
+  reference and are unchanged. `:CLASS` also no longer opens a folding
+  marker that nothing closes (#105).
+
 ## [1.24.0] - 2026-10-14
 
 Bundles **starlims-lsp v0.28.0**, up from v0.23.0. This picks up five

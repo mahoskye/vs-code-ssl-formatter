@@ -23,8 +23,7 @@ describe('SSL Document Symbol Provider (Bug #12)', () => {
 		const document = createDocument(`:CLASS MyClass;
 :PROCEDURE DoSomething;
 	/* implementation */
-:ENDPROC;
-:ENDCLASS;`);
+:ENDPROC;`);
 
 		const symbols = provider.provideDocumentSymbols(document as any, null as any);
 
@@ -63,9 +62,7 @@ describe('SSL Document Symbol Provider (Bug #12)', () => {
 :PROCEDURE Add;
 :PARAMETERS nAmount;
 	Me:nValue := Me:nValue + nAmount;
-:ENDPROC;
-
-:ENDCLASS;`);
+:ENDPROC;`);
 
 		const symbols = provider.provideDocumentSymbols(document as any, null as any);
 
@@ -144,9 +141,7 @@ More notes
 :PROCEDURE ProcessData;
 :PARAMETERS sData;
 	:RETURN AllTrim(sData);
-:ENDPROC;
-
-:ENDCLASS;`);
+:ENDPROC;`);
 
 		const symbols = provider.provideDocumentSymbols(document as any, null as any);
 
