@@ -17,11 +17,11 @@ describe('Code Action: Convert to DoProc', () => {
         // Simulate Diagnostic
         // In a real integration test, the diagnostic provider would run.
         // Here we can manually construct the diagnostic that the provider expects.
-        // The provider expects a diagnostic with code 'ssl-invalid-direct-call' on the function name.
+        // The server reports direct_procedure_call (error tier) on the procedure name.
 
         const range = new vscode.Range(2, 4, 2, 10); // "MyProc"
         const diagnostic = new vscode.Diagnostic(range, "Invalid direct call", vscode.DiagnosticSeverity.Error);
-        diagnostic.code = 'ssl-invalid-direct-call';
+        diagnostic.code = 'direct_procedure_call';
 
         const context: vscode.CodeActionContext = {
             diagnostics: [diagnostic],
@@ -55,7 +55,7 @@ describe('Code Action: Convert to DoProc', () => {
         // "MyProc" at line 2 cols 4-10
         const range = new vscode.Range(2, 4, 2, 10);
         const diagnostic = new vscode.Diagnostic(range, "Invalid direct call", vscode.DiagnosticSeverity.Error);
-        diagnostic.code = 'ssl-invalid-direct-call';
+        diagnostic.code = 'direct_procedure_call';
 
         const context: vscode.CodeActionContext = {
             diagnostics: [diagnostic],
@@ -75,6 +75,50 @@ describe('Code Action: Convert to DoProc', () => {
 
         const newContent = doc.getText();
         assert.ok(newContent.includes('DoProc("MyProc")'), 'Should replace with DoProc("MyProc")');
+    });
+
+    it('Should not offer DoProc for the warning tier (an unknown name that may be a built-in)', async function () {
+        const content = `
+:PROCEDURE TestContext;
+    LegacyBuiltin(1);
+:ENDPROC;
+`;
+        const doc = await vscode.workspace.openTextDocument({ language: 'ssl', content, fileName: '/test3.ssl' } as any);
+        const range = new vscode.Range(2, 4, 2, 17);
+        const diagnostic = new vscode.Diagnostic(range, "Unknown callable", vscode.DiagnosticSeverity.Warning);
+        diagnostic.code = 'direct_procedure_call';
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, {
+            diagnostics: [diagnostic],
+            only: undefined,
+            triggerKind: vscode.CodeActionTriggerKind.Invoke
+        }, {} as vscode.CancellationToken);
+
+        assert.strictEqual(actions.find(a => a.title.startsWith('Convert to DoProc')), undefined);
+    });
+
+    it('Should use the identifier at the diagnostic start even when the range is wider', async function () {
+        const content = `
+:PROCEDURE TestContext;
+    MyProc(2);
+:ENDPROC;
+`;
+        const doc = await vscode.workspace.openTextDocument({ language: 'ssl', content, fileName: '/test4.ssl' } as any);
+        const range = new vscode.Range(2, 4, 2, 14); // the whole call
+        const diagnostic = new vscode.Diagnostic(range, "Direct call", vscode.DiagnosticSeverity.Error);
+        diagnostic.code = 'direct_procedure_call';
+
+        const provider = new SSLCodeActionProvider();
+        const actions = provider.provideCodeActions(doc, range, {
+            diagnostics: [diagnostic],
+            only: undefined,
+            triggerKind: vscode.CodeActionTriggerKind.Invoke
+        }, {} as vscode.CancellationToken);
+        const fix = actions.find(a => a.title.startsWith('Convert to DoProc'));
+        assert.ok(fix, 'Should find convert action');
+        await vscode.workspace.applyEdit(fix.edit!);
+        assert.ok(doc.getText().includes('    DoProc("MyProc", {2});'), doc.getText());
     });
 });
 
@@ -374,15 +418,15 @@ describe('Code Actions: v1.7.0 additions', () => {
     it('universal: suppress actions only appear for known LSP slugs', async function () {
         const doc = await openDoc(`:PROCEDURE T;\n\tnLocal := 1;\n:ENDPROC;\n`);
         const range = new vscode.Range(1, 1, 1, 7);
-        // Native code with kebab prefix — should NOT get the universal suppress actions.
-        const diag = diagnostic(range, "synthetic", 'ssl-invalid-direct-call');
+        // A code the server does not emit should NOT get the universal suppress actions.
+        const diag = diagnostic(range, "synthetic", 'not-a-server-rule');
 
         const provider = new SSLCodeActionProvider();
         const actions = provider.provideCodeActions(doc, range, context(diag), {} as vscode.CancellationToken);
         assert.strictEqual(
             actions.find(a => a.title.includes('Suppress')),
             undefined,
-            'universal suppress should not be offered for legacy native codes',
+            'universal suppress should not be offered for codes the server does not emit',
         );
     });
 
