@@ -50,6 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which an unrecognized style formats as `standard` (#115).
 
 ### Fixed
+- **The Suppress quick fixes no longer add an error.** They inserted
+  `/* @ssl-disable-next-line <rule>; */`, but an SSL comment ends at its
+  first `;`, so the trailing `*/` was code. Since starlims-lsp v0.27.0 the
+  server reports that as a `comment_text_after_terminator` error. The
+  actions now insert `/* @ssl-disable-next-line <rule>;`, and the README
+  shows the correct form.
 - **Pressing Enter after `:CLASS Name;` no longer inserts `:ENDCLASS;`.**
   SSL has no `:ENDCLASS` keyword: a class runs to the end of its file, and
   the bundled server reports `:ENDCLASS` as an `endclass_invalid` error. The
