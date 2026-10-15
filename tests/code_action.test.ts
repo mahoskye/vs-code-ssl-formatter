@@ -396,9 +396,9 @@ describe('Code Actions: v1.7.0 additions', () => {
         assert.ok(fix, 'expected line-suppress action');
         await vscode.workspace.applyEdit(fix.edit!);
         const text = doc.getText();
-        // The directive should be inserted on its own line above the diagnostic line.
-        assert.ok(text.includes('@ssl-disable-next-line parameters_first'),
-            `expected directive in document, got:\n${text}`);
+        // The directive is inserted on its own line above the diagnostic line,
+        // with no closing */ (an SSL comment ends at its ;).
+        assert.strictEqual(text, `:PROCEDURE T;\n\t/* @ssl-disable-next-line parameters_first;\n\tnLocal := 1;\n:ENDPROC;\n`);
     });
 
     it('universal: suppress for this file inserts @ssl-disable at top', async function () {
@@ -411,7 +411,7 @@ describe('Code Actions: v1.7.0 additions', () => {
         const fix = actions.find(a => a.title.startsWith("Suppress 'keyword_uppercase' for this file"));
         assert.ok(fix, 'expected file-suppress action');
         await vscode.workspace.applyEdit(fix.edit!);
-        assert.ok(doc.getText().startsWith('/* @ssl-disable keyword_uppercase'),
+        assert.ok(doc.getText().startsWith('/* @ssl-disable keyword_uppercase;\n:PROCEDURE T;'),
             `expected directive at top, got:\n${doc.getText()}`);
     });
 
