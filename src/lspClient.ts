@@ -9,6 +9,7 @@ import {
     TransportKind
 } from 'vscode-languageclient/node';
 import { applyRuleOverrides } from './utils/ruleOverrides';
+import { replaceRetiredValue } from './utils/settingsMigration';
 
 let client: LanguageClient | undefined;
 
@@ -113,7 +114,7 @@ function getSSLConfiguration(): object {
                 maxConsecutiveBlankLines: config.get<number>('format.maxConsecutiveBlankLines', 2),
                 sql: {
                     enabled: config.get<boolean>('format.sql.enabled', true),
-                    style: config.get<string>('format.sql.style', 'canonicalCompact'),
+                    style: replaceRetiredValue('format.sql.style', config.get<string>('format.sql.style', 'canonicalCompact')),
                     keywordCase: config.get<string>('format.sql.keywordCase', 'upper'),
                     identifierCase: config.get<string>('format.sql.identifierCase', 'preserve'),
                     indentSize: config.get<number>('format.sql.indentSpaces', 4),

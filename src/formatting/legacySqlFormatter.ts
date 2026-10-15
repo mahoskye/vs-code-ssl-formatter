@@ -39,7 +39,6 @@ const SQL_GENERAL_KEYWORDS = [
 
 export type SqlFormattingStyle =
     | "standard"
-    | "compact"
     | "canonicalCompact"
     | "expanded"
     | "hangingOperators"
@@ -106,8 +105,6 @@ export function formatSqlWithStyleImpl(
     }
 
     switch (style) {
-        case "compact":
-            return formatCompactStyle(sql, keywordCase, effectiveIndentString);
         case "canonicalCompact":
             return formatCanonicalCompactStyle(sql, keywordCase, effectiveIndentString, wrapLength);
         case "expanded":
@@ -121,7 +118,9 @@ export function formatSqlWithStyleImpl(
         case "ormFriendly":
             return formatOrmFriendlyStyle(sql, keywordCase, effectiveIndentString);
         default:
-            return formatCompactStyle(sql, keywordCase, effectiveIndentString);
+            // An unknown or retired style (e.g. the old "compact") formats as
+            // canonicalCompact, which "compact" was an alias for.
+            return formatCanonicalCompactStyle(sql, keywordCase, effectiveIndentString, wrapLength);
     }
 }
 
@@ -207,24 +206,6 @@ function applyCasing(sql: string, keywordCase: string): string {
 }
 
 // --- Specific Style Formatters ---
-
-function formatCompactStyle(sql: string, keywordCase: string, indentString: string): string {
-    const indent = indentString;
-    let result = sql;
-    SQL_CLAUSE_KEYWORDS.forEach(keyword => {
-        if (keyword === "ON") { return; }
-        const pattern = keyword.replace(/\s+/g, "\\s+");
-        const clauseRegex = new RegExp(`\\s+(${pattern})\\b`, "gi");
-        result = result.replace(clauseRegex, (_match, clause) => {
-            return `\n${applySqlKeywordCase(keyword, keywordCase, clause)}`;
-        });
-    });
-    const lines = result.split('\n').map(line => line.trim());
-    return lines.map((line, index) => {
-        if (index === 0) { return line; }
-        return indent + line;
-    }).join('\n');
-}
 
 function formatCanonicalCompactStyle(sql: string, keywordCase: string, indentString: string, wrapLength: number = 0): string {
     let result = sql;
@@ -892,7 +873,7 @@ function expandClauseColumns(sql: string, clause: string, keywordCase: string, i
 
 export function formatSqlContent(content: string, keywordCase: string, indentSpaces: number): string {
     const indentString = " ".repeat(indentSpaces);
-    return formatSqlWithStyleImpl(content, "compact", keywordCase, indentSpaces, 0, indentString);
+    return formatSqlWithStyleImpl(content, "canonicalCompact", keywordCase, indentSpaces, 0, indentString);
 }
 
 export function formatAsMultilineString(sql: string, quoteChar: string, wasStringLiteral: boolean): string {
