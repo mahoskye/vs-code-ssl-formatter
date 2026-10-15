@@ -153,6 +153,7 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 - `ssl.format.formatOnSave`: Automatically format on save (default: `false`).
 - `ssl.editor.autoInsertBlockClosers`: When you press Enter on a line like `:IF cond;`, `:WHILE`, `:FOR`, `:BEGINCASE`, `:TRY`, `:PROCEDURE`, `:CLASS`, or `:REGION`, automatically insert the matching `:ENDIF;`/`:ENDWHILE;`/`:NEXT;`/`:ENDCASE;`/`:ENDTRY;`/`:ENDPROC;`/`:ENDCLASS;`/`:ENDREGION;` on the line below (default: `true`).
 - `ssl.format.trimTrailingWhitespace`: Remove trailing whitespace (default: `true`).
+- `ssl.format.maxConsecutiveBlankLines`: Collapse longer runs of blank lines to this many (default: `2`, `0` disables).
 - `ssl.format.sql.enabled`: Format inline SQL string literals (default: `true`).
 - `ssl.format.sql.keywordCase`: `preserve`, `upper`, or `lower` for SQL keywords (default: `upper`).
 - `ssl.format.sql.indentSpaces`: Spaces to indent formatted SQL clauses (default: `4`).
@@ -173,6 +174,9 @@ Open **Settings → Extensions → SSL** or edit `settings.json` directly. A few
 
 - `ssl.security.preventSqlInjection`: Warn about concatenated SQL queries (default: `true`).
 - `ssl.security.requireParameterizedQueries`: Require `?PARAM?` placeholders (default: `true`).
+- `ssl.diagnostics.maxProcedureCodeLines`: Code lines in a procedure before `procedure_length_review` suggests a review (default: `80`, `0` disables).
+- `ssl.diagnostics.maxScriptCodeLines` / `ssl.diagnostics.maxScriptProcedures`: Code lines (default: `400`) or local procedures (default: `12`) in a script before `script_size_review` suggests a review (`0` disables each).
+  Both review rules are info tier: they show only with `ssl.diagnostics.infoDiagnostics` on or an explicit `ssl.diagnostics.rules` entry.
 - Placeholder enforcement: SQL helpers that expect positional arrays (`RunSQL`, `GetDataSet`, etc.) warn if your query uses named `?param?` tokens, while `SQLExecute` warns if you try to pass positional `?` markers.
 
 ### IntelliSense
