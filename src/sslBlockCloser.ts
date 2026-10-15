@@ -54,7 +54,7 @@ export const FAMILIES: ReadonlyArray<BlockFamily> = [
 
 const inFlightDocs = new WeakSet<vscode.TextDocument>();
 
-export function familyForOpener(line: string): BlockFamily | undefined {
+function familyForOpener(line: string): BlockFamily | undefined {
     return FAMILIES.find(f => f.openerLine.test(line));
 }
 
@@ -132,7 +132,7 @@ export function classifyLineStarts(lines: ReadonlyArray<string>): boolean[] {
  * entirely: a `:ENDIF;` that literally sits inside a multi-line string is text, not a
  * keyword.
  */
-export function closerAlreadyExistsInLines(
+function closerAlreadyExistsInLines(
     lines: ReadonlyArray<string>,
     family: BlockFamily,
     openerLineNumber: number,

@@ -4,6 +4,8 @@
         "target": "ES2020",
         "outDir": "out",
         "lib": ["ES2020"],
+        // TypeScript 6 includes no @types packages unless listed.
+        "types": ["node", "mocha"],
         "sourceMap": true,
         "rootDir": ".",
         "strict": false,

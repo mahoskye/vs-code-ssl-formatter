@@ -1,5 +1,5 @@
 import { SQL } from "../constants/sql";
-import { SqlToken, SqlTokenType } from '../parsing/sqlLexer';
+import { type SqlToken, SqlTokenType } from '../parsing/sqlLexer';
 
 export interface SqlFormattingOptions {
     wrapLength: number;

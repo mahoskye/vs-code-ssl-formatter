@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ master, develop ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, develop ]
+    branches: [ master ]
   workflow_dispatch:
 
 permissions:
@@ -40,6 +40,10 @@ jobs:
     - name: Check the grammar matches ssl-style-guide
       if: runner.os == 'Linux'
       run: npm run check:grammar
+
+    - name: Check for unused files, exports and dependencies
+      if: runner.os == 'Linux'
+      run: npm run knip
 
     - name: Compile TypeScript
       run: npm run compile

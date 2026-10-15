@@ -1,9 +1,9 @@
 import * as vscode from "vscode";
 import { CONFIG_KEYS, CONFIG_DEFAULTS } from "../constants/config";
-import { SqlFormatter, SqlFormattingOptions } from "../formatting/sqlFormatter";
+import { SqlFormatter, type SqlFormattingOptions } from "../formatting/sqlFormatter";
 import { SqlLexer } from "../parsing/sqlLexer";
 import { detectSqlContext, findSqlStringInLine, looksLikeSql } from "../parsing/sqlContext";
-import { formatSqlWithStyleImpl, SqlFormattingStyle } from "../formatting/legacySqlFormatter";
+import { formatSqlWithStyleImpl, type SqlFormattingStyle } from "../formatting/legacySqlFormatter";
 import { replaceRetiredValue } from "../utils/settingsMigration";
 
 /**

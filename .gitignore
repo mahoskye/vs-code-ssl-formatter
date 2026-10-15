@@ -7,6 +7,8 @@ config/config.private.json
 
 # Dependencies
 node_modules/
+# Also a symlinked node_modules (a file, which node_modules/ does not match).
+/node_modules
 
 # VS Code directories
 .vscode/

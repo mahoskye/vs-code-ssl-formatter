@@ -9,7 +9,7 @@ import {
 	formatAsMultilineString,
 	formatAsConcatenatedString,
 	formatSqlWithStyleImpl,
-	SqlFormattingStyle
+	type SqlFormattingStyle
 } from '../src/formatting/legacySqlFormatter';
 describe('SQL Format Command - SQL Detection', () => {
 	it('should detect SELECT statements as SQL', () => {

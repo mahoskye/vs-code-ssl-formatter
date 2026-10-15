@@ -15,8 +15,6 @@ dist/**/*.map
 src/**
 tests/**
 scripts/**
-formatter-tests/**
-snapshots/**
 *.ts
 tsconfig.json
 tsconfig.tsnode.json
@@ -25,7 +23,11 @@ tsconfig.tsnode.json
 .vscode/**
 .vscode-test/**
 .editorconfig
-.eslintrc.json
+eslint.config.mjs
+knip.json
+
+# Icon sources (media/icon.png is the shipped icon)
+media/*.svg
 
 # Development docs
 docs/**

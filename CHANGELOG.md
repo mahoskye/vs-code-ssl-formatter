@@ -104,6 +104,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reference and are unchanged. `:CLASS` also no longer opens a folding
   marker that nothing closes (#105).
 
+### Maintenance
+- **Dependencies:**
+  - TypeScript 5.1 → 6.0. TypeScript 7 waits on typescript-eslint, which
+    supports versions below 6.1.
+  - ESLint 8 → 10, with a flat config (`eslint.config.mjs`) and
+    typescript-eslint 8.
+  - mocha 10 → 12 and chai 4 → 6.
+  - `vscode-languageclient` 9 → 10.
+- **CI:**
+  - It runs on `master` only; there is no `develop` branch.
+  - CodeQL moves to `codeql-action` v4.
+  - knip checks for unused files, exports and dependencies.
+- **Dead code:**
+  - `src/constants/language.ts` is trimmed to the SQL function list the
+    Format SQL command uses.
+  - Unused exports, test helpers and `media/icon.svg` are removed.
+  - `.vscodeignore` no longer lists formatter-era folders, and it now keeps
+    the SVG icon sources out of the package (#111).
+
 ## [1.24.0] - 2026-10-14
 
 Bundles **starlims-lsp v0.28.0**, up from v0.23.0. This picks up five

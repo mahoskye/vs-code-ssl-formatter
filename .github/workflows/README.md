@@ -7,13 +7,15 @@ This directory contains automated CI/CD workflows for the SSL VS Code Extension.
 ### 1. CI (Continuous Integration) - `ci.yml`
 
 **Triggers:**
-- Push to `master` or `develop` branches
-- Pull requests to `master` or `develop` branches
+- Push to `master`
+- Pull requests to `master`
 
 **What it does:**
 - Tests on multiple platforms: Ubuntu, Windows, macOS
-- Tests on Node.js versions: 20, 22
-- Runs linting, compilation, and unit tests
+- Tests on Node.js versions: 22, 24
+- Runs linting, compilation, and unit and integration tests
+- On Linux: checks the grammar matches ssl-style-guide (`npm run check:grammar`)
+  and that there are no unused files, exports or dependencies (`npm run knip`)
 - Checks for console.log in production code
 - Checks for TODO/FIXME comments
 - Packages every platform target (`scripts/package-platforms.mjs`),

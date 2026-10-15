@@ -4,8 +4,8 @@ import * as fs from 'fs';
 import * as vscode from 'vscode';
 import {
     LanguageClient,
-    LanguageClientOptions,
-    ServerOptions,
+    type LanguageClientOptions,
+    type ServerOptions,
     Trace,
     TransportKind
 } from 'vscode-languageclient/node';
@@ -296,13 +296,6 @@ export async function stopClient(): Promise<void> {
 export async function restartClient(context: vscode.ExtensionContext): Promise<void> {
     await stopClient();
     await startClient(context);
-}
-
-/**
- * Gets the current language client instance.
- */
-export function getClient(): LanguageClient | undefined {
-    return client;
 }
 
 /**
