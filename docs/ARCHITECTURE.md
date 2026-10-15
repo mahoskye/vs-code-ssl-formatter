@@ -29,7 +29,10 @@ decisions behind them are in [AGENTS.md](../AGENTS.md).
   `initializationOptions` and, on any `ssl` or `editor.tabSize` change, in a
   `workspace/didChangeConfiguration` notification. The raw `ssl` section is
   never sent, because its key names are the extension's, not the server's.
-- **Tracing**: `ssl.trace.server` sets the client's message tracing.
+- **Tracing and output**: `ssl.trace.server` sets the client's message tracing.
+  Server output and traces go to one **SSL Language Server** log channel that
+  the extension creates once and shares with every client, so a restart
+  neither closes it nor adds another.
 - **Restarts**: a client that fails to start is dropped, so **SSL: Restart
   Language Server** or **Retry** creates a fresh one.
 
