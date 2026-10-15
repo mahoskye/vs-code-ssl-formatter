@@ -410,12 +410,12 @@ describe('SSL Hover Provider - Comment Exclusion (Bug #21)', () => {
 	it('should not provide hover for parentheses content inside comments', () => {
 		const code = `/*
 Parameters:
-    bLog - Whether to log operations (.T. or .F.)
+    bVerbose - Whether to print details (.T. or .F.)
 ;`;
 		const doc = createDocument(code);
 
 		// Position of ".T." inside comment
-		const position = new MockPosition(2, 35);
+		const position = new MockPosition(2, 42);
 
 		const hover = hoverProvider.provideHover(doc as any, position as any, null as any);
 

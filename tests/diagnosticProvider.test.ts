@@ -69,15 +69,15 @@ sQuery := "SELECT * FROM table WHERE field = ?Unknown?";
 
 	it('validates SQL params on all lines of multi-line SQL statements', () => {
 		const diagnostics = collectDiagnostics(`:PROCEDURE Example;
-:DECLARE sOrdNo, nTestCode;
-SqlExecute("Update RESULTS set RETESTNO = 1, NUMRES = NULL,
-                               RUNNO = NULL, S = ?Logged?, ORIGSTS = 'N'
-            where ORDNO = ?sOrdNo? and TESTCODE = ?nTestCode?");
+:DECLARE sBatchId, nStepNo;
+SqlExecute("Update WIDGETS set COLOR = 'red', SIZE = NULL,
+                               WEIGHT = NULL, STATE = ?Pending?, FLAG = 'N'
+            where BATCHID = ?sBatchId? and STEPNO = ?nStepNo?");
 :ENDPROC;`);
 		const sqlDiagnostics = diagnostics.filter((diag: any) => diag.code === 'ssl-invalid-sql-param');
-		// ?Logged? should be flagged as undefined on line 2 (inside the multi-line SQL)
+		// ?Pending? should be flagged as undefined on line 2 (inside the multi-line SQL)
 		expect(sqlDiagnostics.length).to.equal(1);
-		expect(sqlDiagnostics[0].message).to.include('Logged');
+		expect(sqlDiagnostics[0].message).to.include('Pending');
 	});
 });
 
@@ -512,7 +512,7 @@ sValue := "test";
 		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
 /*
 Description: This script does something
-Note: REP ; is a part of the key on the ORDTASK table.
+Note: the ; in BIN_KEY is part of the lookup key.
 */;
 :ENDPROC;`);
 		const commentDiagnostics = diagnostics.filter((diag: any) =>
@@ -522,9 +522,9 @@ Note: REP ; is a part of the key on the ORDTASK table.
 
 	it('errors on semicolon in middle of multi-line comment documentation', () => {
 		const diagnostics = collectDiagnostics(`/*
-Description: This script adds a QC sample
-Parameter 1: EQID - equipment id
-Return: Fixed RESULTS; cup number update also searches on ORDTASK.REP.
+Description: This script totals the widget counts
+Parameter 1: sBin - bin identifier
+Return: The total; empty bins count as zero.
 */;`);
 		const commentDiagnostics = diagnostics.filter((diag: any) =>
 			diag.code === 'ssl-comment-text-after-terminator');
@@ -620,9 +620,9 @@ SQLExecute("SELECT ?sProperVar?");
 
 	it('handles multiple dynamic assignments in same procedure', () => {
 		const diagnostics = collectDiagnostics(`:PROCEDURE Test;
-sDebugAddedQCOrders := LimsString(ADDEDQCORDERS);
-sDebugRunArray := LimsString(RUNARRAY);
-SQLExecute("INSERT INTO usgs_debug VALUES (?sDebugAddedQCOrders?, ?sDebugRunArray?)");
+sDebugFirst := LimsString(FIRSTLIST);
+sDebugSecond := LimsString(SECONDLIST);
+SQLExecute("INSERT INTO debug_log VALUES (?sDebugFirst?, ?sDebugSecond?)");
 :ENDPROC;`);
 		const sqlParamErrors = diagnostics.filter((diag: any) =>
 			diag.code === 'ssl-invalid-sql-param');
