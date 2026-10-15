@@ -1,6 +1,6 @@
 # Bundled language server
 
-> **Bundled version:** `starlims-lsp` v0.28.0 (built 2026-10-15). Run `./starlims-lsp-<platform>-<arch> --version` to confirm. Source: https://github.com/mahoskye/starlims-lsp.
+> **Bundled version:** `starlims-lsp` v0.28.1 (built 2026-10-15). Run `./starlims-lsp-<platform>-<arch> --version` to confirm. Source: https://github.com/mahoskye/starlims-lsp.
 
 This folder holds the [starlims-lsp](https://github.com/mahoskye/starlims-lsp)
 language server that the extension starts for SSL files. Each Marketplace
