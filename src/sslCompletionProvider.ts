@@ -189,14 +189,6 @@ export class SSLCompletionProvider implements vscode.CompletionItemProvider {
 				currentClass = classMatch[1];
 				continue;
 			}
-			if (/^\s*:ENDCLASS/i.test(codeLine)) {
-				// Should not happen if strictly one class per file to end, but if user types it, ignore or treat as end?
-				// User says "class declarations to the end of file". 
-				// So we generally assume class continues.
-				// However, maintaining ability to break out if user explicitly types invalid keyword might be good/bad?
-				// Let's remove it as it's invalid.
-				// currentClass = null; 
-			}
 
 			// 3. Variable Instantiation / Assignment
 			// Builtin: var := Class{}
