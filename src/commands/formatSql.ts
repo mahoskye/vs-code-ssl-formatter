@@ -4,13 +4,13 @@ import { SqlFormatter, SqlFormattingOptions } from "../formatting/sqlFormatter";
 import { SqlLexer } from "../parsing/sqlLexer";
 import { detectSqlContext, findSqlStringInLine, looksLikeSql } from "../parsing/sqlContext";
 import { formatSqlWithStyleImpl, SqlFormattingStyle } from "../formatting/legacySqlFormatter";
+import { replaceRetiredValue } from "../utils/settingsMigration";
 
 /**
  * Style display names for the picker
  */
 const STYLE_DISPLAY_NAMES: Record<SqlFormattingStyle, string> = {
 	"standard": "Standard - Simple clause breaks",
-	"compact": "Compact - Single-line clauses",
 	"canonicalCompact": "Canonical Compact - Hanging operators + JOIN breaks",
 	"expanded": "Expanded - Vertical columns",
 	"hangingOperators": "Hanging Operators - AND/OR at line start",
@@ -26,10 +26,10 @@ export function registerFormatSqlCommand(context: vscode.ExtensionContext): void
 	// Main command - uses default style from config
 	const formatSqlCommand = vscode.commands.registerCommand("ssl.formatSql", async () => {
 		const config = vscode.workspace.getConfiguration("ssl");
-		const defaultStyle = config.get<SqlFormattingStyle>(
+		const defaultStyle = replaceRetiredValue("format.sql.style", config.get<SqlFormattingStyle>(
 			CONFIG_KEYS.FORMAT_SQL_STYLE,
 			CONFIG_DEFAULTS[CONFIG_KEYS.FORMAT_SQL_STYLE] as SqlFormattingStyle
-		);
+		));
 		await formatSqlWithStyle(defaultStyle);
 	});
 
@@ -37,7 +37,6 @@ export function registerFormatSqlCommand(context: vscode.ExtensionContext): void
 	const formatSqlPickStyleCommand = vscode.commands.registerCommand("ssl.formatSqlPickStyle", async () => {
 		const styles: { label: string; style: SqlFormattingStyle; description: string }[] = [
 			{ label: "$(check) Standard", style: "standard", description: "Simple clause breaks per style guide" },
-			{ label: "$(list-flat) Compact", style: "compact", description: "Single-line clauses, compact SELECT" },
 			{ label: "$(pulse) Canonical Compact", style: "canonicalCompact", description: "Balanced formatting with indented AND/OR" },
 			{ label: "$(list-tree) Expanded", style: "expanded", description: "Multi-line SELECT with vertical columns" }
 		];
@@ -163,7 +162,7 @@ async function formatSqlWithStyle(style: SqlFormattingStyle): Promise<void> {
 	let formattedSql: string;
 
 	// Use LSP-aligned formatter for supported styles
-	if (style === "standard" || style === "canonicalCompact" || style === "compact" || style === "expanded") {
+	if (style === "standard" || style === "canonicalCompact" || style === "expanded") {
 		const options: SqlFormattingOptions = {
 			wrapLength: wrapLength,
 			insertSpaces: editor.options.insertSpaces as boolean, // respect editor settings

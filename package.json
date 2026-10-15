@@ -189,17 +189,15 @@
                     "enum": [
                         "standard",
                         "canonicalCompact",
-                        "compact",
                         "expanded"
                     ],
                     "enumDescriptions": [
                         "Standard - Simple clause breaks, wraps long lines at ssl.format.wrapLength",
                         "Canonical Compact - Balanced formatting with indented AND/OR and smart wrapping (default, per official style guide)",
-                        "Compact - Deprecated: treated as an alias for canonicalCompact by the LSP formatter",
                         "Expanded - Maximum readability, each column/condition on own line"
                     ],
                     "default": "canonicalCompact",
-                    "description": "SQL formatting style. 'canonicalCompact' follows the official STARLIMS Style Guide. 'compact' is retired and accepted as a deprecated alias for canonicalCompact."
+                    "description": "SQL formatting style. 'canonicalCompact' follows the official STARLIMS Style Guide. A stored 'compact' (retired) is migrated to 'canonicalCompact'."
                 },
                 "ssl.documentNamespaces": {
                     "type": "object",

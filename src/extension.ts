@@ -25,6 +25,7 @@ import { startClient, stopClient, restartClient, isClientRunning } from "./lspCl
 import { loadInventory, getInventorySourceVersion } from "./utils/inventory";
 import { registerStatusBar, refreshStatusBar } from "./sslStatusBar";
 import { registerBlockCloser } from "./sslBlockCloser";
+import { migrateRetiredSettings } from "./utils/settingsMigration";
 
 // Track if LSP is active for this session
 let lspActive = false;
@@ -39,6 +40,8 @@ export async function activate(context: vscode.ExtensionContext) {
     // Initialize logger
     Logger.initialize(context);
     Logger.info("SSL extension is now active!");
+
+    await migrateRetiredSettings();
 
     const config = vscode.workspace.getConfiguration("ssl");
     const lspEnabled = config.get<boolean>("languageServer.enabled", true);
