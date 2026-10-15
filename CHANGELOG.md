@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.2] - 2026-10-15
+
+Bundles **starlims-lsp v0.28.2**, a follow-up formatting fix. Nothing changes
+in settings or diagnostics.
+
+### Fixed
+- **A stray closing `}`, `)` or `]` no longer gets a `;`.** In a C-style
+  block saved as a server script, the `;` made the next line a statement of
+  its own, so formatting added an error. The line after a stray closer is
+  now left as written when it does not parse (starlims-lsp#355, #129).
+- **Range formatting a keyword line after code that does not parse**
+  (`:ENDPROC`, `:ELSE` and so on) now gives the same result as a full format.
+
+### Maintenance
+- The corpus baseline is re-stamped for v0.28.2. Diagnostic counts are
+  unchanged, and no corpus file gains errors from formatting any more, so
+  the baseline drops its `filesGainingErrors` entry.
+
 ## [1.25.1] - 2026-10-14
 
 Bundles **starlims-lsp v0.28.1**, a formatting fix. Nothing changes in
@@ -1760,7 +1778,8 @@ For issues, feature requests, or questions:
 ---
 
 <!-- Release links. Versions without one were never tagged: 1.20.0, 1.14.0, 1.9.1, 1.8.0, 1.7.0, 1.6.0, 1.5.1, 1.5.0, 1.4.0, 1.3.1, 1.3.0, 1.2.5, 1.1.0, 0.4.0, 0.1.0. -->
-[Unreleased]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.25.1...HEAD
+[Unreleased]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.25.2...HEAD
+[1.25.2]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.25.1...v1.25.2
 [1.25.1]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.25.0...v1.25.1
 [1.25.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.24.0...v1.25.0
 [1.24.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.23.0...v1.24.0

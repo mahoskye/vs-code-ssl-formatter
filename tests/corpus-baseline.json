@@ -1,8 +1,7 @@
 {
-    "lspVersion": "0.28.1",
+    "lspVersion": "0.28.2",
     "corpus": "starlims-corpus/script-codebase",
     "corpusFiles": 10170,
-    "filesGainingErrors": 1,
     "totals": {
         "warning": 5355,
         "hint": 1721,
