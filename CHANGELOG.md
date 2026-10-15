@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **The corpus harness (`npm run test:corpus`) defaults to the canonical
+  corpus**, `starlims-corpus/script-codebase` checked out beside this
+  repository, instead of the older `misc-test-files` snapshot. The baseline
+  records which corpus produced it, and a run against a different one is
+  reported as not comparable. The baseline also records `filesGainingErrors`,
+  a count of files that formatting is known to give more errors. It is 2 with
+  starlims-lsp v0.28.0 (mahoskye/starlims-lsp#351), and the check fails only
+  if that number changes (#110).
+- **Test fixtures are synthetic.** A handful of unit-test fixtures carried
+  text from real deployments. They are rewritten with made-up names, and
+  `docs/CORPUS_TESTING.md` states the rule (#110).
+
 ### Fixed
 - **Pressing Enter after `:CLASS Name;` no longer inserts `:ENDCLASS;`.**
   SSL has no `:ENDCLASS` keyword: a class runs to the end of its file, and

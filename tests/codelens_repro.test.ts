@@ -6,12 +6,12 @@ describe('CodeLens Provider Tests', () => {
     it('Detects DoProc references strings even with SSL comments', async () => {
         const text = `
 /* This is an SSL comment;
-:PROCEDURE CheckCalculations;
+:PROCEDURE TallyWidgets;
 :ENDPROC;
 
 /* Another SSL comment;
 :PROCEDURE Main;
-    DoProc("CheckCalculations");
+    DoProc("TallyWidgets");
 :ENDPROC;
 `;
         const document = await vscode.workspace.openTextDocument({ content: text, language: 'ssl' });
@@ -20,13 +20,13 @@ describe('CodeLens Provider Tests', () => {
 
         assert.strictEqual(codeLenses.length, 2, 'Should find 2 procedures');
 
-        // Find CheckCalculations lens at line 2
-        const checkCalcLens = codeLenses.find(l => l.range.start.line === 2);
+        // Find TallyWidgets lens at line 2
+        const tallyLens = codeLenses.find(l => l.range.start.line === 2);
 
-        if (checkCalcLens) {
-            assert.strictEqual(checkCalcLens.command?.title, '1 reference', 'Should count DoProc string as reference');
+        if (tallyLens) {
+            assert.strictEqual(tallyLens.command?.title, '1 reference', 'Should count DoProc string as reference');
         } else {
-            assert.fail('Could not find CodeLens for CheckCalculations');
+            assert.fail('Could not find CodeLens for TallyWidgets');
         }
     });
 });

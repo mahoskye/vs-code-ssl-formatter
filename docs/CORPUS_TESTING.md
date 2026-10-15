@@ -13,8 +13,11 @@ This is **opt-in and local**. It is deliberately not wired into `npm test` or
 CI, because the corpus lives in a separate repository of real customer scripts.
 
 > **Never copy corpus files, diffs, or excerpts into this repository.** They
-> contain customer names, ticket numbers, and site-specific logic. Anything
-> promoted into `tests/fixtures/` must be rewritten and sanitized first.
+> contain customer names, ticket numbers, and site-specific logic. This
+> repository is public, so every test fixture is written synthetically: no
+> identifiers, table or column names, comments or other text taken from a
+> real deployment, edited or not. Only aggregate counts (the baseline below)
+> may come from the corpus.
 
 ## Running it
 
@@ -22,8 +25,14 @@ CI, because the corpus lives in a separate repository of real customer scripts.
 npm run test:corpus
 ```
 
-The corpus defaults to a sibling `../misc-test-files` directory. Point it
-elsewhere with `SSL_CORPUS`:
+The corpus defaults to `../starlims-corpus/script-codebase`: the
+`script-codebase/` tree of the private `starlims-corpus` repository, checked
+out beside this one. It is the canonical real-world corpus for the STARLIMS
+projects: a full production export (about 10,000 server scripts and data
+sources), larger than the older `misc-test-files` snapshot, and the corpus the
+classification and contract tooling works from. Use it so baseline counts stay
+comparable from one bundle bump to the next. Point the harness elsewhere with
+`SSL_CORPUS`:
 
 ```bash
 SSL_CORPUS=/path/to/corpus npm run test:corpus
@@ -54,19 +63,31 @@ setup problem (missing binary, `SSL_CORPUS` pointing nowhere).
 
 ## The baseline
 
-`tests/corpus-baseline.json` records the LSP version, the corpus file count,
-and diagnostic counts per rule slug:
+`tests/corpus-baseline.json` records the LSP version, which corpus produced
+it, the corpus file count, and diagnostic counts per rule slug:
 
 ```json
 {
-    "lspVersion": "0.18.0",
-    "corpusFiles": 6228,
-    "totals": { "error": 119, "warning": 7485, "hint": 1190 },
+    "lspVersion": "0.28.0",
+    "corpus": "starlims-corpus/script-codebase",
+    "corpusFiles": 10170,
+    "filesGainingErrors": 2,
+    "totals": { "warning": 5355, "hint": 1721, "error": 325 },
     "codes": {
-        "sql_injection": { "warning": 1331 }
+        "sql_injection": { "warning": 3022 }
     }
 }
 ```
+
+`corpus` is the corpus's path relative to the directory holding this checkout,
+or `SSL_CORPUS` for one outside it, so no local path is recorded. Everything in
+the file is an aggregate count; it never names a file.
+
+`filesGainingErrors` accepts a known server defect that makes formatting add
+errors to some files. The check then fails only when that number changes, and
+still lists the files on every run. With v0.28.0 it is 2: raw SQL written
+outside any string gets a `;` per line (mahoskye/starlims-lsp#351). Drop the
+field once the server is fixed.
 
 Regenerate it after reviewing a change:
 
@@ -74,9 +95,9 @@ Regenerate it after reviewing a change:
 npm run test:corpus:update
 ```
 
-The baseline is tied to a specific corpus. If the file count differs, the run
-fails with a re-baseline prompt rather than reporting misleading deltas —
-counts from different corpora are not comparable.
+The baseline is tied to a specific corpus. If the corpus or its file count
+differs, the run fails with a re-baseline prompt rather than reporting
+misleading deltas — counts from different corpora are not comparable.
 
 ## Using it for an LSP bundle bump
 
