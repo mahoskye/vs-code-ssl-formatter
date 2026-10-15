@@ -706,6 +706,8 @@
         "check-types": "tsc -p ./ --noEmit",
         "compile": "tsc -p ./ && node -e \"require('fs').mkdirSync('out',{recursive:true});require('fs').writeFileSync('out/package.json',JSON.stringify({type:'commonjs'},null,2))\"",
         "generate:slugs": "node scripts/generate-diagnostic-slugs.mjs",
+        "sync:grammar": "node scripts/sync-grammar.mjs",
+        "check:grammar": "node scripts/sync-grammar.mjs --check",
         "watch": "tsc -watch -p ./",
         "pretest": "npm run compile && npm run lint",
         "lint": "eslint src --ext ts",
@@ -742,6 +744,8 @@
         "glob": "^11.0.0",
         "mocha": "^10.8.2",
         "ts-node": "^10.9.2",
-        "typescript": "~5.1.6"
+        "typescript": "~5.1.6",
+        "vscode-oniguruma": "^2.0.1",
+        "vscode-textmate": "^9.3.2"
     }
 }
