@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.25.0] - 2026-10-14
+
+The extension becomes a thin client for the bundled starlims-lsp server
+(still v0.28.0). Native fallback mode is removed, syntax highlighting now
+comes from ssl-style-guide's canonical grammar, and several quick fixes that
+had stopped working are fixed.
+
+**Before upgrading:** 17 settings that only affected fallback mode are
+removed, among them `ssl.languageServer.enabled`, `ssl.strictStyleGuideMode`,
+`ssl.security.*`, `ssl.intellisense.customFunctions` and
+`ssl.documentNamespaces` (see Removed). VS Code shows any you had set as
+unknown, and they can be deleted. A stored `ssl.format.sql.style: "compact"`
+is migrated to `canonicalCompact` automatically.
+
 ### Changed
 - **The corpus harness (`npm run test:corpus`) defaults to the canonical
   corpus**, `starlims-corpus/script-codebase` checked out beside this
@@ -1728,7 +1742,8 @@ For issues, feature requests, or questions:
 ---
 
 <!-- Release links. Versions without one were never tagged: 1.20.0, 1.14.0, 1.9.1, 1.8.0, 1.7.0, 1.6.0, 1.5.1, 1.5.0, 1.4.0, 1.3.1, 1.3.0, 1.2.5, 1.1.0, 0.4.0, 0.1.0. -->
-[Unreleased]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.24.0...HEAD
+[Unreleased]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.25.0...HEAD
+[1.25.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.24.0...v1.25.0
 [1.24.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.23.0...v1.24.0
 [1.23.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.22.0...v1.23.0
 [1.22.0]: https://github.com/mahoskye/vs-code-ssl-formatter/compare/v1.21.0...v1.22.0
