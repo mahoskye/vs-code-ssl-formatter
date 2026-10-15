@@ -1,29 +1,31 @@
 {
     "lspVersion": "0.28.0",
-    "corpusFiles": 6228,
+    "corpus": "starlims-corpus/script-codebase",
+    "corpusFiles": 10170,
+    "filesGainingErrors": 2,
     "totals": {
-        "warning": 3431,
-        "hint": 1168,
-        "error": 236
+        "warning": 5355,
+        "hint": 1721,
+        "error": 325
     },
     "codes": {
         "arithmetic_type_mismatch": {
-            "warning": 10
+            "warning": 11
         },
         "assignment_in_condition": {
             "warning": 3
         },
         "bare_logical_operator": {
-            "error": 5
+            "error": 18
         },
         "builtin_excess_arguments": {
-            "warning": 97
+            "warning": 114
         },
         "class_name_collision": {
             "warning": 1
         },
         "comment_swallows_code": {
-            "warning": 248
+            "warning": 317
         },
         "comment_termination": {
             "error": 1
@@ -37,37 +39,47 @@
         "datasource_undeclared_placeholder": {
             "warning": 1
         },
+        "declare_initializer": {
+            "error": 1
+        },
         "default_after_parameters": {
-            "error": 35
+            "error": 40
         },
         "default_on_declare_line": {
             "error": 35
         },
         "deprecated_keyword": {
-            "warning": 127
+            "warning": 207
         },
         "direct_procedure_call": {
-            "warning": 192
+            "warning": 313,
+            "error": 1
         },
         "dot_property_access": {
-            "error": 19
+            "error": 65
         },
         "equals_empty_string": {
-            "warning": 2
+            "warning": 3
         },
         "exitcase_after_return": {
-            "hint": 152
+            "hint": 189
         },
         "for_numeric_values": {
-            "warning": 2
+            "warning": 3
         },
         "global_assignment": {
-            "warning": 16
+            "warning": 33
         },
         "include_in_procedure": {
             "warning": 1
         },
+        "inline_default_outside_datasource": {
+            "error": 2
+        },
         "invalid_limstypeex_comparison": {
+            "error": 3
+        },
+        "invalid_operator_sequence": {
             "error": 2
         },
         "me_outside_class": {
@@ -75,16 +87,16 @@
             "warning": 52
         },
         "missing_otherwise": {
-            "hint": 372
+            "hint": 613
         },
         "mixed_error_handling_families": {
-            "warning": 7
+            "warning": 10
         },
         "mixed_type_operator": {
-            "warning": 108
+            "warning": 156
         },
         "named_sql_param_unsupported": {
-            "error": 2
+            "error": 4
         },
         "nil_method_call": {
             "warning": 1
@@ -99,23 +111,23 @@
             "warning": 3
         },
         "parenthesize_negated_comparison": {
-            "error": 4,
+            "error": 8,
             "warning": 1
         },
         "prefer_exitcase": {
-            "warning": 840
+            "warning": 1023
         },
         "raiseerror_in_catch": {
-            "warning": 27
+            "warning": 34
         },
         "redeclare_is_noop": {
-            "hint": 634
+            "hint": 902
         },
         "region_end_mismatch": {
-            "hint": 10
+            "hint": 17
         },
         "sql_injection": {
-            "warning": 1652
+            "warning": 3022
         },
         "udobject_array_in_clause": {
             "warning": 1
@@ -124,25 +136,25 @@
             "error": 2
         },
         "unclosed_delimiter": {
-            "error": 6
+            "error": 7
         },
         "unexpected_token": {
-            "error": 4
+            "error": 12
         },
         "unknown_token": {
-            "error": 70
+            "error": 72
         },
         "unmatched_block_end": {
             "error": 2
         },
         "unmatched_delimiter": {
-            "error": 1
+            "error": 2
         },
         "unqualified_field_assignment": {
-            "warning": 15
+            "warning": 19
         },
         "unqualified_field_read": {
-            "warning": 24
+            "warning": 26
         },
         "unterminated_string": {
             "error": 1

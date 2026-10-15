@@ -8,14 +8,19 @@
  *   1. Formatting never fails.
  *   2. Formatting is idempotent — a second pass changes nothing.
  *   3. Formatting never introduces diagnostics — no file may come out of the
- *      formatter with more errors than it went in with.
+ *      formatter with more errors than it went in with. A known server defect
+ *      can be accepted by recording its file count in the baseline
+ *      (`filesGainingErrors`); the check then fails only when that count
+ *      changes, and still lists the files on every run.
  *
  * It then diffs the corpus-wide diagnostic counts (by rule slug) against
  * tests/corpus-baseline.json, which is how an LSP bundle bump gets reviewed:
  * the deltas tell you exactly which rules changed behaviour on real code.
  *
- * Opt-in. Not part of `npm test` or CI — the corpus is a separate repository
- * of real customer scripts and must never be copied into this one.
+ * Opt-in. Not part of `npm test` or CI — the corpus is a separate, private
+ * repository of real customer scripts and must never be copied into this one.
+ * The canonical corpus is starlims-corpus's script-codebase/, checked out
+ * beside this repository; the baseline records which corpus it came from.
  *
  *   bun scripts/corpus-test.ts                  # check against the baseline
  *   bun scripts/corpus-test.ts --update-baseline
@@ -40,6 +45,8 @@ import { fileURLToPath } from "url";
 // without pulling in @types/bun.
 const PROJECT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BASELINE_PATH = path.join(PROJECT_ROOT, "tests", "corpus-baseline.json");
+/** The canonical corpus, relative to the directory holding this checkout. */
+const CANONICAL_CORPUS = "starlims-corpus/script-codebase";
 const SSL_EXTENSIONS = [".ssl", ".srvscr", ".ds", ".ssl.txt", ".ds.txt"];
 
 /** How many paths to hand a single binary invocation. */
@@ -68,7 +75,18 @@ interface ValidateResult {
 
 interface Baseline {
     lspVersion: string;
+    /**
+     * Which corpus produced the counts: its path relative to the directory
+     * holding this checkout, or "SSL_CORPUS" for one outside it. Never an
+     * absolute path, so no local layout leaks into the baseline.
+     */
+    corpus?: string;
     corpusFiles: number;
+    /**
+     * Files that come out of the formatter with more errors than they went in
+     * with: a known server defect accepted until it is fixed. Absent means 0.
+     */
+    filesGainingErrors?: number;
     totals: Partial<Record<Severity, number>>;
     codes: Record<string, Partial<Record<Severity, number>>>;
 }
@@ -104,19 +122,27 @@ function serverBinaryName(): string {
 function resolveCorpus(): string {
     // An empty SSL_CORPUS counts as unset rather than as a path to nowhere.
     const explicit = process.env.SSL_CORPUS?.trim() || undefined;
-    const candidate = explicit ?? path.resolve(PROJECT_ROOT, "..", "misc-test-files");
+    const candidate = explicit ?? path.resolve(PROJECT_ROOT, "..", CANONICAL_CORPUS);
 
     if (!existsSync(candidate)) {
         if (explicit) {
             setupError(`SSL_CORPUS points at ${explicit}, which does not exist.`);
         }
         console.log(
-            "Corpus not found — skipping. Set SSL_CORPUS to a directory of real SSL " +
-                `files, or place one at ${candidate}.`
+            "Corpus not found — skipping. Check out starlims-corpus beside this " +
+                `repository (expected at ${candidate}), or set SSL_CORPUS.`
         );
         process.exit(0);
     }
     return path.resolve(candidate);
+}
+
+/** The baseline's label for a corpus root (see Baseline.corpus). */
+function corpusLabel(corpusRoot: string): string {
+    const relative = path.relative(path.resolve(PROJECT_ROOT, ".."), corpusRoot);
+    return relative && !relative.startsWith("..") && !path.isAbsolute(relative)
+        ? relative.split(path.sep).join("/")
+        : "SSL_CORPUS";
 }
 
 function collectSslFiles(root: string): string[] {
@@ -237,7 +263,9 @@ function severityCounts(result: ValidateResult): Record<string, number> {
 
 function buildBaseline(
     lspVersion: string,
-    results: ValidateResult[]
+    corpus: string,
+    results: ValidateResult[],
+    filesGainingErrors: number
 ): Baseline {
     const totals: Partial<Record<Severity, number>> = {};
     const codes: Record<string, Partial<Record<Severity, number>>> = {};
@@ -259,7 +287,14 @@ function buildBaseline(
         sortedCodes[code] = codes[code];
     }
 
-    return { lspVersion, corpusFiles: results.length, totals, codes: sortedCodes };
+    return {
+        lspVersion,
+        corpus,
+        corpusFiles: results.length,
+        ...(filesGainingErrors > 0 ? { filesGainingErrors } : {}),
+        totals,
+        codes: sortedCodes,
+    };
 }
 
 function countOf(bucket: Partial<Record<Severity, number>> | undefined, severity: string): number {
@@ -359,9 +394,21 @@ async function main() {
                 );
             }
         }
+        const knownRegressions = existsSync(BASELINE_PATH)
+            ? ((JSON.parse(await readFile(BASELINE_PATH, "utf8")) as Baseline).filesGainingErrors ?? 0)
+            : 0;
         if (regressions.length > 0) {
-            failures++;
-            console.error(`\n✗ formatting introduced errors in ${regressions.length} file(s):`);
+            const accepted = !UPDATE_BASELINE && regressions.length === knownRegressions;
+            if (!accepted && !UPDATE_BASELINE) {
+                failures++;
+            }
+            const mark = accepted || UPDATE_BASELINE ? "!" : "✗";
+            const note = accepted
+                ? " (matches the baseline's known count)"
+                : UPDATE_BASELINE
+                  ? " (recorded in the baseline as a known defect)"
+                  : ` (baseline expects ${knownRegressions})`;
+            console.error(`\n${mark} formatting introduced errors in ${regressions.length} file(s)${note}:`);
             for (const line of regressions.slice(0, 20)) {
                 console.error(`    ${line}`);
             }
@@ -370,10 +417,17 @@ async function main() {
             }
         } else {
             console.log("  ✓ no file gained errors from formatting");
+            if (knownRegressions > 0 && !UPDATE_BASELINE) {
+                failures++;
+                console.error(
+                    `\n✗ The baseline expects ${knownRegressions} file(s) to gain errors, and none did. ` +
+                        "If the server fixed it, re-baseline with `npm run test:corpus:update`."
+                );
+            }
         }
 
         // Baseline: diagnostic counts on the unformatted corpus.
-        const actual = buildBaseline(lspVersion, before);
+        const actual = buildBaseline(lspVersion, corpusLabel(corpusRoot), before, regressions.length);
 
         if (UPDATE_BASELINE) {
             await writeFile(BASELINE_PATH, JSON.stringify(actual, null, 4) + "\n");
@@ -392,7 +446,14 @@ async function main() {
         } else {
             const expected: Baseline = JSON.parse(await readFile(BASELINE_PATH, "utf8"));
 
-            if (expected.corpusFiles !== actual.corpusFiles) {
+            if ((expected.corpus ?? "unrecorded") !== actual.corpus) {
+                failures++;
+                console.error(
+                    `\n✗ The baseline came from a different corpus (${expected.corpus ?? "unrecorded"}) ` +
+                        `than this run (${actual.corpus}), so diagnostic counts are not comparable. ` +
+                        `Run against ${CANONICAL_CORPUS}, or re-baseline with \`npm run test:corpus:update\`.`
+                );
+            } else if (expected.corpusFiles !== actual.corpusFiles) {
                 failures++;
                 console.error(
                     `\n✗ Corpus changed size (${expected.corpusFiles} → ${actual.corpusFiles} files), ` +
