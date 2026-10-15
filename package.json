@@ -51,18 +51,6 @@
         "configuration": {
             "title": "STARLIMS Scripting Language (SSL)",
             "properties": {
-                "ssl.strictStyleGuideMode": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Enable stricter style guide enforcement (converts warnings to errors)"
-                },
-                "ssl.maxNumberOfProblems": {
-                    "type": "number",
-                    "default": 100,
-                    "minimum": 10,
-                    "maximum": 1000,
-                    "description": "Maximum number of diagnostics to report per file (native providers only; LSP uses its own limit)"
-                },
                 "ssl.globals": {
                     "type": "array",
                     "default": [],
@@ -133,7 +121,7 @@
                 "ssl.format.formatOnSave": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Automatically format document when saving (native providers only; when ssl.languageServer.enabled is true, use editor.formatOnSave instead)"
+                    "description": "Format SSL documents with the language server when saving. Equivalent to editor.formatOnSave for SSL files."
                 },
                 "ssl.format.trimTrailingWhitespace": {
                     "type": "boolean",
@@ -199,14 +187,6 @@
                     "default": "canonicalCompact",
                     "description": "SQL formatting style. 'canonicalCompact' follows the official STARLIMS Style Guide. A stored 'compact' (retired) is migrated to 'canonicalCompact'."
                 },
-                "ssl.documentNamespaces": {
-                    "type": "object",
-                    "default": {},
-                    "description": "Map namespace prefixes used in ExecFunction/DoProc to workspace-relative folders",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
                 "ssl.naming.hungarianNotation.enabled": {
                     "type": "boolean",
                     "default": true,
@@ -216,16 +196,6 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Warn when a variable's Hungarian prefix promises one type but its assigned expression produces another (diagnostic hungarian_type_mismatch), e.g. nCode := SubStr(sText, 1, 4). Independent of ssl.naming.hungarianNotation.enabled: this reports a name that contradicts its own prefix, and only ever inspects names that already carry one, so it stays quiet on code that does not use the convention."
-                },
-                "ssl.naming.hungarianNotation.severity": {
-                    "type": "string",
-                    "enum": [
-                        "warn",
-                        "error",
-                        "info"
-                    ],
-                    "default": "warn",
-                    "description": "Severity level for Hungarian notation violations (native providers only; LSP uses its own severity)"
                 },
                 "ssl.naming.hungarianNotation.prefixes": {
                     "type": "array",
@@ -457,37 +427,10 @@
                     "maximum": 10,
                     "description": "Maximum nesting level for control structures (0 = disabled)"
                 },
-                "ssl.styleGuide.maxParamsPerProcedure": {
-                    "type": "number",
-                    "default": 8,
-                    "minimum": 0,
-                    "maximum": 15,
-                    "description": "Maximum procedure parameter count (0 = disabled). Native providers only; LSP uses style guide thresholds (8 recommended, 20 warning)"
-                },
-                "ssl.security.preventSqlInjection": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Warn about non-parameterized SQL queries (native providers only; LSP always checks)"
-                },
-                "ssl.security.requireParameterizedQueries": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Require ?PARAM? placeholders in SQL passed to SQL helper functions (native providers only; LSP always checks)"
-                },
-                "ssl.intellisense.enabled": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Enable IntelliSense features"
-                },
                 "ssl.intellisense.codeLens.enabled": {
                     "type": "boolean",
                     "default": true,
                     "description": "Show CodeLens reference counts above procedures"
-                },
-                "ssl.intellisense.signatureHelp.enabled": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Show parameter hints while typing function calls (native providers only; when the language server is active, signature help is always available — use ssl.intellisense.signatureHelp.autoTrigger to control the popup)"
                 },
                 "ssl.intellisense.signatureHelp.autoTrigger": {
                     "type": "boolean",
@@ -499,126 +442,12 @@
                     "default": true,
                     "description": "Enable inlay hints for parameter names"
                 },
-                "ssl.intellisense.inlayHints.parameterNames": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Show parameter names as inlay hints in function calls"
-                },
                 "ssl.intellisense.inlayHints.minParameterCount": {
                     "type": "number",
                     "default": 2,
                     "minimum": 1,
                     "maximum": 10,
                     "description": "Minimum number of parameters a function must have before inlay hints are shown"
-                },
-                "ssl.intellisense.completion.enableKeywords": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Include STARLIMS keywords (e.g., :IF, :WHILE) in completion lists"
-                },
-                "ssl.intellisense.completion.enableBuiltinFunctions": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Include built-in functions (SQLExecute, RunSQL, etc.) in completion lists"
-                },
-                "ssl.intellisense.completion.enableBuiltinClasses": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Include built-in classes in completion lists"
-                },
-                "ssl.intellisense.completion.enableSnippets": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "Include STARLIMS code snippets (IF/ELSE, PROCEDURE, TRY/CATCH, etc.) in completion lists"
-                },
-                "ssl.intellisense.customFunctions": {
-                    "type": "array",
-                    "default": [],
-                    "markdownDescription": "Add or override functions available to IntelliSense, diagnostics, and formatting. Entries with the same name as built-ins replace their metadata.",
-                    "items": {
-                        "type": "object",
-                        "required": [
-                            "name"
-                        ],
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "Function name (case-insensitive)"
-                            },
-                            "description": {
-                                "type": "string",
-                                "description": "Short description shown in completion details and hovers"
-                            },
-                            "params": {
-                                "type": "string",
-                                "description": "Parameter list, including parentheses (e.g., \"(value, options)\")"
-                            },
-                            "signature": {
-                                "type": "string",
-                                "description": "Full signature displayed in hovers"
-                            },
-                            "returnType": {
-                                "type": "string",
-                                "description": "Return type label shown in hover documentation"
-                            },
-                            "category": {
-                                "type": "string",
-                                "description": "Category label for the hover (e.g., \"Database Functions\")"
-                            },
-                            "untypedSignature": {
-                                "type": "string",
-                                "description": "Untyped signature variant to show alongside the main signature"
-                            }
-                        }
-                    }
-                },
-                "ssl.intellisense.customClasses": {
-                    "type": "array",
-                    "default": [],
-                    "markdownDescription": "Add or override built-in classes for IntelliSense and member completions. Entries with the same name as built-ins replace their metadata.",
-                    "items": {
-                        "type": "object",
-                        "required": [
-                            "name"
-                        ],
-                        "properties": {
-                            "name": {
-                                "type": "string",
-                                "description": "Class name"
-                            },
-                            "description": {
-                                "type": "string",
-                                "description": "Short description for completions and hovers"
-                            },
-                            "instantiation": {
-                                "type": "string",
-                                "description": "Instantiation example (defaults to Name{})"
-                            },
-                            "usage": {
-                                "type": "string",
-                                "description": "Sample usage shown in hover details"
-                            },
-                            "methods": {
-                                "type": "array",
-                                "description": "Method names exposed for member completion",
-                                "items": {
-                                    "type": "string"
-                                }
-                            },
-                            "properties": {
-                                "type": "array",
-                                "description": "Property names exposed for member completion",
-                                "items": {
-                                    "type": "string"
-                                }
-                            }
-                        }
-                    }
-                },
-                "ssl.languageServer.enabled": {
-                    "type": "boolean",
-                    "default": true,
-                    "markdownDescription": "Use the starlims-lsp language server for core features (completion, hover, definition, references, symbols, folding, signature help, formatting, diagnostics). When enabled, the native TypeScript providers for these features are disabled to avoid duplication."
                 },
                 "ssl.trace.server": {
                     "type": "string",
@@ -636,11 +465,6 @@
             {
                 "command": "ssl.toggleComment",
                 "title": "SSL: Toggle Comment",
-                "category": "SSL"
-            },
-            {
-                "command": "ssl.configureDocumentNamespaces",
-                "title": "SSL: Configure Document Namespaces",
                 "category": "SSL"
             },
             {
@@ -713,8 +537,6 @@
         "test:unit": "cross-env TS_NODE_PROJECT=tsconfig.tsnode.json NODE_OPTIONS=--no-deprecation node --import ./tests/register-loaders.mjs --experimental-specifier-resolution=node ./node_modules/mocha/bin/mocha.js \"tests/*.test.ts\"",
         "pretest:integration": "npm run bundle",
         "test:integration": "node ./out/tests/runTest.js",
-        "pretest:integration-fallback": "npm run bundle",
-        "test:integration-fallback": "node ./out/tests/runFallbackTest.js",
         "test:corpus": "bun scripts/corpus-test.ts",
         "test:corpus:update": "bun scripts/corpus-test.ts --update-baseline",
         "package": "vsce package",

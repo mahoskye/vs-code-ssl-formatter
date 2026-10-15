@@ -30,7 +30,6 @@ Len("test2");
         // would suppress hints for single-arg calls.
         const config = vscode.workspace.getConfiguration('ssl');
         await config.update('intellisense.inlayHints.enabled', true, vscode.ConfigurationTarget.Global);
-        await config.update('intellisense.inlayHints.parameterNames', true, vscode.ConfigurationTarget.Global);
         await config.update('intellisense.inlayHints.minParameterCount', 1, vscode.ConfigurationTarget.Global);
 
         // Wait for ready

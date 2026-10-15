@@ -240,8 +240,20 @@ export async function startClient(context: vscode.ExtensionContext): Promise<Lan
         })
     );
 
-    // Start the client
-    await client.start();
+    // Start the client. A client that failed to start is dropped, so a later
+    // start (the Retry action or the restart command) creates a fresh one.
+    try {
+        await client.start();
+    } catch (error) {
+        const failed = client;
+        client = undefined;
+        try {
+            await failed.dispose();
+        } catch {
+            // Already stopped; nothing to clean up.
+        }
+        throw error;
+    }
 
     return client;
 }
@@ -262,8 +274,13 @@ function sendConfigurationUpdate(): void {
  */
 export async function stopClient(): Promise<void> {
     if (client) {
-        await client.stop();
+        const stopping = client;
         client = undefined;
+        if (stopping.isRunning()) {
+            await stopping.stop();
+        } else {
+            await stopping.dispose().catch(() => undefined);
+        }
     }
 }
 
@@ -281,6 +298,13 @@ export async function restartClient(context: vscode.ExtensionContext): Promise<v
  */
 export function getClient(): LanguageClient | undefined {
     return client;
+}
+
+/**
+ * The running server's version, as it reports it in its initialize result.
+ */
+export function getServerVersion(): string | undefined {
+    return client?.initializeResult?.serverInfo?.version;
 }
 
 /**
