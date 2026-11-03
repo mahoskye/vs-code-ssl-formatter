@@ -68,10 +68,10 @@ it, the corpus file count, and diagnostic counts per rule slug:
 
 ```json
 {
-    "lspVersion": "0.28.2",
+    "lspVersion": "0.29.0",
     "corpus": "starlims-corpus/script-codebase",
     "corpusFiles": 10170,
-    "totals": { "warning": 5355, "hint": 1721, "error": 325 },
+    "totals": { "warning": 5385, "hint": 1721, "error": 325 },
     "codes": {
         "sql_injection": { "warning": 3022 }
     }

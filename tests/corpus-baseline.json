@@ -1,9 +1,9 @@
 {
-    "lspVersion": "0.28.2",
+    "lspVersion": "0.29.0",
     "corpus": "starlims-corpus/script-codebase",
     "corpusFiles": 10170,
     "totals": {
-        "warning": 5355,
+        "warning": 5385,
         "hint": 1721,
         "error": 325
     },
@@ -124,6 +124,9 @@
         },
         "region_end_mismatch": {
             "hint": 17
+        },
+        "script_size_ceiling": {
+            "warning": 30
         },
         "sql_injection": {
             "warning": 3022

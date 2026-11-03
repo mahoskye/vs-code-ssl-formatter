@@ -158,6 +158,7 @@ Open **Settings → Extensions → SSL**, or edit `settings.json`.
 | `ssl.diagnostics.maxProcedureCodeLines` | `80` | Code lines before `procedure_length_review` suggests a review; `0` disables. |
 | `ssl.diagnostics.maxScriptCodeLines` | `400` | Code lines before `script_size_review` suggests a review; `0` disables. |
 | `ssl.diagnostics.maxScriptProcedures` | `12` | Local procedures before `script_size_review` suggests a review; `0` disables. |
+| `ssl.diagnostics.maxScriptBytes` | `51200` | Bytes (line endings included) before `script_size_ceiling` warns that a file is over the size limit; `0` disables. |
 | `ssl.globals` | `[]` | Names always treated as declared globals. |
 | `ssl.naming.hungarianNotation.enabled` | `true` | Check Hungarian prefixes. |
 | `ssl.naming.hungarianNotation.checkTypes` | `true` | Warn when a prefix promises one type and the assigned value has another. |

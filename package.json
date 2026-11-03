@@ -3,7 +3,7 @@
     "type": "module",
     "displayName": "STARLIMS Scripting Language",
     "description": "Comprehensive language support for STARLIMS SSL: formatting, IntelliSense, diagnostics, and code quality tools",
-    "version": "1.25.2",
+    "version": "1.26.0",
     "engines": {
         "vscode": "^1.105.0"
     },
@@ -345,6 +345,7 @@
                             "return_in_finally",
                             "runsql_non_dml",
                             "scientific_notation",
+                            "script_size_ceiling",
                             "script_size_review",
                             "single_catch",
                             "single_finally",
@@ -420,6 +421,12 @@
                     "default": 12,
                     "minimum": 0,
                     "markdownDescription": "Flag a server script with more than this many local procedures as a prompt to review its size (`script_size_review`, info tier). `0` disables. Shown only with `#ssl.diagnostics.infoDiagnostics#` on or an explicit `#ssl.diagnostics.rules#` entry."
+                },
+                "ssl.diagnostics.maxScriptBytes": {
+                    "type": "number",
+                    "default": 51200,
+                    "minimum": 0,
+                    "markdownDescription": "Flag a file over this many bytes as past the size limit (`script_size_ceiling`, warning). Every server script, class and data source (SSL or SQL) is measured, line endings included, so a CRLF file counts one byte more per line than the same file with LF. `0` disables."
                 },
                 "ssl.styleGuide.limitBlockDepth": {
                     "type": "number",
