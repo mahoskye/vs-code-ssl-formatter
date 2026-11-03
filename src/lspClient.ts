@@ -139,7 +139,8 @@ function getSSLConfiguration(): object {
                 infoDiagnostics: config.get<boolean>('diagnostics.infoDiagnostics', false),
                 maxProcedureCodeLines: config.get<number>('diagnostics.maxProcedureCodeLines', 80),
                 maxScriptCodeLines: config.get<number>('diagnostics.maxScriptCodeLines', 400),
-                maxScriptProcedures: config.get<number>('diagnostics.maxScriptProcedures', 12)
+                maxScriptProcedures: config.get<number>('diagnostics.maxScriptProcedures', 12),
+                maxScriptBytes: config.get<number>('diagnostics.maxScriptBytes', 51200)
             },
             inlayHints: {
                 enabled: config.get<boolean>('intellisense.inlayHints.enabled', true),

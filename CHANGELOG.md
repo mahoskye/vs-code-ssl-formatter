@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.26.0] - 2026-11-03
+
+Bundles **starlims-lsp v0.29.0**, which adds a file size limit. One new
+diagnostic and one new setting; formatting is unchanged.
+
+### Added
+- **`script_size_ceiling` (warning)**: a file over 50 KB is past the limit
+  ssl-style-guide sets. Unlike `script_size_review`, every file is measured:
+  server scripts, class files and data sources (SSL or SQL), test scripts
+  included. The size is the file's bytes as the server receives it, line
+  endings included, so a CRLF file counts one byte more per line than the
+  same file with LF. It reports once, on line 1 (starlims-lsp#358, #131).
+- **`ssl.diagnostics.maxScriptBytes`** (default `51200`): the limit in bytes
+  for `script_size_ceiling`; `0` disables it. Turn the rule off as a whole
+  with `"script_size_ceiling": "off"` in `ssl.diagnostics.rules`, where its
+  slug now completes.
+
+### Changed
+- **`script_size_review` gives the style guide's new advice**: check the
+  script's responsibilities and move each one that stands alone into its
+  own script, in place of putting regions first. Thresholds and severity
+  are unchanged.
+- **Hover** carries the SSL reference's new caveats: `++` and `--` evaluate
+  left to right; string `-` trims only trailing spaces, not a trailing tab;
+  `.NOT.` binds before a comparison, so write `.NOT. (s = "AB")`; and
+  `.AND.` groups before `.OR.`.
+
+### Maintenance
+- The server advertises two custom requests, `ssl/syntaxTree` and
+  `ssl/callGraph`, under `capabilities.experimental.ssl`. The extension
+  does not use them.
+- The corpus baseline is re-stamped for v0.29.0: 30 files in the corpus are
+  over the limit and gain a `script_size_ceiling` warning. Every other count
+  is unchanged, formatting stays idempotent and adds no errors.
+
 ## [1.25.2] - 2026-10-15
 
 Bundles **starlims-lsp v0.28.2**, a follow-up formatting fix. Nothing changes
